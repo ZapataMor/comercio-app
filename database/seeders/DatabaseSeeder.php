@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -18,11 +17,7 @@ class DatabaseSeeder extends Seeder
         // Primero los roles, para poder asignarlos a los usuarios.
         $this->call(RoleSeeder::class);
 
-        $admin = User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
-
-        $admin->assignRole('administrador');
+        // Usuarios de prueba (uno por rol, contraseña conocida) para desarrollo.
+        $this->call(DemoUsersSeeder::class);
     }
 }

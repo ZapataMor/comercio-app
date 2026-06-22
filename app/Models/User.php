@@ -31,4 +31,12 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+    /**
+     * El negocio del usuario (cuando es comerciante).
+     */
+    public function negocio(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Negocio::class);
+    }
 }
