@@ -3,6 +3,8 @@
 @section('titulo', 'Explorar')
 
 @section('contenido')
+@include('cliente._buscador')
+
 <div class="mb-5">
     <h2 class="text-xl font-bold">Negocios disponibles</h2>
     <p class="text-slate-500 text-sm">Explora los comercios abiertos en Maicao.</p>

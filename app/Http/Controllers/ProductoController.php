@@ -137,7 +137,12 @@ class ProductoController extends Controller
         return [
             'nombre' => [$requerido, 'string', 'max:255'],
             'descripcion' => ['nullable', 'string'],
+            // El precio se entiende "por unidad_medida" (por unidad, por kg, por litro...).
             'precio' => [$requerido, 'numeric', 'min:0'],
+            // Cómo se selecciona la cantidad: cantidad | peso | volumen | longitud.
+            'tipo_venta' => ['sometimes', Rule::in(Producto::TIPOS_VENTA)],
+            // Etiqueta de la medida del precio: 'unidad', 'kg', 'litro', 'metro', 'combo'...
+            'unidad_medida' => ['sometimes', 'string', 'max:20'],
             'disponible' => ['sometimes', 'boolean'],
             'categoria_id' => [
                 'nullable',

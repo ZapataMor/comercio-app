@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Web\AdminController;
 use App\Http\Controllers\Web\AuthWebController;
 use App\Http\Controllers\Web\ClienteController;
 use App\Http\Controllers\Web\HomeController;
@@ -20,7 +21,16 @@ Route::get('/home', [HomeController::class, 'index'])->middleware('auth')->name(
 // --- Zona del CLIENTE (sesión + rol usuario) ---
 Route::middleware(['auth', 'role:usuario'])->group(function () {
     Route::get('/explorar', [ClienteController::class, 'explorar'])->name('explorar');
+    Route::get('/buscar', [ClienteController::class, 'buscar'])->name('buscar');
     Route::get('/explorar/{id}', [ClienteController::class, 'verNegocio'])->name('explorar.negocio');
+});
+
+// --- Zona del ADMINISTRADOR (sesión + rol administrador) ---
+Route::middleware(['auth', 'role:administrador'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/', [AdminController::class, 'index'])->name('panel');
+    Route::get('/usuarios', [AdminController::class, 'usuarios'])->name('usuarios');
+    Route::put('/usuarios/{usuario}/rol', [AdminController::class, 'updateRol'])->name('usuarios.rol');
+    Route::get('/negocios', [AdminController::class, 'negocios'])->name('negocios');
 });
 
 // --- Panel del comerciante (requiere sesión + rol comerciante) ---

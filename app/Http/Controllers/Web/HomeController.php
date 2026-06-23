@@ -19,7 +19,8 @@ class HomeController extends Controller
         return match (true) {
             $user->hasRole('comerciante') => redirect()->route('panel'),
             $user->hasRole('usuario') => redirect()->route('explorar'),
-            // Admin y domiciliario: sus vistas se construirán después.
+            $user->hasRole('administrador') => redirect()->route('admin.panel'),
+            // Domiciliario: su vista se construirá después.
             default => view('home.proximamente', [
                 'rol' => $user->getRoleNames()->first() ?? 'sin rol',
             ]),

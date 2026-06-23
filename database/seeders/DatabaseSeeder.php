@@ -19,5 +19,8 @@ class DatabaseSeeder extends Seeder
 
         // Usuarios de prueba (uno por rol, contraseña conocida) para desarrollo.
         $this->call(DemoUsersSeeder::class);
+
+        // Catálogo realista: 60+ negocios con categorías y productos.
+        $this->call(CatalogoDemoSeeder::class);
     }
 }

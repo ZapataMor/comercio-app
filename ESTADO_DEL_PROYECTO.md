@@ -51,9 +51,10 @@ API REST en **Laravel 13** (PHP 8.4), autenticación por token con **Sanctum** y
 ## 5. Modelo de datos
 - [x] `users` (con roles vía Spatie)
 - [x] `negocios` (user_id, nombre, descripcion, direccion, telefono, activo) — 1 por comerciante
-- [x] `productos` (negocio_id, categoria_id, nombre, descripcion, precio, disponible) — con **SoftDeletes**
+- [x] `productos` (negocio_id, categoria_id, nombre, descripcion, precio, **tipo_venta**, **unidad_medida**, disponible) — con **SoftDeletes**
 - [x] `categorias` (negocio_id, nombre)
 - [x] Relaciones: User→Negocio, Negocio→Productos, Negocio→Categorias, Producto→Categoria
+- [x] **Tipos de venta de producto**: `cantidad` (unidades/porciones/combos/paquetes/docenas), `peso` (precio por kg/libra), `volumen` (por litro), `longitud` (por metro). El precio se entiende "por `unidad_medida`"
 
 ---
 
@@ -68,6 +69,7 @@ API REST en **Laravel 13** (PHP 8.4), autenticación por token con **Sanctum** y
 - [x] **JSON limpio** con API Resources (`ProductoResource`, `NegocioResource`, `CategoriaResource`)
 - [x] **Paginación + búsqueda/filtros** del catálogo (`?buscar`, `?categoria_id`, `?disponible`, `?por_pagina`)
 - [x] **Soft deletes** en productos (borrar oculta pero conserva historial)
+- [x] Productos con **tipo de venta** (`tipo_venta` + `unidad_medida`) y `precio_formateado` en el JSON (ej. "$8.900 / kg")
 
 ### Cliente (`usuario`)
 - [x] Ve su panel en `/api/dashboard`
@@ -77,8 +79,8 @@ API REST en **Laravel 13** (PHP 8.4), autenticación por token con **Sanctum** y
 
 ### Administrador
 - [x] Ve su panel en `/api/dashboard`
-- [ ] Gestionar usuarios y asignar roles
-- [ ] Ver todos los negocios
+- [x] Gestionar usuarios y asignar roles (vía web `/admin/usuarios`)
+- [x] Ver todos los negocios (vía web `/admin/negocios`)
 
 ### Domiciliario
 - [x] Ve su panel en `/api/dashboard`
@@ -101,14 +103,22 @@ API REST en **Laravel 13** (PHP 8.4), autenticación por token con **Sanctum** y
 ### Interfaz WEB (Blade) — cliente (rol `usuario`)
 - [x] `/explorar` — lista de negocios abiertos con nº de productos disponibles (`Web\ClienteController`, vista `cliente/explorar`)
 - [x] `/explorar/{id}` — catálogo de un negocio (productos disponibles agrupados por categoría) — vista `cliente/negocio`
+- [x] **Barra de búsqueda** `/buscar?q=` — busca productos por nombre, descripción, **categoría** y nombre del negocio; multi-palabra; insensible a mayúsculas/tildes (colación MySQL). Solo productos disponibles de negocios activos
 - [ ] Botón "Pedir" (hoy deshabilitado): requiere el flujo de pedidos
-- [ ] Vistas web del **administrador** y del **domiciliario** (pendientes, en ese orden)
+- [ ] **Búsqueda inteligente/semántica** (tolerante a errores de ortografía y por intención, ej: "pastillas para el dolor" → analgésicos). Capa futura sobre la búsqueda actual (full-text / trigramas / embeddings IA)
+
+### Interfaz WEB (Blade) — administrador (rol `administrador`)
+- [x] `/admin` — tablero con totales (usuarios, negocios, abiertos, productos) — `Web\AdminController`, vista `admin/index`
+- [x] `/admin/usuarios` — lista de usuarios y **cambio de rol** (con salvaguarda: el admin no puede quitarse su propio rol) — vista `admin/usuarios`
+- [x] `/admin/negocios` — visión global de todos los negocios (dueño, productos, abierto/cerrado) — vista `admin/negocios`
+- [ ] Vista web del **domiciliario** (pendiente, es lo último que queda de las vistas)
 
 ---
 
 ## 7. Pruebas y datos
 - [x] Usuarios demo sembrados (`DemoUsersSeeder`), contraseña `password123`:
   `admin@demo.co`, `comerciante@demo.co`, `domiciliario@demo.co`, `cliente@demo.co`
+- [x] **Catálogo realista sembrado** (`CatalogoDemoSeeder`): 57 negocios de 14 tipos (restaurante, asadero, cafetería, bar, heladería, panadería, papelería, ferretería, ropa, frutería, carnicería, droguería, licorería, minimercado), con sus categorías y ~980 productos de distintos tipos de venta. Cada negocio es de un comerciante propio (`{slug}@demo.co` / `password123`). Idempotente
 - [x] Verificado manualmente: login por rol, dashboard por rol, comerciante crea negocio (201), cliente bloqueado en zona de comerciante (403)
 - [x] Tests automatizados (Pest): 15 tests del flujo de comerciante (negocio, productos, categorías, paginación, búsqueda, soft delete, aislamiento) — `tests/Feature/ComercianteTest.php`. Corren en SQLite en memoria (no tocan MySQL). `RefreshDatabase` activado en `tests/Pest.php`
 - [x] Colección **Postman** con todos los endpoints y guardado automático de token — `postman/comercio-api.postman_collection.json` (importable también en Bruno; Thunder Client ya cobra por importar)
@@ -125,6 +135,8 @@ API REST en **Laravel 13** (PHP 8.4), autenticación por token con **Sanctum** y
 ---
 
 ## 📜 Historial de cambios
+- **2026-06-23** — **Tipos de venta de producto** (cambio de esquema): añadidas columnas `tipo_venta` (`cantidad`/`peso`/`volumen`/`longitud`) y `unidad_medida` a `productos`; validación en `ProductoController` y `precio_formateado` en `ProductoResource` (ej. "$25.700 / kg"). **Seeder de catálogo** (`CatalogoDemoSeeder`): 57 negocios de 14 tipos con categorías y ~980 productos (cantidad/peso/volumen/longitud, incluyendo combos, paquetes, docenas, por kg/libra/litro/metro). Verificado: migración OK, datos sembrados (59 negocios, 364 categorías, 981 productos), 15 tests Pest en verde, JSON formateado correcto.
+- **2026-06-23** — **Barra de búsqueda** del cliente (`/buscar`): por nombre, categoría, descripción y negocio; multi-palabra; insensible a mayúsculas/tildes. **Vistas del administrador**: tablero, gestión de usuarios/roles (con salvaguarda anti-autobloqueo) y listado global de negocios. Verificado todo end-to-end (búsqueda por nombre y por categoría; cambio de rol y bloqueo de auto-degradación). Anotada la búsqueda **semántica/IA** como capa futura. Pendiente: vista del domiciliario.
 - **2026-06-23** — Web: **editar producto** desde el panel del comerciante (formulario completo). Nuevas **vistas del cliente**: `/explorar` (negocios abiertos) y `/explorar/{id}` (catálogo por categorías), con botón "Pedir" deshabilitado hasta tener pedidos. Añadida **redirección por rol** tras login (`/home`). Verificado end-to-end (cliente explora; comerciante edita producto y persiste). Pendientes: vistas de admin y domiciliario.
 - **2026-06-22** — Creación de este documento de seguimiento. Estado inicial: auth, roles, negocio y productos del comerciante, dashboard por rol y usuarios demo ya implementados; categorías y flujo de cliente/pedidos pendientes.
 - **2026-06-22** — **Interfaz web (Blade)** del comerciante: login por sesión + panel `/panel` (role:comerciante) para gestionar negocio, categorías y productos desde el navegador, con Tailwind por CDN. Sirve para ver/probar todo visualmente; la app nativa (React Native CLI) vendrá después sobre la misma API. Verificado el flujo completo (login con CSRF/sesión → panel 200).

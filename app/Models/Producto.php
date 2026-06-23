@@ -15,15 +15,22 @@ class Producto extends Model
     /** Valores por defecto a nivel de modelo (coinciden con la migración). */
     protected $attributes = [
         'disponible' => true,
+        'tipo_venta' => 'cantidad',
+        'unidad_medida' => 'unidad',
     ];
 
     protected $fillable = [
         'nombre',
         'descripcion',
         'precio',
+        'tipo_venta',
+        'unidad_medida',
         'disponible',
         'categoria_id',
     ];
+
+    /** Tipos de venta válidos (cómo se selecciona la cantidad del producto). */
+    public const TIPOS_VENTA = ['cantidad', 'peso', 'volumen', 'longitud'];
 
     protected function casts(): array
     {
