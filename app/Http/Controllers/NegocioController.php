@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\NegocioResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -20,7 +21,7 @@ class NegocioController extends Controller
             ], 404);
         }
 
-        return response()->json(['negocio' => $negocio]);
+        return response()->json(['negocio' => new NegocioResource($negocio)]);
     }
 
     /**
@@ -45,7 +46,7 @@ class NegocioController extends Controller
         // Se crea ligado al usuario autenticado: imposible crearlo para otro.
         $negocio = $request->user()->negocio()->create($data);
 
-        return response()->json(['negocio' => $negocio], 201);
+        return response()->json(['negocio' => new NegocioResource($negocio)], 201);
     }
 
     /**
@@ -71,6 +72,6 @@ class NegocioController extends Controller
 
         $negocio->update($data);
 
-        return response()->json(['negocio' => $negocio]);
+        return response()->json(['negocio' => new NegocioResource($negocio)]);
     }
 }

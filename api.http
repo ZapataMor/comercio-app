@@ -1,0 +1,177 @@
+###############################################################################
+# Comercio API — peticiones de prueba
+#
+# Cómo usar (gratis, sin cuenta):
+#   1. Instala la extensión "REST Client" de Huachao Mao en VS Code.
+#   2. Arranca el servidor:  php artisan serve
+#   3. Haz clic en "Send Request" (aparece encima de cada petición ###).
+#   4. Manda primero LOGIN: el token se captura solo y lo usan las demás.
+#
+# Usuarios demo (password: password123):
+#   comerciante@demo.co · cliente@demo.co · admin@demo.co · domiciliario@demo.co
+###############################################################################
+
+@base_url = http://127.0.0.1:8000/api
+
+# El token sale de la respuesta del request llamado "login" (más abajo).
+# REST Client lo rellena solo después de que mandes el login una vez.
+@token = {{login.response.body.$.token}}
+
+
+# ============================================================
+#  AUTH
+# ============================================================
+
+### Registro (devuelve token). role: usuario | comerciante
+POST {{base_url}}/register
+Accept: application/json
+Content-Type: application/json
+
+{
+  "name": "Tienda Nueva",
+  "email": "nueva@maicao.co",
+  "password": "clave1234",
+  "password_confirmation": "clave1234",
+  "role": "comerciante"
+}
+
+### Login  (manda este primero: guarda el token)
+# @name login
+POST {{base_url}}/login
+Accept: application/json
+Content-Type: application/json
+
+{
+  "email": "comerciante@demo.co",
+  "password": "password123"
+}
+
+### Mi usuario
+GET {{base_url}}/user
+Accept: application/json
+Authorization: Bearer {{token}}
+
+### Dashboard (cambia según el rol logueado)
+GET {{base_url}}/dashboard
+Accept: application/json
+Authorization: Bearer {{token}}
+
+### Logout (revoca el token actual)
+POST {{base_url}}/logout
+Accept: application/json
+Authorization: Bearer {{token}}
+
+
+# ============================================================
+#  COMERCIANTE — NEGOCIO
+# ============================================================
+
+### Ver mi negocio
+GET {{base_url}}/comerciante/negocio
+Accept: application/json
+Authorization: Bearer {{token}}
+
+### Crear mi negocio
+POST {{base_url}}/comerciante/negocio
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "nombre": "Donde Pepe",
+  "descripcion": "Abarrotes y fritos",
+  "direccion": "Cra 10 #5-20, Maicao",
+  "telefono": "3001234567"
+}
+
+### Actualizar mi negocio
+PUT {{base_url}}/comerciante/negocio
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "descripcion": "Ahora con domicilios",
+  "activo": true
+}
+
+
+# ============================================================
+#  COMERCIANTE — CATEGORÍAS
+# ============================================================
+
+### Listar categorías
+GET {{base_url}}/comerciante/categorias
+Accept: application/json
+Authorization: Bearer {{token}}
+
+### Crear categoría
+POST {{base_url}}/comerciante/categorias
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "nombre": "Bebidas"
+}
+
+### Renombrar categoría (cambia el 1 por el id real)
+PUT {{base_url}}/comerciante/categorias/1
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "nombre": "Bebidas frías"
+}
+
+### Borrar categoría
+DELETE {{base_url}}/comerciante/categorias/1
+Accept: application/json
+Authorization: Bearer {{token}}
+
+
+# ============================================================
+#  COMERCIANTE — PRODUCTOS
+# ============================================================
+
+### Listar productos (paginado). Prueba los filtros en la URL:
+###   ?buscar=empanada   ?categoria_id=1   ?disponible=1   ?por_pagina=5
+GET {{base_url}}/comerciante/productos?por_pagina=15
+Accept: application/json
+Authorization: Bearer {{token}}
+
+### Crear producto (categoria_id debe ser TUYO, o null)
+POST {{base_url}}/comerciante/productos
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "nombre": "Empanada de carne",
+  "descripcion": "Recién hecha",
+  "precio": 2500,
+  "disponible": true,
+  "categoria_id": null
+}
+
+### Ver un producto (cambia el 1 por el id real)
+GET {{base_url}}/comerciante/productos/1
+Accept: application/json
+Authorization: Bearer {{token}}
+
+### Actualizar producto
+PUT {{base_url}}/comerciante/productos/1
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "precio": 2800,
+  "disponible": false
+}
+
+### Borrar producto (soft delete)
+DELETE {{base_url}}/comerciante/productos/1
+Accept: application/json
+Authorization: Bearer {{token}}

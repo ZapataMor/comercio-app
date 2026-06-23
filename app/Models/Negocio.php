@@ -10,6 +10,11 @@ class Negocio extends Model
 {
     protected $table = 'negocios';
 
+    /** Valores por defecto a nivel de modelo (coinciden con la migración). */
+    protected $attributes = [
+        'activo' => true,
+    ];
+
     protected $fillable = [
         'nombre',
         'descripcion',
@@ -39,5 +44,13 @@ class Negocio extends Model
     public function productos(): HasMany
     {
         return $this->hasMany(Producto::class);
+    }
+
+    /**
+     * Las categorías del catálogo de este negocio.
+     */
+    public function categorias(): HasMany
+    {
+        return $this->hasMany(Categoria::class);
     }
 }

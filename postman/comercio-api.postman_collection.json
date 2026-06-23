@@ -1,0 +1,352 @@
+{
+  "info": {
+    "name": "Comercio API",
+    "description": "Colección de la API de comercio (Maicao). El token se guarda solo al hacer Login o Register y se usa automáticamente en las rutas protegidas.\n\nVariables:\n- base_url: http://127.0.0.1:8000/api\n- token: se llena solo tras Login/Register\n\nUsuarios demo (seeder): comerciante@demo.co, cliente@demo.co, admin@demo.co, domiciliario@demo.co — contraseña: password123",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      { "key": "token", "value": "{{token}}", "type": "string" }
+    ]
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://127.0.0.1:8000/api" },
+    { "key": "token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.token) {",
+                  "  pm.collectionVariables.set('token', json.token);",
+                  "  console.log('Token guardado:', json.token.substring(0, 12) + '...');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Tienda Nueva\",\n  \"email\": \"nueva@maicao.co\",\n  \"password\": \"clave1234\",\n  \"password_confirmation\": \"clave1234\",\n  \"role\": \"comerciante\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/register",
+              "host": ["{{base_url}}"],
+              "path": ["register"]
+            },
+            "description": "Registra un usuario y devuelve token. 'role' solo acepta 'usuario' o 'comerciante' (por defecto 'usuario')."
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.token) {",
+                  "  pm.collectionVariables.set('token', json.token);",
+                  "  console.log('Token guardado:', json.token.substring(0, 12) + '...');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"comerciante@demo.co\",\n  \"password\": \"password123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/login",
+              "host": ["{{base_url}}"],
+              "path": ["login"]
+            },
+            "description": "Inicia sesión y guarda el token automáticamente."
+          }
+        },
+        {
+          "name": "Mi usuario (/user)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/user",
+              "host": ["{{base_url}}"],
+              "path": ["user"]
+            }
+          }
+        },
+        {
+          "name": "Dashboard (segun rol)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/dashboard",
+              "host": ["{{base_url}}"],
+              "path": ["dashboard"]
+            },
+            "description": "Devuelve un panel distinto segun el rol del usuario logueado."
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/logout",
+              "host": ["{{base_url}}"],
+              "path": ["logout"]
+            },
+            "description": "Revoca el token actual."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Comerciante - Negocio",
+      "item": [
+        {
+          "name": "Ver mi negocio",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/comerciante/negocio",
+              "host": ["{{base_url}}"],
+              "path": ["comerciante", "negocio"]
+            }
+          }
+        },
+        {
+          "name": "Crear mi negocio",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Donde Pepe\",\n  \"descripcion\": \"Abarrotes y fritos\",\n  \"direccion\": \"Cra 10 #5-20, Maicao\",\n  \"telefono\": \"3001234567\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/comerciante/negocio",
+              "host": ["{{base_url}}"],
+              "path": ["comerciante", "negocio"]
+            }
+          }
+        },
+        {
+          "name": "Actualizar mi negocio",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"descripcion\": \"Ahora con domicilios\",\n  \"activo\": true\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/comerciante/negocio",
+              "host": ["{{base_url}}"],
+              "path": ["comerciante", "negocio"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Comerciante - Categorias",
+      "item": [
+        {
+          "name": "Listar categorias",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/comerciante/categorias",
+              "host": ["{{base_url}}"],
+              "path": ["comerciante", "categorias"]
+            }
+          }
+        },
+        {
+          "name": "Crear categoria",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Bebidas\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/comerciante/categorias",
+              "host": ["{{base_url}}"],
+              "path": ["comerciante", "categorias"]
+            }
+          }
+        },
+        {
+          "name": "Renombrar categoria",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Bebidas frias\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/comerciante/categorias/1",
+              "host": ["{{base_url}}"],
+              "path": ["comerciante", "categorias", "1"]
+            }
+          }
+        },
+        {
+          "name": "Borrar categoria",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/comerciante/categorias/1",
+              "host": ["{{base_url}}"],
+              "path": ["comerciante", "categorias", "1"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Comerciante - Productos",
+      "item": [
+        {
+          "name": "Listar productos (paginado/busqueda)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/comerciante/productos?buscar=&categoria_id=&disponible=&por_pagina=15&page=1",
+              "host": ["{{base_url}}"],
+              "path": ["comerciante", "productos"],
+              "query": [
+                { "key": "buscar", "value": "", "disabled": true },
+                { "key": "categoria_id", "value": "", "disabled": true },
+                { "key": "disponible", "value": "", "disabled": true },
+                { "key": "por_pagina", "value": "15", "disabled": true },
+                { "key": "page", "value": "1", "disabled": true }
+              ]
+            },
+            "description": "Activa los parametros de query (quitar 'disabled') para buscar, filtrar por categoria/disponibilidad y paginar."
+          }
+        },
+        {
+          "name": "Crear producto",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Empanada de carne\",\n  \"descripcion\": \"Recien hecha\",\n  \"precio\": 2500,\n  \"disponible\": true,\n  \"categoria_id\": null\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/comerciante/productos",
+              "host": ["{{base_url}}"],
+              "path": ["comerciante", "productos"]
+            },
+            "description": "categoria_id debe ser una categoria TUYA (o null)."
+          }
+        },
+        {
+          "name": "Ver un producto",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/comerciante/productos/1",
+              "host": ["{{base_url}}"],
+              "path": ["comerciante", "productos", "1"]
+            }
+          }
+        },
+        {
+          "name": "Actualizar producto",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"precio\": 2800,\n  \"disponible\": false\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/comerciante/productos/1",
+              "host": ["{{base_url}}"],
+              "path": ["comerciante", "productos", "1"]
+            }
+          }
+        },
+        {
+          "name": "Borrar producto (soft delete)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/comerciante/productos/1",
+              "host": ["{{base_url}}"],
+              "path": ["comerciante", "productos", "1"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
