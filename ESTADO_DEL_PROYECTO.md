@@ -1,7 +1,7 @@
 # 📦 Estado del proyecto — comercio-api
 
 > Documento vivo de seguimiento. Refleja **qué hay hecho** y **qué falta** en la app.
-> Última actualización: **2026-06-22**
+> Última actualización: **2026-06-23**
 
 ---
 
@@ -87,6 +87,23 @@ API REST en **Laravel 13** (PHP 8.4), autenticación por token con **Sanctum** y
 ### General
 - [x] `GET /api/dashboard` — panel adaptativo que responde distinto según el rol
 
+### Interfaz WEB (Blade) — panel del comerciante (sesión con cookies)
+> Front web temporal para ver/probar todo en el navegador mientras se desarrolla el frontend nativo (React Native CLI vendrá después y consume la misma API). Login web por **sesión** (independiente de los tokens de la API). Estilo con Tailwind por CDN.
+- [x] Login/Logout web (`/login`, `/logout`) — `Web\AuthWebController`, vista `auth/login`
+- [x] Panel `/panel` protegido por sesión + `role:comerciante` — `Web\PanelController`, vista `panel/index`
+- [x] Crear/editar negocio, abrir/cerrar (activo)
+- [x] Crear/borrar categorías
+- [x] Crear productos (con categoría), mostrar/ocultar (disponible) y borrar (soft delete)
+- [x] **Editar producto** existente (nombre/precio/descripción/categoría/disponible) desde la web — `panel/producto-editar`
+- [x] Redirección por rol tras login (`/home` → `HomeController`): comerciante→panel, usuario→explorar, otros→"próximamente"
+- [ ] Paginación visual del listado de productos en la web
+
+### Interfaz WEB (Blade) — cliente (rol `usuario`)
+- [x] `/explorar` — lista de negocios abiertos con nº de productos disponibles (`Web\ClienteController`, vista `cliente/explorar`)
+- [x] `/explorar/{id}` — catálogo de un negocio (productos disponibles agrupados por categoría) — vista `cliente/negocio`
+- [ ] Botón "Pedir" (hoy deshabilitado): requiere el flujo de pedidos
+- [ ] Vistas web del **administrador** y del **domiciliario** (pendientes, en ese orden)
+
 ---
 
 ## 7. Pruebas y datos
@@ -108,5 +125,7 @@ API REST en **Laravel 13** (PHP 8.4), autenticación por token con **Sanctum** y
 ---
 
 ## 📜 Historial de cambios
+- **2026-06-23** — Web: **editar producto** desde el panel del comerciante (formulario completo). Nuevas **vistas del cliente**: `/explorar` (negocios abiertos) y `/explorar/{id}` (catálogo por categorías), con botón "Pedir" deshabilitado hasta tener pedidos. Añadida **redirección por rol** tras login (`/home`). Verificado end-to-end (cliente explora; comerciante edita producto y persiste). Pendientes: vistas de admin y domiciliario.
 - **2026-06-22** — Creación de este documento de seguimiento. Estado inicial: auth, roles, negocio y productos del comerciante, dashboard por rol y usuarios demo ya implementados; categorías y flujo de cliente/pedidos pendientes.
+- **2026-06-22** — **Interfaz web (Blade)** del comerciante: login por sesión + panel `/panel` (role:comerciante) para gestionar negocio, categorías y productos desde el navegador, con Tailwind por CDN. Sirve para ver/probar todo visualmente; la app nativa (React Native CLI) vendrá después sobre la misma API. Verificado el flujo completo (login con CSRF/sesión → panel 200).
 - **2026-06-22** — Pulido del comerciante: CRUD de **categorías** (por negocio, nombre único) + asignación validada de `categoria_id` a productos; **soft deletes** en productos; **API Resources** (JSON limpio); **paginación + búsqueda/filtros** del catálogo; **15 tests Pest** del flujo de comerciante (todo verde); colección **Postman** con auto-guardado de token. Añadido `api.http` (REST Client de VS Code, gratis) como alternativa sin suscripción a Thunder Client.
