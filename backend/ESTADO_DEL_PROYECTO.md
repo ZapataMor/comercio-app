@@ -21,7 +21,15 @@ Leyenda: `- [x]` hecho · `- [ ]` pendiente · 🚧 a medias
 ---
 
 ## 1. Resumen
-API REST en **Laravel 13** (PHP 8.4), autenticación por token con **Sanctum** y roles/permisos con **Spatie**. Base de datos **MySQL** (`comercio_api`). Sin frontend: se consume como JSON.
+API REST en **Laravel 13** (PHP 8.4), autenticación por token con **Sanctum** y roles/permisos con **Spatie**. Base de datos **MySQL** (`comercio_api`). Interfaz web Blade para probar, y app móvil React Native en marcha.
+
+### Estructura del proyecto (monorepo, fuera de OneDrive)
+```
+C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
+├── backend/                   ← este proyecto Laravel (la API + web Blade)
+└── frontend/                  ← app móvil React Native (ComercioApp)
+```
+> Movido fuera de OneDrive el 2026-06-24 (OneDrive + node_modules/builds da problemas). Respaldo = Git/GitHub. La carpeta vieja en OneDrive quedó vacía (cascarones inofensivos).
 
 ---
 
@@ -156,6 +164,7 @@ API REST en **Laravel 13** (PHP 8.4), autenticación por token con **Sanctum** y
 ---
 
 ## 📜 Historial de cambios
+- **2026-06-24** — **Monorepo + arranque de la app móvil**: el proyecto se movió fuera de OneDrive a `C:\dev\comercio-app\` con `backend/` (Laravel) y `frontend/` (React Native CLI, TypeScript, app "ComercioApp"). Creado el frontend con la **pantalla de Login** conectada a `POST /api/login` (Sanctum): `src/config.ts` (API_URL, 10.0.2.2 para emulador), `src/api.ts`, `src/screens/{LoginScreen,HomeScreen}.tsx`, `App.tsx` con estado de sesión. Type-check (`tsc --noEmit`) en verde. Falta poder *correrla* (entorno Android: el teléfono está bloqueado por financiación, emulador pendiente). Nativewind/navegación: siguiente paso.
 - **2026-06-24** — **Idioma a español**: creados `lang/es/validation.php`, `auth.php` y `pagination.php` (Laravel 11+ no los trae por defecto, por eso los errores salían en inglés aunque `APP_LOCALE=es`). Mensajes de validación, login y paginación ahora en español, con nombres de campos legibles (correo electrónico, contraseña, etc.). 17 tests en verde.
 - **2026-06-24** — **Admin — gestión de usuarios mejorada**: ver usuarios **por tipo** (pestañas por rol con conteo, ya no todos en una sola lista) y **crear usuarios** (nombre/correo/contraseña/rol) desde `/admin/usuarios`. Verificado: filtro por rol, creación (persiste con rol) y validación de email duplicado.
 - **2026-06-24** — **FLUJO DE PEDIDOS completo (web)**, atravesando los 4 roles. Nuevas tablas/modelos: `carrito_items`, `pedidos`, `pedido_items` (con copia de nombre/precio). Cliente: carrito (1 negocio a la vez) → checkout con **forma de pago (efectivo/transferencia)** + dirección/teléfono → confirmar → seguimiento con línea de tiempo. Comercio: ve pedidos con datos del cliente y marca **"Listo"**. Domiciliario: ve disponibles, **toma** indicando minutos, y marca Recogido→En camino→Entregado. Estados: `pendiente→listo→tomado→recogido→en_camino→entregado`. Menú del layout adaptado por rol (carrito con contador, Mis pedidos, etc.). Verificado **end-to-end** (cliente pide → comercio listo → domiciliario toma/recoge/entrega → cliente ve "Entregado" en BD). 17 tests Pest en verde (actualizado `ExampleTest` porque `/` ahora redirige). Pendiente: versión API, mapa y push.
