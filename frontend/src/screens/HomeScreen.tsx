@@ -10,6 +10,9 @@ export default function HomeScreen({ navigation }: Props) {
   const { auth, salir } = useAuth();
   const user = auth!.user;
   const esComerciante = user.roles.includes('comerciante');
+  const esCliente = user.roles.includes('usuario');
+  const esAdmin = user.roles.includes('administrador');
+  const esDomiciliario = user.roles.includes('domiciliario');
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -39,7 +42,49 @@ export default function HomeScreen({ navigation }: Props) {
             </View>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('ComercioPedidos')}>
+            <Text style={styles.itemEmoji}>📥</Text>
+            <View style={styles.itemTexto}>
+              <Text style={styles.itemTitulo}>Pedidos recibidos</Text>
+              <Text style={styles.itemSub}>Confírmalos para que los recojan</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
         </>
+      )}
+
+      {esCliente && (
+        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('Explorar')}>
+          <Text style={styles.itemEmoji}>🛍️</Text>
+          <View style={styles.itemTexto}>
+            <Text style={styles.itemTitulo}>Explorar negocios</Text>
+            <Text style={styles.itemSub}>Mira los comercios abiertos</Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
+      )}
+
+      {esAdmin && (
+        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('AdminTablero')}>
+          <Text style={styles.itemEmoji}>🛠️</Text>
+          <View style={styles.itemTexto}>
+            <Text style={styles.itemTitulo}>Administración</Text>
+            <Text style={styles.itemSub}>Usuarios, roles y negocios</Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
+      )}
+
+      {esDomiciliario && (
+        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('Domiciliario')}>
+          <Text style={styles.itemEmoji}>🛵</Text>
+          <View style={styles.itemTexto}>
+            <Text style={styles.itemTitulo}>Mis entregas</Text>
+            <Text style={styles.itemSub}>Pedidos para recoger y entregar</Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
       )}
 
       <TouchableOpacity style={styles.logout} onPress={salir}>

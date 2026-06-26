@@ -1,0 +1,62 @@
+CREDENCIALES DE COMERCIOS DE PRUEBA
+Contrasena para todos: password123
+
+Almacén La Moda                 almacen-la-moda@demo.co
+Aroma Café                      aroma-cafe@demo.co
+Asadero Doña Tere               asadero-dona-tere@demo.co
+Asadero El Carbón               asadero-el-carbon@demo.co
+Autoservicio La Economía        autoservicio-la-economia@demo.co
+Bar La Estación                 bar-la-estacion@demo.co
+Boutique Elegancia               boutique-elegancia@demo.co
+Café de la Esquina              cafe-de-la-esquina@demo.co
+Carnes Finas El Novillo          carnes-finas-el-novillo@demo.co
+Carnicería La Res Feliz         carniceria-la-res-feliz@demo.co
+Construrey                       construrey@demo.co
+Delicias del Trigo               delicias-del-trigo@demo.co
+Distribuidora El Ganadero        distribuidora-el-ganadero@demo.co
+Distrilicores                    distrilicores@demo.co
+Doña Rosa Restaurante           dona-rosa-restaurante@demo.co
+Drogas Económicas               drogas-economicas@demo.co
+Droguería La Salud              drogueria-la-salud@demo.co
+Dulce Frío                      dulce-frio@demo.co
+El Botellón                     el-botellon@demo.co
+El Buen Sabor                    el-buen-sabor@demo.co
+El Fogón del Pollo              el-fogon-del-pollo@demo.co
+El Rincón Paisa                 el-rincon-paisa@demo.co
+Farma Express                    farma-express@demo.co
+Ferremax                         ferremax@demo.co
+Ferretería El Tornillo          ferreteria-el-tornillo@demo.co
+Frutas y Verduras El Campo       frutas-y-verduras-el-campo@demo.co
+Frutería Tropical               fruteria-tropical@demo.co
+Frutos del Trópico              frutos-del-tropico@demo.co
+Helados La Nieve                 helados-la-nieve@demo.co
+La Bohemia Café                 la-bohemia-cafe@demo.co
+La Cantina de Pepe               la-cantina-de-pepe@demo.co
+La Casa del Herraje              la-casa-del-herraje@demo.co
+La Fonda Antioqueña             la-fonda-antioquena@demo.co
+La Francesa Panadería           la-francesa-panaderia@demo.co
+La Huerta Fresca                 la-huerta-fresca@demo.co
+Licorería El Brindis            licoreria-el-brindis@demo.co
+Licores La 80                    licores-la-80@demo.co
+Luna Bar                         luna-bar@demo.co
+MercaFácil                      mercafacil@demo.co
+Mini Market La Esquina           mini-market-la-esquina@demo.co
+Moda Urbana                      moda-urbana@demo.co
+Mundo Escolar                    mundo-escolar@demo.co
+Pan de Cada Día                 pan-de-cada-dia@demo.co
+Panaderia La Espiga              comerciante@demo.co
+Panadería La Espiga Dorada      panaderia-la-espiga-dorada@demo.co
+Papelería El Lápiz Feliz       papeleria-el-lapiz-feliz@demo.co
+Papelería La Económica         papeleria-la-economica@demo.co
+Pollos La Brasa Dorada           pollos-la-brasa-dorada@demo.co
+Polo Norte Helados               polo-norte-helados@demo.co
+Punto Fashion                    punto-fashion@demo.co
+Sazón de la Abuela              sazon-de-la-abuela@demo.co
+Supermercado El Ahorro           supermercado-el-ahorro@demo.co
+Surtitodo                        surtitodo@demo.co
+Tienda Don Pepe                  pepe@maicao.co
+Tinto y Pan                      tinto-y-pan@demo.co
+Todo en Papel                    todo-en-papel@demo.co
+Tu Farmacia                      tu-farmacia@demo.co
+Verduras Doña Marta             verduras-dona-marta@demo.co
+Vestir Bien                      vestir-bien@demo.co
