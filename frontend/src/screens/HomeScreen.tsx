@@ -1,76 +1,73 @@
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Usuario } from '../api';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useAuth } from '../AuthContext';
+import { RootStackParamList } from '../navTypes';
 
-type Props = {
-  user: Usuario;
-  onLogout: () => void;
-};
+type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
-export default function HomeScreen({ user, onLogout }: Props) {
+export default function HomeScreen({ navigation }: Props) {
+  const { auth, salir } = useAuth();
+  const user = auth!.user;
+  const esComerciante = user.roles.includes('comerciante');
+
   return (
-    <View style={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.emoji}>👋</Text>
-        <Text style={styles.titulo}>¡Hola, {user.name}!</Text>
-        <Text style={styles.email}>{user.email}</Text>
-
-        <View style={styles.roles}>
-          {user.roles.map(rol => (
-            <Text key={rol} style={styles.rol}>
-              {rol}
-            </Text>
-          ))}
-        </View>
-
-        <Text style={styles.ok}>✓ Sesión iniciada contra tu API</Text>
-
-        <TouchableOpacity style={styles.boton} onPress={onLogout}>
-          <Text style={styles.botonTexto}>Cerrar sesión</Text>
-        </TouchableOpacity>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <Text style={styles.saludo}>¡Hola, {user.name}! 👋</Text>
+      <View style={styles.rolesRow}>
+        {user.roles.map(r => (
+          <Text key={r} style={styles.rol}>{r}</Text>
+        ))}
       </View>
-    </View>
+
+      {esComerciante && (
+        <>
+          <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('MiTienda')}>
+            <Text style={styles.itemEmoji}>🏪</Text>
+            <View style={styles.itemTexto}>
+              <Text style={styles.itemTitulo}>Mi Tienda</Text>
+              <Text style={styles.itemSub}>Ver y gestionar tu negocio</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('MisProductos')}>
+            <Text style={styles.itemEmoji}>📦</Text>
+            <View style={styles.itemTexto}>
+              <Text style={styles.itemTitulo}>Mis Productos</Text>
+              <Text style={styles.itemSub}>Tu catálogo</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+        </>
+      )}
+
+      <TouchableOpacity style={styles.logout} onPress={salir}>
+        <Text style={styles.logoutTexto}>Cerrar sesión</Text>
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f1f5f9',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 28,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  emoji: { fontSize: 40, marginBottom: 8 },
-  titulo: { fontSize: 22, fontWeight: 'bold', color: '#0f172a' },
-  email: { color: '#64748b', marginTop: 4 },
-  roles: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 16 },
+  container: { flex: 1, backgroundColor: '#f1f5f9' },
+  content: { padding: 20 },
+  saludo: { fontSize: 24, fontWeight: 'bold', color: '#0f172a', marginTop: 8 },
+  rolesRow: { flexDirection: 'row', gap: 8, marginTop: 8, marginBottom: 24 },
   rol: {
-    backgroundColor: '#e0e7ff',
-    color: '#4338ca',
-    fontWeight: '600',
-    fontSize: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    overflow: 'hidden',
+    backgroundColor: '#e0e7ff', color: '#4338ca', fontWeight: '600', fontSize: 12,
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, overflow: 'hidden',
   },
-  ok: { color: '#16a34a', marginTop: 20, fontSize: 13 },
-  boton: {
-    marginTop: 24,
-    backgroundColor: '#ef4444',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 28,
+  item: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff',
+    borderRadius: 16, padding: 16, marginBottom: 12,
+    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
   },
-  botonTexto: { color: '#fff', fontWeight: '700' },
+  itemEmoji: { fontSize: 28, marginRight: 14 },
+  itemTexto: { flex: 1 },
+  itemTitulo: { fontSize: 16, fontWeight: '700', color: '#0f172a' },
+  itemSub: { color: '#64748b', fontSize: 13, marginTop: 2 },
+  chevron: { fontSize: 28, color: '#cbd5e1' },
+  logout: { marginTop: 24, alignItems: 'center' },
+  logoutTexto: { color: '#ef4444', fontWeight: '700' },
 });

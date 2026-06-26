@@ -9,13 +9,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { login, Usuario } from '../api';
+import { login } from '../api';
+import { useAuth } from '../AuthContext';
 
-type Props = {
-  onLogin: (token: string, user: Usuario) => void;
-};
-
-export default function LoginScreen({ onLogin }: Props) {
+export default function LoginScreen() {
+  const { entrar: guardarSesion } = useAuth();
   // Prellenado con el usuario demo para probar rápido.
   const [email, setEmail] = useState('comerciante@demo.co');
   const [password, setPassword] = useState('password123');
@@ -27,7 +25,7 @@ export default function LoginScreen({ onLogin }: Props) {
     setCargando(true);
     try {
       const { token, user } = await login(email.trim(), password);
-      onLogin(token, user);
+      guardarSesion(token, user);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error inesperado.');
     } finally {
