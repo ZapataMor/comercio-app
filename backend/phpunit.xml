@@ -26,6 +26,9 @@
         <env name="DB_CONNECTION" value="sqlite"/>
         <env name="DB_DATABASE" value=":memory:"/>
         <env name="DB_URL" value=""/>
+        <!-- Simula que Firebase está configurado: Notification::fake() intercepta
+             el envío antes de tocar Firebase, así que el valor no se usa de verdad. -->
+        <env name="FIREBASE_CREDENTIALS" value="testing"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

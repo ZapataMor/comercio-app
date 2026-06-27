@@ -3,6 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
+use App\Notifications\EstadoPedidoActualizado;
+use App\Notifications\PedidoDisponibleParaDomiciliario;
+use App\Support\Push;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -55,6 +59,14 @@ class ComercioPedidoController extends Controller
         }
 
         $pedido->update(['estado' => 'listo']);
+
+        // Avisa a TODOS los domiciliarios que hay un pedido para tomar.
+        Push::enviar(User::role('domiciliario')->get(), new PedidoDisponibleParaDomiciliario($pedido));
+
+        // Y avisa al cliente que su pedido ya está listo.
+        if ($pedido->cliente) {
+            Push::enviar($pedido->cliente, new EstadoPedidoActualizado($pedido));
+        }
 
         return response()->json(['message' => 'Pedido listo. Los domiciliarios ya pueden tomarlo.']);
     }

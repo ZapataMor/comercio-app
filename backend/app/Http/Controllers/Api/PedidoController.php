@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Negocio;
 use App\Models\Pedido;
+use App\Notifications\NuevoPedidoParaComercio;
+use App\Support\Push;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -77,6 +79,11 @@ class PedidoController extends Controller
 
             return $pedido;
         });
+
+        // Avisa al comercio (su dueño) que entró un pedido nuevo.
+        if ($negocio->user) {
+            Push::enviar($negocio->user, new NuevoPedidoParaComercio($pedido));
+        }
 
         return response()->json(['id' => $pedido->id, 'message' => '¡Pedido confirmado!'], 201);
     }

@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Pedido;
+use App\Notifications\EstadoPedidoActualizado;
+use App\Support\Push;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -70,6 +72,12 @@ class DomiciliarioController extends Controller
             return response()->json(['message' => 'Ese pedido ya fue tomado por otro domiciliario.'], 409);
         }
 
+        // Avisa al cliente que ya tiene domiciliario asignado.
+        $pedido = Pedido::find($id);
+        if ($pedido?->cliente) {
+            Push::enviar($pedido->cliente, new EstadoPedidoActualizado($pedido));
+        }
+
         return response()->json(['message' => 'Pedido tomado. Pasa a recogerlo.']);
     }
 
@@ -101,6 +109,11 @@ class DomiciliarioController extends Controller
         }
 
         $pedido->update(['estado' => $hacia]);
+
+        // Avisa al cliente del nuevo estado (recogido / en camino / entregado).
+        if ($pedido->cliente) {
+            Push::enviar($pedido->cliente, new EstadoPedidoActualizado($pedido));
+        }
 
         return response()->json(['message' => $msg]);
     }

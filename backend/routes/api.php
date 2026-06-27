@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\DomiciliarioController as ApiDomiciliarioController;
 use App\Http\Controllers\Api\PedidoController as ApiPedidoController;
 use App\Http\Controllers\Api\ComercioPedidoController;
+use App\Http\Controllers\Api\DeviceTokenController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -29,6 +30,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Panel adaptativo: responde distinto según el rol del usuario logueado.
     // El frontend llama siempre aquí y pinta lo que reciba.
     Route::get('/dashboard', [DashboardController::class, 'index']);
+
+    // --- Notificaciones push: registrar/dar de baja el token del dispositivo ---
+    Route::post('/device-tokens', [DeviceTokenController::class, 'store']);
+    Route::delete('/device-tokens', [DeviceTokenController::class, 'destroy']);
 
     // --- Catálogo público (cliente): explorar negocios y ver productos ---
     Route::get('/negocios', [CatalogoController::class, 'index']);

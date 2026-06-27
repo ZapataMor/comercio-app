@@ -57,4 +57,20 @@ class User extends Authenticatable
     {
         return $this->hasMany(Pedido::class, 'domiciliario_id');
     }
+
+    /** Dispositivos (tokens FCM) donde el usuario recibe notificaciones push. */
+    public function deviceTokens(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(DeviceToken::class);
+    }
+
+    /**
+     * Canal FCM: a qué token(s) enviar las notificaciones push de este usuario.
+     * La librería laravel-notification-channels/fcm llama aquí.
+     * Devolver un array envía a todos sus dispositivos (multicast).
+     */
+    public function routeNotificationForFcm(): array
+    {
+        return $this->deviceTokens()->pluck('token')->all();
+    }
 }

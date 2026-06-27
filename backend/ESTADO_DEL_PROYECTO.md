@@ -1,7 +1,7 @@
 # 📦 Estado del proyecto — comercio-api
 
 > Documento vivo de seguimiento. Refleja **qué hay hecho** y **qué falta** en la app.
-> Última actualización: **2026-06-24**
+> Última actualización: **2026-06-27**
 
 ---
 
@@ -64,6 +64,7 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 - [x] `carrito_items` (user_id, producto_id, cantidad) — carrito del cliente (1 negocio a la vez)
 - [x] `pedidos` (negocio_id, user_id, domiciliario_id, estado, metodo_pago, total, direccion_entrega, telefono_contacto, minutos_recogida)
 - [x] `pedido_items` (pedido_id, producto_id, **copia** de nombre/precio/cantidad al momento del pedido)
+- [x] `device_tokens` (user_id, token único, plataforma, last_used_at) — tokens FCM para notificaciones push (un usuario puede tener varios aparatos)
 - [x] Relaciones: User→Negocio, Negocio→Productos, Negocio→Categorias, Producto→Categoria, Negocio→Pedidos, Pedido→(cliente, domiciliario, items), User→(pedidos, entregas, carritoItems)
 - [x] **Tipos de venta de producto**: `cantidad` (unidades/porciones/combos/paquetes/docenas), `peso` (precio por kg/libra), `volumen` (por litro), `longitud` (por metro). El precio se entiende "por `unidad_medida`"
 
@@ -153,17 +154,30 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 
 ---
 
+### Notificaciones push (FCM) — 🚧 a medias
+> Estados: **Capa 1 (backend) HECHA**; faltan Capa 2 (conectar Firebase real) y Capa 3 (app móvil). El envío está **blindado**: si Firebase no está configurado, no hace nada; si falla un envío, se registra en log y NUNCA rompe el flujo de pedidos (`App\Support\Push`).
+- [x] Librería `laravel-notification-channels/fcm` instalada + `config/firebase.php` publicado (requirió habilitar `ext-sodium` en php.ini)
+- [x] Tabla/modelo `device_tokens` + relación `User::deviceTokens()` y `User::routeNotificationForFcm()`
+- [x] Endpoints `POST /api/device-tokens` (registrar, idempotente, reasigna si el aparato cambió de dueño) y `DELETE /api/device-tokens` (baja al cerrar sesión)
+- [x] Notificaciones: `NuevoPedidoParaComercio`, `PedidoDisponibleParaDomiciliario`, `EstadoPedidoActualizado` (mensaje por estado)
+- [x] Disparos enganchados: crear pedido→comercio; marcar listo→domiciliarios + cliente; tomar/recogido/en_camino/entregado→cliente
+- [x] Helper `App\Support\Push` (no-op si no hay credenciales, atrapa fallos) + 10 tests Pest con `Notification::fake()`
+- [ ] **Capa 2**: crear proyecto Firebase, poner la service account en `storage/app/firebase/` y `FIREBASE_CREDENTIALS` en `.env` → envío real
+- [ ] **Capa 3**: app móvil con `@react-native-firebase/messaging`, `google-services.json`, permiso, registrar token al login y manejar notificaciones (foreground/background)
+
 ## 8. Pendiente grande (siguiente fase)
 - [x] Flujo de **pedidos** (carrito → pedido → estados) en la web — núcleo del comercio
 - [x] Panel de administrador (gestión de usuarios/roles) en la web
 - [x] Asignación de pedidos a domiciliarios (los toman ellos mismos)
 - [ ] Versión **API** del flujo de pedidos (para la app nativa React Native CLI)
-- [ ] Ubicación en mapa + notificaciones push (FCM) en tiempo real
+- [ ] Ubicación en mapa en tiempo real
+- 🚧 Notificaciones push (FCM): Capa 1 backend hecha (ver sección 6); faltan Firebase real + app
 - [ ] Búsqueda inteligente/semántica (capa 2 y 3)
 
 ---
 
 ## 📜 Historial de cambios
+- **2026-06-27** — **Notificaciones push (FCM) — Capa 1 backend**. Instalada `laravel-notification-channels/fcm` (hubo que habilitar `ext-sodium` en `C:\tools\php84\php.ini`) y publicado `config/firebase.php`. Nueva tabla/modelo `device_tokens` + `User::deviceTokens()`/`routeNotificationForFcm()`. Endpoints `POST/DELETE /api/device-tokens` (registro idempotente que reasigna el aparato al usuario actual; baja en logout). Notificaciones `NuevoPedidoParaComercio`, `PedidoDisponibleParaDomiciliario`, `EstadoPedidoActualizado`, enganchadas en `Api\PedidoController@store` (→comercio), `Api\ComercioPedidoController@marcarListo` (→domiciliarios + cliente) y `Api\DomiciliarioController` tomar/recogido/enCamino/entregado (→cliente). Helper `App\Support\Push`: **no-op si Firebase no está configurado y atrapa cualquier fallo**, para que el push nunca rompa el flujo de pedidos. Credenciales secretas van a `storage/app/firebase/` (con `.gitignore`) vía `FIREBASE_CREDENTIALS`. 10 tests Pest nuevos con `Notification::fake()` (suite total **27 verdes**). Faltan Capa 2 (Firebase real) y Capa 3 (app).
 - **2026-06-26** — **Móvil: el COMERCIO recibe y confirma pedidos** → cierra el ciclo en la app. API `Api\ComercioPedidoController` (`GET /api/comerciante/pedidos`, `PUT /api/comerciante/pedidos/{id}/listo`). Pantalla `ComercioPedidosScreen` (datos del cliente + items; botón "Marcar listo" en los pendientes; se refresca al entrar) + ítem "Pedidos recibidos" en el menú del comerciante. **Ciclo completo en móvil**: cliente confirma (pendiente) → comercio marca listo → domiciliario toma/recoge/en camino/entrega → cliente y comercio ven el avance. Verificado API por curl + tsc verde.
 - **2026-06-26** — **Móvil: el CLIENTE ya puede pedir (ciclo de compra completo)**. API nueva `Api\PedidoController` (`POST /api/pedidos` crea pedido validando productos del negocio + copia de precios; `GET /api/pedidos` mis pedidos; `GET /api/pedidos/{id}` seguimiento con estados). En la app: **carrito en memoria** (`CartContext`, una tienda a la vez), botón "+ Pedir" por producto en el catálogo, pantallas `Carrito`, `Checkout` (dirección/teléfono/pago efectivo o transferencia), `MisPedidos` y `PedidoDetalle` (línea de tiempo de estados, se refresca al entrar). El **cliente ahora aterriza en "Negocios abiertos" (Explorar)** al iniciar sesión, con barra de Carrito/Mis pedidos/Salir. Lista de credenciales de los 59 comercios en `comercios-demo.txt` (email = nombre slug + @demo.co, pass password123). Verificado API por curl + tsc verde + app sin crashes.
 - **2026-06-24** — **Móvil: rol DOMICILIARIO + API de pedidos**. Nueva `Api\DomiciliarioController` bajo auth:sanctum+role:domiciliario: `GET /disponibles|/entregas|/historial`, `PUT /pedidos/{id}/tomar|recogido|en-camino|entregado` (reusa la máquina de estados, con update condicional anti-choque). Pantalla RN `DomiciliarioScreen` (disponibles con "tomar"+minutos, entregas en curso con avance de estado, historial). Sembrados 2 pedidos demo en estado "listo". Con esto **los 4 roles ya tienen vistas en la app móvil** (comerciante, cliente, admin, domiciliario). Verificado API por curl + tsc verde. Pendiente: flujo de pedidos del CLIENTE en móvil (carrito→confirmar→seguimiento), Nativewind, pull-to-refresh.
