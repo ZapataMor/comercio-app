@@ -1,0 +1,218 @@
+{
+  "main": {
+    "id": "034217a738ed8fc8",
+    "type": "split",
+    "children": [
+      {
+        "id": "d810765709a24d2d",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "ac1ecd726afbdac6",
+            "type": "leaf",
+            "state": {
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Vista gráfica"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "146fbd6321fd076e",
+    "type": "split",
+    "children": [
+      {
+        "id": "55ebbfa08a86cb70",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "3fca6faa18ec9fa1",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Explorador de archivos"
+            }
+          },
+          {
+            "id": "bf2cfd78e840d98f",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Buscar"
+            }
+          },
+          {
+            "id": "712621cb3ce0323c",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Marcadores"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "bacd0d08d2865b65",
+    "type": "split",
+    "children": [
+      {
+        "id": "b1569c256a5e0842",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "bfb6987710de0702",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Enlaces entrantes"
+            }
+          },
+          {
+            "id": "07c7579759612b77",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Enlaces salientes"
+            }
+          },
+          {
+            "id": "9aab405aee8fce3f",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Etiquetas"
+            }
+          },
+          {
+            "id": "279548dae1f3555a",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "Todas las propiedades"
+            }
+          },
+          {
+            "id": "b626218a248edb94",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Esquema"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Abrir selector rápido": false,
+      "graph:Abrir vista gráfica": false,
+      "canvas:Crear nuevo lienzo": false,
+      "daily-notes:Abrir la nota de hoy": false,
+      "templates:Insertar plantilla": false,
+      "command-palette:Abrir paleta de comandos": false,
+      "bases:Crear nueva base": false
+    }
+  },
+  "active": "ac1ecd726afbdac6",
+  "lastOpenFiles": [
+    "08 - Ideas/ADR/ADR-003 Botón llamar o WhatsApp al cliente.md",
+    "08 - Ideas/ADR/ADR-002 Notificaciones en tiempo real.md",
+    "08 - Ideas/ADR/ADR-001 Inicio de sesión con Google.md",
+    "08 - Ideas/ADR/_MOC ADR.md",
+    "08 - Ideas/ADR",
+    "_templates/Plantilla ADR.md",
+    "README.md",
+    "README.md.tmp.24444.89a121a9b96b",
+    "08 - Ideas/Idea - Pagos en linea.md",
+    "08 - Ideas/Idea - Calificaciones y reseñas.md",
+    "08 - Ideas/Idea - Busqueda semantica.md",
+    "08 - Ideas/Idea - Mapa en tiempo real.md",
+    "08 - Ideas/_MOC Ideas.md",
+    "08 - Ideas",
+    "07 - Convenciones/Sistema de Tags.md",
+    "05 - Casos de Prueba/_MOC Casos de Prueba.md",
+    "07 - Convenciones/Convenciones de Negocio.md",
+    "07 - Convenciones/Convenciones de Notas.md",
+    "07 - Convenciones/_MOC Convenciones.md",
+    "07 - Convenciones/_MOC Convenciones.md.tmp.24444.87d29543f3aa",
+    "07 - Convenciones",
+    "06 - Diseño/Sistema Visual.md",
+    "06 - Diseño/Wireframes y Pantallas.md",
+    "06 - Diseño/Wireframes y Pantallas.md.tmp.24444.99fbc3f14f55",
+    "06 - Diseño/Flujos de Usuario.md",
+    "06 - Diseño/_MOC Diseño.md",
+    "06 - Diseño/_MOC Diseño.md.tmp.24444.be7e3599de66",
+    "06 - Diseño",
+    "05 - Casos de Prueba/CP-006 Avanzar a entregado.md",
+    "05 - Casos de Prueba/CP-005 Tomar pedido.md",
+    "01 - Negocio/Pitch.md",
+    "05 - Casos de Prueba/CP-004 Comercio marca listo.md",
+    "05 - Casos de Prueba/CP-003 Buscar productos.md",
+    "05 - Casos de Prueba/CP-002 Un carrito un negocio.md",
+    "05 - Casos de Prueba/_MOC Casos de Prueba.md.tmp.24444.6d32efc23f4b",
+    "05 - Casos de Prueba"
+  ]
+}
