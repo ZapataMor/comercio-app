@@ -4,6 +4,10 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Negocio;
+use App\Models\User;
+use App\Notifications\EstadoPedidoActualizado;
+use App\Notifications\PedidoDisponibleParaDomiciliario;
+use App\Support\Push;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -209,6 +213,11 @@ class PanelController extends Controller
         }
 
         $pedido->update(['estado' => 'listo']);
+        Push::enviar(User::role('domiciliario')->get(), new PedidoDisponibleParaDomiciliario($pedido));
+
+        if ($pedido->cliente) {
+            Push::enviar($pedido->cliente, new EstadoPedidoActualizado($pedido));
+        }
 
         return back()->with('ok', "Pedido #{$pedido->id} marcado como listo. Los domiciliarios ya pueden tomarlo.");
     }

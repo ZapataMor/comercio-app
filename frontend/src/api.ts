@@ -461,6 +461,19 @@ export async function getAdminNegocios(token: string): Promise<AdminNegocio[]> {
   return (data.negocios ?? []) as AdminNegocio[];
 }
 
+// ---------- Push notifications ----------
+
+export async function registrarDeviceToken(token: string, fcmToken: string): Promise<void> {
+  await authSend('POST', '/api/device-tokens', token, {
+    token: fcmToken,
+    plataforma: 'android',
+  });
+}
+
+export async function eliminarDeviceToken(token: string, fcmToken: string): Promise<void> {
+  await authSend('DELETE', '/api/device-tokens', token, { token: fcmToken });
+}
+
 // ---------- Domiciliario (pedidos) ----------
 
 export type PedidoItem = { nombre: string; cantidad: number };

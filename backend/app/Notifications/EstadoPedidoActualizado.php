@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\Pedido;
+use App\Notifications\Concerns\UsaCanalPedidosFcm;
 use Illuminate\Notifications\Notification;
 use NotificationChannels\Fcm\FcmChannel;
 use NotificationChannels\Fcm\FcmMessage;
@@ -14,6 +15,8 @@ use NotificationChannels\Fcm\Resources\Notification as FcmNotification;
  */
 class EstadoPedidoActualizado extends Notification
 {
+    use UsaCanalPedidosFcm;
+
     /**
      * Título y cuerpo del aviso según el estado del pedido.
      *
@@ -43,7 +46,9 @@ class EstadoPedidoActualizado extends Notification
 
         return (new FcmMessage(
             notification: new FcmNotification(title: $titulo, body: $cuerpo),
-        ))->data([
+        ))
+            ->android($this->androidAlertaAlta())
+            ->data([
             'tipo' => 'estado_pedido',
             'pedido_id' => (string) $this->pedido->id,
             'estado' => $this->pedido->estado,

@@ -28,16 +28,25 @@ export default function PedidoDetalleScreen({ route }: Props) {
   const [pedido, setPedido] = useState<SeguimientoPedido | null>(null);
   const [cargando, setCargando] = useState(true);
 
+  const cargarPedido = useCallback(
+    (mostrarCarga = false) => {
+      if (mostrarCarga) {
+        setCargando(true);
+      }
+
+      return getPedido(auth!.token, id)
+        .then(setPedido)
+        .finally(() => setCargando(false));
+    },
+    [auth, id],
+  );
+
   useFocusEffect(
     useCallback(() => {
-      let activo = true;
-      getPedido(auth!.token, id)
-        .then(p => activo && setPedido(p))
-        .finally(() => activo && setCargando(false));
-      return () => {
-        activo = false;
-      };
-    }, [auth, id]),
+      cargarPedido(true);
+      const timer = setInterval(() => cargarPedido(), 5000);
+      return () => clearInterval(timer);
+    }, [cargarPedido]),
   );
 
   if (cargando) {

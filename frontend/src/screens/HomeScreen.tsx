@@ -75,16 +75,27 @@ export default function HomeScreen({ navigation }: Props) {
     });
   }, [navigation, esComerciante]);
 
-  // Pedidos en espera: se recargan cada vez que se entra al Inicio.
+  const cargarPedidos = useCallback(() => {
+    if (!esComerciante) {
+      return;
+    }
+
+    getPedidosComercio(token)
+      .then(setPedidos)
+      .catch(() => {});
+  }, [esComerciante, token]);
+
+  // Pedidos en espera: se recargan al entrar y luego cada pocos segundos.
   useFocusEffect(
     useCallback(() => {
       if (!esComerciante) {
         return;
       }
-      getPedidosComercio(token)
-        .then(setPedidos)
-        .catch(() => {});
-    }, [esComerciante, token]),
+
+      cargarPedidos();
+      const timer = setInterval(cargarPedidos, 5000);
+      return () => clearInterval(timer);
+    }, [cargarPedidos, esComerciante]),
   );
 
   const enEspera = pedidos.filter(p => p.estado === 'pendiente');

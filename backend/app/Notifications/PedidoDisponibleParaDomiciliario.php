@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\Pedido;
+use App\Notifications\Concerns\UsaCanalPedidosFcm;
 use Illuminate\Notifications\Notification;
 use NotificationChannels\Fcm\FcmChannel;
 use NotificationChannels\Fcm\FcmMessage;
@@ -13,6 +14,8 @@ use NotificationChannels\Fcm\Resources\Notification as FcmNotification;
  */
 class PedidoDisponibleParaDomiciliario extends Notification
 {
+    use UsaCanalPedidosFcm;
+
     public function __construct(public Pedido $pedido)
     {
     }
@@ -31,7 +34,9 @@ class PedidoDisponibleParaDomiciliario extends Notification
                 title: 'Pedido listo para recoger 🛵',
                 body: "{$negocio} tiene un pedido listo. ¡Tómalo antes que otro!",
             ),
-        ))->data([
+        ))
+            ->android($this->androidAlertaAlta())
+            ->data([
             'tipo' => 'pedido_disponible',
             'pedido_id' => (string) $this->pedido->id,
             'estado' => 'listo',

@@ -10,7 +10,10 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/AuthContext';
 import { CartProvider } from './src/CartContext';
 import { NegocioProvider } from './src/NegocioContext';
+import { configurarMensajesForeground } from './src/pushNotifications';
+import { navigationRef, procesarNotificacionPendiente } from './src/RootNavigation';
 import { ToastProvider } from './src/Toast';
+import { useToast } from './src/Toast';
 import { RootStackParamList } from './src/navTypes';
 import HomeScreen from './src/screens/HomeScreen';
 import LoginScreen from './src/screens/LoginScreen';
@@ -47,7 +50,7 @@ function Navegacion() {
   const inicial = !auth ? 'Login' : roles.includes('usuario') ? 'Explorar' : 'Home';
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef} onReady={() => procesarNotificacionPendiente(auth?.user)}>
       <Stack.Navigator
         initialRouteName={inicial}
         screenOptions={{
@@ -114,6 +117,25 @@ function Navegacion() {
   );
 }
 
+function PushBridge() {
+  const { auth } = useAuth();
+  const toast = useToast();
+
+  React.useEffect(() => {
+    return configurarMensajesForeground(auth?.user, message => {
+      const titulo = message.notification?.title ?? 'Nueva notificacion';
+      const cuerpo = message.notification?.body;
+      toast.info(titulo, cuerpo);
+    });
+  }, [auth?.user, toast]);
+
+  React.useEffect(() => {
+    procesarNotificacionPendiente(auth?.user);
+  }, [auth?.user]);
+
+  return null;
+}
+
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
   return (
@@ -123,6 +145,7 @@ function App() {
           <SafeAreaProvider>
             <ToastProvider>
               <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+              <PushBridge />
               <Navegacion />
             </ToastProvider>
           </SafeAreaProvider>

@@ -18,23 +18,31 @@ export default function MisPedidosScreen({ navigation }: Props) {
   const [cargando, setCargando] = useState(true);
   const [refrescando, setRefrescando] = useState(false);
 
+  const cargar = useCallback(
+    (mostrarCarga = false) => {
+      if (mostrarCarga) {
+        setCargando(true);
+      }
+
+      return getMisPedidos(auth!.token)
+        .then(setPedidos)
+        .finally(() => setCargando(false));
+    },
+    [auth],
+  );
+
   // Se recarga cada vez que entras a la pantalla (para ver el avance de estado).
   useFocusEffect(
     useCallback(() => {
-      let activo = true;
-      getMisPedidos(auth!.token)
-        .then(p => activo && setPedidos(p))
-        .finally(() => activo && setCargando(false));
-      return () => {
-        activo = false;
-      };
-    }, [auth]),
+      cargar(true);
+      const timer = setInterval(() => cargar(), 5000);
+      return () => clearInterval(timer);
+    }, [cargar]),
   );
 
   function refrescar() {
     setRefrescando(true);
-    getMisPedidos(auth!.token)
-      .then(setPedidos)
+    cargar()
       .finally(() => setRefrescando(false));
   }
 

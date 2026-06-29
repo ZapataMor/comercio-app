@@ -36,8 +36,13 @@ export default function DomiciliarioScreen() {
   const [refrescando, setRefrescando] = useState(false);
 
   const cargar = useCallback(
-    (refresco = false) => {
-      refresco ? setRefrescando(true) : setCargando(true);
+    (refresco = false, silencioso = false) => {
+      if (refresco) {
+        setRefrescando(true);
+      } else if (!silencioso) {
+        setCargando(true);
+      }
+
       Promise.all([getDisponibles(token), getMisEntregas(token), getHistorialEntregas(token)])
         .then(([d, e, h]) => {
           setDisponibles(d);
@@ -53,7 +58,11 @@ export default function DomiciliarioScreen() {
     [token],
   );
 
-  useEffect(() => cargar(), [cargar]);
+  useEffect(() => {
+    cargar();
+    const timer = setInterval(() => cargar(false, true), 5000);
+    return () => clearInterval(timer);
+  }, [cargar]);
 
   async function onTomar(id: number, minutos: number) {
     try {

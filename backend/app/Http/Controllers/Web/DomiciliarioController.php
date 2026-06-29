@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Pedido;
+use App\Notifications\EstadoPedidoActualizado;
+use App\Support\Push;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -68,6 +70,11 @@ class DomiciliarioController extends Controller
             return back()->with('error', 'Ese pedido ya fue tomado por otro domiciliario.');
         }
 
+        $pedido = Pedido::find($id);
+        if ($pedido?->cliente) {
+            Push::enviar($pedido->cliente, new EstadoPedidoActualizado($pedido));
+        }
+
         return back()->with('ok', 'Tomaste el pedido. Pasa a recogerlo al negocio.');
     }
 
@@ -104,6 +111,10 @@ class DomiciliarioController extends Controller
         }
 
         $pedido->update(['estado' => $hacia]);
+
+        if ($pedido->cliente) {
+            Push::enviar($pedido->cliente, new EstadoPedidoActualizado($pedido));
+        }
 
         return back()->with('ok', $msg);
     }

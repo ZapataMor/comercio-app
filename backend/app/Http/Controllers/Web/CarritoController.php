@@ -7,6 +7,8 @@ use App\Models\CarritoItem;
 use App\Models\Pedido;
 use App\Models\PedidoItem;
 use App\Models\Producto;
+use App\Notifications\NuevoPedidoParaComercio;
+use App\Support\Push;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -148,6 +150,11 @@ class CarritoController extends Controller
 
             return $pedido;
         });
+
+        $pedido->loadMissing('negocio.user');
+        if ($pedido->negocio?->user) {
+            Push::enviar($pedido->negocio->user, new NuevoPedidoParaComercio($pedido));
+        }
 
         return redirect()->route('pedidos.show', $pedido->id)
             ->with('ok', '¡Pedido confirmado! El negocio ya lo recibió.');

@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\Pedido;
+use App\Notifications\Concerns\UsaCanalPedidosFcm;
 use Illuminate\Notifications\Notification;
 use NotificationChannels\Fcm\FcmChannel;
 use NotificationChannels\Fcm\FcmMessage;
@@ -13,6 +14,8 @@ use NotificationChannels\Fcm\Resources\Notification as FcmNotification;
  */
 class NuevoPedidoParaComercio extends Notification
 {
+    use UsaCanalPedidosFcm;
+
     public function __construct(public Pedido $pedido)
     {
     }
@@ -32,7 +35,9 @@ class NuevoPedidoParaComercio extends Notification
                 title: '¡Nuevo pedido! 🛒',
                 body: "Recibiste un pedido por {$total}. Tócalo para prepararlo.",
             ),
-        ))->data([
+        ))
+            ->android($this->androidAlertaAlta())
+            ->data([
             'tipo' => 'nuevo_pedido',
             'pedido_id' => (string) $this->pedido->id,
             'estado' => 'pendiente',

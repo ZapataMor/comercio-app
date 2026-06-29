@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">ComercioApp</string>
+    <string name="default_notification_channel_id">pedidos</string>
 </resources>

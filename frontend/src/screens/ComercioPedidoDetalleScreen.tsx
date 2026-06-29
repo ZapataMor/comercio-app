@@ -1,7 +1,7 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { marcarPedidoListo } from '../api';
+import { ComercioPedido, getPedidosComercio, marcarPedidoListo } from '../api';
 import { useAuth } from '../AuthContext';
 import Icon from '../components/Icon';
 import { RootStackParamList } from '../navTypes';
@@ -14,13 +14,36 @@ function cop(n: number) {
 }
 
 export default function ComercioPedidoDetalleScreen({ route, navigation }: Props) {
-  const { pedido } = route.params;
   const { auth } = useAuth();
   const token = auth!.token;
   const toast = useToast();
+  const [pedido, setPedido] = useState<ComercioPedido | null>(route.params.pedido ?? null);
+  const [cargando, setCargando] = useState(!route.params.pedido);
   const [enviando, setEnviando] = useState(false);
 
+  useEffect(() => {
+    if (pedido || !route.params.pedidoId) {
+      setCargando(false);
+      return;
+    }
+
+    getPedidosComercio(token)
+      .then(pedidos => {
+        const encontrado = pedidos.find(p => p.id === route.params.pedidoId);
+        if (encontrado) {
+          setPedido(encontrado);
+        } else {
+          toast.error('Pedido no encontrado', 'Actualiza la lista de pedidos.');
+        }
+      })
+      .catch(e => toast.error('No se pudo cargar', e instanceof Error ? e.message : 'Error'))
+      .finally(() => setCargando(false));
+  }, [pedido, route.params.pedidoId, toast, token]);
+
   async function onListo() {
+    if (!pedido) {
+      return;
+    }
     setEnviando(true);
     try {
       await marcarPedidoListo(token, pedido.id);
@@ -30,6 +53,22 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
       toast.error('No se pudo', e instanceof Error ? e.message : 'Error');
       setEnviando(false);
     }
+  }
+
+  if (cargando) {
+    return (
+      <View style={styles.centro}>
+        <ActivityIndicator size="large" color="#4f46e5" />
+      </View>
+    );
+  }
+
+  if (!pedido) {
+    return (
+      <View style={styles.centro}>
+        <Text style={styles.nota}>No se pudo abrir este pedido.</Text>
+      </View>
+    );
   }
 
   return (
@@ -124,6 +163,7 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f1f5f9' },
+  centro: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f1f5f9', padding: 20 },
   card: { backgroundColor: '#fff', borderRadius: 16, padding: 18 },
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   pid: { fontWeight: '800', color: '#0f172a', fontSize: 18 },

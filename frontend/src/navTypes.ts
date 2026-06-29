@@ -9,7 +9,7 @@ export type RootStackParamList = {
   MiTienda: undefined;
   MisCategorias: undefined;
   CategoriaProductos: { categoriaId: number | null; nombre: string };
-  ComercioPedidoDetalle: { pedido: ComercioPedido };
+  ComercioPedidoDetalle: { pedido?: ComercioPedido; pedidoId?: number };
   // Cliente
   Explorar: undefined;
   Negocio: { id: number; nombre: string };

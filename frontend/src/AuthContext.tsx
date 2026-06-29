@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 import { Usuario } from './api';
+import { eliminarPush, escucharRotacionToken, registrarPush } from './pushNotifications';
 
 type Sesion = { token: string; user: Usuario } | null;
 
@@ -37,6 +39,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .finally(() => setCargando(false));
   }, []);
 
+  useEffect(() => {
+    if (!auth?.token) {
+      return;
+    }
+
+    registrarPush(auth.token);
+
+    const appStateSubscription = AppState.addEventListener('change', state => {
+      if (state === 'active') {
+        registrarPush(auth.token);
+      }
+    });
+
+    const unsubscribeTokenRefresh = escucharRotacionToken(auth.token);
+
+    return () => {
+      appStateSubscription.remove();
+      unsubscribeTokenRefresh();
+    };
+  }, [auth?.token, auth?.user.id]);
+
   const entrar = (token: string, user: Usuario) => {
     const sesion = { token, user };
     setAuth(sesion);
@@ -44,6 +67,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const salir = () => {
+    if (auth?.token) {
+      eliminarPush(auth.token);
+    }
     setAuth(null);
     AsyncStorage.removeItem(CLAVE);
   };
