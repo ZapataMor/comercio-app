@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   RefreshControl,
   StyleSheet,
   Text,
@@ -10,7 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { getNegocios, NegocioLista } from '../api';
+import { getNegocios, imagenUrl, NegocioLista } from '../api';
 import { useAuth } from '../AuthContext';
 import { useCart } from '../CartContext';
 import { RootStackParamList } from '../navTypes';
@@ -108,6 +109,9 @@ export default function ExplorarScreen({ navigation }: Props) {
         <TouchableOpacity
           style={styles.card}
           onPress={() => navigation.navigate('Negocio', { id: item.id, nombre: item.nombre })}>
+          {!!imagenUrl(item.imagen) && (
+            <Image source={{ uri: imagenUrl(item.imagen) }} style={styles.portada} resizeMode="cover" />
+          )}
           <View style={styles.cardHead}>
             <Text style={styles.nombre}>{item.nombre}</Text>
             <Text style={styles.abierto}>Abierto</Text>
@@ -138,6 +142,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 12,
     shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
   },
+  portada: { width: '100%', height: 130, borderRadius: 12, marginBottom: 10, backgroundColor: '#e2e8f0' },
   cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   nombre: { fontSize: 17, fontWeight: '700', color: '#0f172a', flex: 1 },
   abierto: {

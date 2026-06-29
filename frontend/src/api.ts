@@ -19,16 +19,20 @@ export type Negocio = {
   direccion: string | null;
   telefono: string | null;
   activo: boolean;
+  imagen?: string | null; // ruta relativa "/storage/negocios/x.jpg"
 };
 
-export type Categoria = { id: number; nombre: string };
+export type Categoria = { id: number; nombre: string; productos?: number };
 
 export type Producto = {
   id: number;
   nombre: string;
   descripcion: string | null;
   precio: number;
+  tipo_venta?: string; // 'cantidad' | 'peso' | ...
+  unidad_medida?: string; // 'unidad' | 'kg' | 'libra' | ...
   precio_formateado?: string; // ej. "$3.200 c/u" o "$8.900 / kg"
+  imagen?: string | null; // ruta relativa "/storage/productos/x.jpg"
   disponible: boolean;
   categoria: Categoria | null;
 };
@@ -39,8 +43,20 @@ export type NegocioLista = {
   nombre: string;
   descripcion: string | null;
   direccion: string | null;
+  imagen?: string | null;
   productos: number;
 };
+
+/**
+ * Convierte la ruta relativa de imagen del backend (ej "/storage/...") en una
+ * URL completa usando la API_URL. Devuelve undefined si no hay imagen, para
+ * poder usarla directo en `source={{ uri }}` (Image no pinta nada si es undefined).
+ */
+export function imagenUrl(path?: string | null): string | undefined {
+  if (!path) return undefined;
+  if (path.startsWith('http')) return path;
+  return `${API_URL}${path}`;
+}
 
 /** Error de API que conserva el código HTTP (para distinguir 404, 422, etc.). */
 export class ApiError extends Error {
@@ -163,6 +179,58 @@ async function authSend(method: 'POST' | 'PUT' | 'DELETE', path: string, token: 
   return data;
 }
 
+/**
+ * Envío multipart/form-data autenticado, para subir archivos (imágenes).
+ * Como PHP no parsea archivos en peticiones PUT reales, los "PUT" se simulan
+ * con POST + campo `_method=PUT` (method spoofing de Laravel).
+ * NO fijamos Content-Type: fetch pone el boundary correcto solo.
+ */
+async function authUpload(
+  metodo: 'POST' | 'PUT',
+  path: string,
+  token: string,
+  campos: Record<string, any>,
+  imagenUri?: string,
+): Promise<any> {
+  const form = new FormData();
+  if (metodo === 'PUT') {
+    form.append('_method', 'PUT');
+  }
+  for (const [k, v] of Object.entries(campos)) {
+    if (v === undefined) continue;
+    if (typeof v === 'boolean') form.append(k, v ? '1' : '0');
+    else if (v === null) form.append(k, ''); // '' -> null en el backend
+    else form.append(k, String(v));
+  }
+  if (imagenUri) {
+    const nombre = imagenUri.split('/').pop() || 'foto.jpg';
+    const ext = (nombre.split('.').pop() || 'jpg').toLowerCase();
+    const tipo = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+    // En React Native el archivo se adjunta como {uri, name, type}.
+    form.append('imagen', { uri: imagenUri, name: nombre, type: tipo } as any);
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      method: 'POST', // siempre POST; el PUT real se simula con _method
+      headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+      body: form,
+    });
+  } catch (e) {
+    throw new Error('No se pudo conectar con el servidor.');
+  }
+  const data = await res.json().catch(() => ({} as any));
+  if (!res.ok) {
+    const primero =
+      data?.errors && typeof data.errors === 'object'
+        ? (Object.values(data.errors)[0] as string[])?.[0]
+        : undefined;
+    throw new ApiError(primero ?? data?.message ?? 'Error en la petición.', res.status);
+  }
+  return data;
+}
+
 /** Mi negocio (o null si el comerciante aún no lo creó → 404). */
 export async function getNegocio(token: string): Promise<Negocio | null> {
   try {
@@ -176,9 +244,25 @@ export async function getNegocio(token: string): Promise<Negocio | null> {
   }
 }
 
-/** Mis productos (primera página del catálogo). */
-export async function getProductos(token: string): Promise<Producto[]> {
-  const data = await authGet('/api/comerciante/productos', token);
+/**
+ * Mis productos. Sin opciones trae la primera página; con `categoriaId`
+ * filtra por categoría y con `sinCategoria` los que no tienen categoría.
+ */
+export async function getProductos(
+  token: string,
+  opts?: { categoriaId?: number | null; sinCategoria?: boolean; porPagina?: number },
+): Promise<Producto[]> {
+  const partes: string[] = [];
+  if (opts?.sinCategoria) {
+    partes.push('sin_categoria=1');
+  } else if (opts?.categoriaId != null) {
+    partes.push(`categoria_id=${opts.categoriaId}`);
+  }
+  if (opts) {
+    partes.push(`por_pagina=${opts.porPagina ?? 100}`);
+  }
+  const qs = partes.length ? `?${partes.join('&')}` : '';
+  const data = await authGet(`/api/comerciante/productos${qs}`, token);
   return (data.data ?? []) as Producto[];
 }
 
@@ -193,15 +277,36 @@ export type NegocioInput = {
   activo?: boolean;
 };
 
-/** Crea mi negocio (cuando aún no existe). */
-export async function crearNegocio(token: string, body: NegocioInput): Promise<Negocio> {
-  const d = await authSend('POST', '/api/comerciante/negocio', token, body);
+/** Crea mi negocio (cuando aún no existe). Con `imagenUri` sube la foto. */
+export async function crearNegocio(
+  token: string,
+  body: NegocioInput,
+  imagenUri?: string,
+): Promise<Negocio> {
+  const d = imagenUri
+    ? await authUpload('POST', '/api/comerciante/negocio', token, body, imagenUri)
+    : await authSend('POST', '/api/comerciante/negocio', token, body);
   return d.negocio as Negocio;
 }
 
-/** Actualiza mi negocio. */
-export async function actualizarNegocio(token: string, body: NegocioInput): Promise<Negocio> {
-  const d = await authSend('PUT', '/api/comerciante/negocio', token, body);
+/** Actualiza mi negocio. Con `imagenUri` reemplaza la foto. */
+export async function actualizarNegocio(
+  token: string,
+  body: NegocioInput,
+  imagenUri?: string,
+): Promise<Negocio> {
+  const d = imagenUri
+    ? await authUpload('PUT', '/api/comerciante/negocio', token, body, imagenUri)
+    : await authSend('PUT', '/api/comerciante/negocio', token, body);
+  return d.negocio as Negocio;
+}
+
+/**
+ * Abrir/cerrar el negocio rápidamente (switch de la topbar).
+ * Reutiliza `activo`: cerrado = no visible para los clientes en Explorar.
+ */
+export async function cambiarEstadoNegocio(token: string, activo: boolean): Promise<Negocio> {
+  const d = await authSend('PUT', '/api/comerciante/negocio', token, { activo });
   return d.negocio as Negocio;
 }
 
@@ -232,13 +337,20 @@ export type ProductoInput = {
   nombre: string;
   descripcion?: string | null;
   precio: number;
+  tipo_venta?: string;
   unidad_medida?: string;
   disponible?: boolean;
   categoria_id?: number | null;
 };
 
-export async function crearProducto(token: string, body: ProductoInput): Promise<Producto> {
-  const d = await authSend('POST', '/api/comerciante/productos', token, body);
+export async function crearProducto(
+  token: string,
+  body: ProductoInput,
+  imagenUri?: string,
+): Promise<Producto> {
+  const d = imagenUri
+    ? await authUpload('POST', '/api/comerciante/productos', token, body, imagenUri)
+    : await authSend('POST', '/api/comerciante/productos', token, body);
   return d.producto as Producto;
 }
 
@@ -246,8 +358,11 @@ export async function actualizarProducto(
   token: string,
   id: number,
   body: ProductoInput,
+  imagenUri?: string,
 ): Promise<Producto> {
-  const d = await authSend('PUT', `/api/comerciante/productos/${id}`, token, body);
+  const d = imagenUri
+    ? await authUpload('PUT', `/api/comerciante/productos/${id}`, token, body, imagenUri)
+    : await authSend('PUT', `/api/comerciante/productos/${id}`, token, body);
   return d.producto as Producto;
 }
 

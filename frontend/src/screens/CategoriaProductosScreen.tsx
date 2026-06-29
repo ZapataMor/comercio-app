@@ -1,3 +1,4 @@
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -27,15 +28,40 @@ import {
   Producto,
 } from '../api';
 import { useAuth } from '../AuthContext';
+import { Dropdown } from '../components/Dropdown';
 import SelectorImagen from '../components/SelectorImagen';
+import { RootStackParamList } from '../navTypes';
+import { useToast } from '../Toast';
+
+type Props = NativeStackScreenProps<RootStackParamList, 'CategoriaProductos'>;
+
+/**
+ * Unidad de venta tal como la elige el comerciante en la app (3 opciones),
+ * mapeada a los campos del backend (`tipo_venta` + `unidad_medida`).
+ */
+const UNIDADES = [
+  { value: 'cantidad', label: 'Cantidad', tipo_venta: 'cantidad', unidad_medida: 'unidad' },
+  { value: 'kilos', label: 'Kilos', tipo_venta: 'peso', unidad_medida: 'kg' },
+  { value: 'libras', label: 'Libras', tipo_venta: 'peso', unidad_medida: 'libra' },
+] as const;
+type UnidadKey = (typeof UNIDADES)[number]['value'];
+
+function unidadDesdeProducto(p: Producto | null): UnidadKey {
+  if (p?.unidad_medida === 'kg') return 'kilos';
+  if (p?.unidad_medida === 'libra') return 'libras';
+  return 'cantidad';
+}
 
 function precioCOP(n: number) {
   return '$' + Math.round(n).toLocaleString('es-CO');
 }
 
-export default function MisProductosScreen() {
+export default function CategoriaProductosScreen({ route }: Props) {
+  const { categoriaId } = route.params;
+  const esSinCategoria = categoriaId == null;
   const { auth } = useAuth();
   const token = auth!.token;
+  const toast = useToast();
 
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -43,22 +69,25 @@ export default function MisProductosScreen() {
   const [refrescando, setRefrescando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Estado del formulario (modal).
+  // Formulario (modal).
   const [modal, setModal] = useState(false);
   const [editando, setEditando] = useState<Producto | null>(null);
   const [nombre, setNombre] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [precio, setPrecio] = useState('');
-  const [unidad, setUnidad] = useState('unidad');
-  const [categoriaId, setCategoriaId] = useState<number | null>(null);
+  const [unidad, setUnidad] = useState<UnidadKey>('cantidad');
+  const [catId, setCatId] = useState<number | null>(categoriaId);
+  const [imagenUri, setImagenUri] = useState<string | null>(null);
   const [disponible, setDisponible] = useState(true);
-  const [imagenUri, setImagenUri] = useState<string | null>(null); // foto local recién elegida
   const [guardando, setGuardando] = useState(false);
 
   const cargar = useCallback(
     (refresco = false) => {
       refresco ? setRefrescando(true) : setCargando(true);
-      Promise.all([getProductos(token), getCategoriasComerciante(token)])
+      Promise.all([
+        getProductos(token, esSinCategoria ? { sinCategoria: true } : { categoriaId }),
+        getCategoriasComerciante(token),
+      ])
         .then(([ps, cs]) => {
           setProductos(ps);
           setCategorias(cs);
@@ -69,7 +98,7 @@ export default function MisProductosScreen() {
           setRefrescando(false);
         });
     },
-    [token],
+    [token, categoriaId, esSinCategoria],
   );
 
   useEffect(() => cargar(), [cargar]);
@@ -79,10 +108,10 @@ export default function MisProductosScreen() {
     setNombre('');
     setDescripcion('');
     setPrecio('');
-    setUnidad('unidad');
-    setCategoriaId(null);
-    setDisponible(true);
+    setUnidad('cantidad');
+    setCatId(categoriaId);
     setImagenUri(null);
+    setDisponible(true);
     setModal(true);
   }
 
@@ -91,42 +120,46 @@ export default function MisProductosScreen() {
     setNombre(p.nombre);
     setDescripcion(p.descripcion ?? '');
     setPrecio(String(Math.round(p.precio)));
-    setUnidad(p.unidad_medida ?? 'unidad');
-    setCategoriaId(p.categoria?.id ?? null);
-    setDisponible(p.disponible);
+    setUnidad(unidadDesdeProducto(p));
+    setCatId(p.categoria?.id ?? null);
     setImagenUri(null);
+    setDisponible(p.disponible);
     setModal(true);
   }
 
   async function guardar() {
     const precioNum = Number(precio.replace(/[^0-9.]/g, ''));
     if (!nombre.trim()) {
-      Alert.alert('Falta el nombre', 'El nombre del producto es obligatorio.');
+      toast.error('Falta el nombre', 'El nombre del producto es obligatorio.');
       return;
     }
     if (!precio || isNaN(precioNum) || precioNum < 0) {
-      Alert.alert('Precio inválido', 'Ingresa un precio válido.');
+      toast.error('Precio inválido', 'Ingresa un precio válido.');
       return;
     }
+    const u = UNIDADES.find(x => x.value === unidad)!;
     setGuardando(true);
     try {
       const body = {
         nombre: nombre.trim(),
         descripcion: descripcion.trim() || null,
         precio: precioNum,
-        unidad_medida: unidad.trim() || 'unidad',
-        categoria_id: categoriaId,
+        tipo_venta: u.tipo_venta,
+        unidad_medida: u.unidad_medida,
+        categoria_id: catId,
         disponible,
       };
       if (editando) {
         await actualizarProducto(token, editando.id, body, imagenUri ?? undefined);
+        toast.exito('Listo', 'Producto actualizado.');
       } else {
         await crearProducto(token, body, imagenUri ?? undefined);
+        toast.exito('Listo', 'Producto creado.');
       }
       setModal(false);
       cargar();
     } catch (e) {
-      Alert.alert('No se pudo guardar', e instanceof Error ? e.message : 'Error');
+      toast.error('No se pudo guardar', e instanceof Error ? e.message : 'Error');
     } finally {
       setGuardando(false);
     }
@@ -141,9 +174,10 @@ export default function MisProductosScreen() {
         onPress: async () => {
           try {
             await eliminarProducto(token, p.id);
+            toast.exito('Eliminado', `"${p.nombre}" se quitó del catálogo.`);
             cargar();
           } catch (e) {
-            Alert.alert('No se pudo eliminar', e instanceof Error ? e.message : 'Error');
+            toast.error('No se pudo eliminar', e instanceof Error ? e.message : 'Error');
           }
         },
       },
@@ -157,6 +191,12 @@ export default function MisProductosScreen() {
     return <Text style={styles.error}>{error}</Text>;
   }
 
+  // Opciones del dropdown de categoría (solo se usa en el grupo "Sin categoría").
+  const opcionesCategoria = [
+    { label: 'Sin categoría', value: '0' },
+    ...categorias.map(c => ({ label: c.nombre, value: String(c.id) })),
+  ];
+
   return (
     <View style={styles.container}>
       <FlatList
@@ -167,25 +207,34 @@ export default function MisProductosScreen() {
           <RefreshControl refreshing={refrescando} onRefresh={() => cargar(true)} colors={['#4f46e5']} />
         }
         ListHeaderComponent={
-          <TouchableOpacity style={styles.nuevoBtn} onPress={abrirNuevo}>
-            <Text style={styles.nuevoTxt}>+ Nuevo producto</Text>
-          </TouchableOpacity>
+          esSinCategoria ? (
+            <Text style={styles.ayuda}>
+              Productos sin categoría. Edítalos para asignarles una categoría.
+            </Text>
+          ) : (
+            <TouchableOpacity style={styles.nuevoBtn} onPress={abrirNuevo}>
+              <Text style={styles.nuevoTxt}>+ Nuevo producto</Text>
+            </TouchableOpacity>
+          )
         }
-        ListEmptyComponent={<Text style={styles.vacio}>Aún no tienes productos.</Text>}
+        ListEmptyComponent={
+          <Text style={styles.vacio}>
+            {esSinCategoria
+              ? 'No hay productos sin categoría.'
+              : 'Aún no hay productos en esta categoría.\nToca "+ Nuevo producto" para crear el primero.'}
+          </Text>
+        }
         renderItem={({ item }) => (
           <TouchableOpacity style={styles.item} onPress={() => abrirEditar(item)}>
-            {imagenUrl(item.imagen) ? (
-              <Image source={{ uri: imagenUrl(item.imagen) }} style={styles.thumb} resizeMode="cover" />
-            ) : (
-              <View style={[styles.thumb, styles.thumbVacio]}>
-                <Text style={styles.thumbEmoji}>📦</Text>
-              </View>
-            )}
+            <View style={styles.thumb}>
+              {item.imagen ? (
+                <Image source={{ uri: imagenUrl(item.imagen) }} style={styles.thumbImg} resizeMode="cover" />
+              ) : (
+                <Text style={styles.thumbPlaceholder}>📦</Text>
+              )}
+            </View>
             <View style={styles.itemTexto}>
-              <View style={styles.itemTituloRow}>
-                <Text style={styles.nombre}>{item.nombre}</Text>
-                {item.categoria && <Text style={styles.cat}>{item.categoria.nombre}</Text>}
-              </View>
+              <Text style={styles.nombre}>{item.nombre}</Text>
               <Text style={styles.precio}>{item.precio_formateado ?? precioCOP(item.precio)}</Text>
             </View>
             <View style={styles.acciones}>
@@ -217,7 +266,13 @@ export default function MisProductosScreen() {
               />
 
               <Text style={styles.label}>Nombre *</Text>
-              <TextInput style={styles.input} value={nombre} onChangeText={setNombre} placeholder="Ej: Arroz" />
+              <TextInput
+                style={styles.input}
+                value={nombre}
+                onChangeText={setNombre}
+                placeholder="Ej: Arroz con pollo"
+                editable={!guardando}
+              />
 
               <Text style={styles.label}>Descripción</Text>
               <TextInput
@@ -226,58 +281,42 @@ export default function MisProductosScreen() {
                 onChangeText={setDescripcion}
                 placeholder="Opcional"
                 multiline
+                editable={!guardando}
               />
 
-              <View style={styles.fila}>
-                <View style={{ flex: 2 }}>
-                  <Text style={styles.label}>Precio *</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={precio}
-                    onChangeText={setPrecio}
-                    placeholder="3000"
-                    keyboardType="numeric"
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Unidad</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={unidad}
-                    onChangeText={setUnidad}
-                    placeholder="unidad / kg"
-                    autoCapitalize="none"
-                  />
-                </View>
-              </View>
+              <Text style={styles.label}>Precio *</Text>
+              <TextInput
+                style={styles.input}
+                value={precio}
+                onChangeText={setPrecio}
+                placeholder="12000"
+                keyboardType="numeric"
+                editable={!guardando}
+              />
 
-              <Text style={styles.label}>Categoría</Text>
-              <View style={styles.chips}>
-                <TouchableOpacity
-                  onPress={() => setCategoriaId(null)}
-                  style={[styles.chip, categoriaId === null && styles.chipOn]}>
-                  <Text style={[styles.chipTxt, categoriaId === null && styles.chipTxtOn]}>
-                    Sin categoría
-                  </Text>
-                </TouchableOpacity>
-                {categorias.map(c => (
-                  <TouchableOpacity
-                    key={c.id}
-                    onPress={() => setCategoriaId(c.id)}
-                    style={[styles.chip, categoriaId === c.id && styles.chipOn]}>
-                    <Text style={[styles.chipTxt, categoriaId === c.id && styles.chipTxtOn]}>
-                      {c.nombre}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              {categorias.length === 0 && (
-                <Text style={styles.ayuda}>Crea categorías desde "Categorías" en el inicio.</Text>
+              <Text style={styles.label}>Unidad de venta</Text>
+              <Dropdown<UnidadKey>
+                valor={unidad}
+                opciones={UNIDADES.map(u => ({ label: u.label, value: u.value }))}
+                onChange={setUnidad}
+                disabled={guardando}
+              />
+
+              {esSinCategoria && (
+                <>
+                  <Text style={styles.label}>Categoría</Text>
+                  <Dropdown
+                    valor={catId == null ? '0' : String(catId)}
+                    opciones={opcionesCategoria}
+                    onChange={v => setCatId(v === '0' ? null : Number(v))}
+                    disabled={guardando}
+                  />
+                </>
               )}
 
               <View style={styles.switchRow}>
                 <Text style={styles.label}>Disponible</Text>
-                <Switch value={disponible} onValueChange={setDisponible} />
+                <Switch value={disponible} onValueChange={setDisponible} disabled={guardando} />
               </View>
 
               <TouchableOpacity
@@ -307,21 +346,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#4f46e5', borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginBottom: 14,
   },
   nuevoTxt: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  ayuda: { color: '#64748b', fontSize: 13, marginBottom: 14, textAlign: 'center' },
   item: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10,
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#fff', borderRadius: 14, padding: 12, marginBottom: 10,
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, elevation: 1,
   },
-  thumb: { width: 48, height: 48, borderRadius: 10, marginRight: 12, backgroundColor: '#f1f5f9' },
-  thumbVacio: { alignItems: 'center', justifyContent: 'center' },
-  thumbEmoji: { fontSize: 22 },
-  itemTexto: { flex: 1 },
-  itemTituloRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  nombre: { fontSize: 15, fontWeight: '600', color: '#0f172a' },
-  cat: {
-    fontSize: 11, color: '#64748b', backgroundColor: '#f1f5f9',
-    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, overflow: 'hidden',
+  thumb: {
+    width: 48, height: 48, borderRadius: 10, backgroundColor: '#f1f5f9',
+    alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginRight: 12,
   },
+  thumbImg: { width: '100%', height: '100%' },
+  thumbPlaceholder: { fontSize: 22 },
+  itemTexto: { flex: 1 },
+  nombre: { fontSize: 15, fontWeight: '600', color: '#0f172a' },
   precio: { color: '#475569', marginTop: 4, fontWeight: '600' },
   acciones: { alignItems: 'flex-end', gap: 8, marginLeft: 8 },
   estado: {
@@ -331,7 +369,7 @@ const styles = StyleSheet.create({
   disp: { backgroundColor: '#dcfce7', color: '#15803d' },
   oculto: { backgroundColor: '#e2e8f0', color: '#64748b' },
   eliminar: { fontSize: 18 },
-  vacio: { textAlign: 'center', color: '#64748b', marginTop: 40 },
+  vacio: { textAlign: 'center', color: '#64748b', marginTop: 40, lineHeight: 20 },
   error: { color: '#b91c1c', backgroundColor: '#fee2e2', padding: 12, borderRadius: 10, margin: 20 },
   // Modal
   modalFondo: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'flex-end' },
@@ -346,13 +384,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 11, fontSize: 16, marginBottom: 14, color: '#0f172a',
   },
   area: { minHeight: 70, textAlignVertical: 'top' },
-  fila: { flexDirection: 'row', gap: 10 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
-  chip: { backgroundColor: '#f1f5f9', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
-  chipOn: { backgroundColor: '#4f46e5' },
-  chipTxt: { fontSize: 12, color: '#475569', fontWeight: '600' },
-  chipTxtOn: { color: '#fff' },
-  ayuda: { color: '#94a3b8', fontSize: 12, marginBottom: 8 },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: 10 },
   boton: { backgroundColor: '#4f46e5', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 6 },
   botonTxt: { color: '#fff', fontWeight: '700', fontSize: 16 },

@@ -4,12 +4,13 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { getCatalogo, Negocio, Producto } from '../api';
+import { getCatalogo, imagenUrl, Negocio, Producto } from '../api';
 import { useAuth } from '../AuthContext';
 import { useCart } from '../CartContext';
 import { RootStackParamList } from '../navTypes';
@@ -75,6 +76,9 @@ export default function NegocioScreen({ route, navigation }: Props) {
       ListHeaderComponent={
         negocio ? (
           <View style={styles.cabecera}>
+            {!!imagenUrl(negocio.imagen) && (
+              <Image source={{ uri: imagenUrl(negocio.imagen) }} style={styles.portada} resizeMode="cover" />
+            )}
             {!!negocio.descripcion && <Text style={styles.desc}>{negocio.descripcion}</Text>}
             {!!negocio.direccion && <Text style={styles.dato}>📍 {negocio.direccion}</Text>}
           </View>
@@ -83,6 +87,13 @@ export default function NegocioScreen({ route, navigation }: Props) {
       ListEmptyComponent={<Text style={styles.vacio}>Este negocio no tiene productos disponibles.</Text>}
       renderItem={({ item }) => (
         <View style={styles.item}>
+          {imagenUrl(item.imagen) ? (
+            <Image source={{ uri: imagenUrl(item.imagen) }} style={styles.thumb} resizeMode="cover" />
+          ) : (
+            <View style={[styles.thumb, styles.thumbVacio]}>
+              <Text style={styles.thumbEmoji}>📦</Text>
+            </View>
+          )}
           <View style={styles.itemTexto}>
             <View style={styles.tituloRow}>
               <Text style={styles.nombre}>{item.nombre}</Text>
@@ -109,6 +120,7 @@ export default function NegocioScreen({ route, navigation }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f1f5f9' },
   cabecera: { marginBottom: 12 },
+  portada: { width: '100%', height: 150, borderRadius: 14, marginBottom: 12, backgroundColor: '#e2e8f0' },
   desc: { color: '#475569', fontSize: 15 },
   dato: { color: '#94a3b8', fontSize: 13, marginTop: 6 },
   item: {
@@ -116,6 +128,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10,
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, elevation: 1,
   },
+  thumb: { width: 48, height: 48, borderRadius: 10, marginRight: 12, backgroundColor: '#f1f5f9' },
+  thumbVacio: { alignItems: 'center', justifyContent: 'center' },
+  thumbEmoji: { fontSize: 22 },
   itemTexto: { flex: 1, marginRight: 10 },
   tituloRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   nombre: { fontSize: 15, fontWeight: '600', color: '#0f172a' },

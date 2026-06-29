@@ -9,14 +9,16 @@ import { ActivityIndicator, StatusBar, StyleSheet, useColorScheme, View } from '
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/AuthContext';
 import { CartProvider } from './src/CartContext';
+import { NegocioProvider } from './src/NegocioContext';
+import { ToastProvider } from './src/Toast';
 import { RootStackParamList } from './src/navTypes';
 import HomeScreen from './src/screens/HomeScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import MiTiendaScreen from './src/screens/MiTiendaScreen';
-import MisProductosScreen from './src/screens/MisProductosScreen';
 import MisCategoriasScreen from './src/screens/MisCategoriasScreen';
-import ComercioPedidosScreen from './src/screens/ComercioPedidosScreen';
+import CategoriaProductosScreen from './src/screens/CategoriaProductosScreen';
+import ComercioPedidoDetalleScreen from './src/screens/ComercioPedidoDetalleScreen';
 import ExplorarScreen from './src/screens/ExplorarScreen';
 import NegocioScreen from './src/screens/NegocioScreen';
 import AdminTableroScreen from './src/screens/AdminTableroScreen';
@@ -65,9 +67,17 @@ function Navegacion() {
             {roles.includes('comerciante') && (
               <>
                 <Stack.Screen name="MiTienda" component={MiTiendaScreen} options={{ title: 'Mi Tienda' }} />
-                <Stack.Screen name="MisProductos" component={MisProductosScreen} options={{ title: 'Mis Productos' }} />
                 <Stack.Screen name="MisCategorias" component={MisCategoriasScreen} options={{ title: 'Categorías' }} />
-                <Stack.Screen name="ComercioPedidos" component={ComercioPedidosScreen} options={{ title: 'Pedidos recibidos' }} />
+                <Stack.Screen
+                  name="CategoriaProductos"
+                  component={CategoriaProductosScreen}
+                  options={({ route }) => ({ title: route.params.nombre })}
+                />
+                <Stack.Screen
+                  name="ComercioPedidoDetalle"
+                  component={ComercioPedidoDetalleScreen}
+                  options={{ title: 'Pedido' }}
+                />
               </>
             )}
 
@@ -108,12 +118,16 @@ function App() {
   const isDarkMode = useColorScheme() === 'dark';
   return (
     <AuthProvider>
-      <CartProvider>
-        <SafeAreaProvider>
-          <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-          <Navegacion />
-        </SafeAreaProvider>
-      </CartProvider>
+      <NegocioProvider>
+        <CartProvider>
+          <SafeAreaProvider>
+            <ToastProvider>
+              <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+              <Navegacion />
+            </ToastProvider>
+          </SafeAreaProvider>
+        </CartProvider>
+      </NegocioProvider>
     </AuthProvider>
   );
 }

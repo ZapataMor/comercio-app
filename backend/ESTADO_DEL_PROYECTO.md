@@ -1,7 +1,7 @@
 # 📦 Estado del proyecto — comercio-api
 
 > Documento vivo de seguimiento. Refleja **qué hay hecho** y **qué falta** en la app.
-> Última actualización: **2026-06-28**
+> Última actualización: **2026-06-29**
 
 ---
 
@@ -82,6 +82,8 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 - [x] **Paginación + búsqueda/filtros** del catálogo (`?buscar`, `?categoria_id`, `?disponible`, `?por_pagina`)
 - [x] **Soft deletes** en productos (borrar oculta pero conserva historial)
 - [x] Productos con **tipo de venta** (`tipo_venta` + `unidad_medida`) y `precio_formateado` en el JSON (ej. "$8.900 / kg")
+- [x] `CategoriaResource` incluye el **conteo de productos** (`productos`, vía `withCount`) para la lista de categorías de la app
+- [x] Filtro `?sin_categoria=1` en `GET /productos` (lista los productos sin categoría)
 
 ### Cliente (`usuario`)
 - [x] Ve su panel en `/api/dashboard`
@@ -177,6 +179,15 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 ---
 
 ## 📜 Historial de cambios
+- **2026-06-29** — **Móvil: rediseño del flujo del comerciante**.
+  - **Mi Tienda**: ahora se muestra como **tarjeta de solo lectura** con botón **"Editar información"**; el formulario solo aparece al crear/editar. Al **crear** el negocio, **redirige al Inicio**.
+  - **Inicio del comerciante**: muestra **solo "Mi negocio" y "Categorías"**. **Switch Abierto/Cerrado** en la parte derecha de la topbar (reutiliza el campo `activo`: cerrado = oculto en Explorar). Los **pedidos en espera** se listan directamente en el Inicio; cada uno abre un **detalle** (`ComercioPedidoDetalle`) con toda su info y el botón **"Marcar listo"**.
+  - **Productos dentro de categorías**: nueva pantalla `CategoriaProductos` (se entra tocando una categoría). La antigua "Unidad" es ahora un **dropdown "Unidad de venta"** con **Cantidad / Kilos / Libras** (mapea a `tipo_venta`+`unidad_medida`). Grupo **"Sin categoría"** para reubicar productos sueltos. Se retiró del Inicio la pantalla plana "Mis Productos".
+  - **Notificaciones tipo toast** con estilo de la app (arriba a la derecha, temporales, con barra de color por tipo) en lugar de los `Alert` genéricos para avisos de éxito/error.
+  - Infra nueva: `src/Toast.tsx` (ToastProvider/useToast), `src/NegocioContext.tsx` (estado del negocio compartido para el switch y Mi Tienda), `src/components/Dropdown.tsx`.
+  - Backend: `CategoriaResource` con `productos` (conteo, `withCount`) y `ProductoController` con `?sin_categoria=1`. **+2 tests Pest** (conteo por categoría y filtro sin categoría) → **29 verdes**. `tsc --noEmit` verde.
+  - El editor de productos de `CategoriaProductos` ya incluye `SelectorImagen` (foto del producto) y `crearProducto`/`actualizarProducto` suben la imagen, consistente con el flujo de imágenes en curso.
+  - Quedaron **sin uso** `MisProductosScreen.tsx` y `ComercioPedidosScreen.tsx` (su función se reorganizó); se dejaron en disco para no chocar con el trabajo de imágenes en curso. Pendiente: decidir si se borran.
 - **2026-06-28** — **Móvil: cierre de brechas de funcionalidad (registro + CRUD comerciante + búsqueda + pull-to-refresh)**. Tras una ronda de QA en el emulador se implementó lo que faltaba en la app:
   - **Registro de cuenta** desde la app: nueva `RegisterScreen` (nombre, correo, contraseña + confirmación, selector de rol) enlazada desde Login; **solo permite roles `usuario` (cliente) y `comerciante`** — admin y domiciliario NUNCA se ofrecen (consistente con `ROLES_PUBLICOS` del backend; los domiciliarios los creará luego un admin de domiciliarios). `api.register()` envía `password_confirmation`. Rutas `Login`/`Register` ahora conviven en el stack no-autenticado de `App.tsx`.
   - **Comerciante: gestión de su negocio**: `MiTiendaScreen` pasó de solo-lectura a **formulario** que crea (`POST`) o edita (`PUT`) el negocio (nombre, descripción, dirección, teléfono, switch abierto/cerrado).

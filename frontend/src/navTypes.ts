@@ -1,13 +1,15 @@
 // Rutas de navegación de la app (React Navigation - native stack).
+import { ComercioPedido } from './api';
+
 export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
   Home: undefined;
   // Comerciante
   MiTienda: undefined;
-  MisProductos: undefined;
   MisCategorias: undefined;
-  ComercioPedidos: undefined;
+  CategoriaProductos: { categoriaId: number | null; nombre: string };
+  ComercioPedidoDetalle: { pedido: ComercioPedido };
   // Cliente
   Explorar: undefined;
   Negocio: { id: number; nombre: string };

@@ -203,3 +203,27 @@ test('al borrar una categoría sus productos quedan sin categoría', function ()
         'categoria_id' => null,
     ]);
 });
+
+test('el listado de categorías incluye el conteo de productos', function () {
+    [$user, $negocio] = comercianteConNegocio();
+    $cat = $negocio->categorias()->create(['nombre' => 'Comida']);
+    $negocio->productos()->create(['nombre' => 'Arroz con pollo', 'precio' => 12000, 'categoria_id' => $cat->id]);
+    $negocio->productos()->create(['nombre' => 'Sancocho', 'precio' => 15000, 'categoria_id' => $cat->id]);
+
+    $this->getJson('/api/comerciante/categorias')
+        ->assertOk()
+        ->assertJsonPath('data.0.nombre', 'Comida')
+        ->assertJsonPath('data.0.productos', 2);
+});
+
+test('se pueden listar solo los productos sin categoría', function () {
+    [$user, $negocio] = comercianteConNegocio();
+    $cat = $negocio->categorias()->create(['nombre' => 'Comida']);
+    $negocio->productos()->create(['nombre' => 'Con categoría', 'precio' => 1000, 'categoria_id' => $cat->id]);
+    $negocio->productos()->create(['nombre' => 'Suelto', 'precio' => 1000]);
+
+    $this->getJson('/api/comerciante/productos?sin_categoria=1')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.nombre', 'Suelto');
+});

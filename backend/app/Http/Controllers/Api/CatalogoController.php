@@ -53,6 +53,7 @@ class CatalogoController extends Controller
                 'nombre' => $n->nombre,
                 'descripcion' => $n->descripcion,
                 'direccion' => $n->direccion,
+                'imagen' => $n->imagen ? '/storage/'.$n->imagen : null,
                 'productos' => $n->productos_count,
             ]);
 
@@ -81,6 +82,7 @@ class CatalogoController extends Controller
                 'descripcion' => $negocio->descripcion,
                 'direccion' => $negocio->direccion,
                 'telefono' => $negocio->telefono,
+                'imagen' => $negocio->imagen ? '/storage/'.$negocio->imagen : null,
             ],
             'productos' => ProductoResource::collection($productos),
         ]);

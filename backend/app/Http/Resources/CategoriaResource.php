@@ -17,6 +17,8 @@ class CategoriaResource extends JsonResource
         return [
             'id' => $this->id,
             'nombre' => $this->nombre,
+            // Cantidad de productos de la categoría (solo si se cargó con withCount).
+            'productos' => $this->whenCounted('productos'),
         ];
     }
 }

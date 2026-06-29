@@ -8,6 +8,7 @@ use App\Models\Producto;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class ProductoController extends Controller
@@ -36,7 +37,10 @@ class ProductoController extends Controller
             $query->where('nombre', 'like', '%'.$request->string('buscar').'%');
         }
 
-        if ($request->filled('categoria_id')) {
+        if ($request->boolean('sin_categoria')) {
+            // Productos sin categoría (grupo "Sin categoría" de la app).
+            $query->whereNull('categoria_id');
+        } elseif ($request->filled('categoria_id')) {
             $query->where('categoria_id', $request->integer('categoria_id'));
         }
 
@@ -63,6 +67,8 @@ class ProductoController extends Controller
         $data = $request->validate($this->reglas($negocio, creando: true));
 
         $producto = $negocio->productos()->create($data);
+
+        $this->guardarImagen($request, $producto);
 
         return response()->json([
             'producto' => new ProductoResource($producto->load('categoria')),
@@ -99,6 +105,8 @@ class ProductoController extends Controller
         $data = $request->validate($this->reglas($producto->negocio, creando: false));
 
         $producto->update($data);
+
+        $this->guardarImagen($request, $producto);
 
         return response()->json([
             'producto' => new ProductoResource($producto->load('categoria')),
@@ -148,7 +156,26 @@ class ProductoController extends Controller
                 'nullable',
                 Rule::exists('categorias', 'id')->where('negocio_id', $negocio->id),
             ],
+            'imagen' => ['sometimes', 'image', 'max:4096'], // máx 4 MB
         ];
+    }
+
+    /**
+     * Guarda la imagen subida (si viene) en storage/public/productos y la
+     * asigna, borrando la anterior. `imagen` no está en $fillable.
+     */
+    private function guardarImagen(Request $request, Producto $producto): void
+    {
+        if (! $request->hasFile('imagen')) {
+            return;
+        }
+
+        if ($producto->imagen) {
+            Storage::disk('public')->delete($producto->imagen);
+        }
+
+        $producto->imagen = $request->file('imagen')->store('productos', 'public');
+        $producto->save();
     }
 
     private function negocioDe(Request $request): ?Negocio

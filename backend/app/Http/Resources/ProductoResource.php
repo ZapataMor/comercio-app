@@ -25,6 +25,8 @@ class ProductoResource extends JsonResource
             'unidad_medida' => $this->unidad_medida,
             // Precio listo para mostrar, ej: "$2.500 c/u" o "$8.900 / kg".
             'precio_formateado' => $this->precioFormateado(),
+            // Ruta relativa (ej "/storage/productos/x.jpg") o null; la app le antepone la API_URL.
+            'imagen' => $this->imagen ? '/storage/'.$this->imagen : null,
             'disponible' => $this->disponible,
             // Solo incluye la categoría si fue cargada (evita consultas N+1).
             'categoria' => new CategoriaResource($this->whenLoaded('categoria')),

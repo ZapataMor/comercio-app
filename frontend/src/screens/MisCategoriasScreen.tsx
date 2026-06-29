@@ -1,3 +1,4 @@
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -16,14 +17,21 @@ import {
   crearCategoria,
   eliminarCategoria,
   getCategoriasComerciante,
+  getProductos,
 } from '../api';
 import { useAuth } from '../AuthContext';
+import { RootStackParamList } from '../navTypes';
+import { useToast } from '../Toast';
 
-export default function MisCategoriasScreen() {
+type Props = NativeStackScreenProps<RootStackParamList, 'MisCategorias'>;
+
+export default function MisCategoriasScreen({ navigation }: Props) {
   const { auth } = useAuth();
   const token = auth!.token;
+  const toast = useToast();
 
   const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [sinCategoria, setSinCategoria] = useState(0); // nº de productos sin categoría
   const [cargando, setCargando] = useState(true);
   const [refrescando, setRefrescando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,8 +46,14 @@ export default function MisCategoriasScreen() {
   const cargar = useCallback(
     (refresco = false) => {
       refresco ? setRefrescando(true) : setCargando(true);
-      getCategoriasComerciante(token)
-        .then(setCategorias)
+      Promise.all([
+        getCategoriasComerciante(token),
+        getProductos(token, { sinCategoria: true }),
+      ])
+        .then(([cats, sueltos]) => {
+          setCategorias(cats);
+          setSinCategoria(sueltos.length);
+        })
         .catch(e => setError(e.message))
         .finally(() => {
           setCargando(false);
@@ -49,17 +63,22 @@ export default function MisCategoriasScreen() {
     [token],
   );
 
-  useEffect(() => cargar(), [cargar]);
+  // Se recarga al volver (p. ej. tras crear productos en una categoría).
+  useEffect(() => {
+    const unsub = navigation.addListener('focus', () => cargar());
+    return unsub;
+  }, [navigation, cargar]);
 
   async function onCrear() {
     if (!nueva.trim()) return;
     setCreando(true);
     try {
       await crearCategoria(token, nueva.trim());
+      toast.exito('Categoría creada', `"${nueva.trim()}" lista para agregarle productos.`);
       setNueva('');
       cargar();
     } catch (e) {
-      Alert.alert('No se pudo crear', e instanceof Error ? e.message : 'Error');
+      toast.error('No se pudo crear', e instanceof Error ? e.message : 'Error');
     } finally {
       setCreando(false);
     }
@@ -69,11 +88,12 @@ export default function MisCategoriasScreen() {
     if (!editNombre.trim()) return;
     try {
       await actualizarCategoria(token, id, editNombre.trim());
+      toast.exito('Listo', 'Categoría actualizada.');
       setEditId(null);
       setEditNombre('');
       cargar();
     } catch (e) {
-      Alert.alert('No se pudo actualizar', e instanceof Error ? e.message : 'Error');
+      toast.error('No se pudo actualizar', e instanceof Error ? e.message : 'Error');
     }
   }
 
@@ -86,13 +106,18 @@ export default function MisCategoriasScreen() {
         onPress: async () => {
           try {
             await eliminarCategoria(token, c.id);
+            toast.exito('Eliminada', `"${c.nombre}" se eliminó.`);
             cargar();
           } catch (e) {
-            Alert.alert('No se pudo eliminar', e instanceof Error ? e.message : 'Error');
+            toast.error('No se pudo eliminar', e instanceof Error ? e.message : 'Error');
           }
         },
       },
     ]);
+  }
+
+  function abrirProductos(c: Categoria) {
+    navigation.navigate('CategoriaProductos', { categoriaId: c.id, nombre: c.nombre });
   }
 
   if (cargando) {
@@ -119,18 +144,37 @@ export default function MisCategoriasScreen() {
               style={styles.input}
               value={nueva}
               onChangeText={setNueva}
-              placeholder="Ej: Bebidas"
+              placeholder="Ej: Comida"
               editable={!creando}
             />
             <TouchableOpacity style={styles.addBtn} onPress={onCrear} disabled={creando}>
               {creando ? <ActivityIndicator color="#fff" /> : <Text style={styles.addTxt}>Agregar</Text>}
             </TouchableOpacity>
           </View>
+          <Text style={styles.ayuda}>Toca una categoría para ver y crear sus productos.</Text>
         </View>
       }
       ListEmptyComponent={<Text style={styles.vacio}>Aún no tienes categorías.</Text>}
+      ListFooterComponent={
+        sinCategoria > 0 ? (
+          <TouchableOpacity
+            style={styles.sinCat}
+            onPress={() => navigation.navigate('CategoriaProductos', { categoriaId: null, nombre: 'Sin categoría' })}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.sinCatNombre}>Sin categoría</Text>
+              <Text style={styles.conteo}>
+                {sinCategoria} {sinCategoria === 1 ? 'producto' : 'productos'} por organizar
+              </Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+        ) : null
+      }
       renderItem={({ item }) => (
-        <View style={styles.card}>
+        <TouchableOpacity
+          style={styles.card}
+          activeOpacity={0.7}
+          onPress={editId === item.id ? undefined : () => abrirProductos(item)}>
           {editId === item.id ? (
             <>
               <TextInput
@@ -148,7 +192,12 @@ export default function MisCategoriasScreen() {
             </>
           ) : (
             <>
-              <Text style={styles.nombre}>{item.nombre}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.nombre}>{item.nombre}</Text>
+                <Text style={styles.conteo}>
+                  {item.productos ?? 0} {item.productos === 1 ? 'producto' : 'productos'}
+                </Text>
+              </View>
               <TouchableOpacity
                 style={styles.iconBtn}
                 onPress={() => {
@@ -160,9 +209,10 @@ export default function MisCategoriasScreen() {
               <TouchableOpacity style={styles.iconBtn} onPress={() => onEliminar(item)}>
                 <Text style={styles.eliminar}>Eliminar</Text>
               </TouchableOpacity>
+              <Text style={styles.chevron}>›</Text>
             </>
           )}
-        </View>
+        </TouchableOpacity>
       )}
     />
   );
@@ -179,17 +229,26 @@ const styles = StyleSheet.create({
   },
   addBtn: { backgroundColor: '#4f46e5', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 11 },
   addTxt: { color: '#fff', fontWeight: '700' },
+  ayuda: { color: '#94a3b8', fontSize: 12, marginTop: 10 },
   card: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10,
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, elevation: 1,
   },
-  nombre: { fontSize: 15, fontWeight: '600', color: '#0f172a', flex: 1 },
+  nombre: { fontSize: 15, fontWeight: '600', color: '#0f172a' },
+  conteo: { fontSize: 12, color: '#94a3b8', marginTop: 2 },
   iconBtn: { paddingHorizontal: 6, paddingVertical: 4 },
   editar: { color: '#4f46e5', fontWeight: '600', fontSize: 13 },
   eliminar: { color: '#ef4444', fontWeight: '600', fontSize: 13 },
   guardar: { color: '#16a34a', fontWeight: '700', fontSize: 13 },
   cancelar: { color: '#64748b', fontWeight: '600', fontSize: 13 },
+  chevron: { fontSize: 24, color: '#cbd5e1', marginLeft: 2 },
+  sinCat: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#fff', borderRadius: 14, padding: 14, marginTop: 4,
+    borderWidth: 1, borderColor: '#e2e8f0', borderStyle: 'dashed',
+  },
+  sinCatNombre: { fontSize: 15, fontWeight: '600', color: '#64748b' },
   vacio: { textAlign: 'center', color: '#64748b', marginTop: 40 },
   error: { color: '#b91c1c', backgroundColor: '#fee2e2', padding: 12, borderRadius: 10, margin: 20 },
 });

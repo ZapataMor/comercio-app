@@ -23,7 +23,11 @@ class CategoriaController extends Controller
             return $this->sinNegocio();
         }
 
-        return CategoriaResource::collection($negocio->categorias()->orderBy('nombre')->get());
+        // withCount('productos') agrega `productos_count` a cada categoría
+        // para que la app muestre "N productos" en la lista de categorías.
+        return CategoriaResource::collection(
+            $negocio->categorias()->withCount('productos')->orderBy('nombre')->get()
+        );
     }
 
     /**
