@@ -14,11 +14,38 @@ use Illuminate\Http\Request;
  */
 class CatalogoController extends Controller
 {
-    /** Lista de negocios abiertos, con su número de productos disponibles. */
-    public function index(): JsonResponse
+    /**
+     * Lista de negocios abiertos, con su número de productos disponibles.
+     *
+     * Parámetro opcional:
+     *   ?buscar=texto -> filtra por nombre/descripción del negocio, o por
+     *                    negocios que tengan algún producto disponible que
+     *                    coincida (por nombre o por su categoría).
+     */
+    public function index(Request $request): JsonResponse
     {
-        $negocios = Negocio::where('activo', true)
-            ->withCount(['productos' => fn ($q) => $q->where('disponible', true)])
+        $query = Negocio::where('activo', true)
+            ->withCount(['productos' => fn ($q) => $q->where('disponible', true)]);
+
+        if ($request->filled('buscar')) {
+            $texto = trim((string) $request->string('buscar'));
+
+            $query->where(function ($q) use ($texto) {
+                $q->where('nombre', 'like', "%{$texto}%")
+                    ->orWhere('descripcion', 'like', "%{$texto}%")
+                    // Negocios con productos disponibles que coincidan por
+                    // nombre o por el nombre de su categoría.
+                    ->orWhereHas('productos', function ($p) use ($texto) {
+                        $p->where('disponible', true)
+                            ->where(function ($pp) use ($texto) {
+                                $pp->where('nombre', 'like', "%{$texto}%")
+                                    ->orWhereHas('categoria', fn ($c) => $c->where('nombre', 'like', "%{$texto}%"));
+                            });
+                    });
+            });
+        }
+
+        $negocios = $query
             ->orderBy('nombre')
             ->get()
             ->map(fn ($n) => [

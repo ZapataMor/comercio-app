@@ -12,8 +12,10 @@ import { CartProvider } from './src/CartContext';
 import { RootStackParamList } from './src/navTypes';
 import HomeScreen from './src/screens/HomeScreen';
 import LoginScreen from './src/screens/LoginScreen';
+import RegisterScreen from './src/screens/RegisterScreen';
 import MiTiendaScreen from './src/screens/MiTiendaScreen';
 import MisProductosScreen from './src/screens/MisProductosScreen';
+import MisCategoriasScreen from './src/screens/MisCategoriasScreen';
 import ComercioPedidosScreen from './src/screens/ComercioPedidosScreen';
 import ExplorarScreen from './src/screens/ExplorarScreen';
 import NegocioScreen from './src/screens/NegocioScreen';
@@ -52,7 +54,10 @@ function Navegacion() {
           headerTitleStyle: { fontWeight: '700' },
         }}>
         {!auth ? (
-          <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+          <>
+            <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
+          </>
         ) : (
           <>
             <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Comercio' }} />
@@ -61,6 +66,7 @@ function Navegacion() {
               <>
                 <Stack.Screen name="MiTienda" component={MiTiendaScreen} options={{ title: 'Mi Tienda' }} />
                 <Stack.Screen name="MisProductos" component={MisProductosScreen} options={{ title: 'Mis Productos' }} />
+                <Stack.Screen name="MisCategorias" component={MisCategoriasScreen} options={{ title: 'Categorías' }} />
                 <Stack.Screen name="ComercioPedidos" component={ComercioPedidosScreen} options={{ title: 'Pedidos recibidos' }} />
               </>
             )}

@@ -1,10 +1,12 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -20,21 +22,30 @@ export default function ExplorarScreen({ navigation }: Props) {
   const cart = useCart();
   const [negocios, setNegocios] = useState<NegocioLista[]>([]);
   const [cargando, setCargando] = useState(true);
+  const [refrescando, setRefrescando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [busqueda, setBusqueda] = useState('');
 
+  const cargar = useCallback(
+    (texto: string, refresco = false) => {
+      refresco ? setRefrescando(true) : setCargando(true);
+      setError(null);
+      getNegocios(auth!.token, texto)
+        .then(setNegocios)
+        .catch(e => setError(e.message))
+        .finally(() => {
+          setCargando(false);
+          setRefrescando(false);
+        });
+    },
+    [auth],
+  );
+
+  // Búsqueda con "debounce": espera 350 ms tras dejar de teclear.
   useEffect(() => {
-    getNegocios(auth!.token)
-      .then(setNegocios)
-      .catch(e => setError(e.message))
-      .finally(() => setCargando(false));
-  }, [auth]);
-
-  if (cargando) {
-    return <ActivityIndicator size="large" color="#4f46e5" style={{ marginTop: 40 }} />;
-  }
-  if (error) {
-    return <Text style={styles.error}>{error}</Text>;
-  }
+    const t = setTimeout(() => cargar(busqueda), 350);
+    return () => clearTimeout(t);
+  }, [busqueda, cargar]);
 
   return (
     <FlatList
@@ -42,20 +53,57 @@ export default function ExplorarScreen({ navigation }: Props) {
       data={negocios}
       keyExtractor={n => String(n.id)}
       contentContainerStyle={{ padding: 16 }}
+      keyboardShouldPersistTaps="handled"
+      refreshControl={
+        <RefreshControl
+          refreshing={refrescando}
+          onRefresh={() => cargar(busqueda, true)}
+          colors={['#4f46e5']}
+        />
+      }
       ListHeaderComponent={
-        <View style={styles.barra}>
-          <TouchableOpacity style={styles.accion} onPress={() => navigation.navigate('Carrito')}>
-            <Text style={styles.accionTxt}>🛒 Carrito{cart.count > 0 ? ` (${cart.count})` : ''}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.accion} onPress={() => navigation.navigate('MisPedidos')}>
-            <Text style={styles.accionTxt}>📋 Mis pedidos</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.accion} onPress={salir}>
-            <Text style={[styles.accionTxt, { color: '#ef4444' }]}>Salir</Text>
-          </TouchableOpacity>
+        <View>
+          <View style={styles.barra}>
+            <TouchableOpacity style={styles.accion} onPress={() => navigation.navigate('Carrito')}>
+              <Text style={styles.accionTxt}>🛒 Carrito{cart.count > 0 ? ` (${cart.count})` : ''}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.accion} onPress={() => navigation.navigate('MisPedidos')}>
+              <Text style={styles.accionTxt}>📋 Mis pedidos</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.accion} onPress={salir}>
+              <Text style={[styles.accionTxt, { color: '#ef4444' }]}>Salir</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.buscadorBox}>
+            <Text style={styles.lupa}>🔎</Text>
+            <TextInput
+              style={styles.buscador}
+              value={busqueda}
+              onChangeText={setBusqueda}
+              placeholder="Buscar negocio o producto…"
+              placeholderTextColor="#94a3b8"
+              autoCapitalize="none"
+              returnKeyType="search"
+            />
+            {busqueda.length > 0 && (
+              <TouchableOpacity onPress={() => setBusqueda('')} hitSlop={8}>
+                <Text style={styles.limpiar}>✕</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {cargando && <ActivityIndicator color="#4f46e5" style={{ marginVertical: 16 }} />}
+          {error ? <Text style={styles.error}>{error}</Text> : null}
         </View>
       }
-      ListEmptyComponent={<Text style={styles.vacio}>No hay negocios abiertos ahora.</Text>}
+      ListEmptyComponent={
+        !cargando ? (
+          <Text style={styles.vacio}>
+            {busqueda ? `Sin resultados para "${busqueda}".` : 'No hay negocios abiertos ahora.'}
+          </Text>
+        ) : null
+      }
       renderItem={({ item }) => (
         <TouchableOpacity
           style={styles.card}
@@ -78,6 +126,14 @@ const styles = StyleSheet.create({
   barra: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   accion: { backgroundColor: '#fff', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
   accionTxt: { fontWeight: '600', color: '#4338ca', fontSize: 13 },
+  buscadorBox: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff',
+    borderRadius: 12, paddingHorizontal: 12, marginBottom: 12,
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, elevation: 1,
+  },
+  lupa: { fontSize: 15, marginRight: 6 },
+  buscador: { flex: 1, paddingVertical: 11, fontSize: 15, color: '#0f172a' },
+  limpiar: { color: '#94a3b8', fontSize: 16, paddingHorizontal: 4 },
   card: {
     backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 12,
     shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
@@ -92,5 +148,5 @@ const styles = StyleSheet.create({
   dir: { color: '#94a3b8', fontSize: 12, marginTop: 8 },
   cont: { color: '#4f46e5', fontWeight: '600', marginTop: 10 },
   vacio: { textAlign: 'center', color: '#64748b', marginTop: 40 },
-  error: { color: '#b91c1c', backgroundColor: '#fee2e2', padding: 12, borderRadius: 10, margin: 16 },
+  error: { color: '#b91c1c', backgroundColor: '#fee2e2', padding: 12, borderRadius: 10, marginBottom: 12 },
 });

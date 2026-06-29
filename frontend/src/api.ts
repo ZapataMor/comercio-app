@@ -80,6 +80,49 @@ export async function login(email: string, password: string): Promise<LoginRespo
   return data as LoginResponse;
 }
 
+/** Roles que el público puede elegir al registrarse (NUNCA admin/domiciliario). */
+export type RolPublico = 'usuario' | 'comerciante';
+
+/**
+ * Registro de una cuenta nueva contra POST /api/register.
+ * Solo permite roles 'usuario' (cliente) o 'comerciante'.
+ * Devuelve usuario + token, o lanza Error con el mensaje del backend.
+ */
+export async function register(body: {
+  name: string;
+  email: string;
+  password: string;
+  role: RolPublico;
+}): Promise<LoginResponse> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/api/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        ...body,
+        // El backend exige confirmación de contraseña (regla 'confirmed').
+        password_confirmation: body.password,
+      }),
+    });
+  } catch (e) {
+    throw new Error('No se pudo conectar con el servidor. ¿Está corriendo la API?');
+  }
+
+  const data = await res.json().catch(() => ({} as any));
+
+  if (!res.ok) {
+    // El backend puede devolver errores de validación en data.errors.
+    const primero =
+      data?.errors && typeof data.errors === 'object'
+        ? (Object.values(data.errors)[0] as string[])?.[0]
+        : undefined;
+    throw new Error(primero ?? data?.message ?? 'No se pudo crear la cuenta.');
+  }
+
+  return data as LoginResponse;
+}
+
 /** GET autenticado con el token Sanctum. Lanza ApiError con el código HTTP. */
 async function authGet(path: string, token: string): Promise<any> {
   let res: Response;
@@ -139,6 +182,79 @@ export async function getProductos(token: string): Promise<Producto[]> {
   return (data.data ?? []) as Producto[];
 }
 
+// ---------- Comerciante: crear / editar su negocio ----------
+
+/** Datos editables del negocio. */
+export type NegocioInput = {
+  nombre: string;
+  descripcion?: string | null;
+  direccion?: string | null;
+  telefono?: string | null;
+  activo?: boolean;
+};
+
+/** Crea mi negocio (cuando aún no existe). */
+export async function crearNegocio(token: string, body: NegocioInput): Promise<Negocio> {
+  const d = await authSend('POST', '/api/comerciante/negocio', token, body);
+  return d.negocio as Negocio;
+}
+
+/** Actualiza mi negocio. */
+export async function actualizarNegocio(token: string, body: NegocioInput): Promise<Negocio> {
+  const d = await authSend('PUT', '/api/comerciante/negocio', token, body);
+  return d.negocio as Negocio;
+}
+
+// ---------- Comerciante: categorías ----------
+
+export async function getCategoriasComerciante(token: string): Promise<Categoria[]> {
+  const d = await authGet('/api/comerciante/categorias', token);
+  return (d.data ?? []) as Categoria[];
+}
+
+export async function crearCategoria(token: string, nombre: string): Promise<Categoria> {
+  const d = await authSend('POST', '/api/comerciante/categorias', token, { nombre });
+  return d.categoria as Categoria;
+}
+
+export async function actualizarCategoria(token: string, id: number, nombre: string): Promise<void> {
+  await authSend('PUT', `/api/comerciante/categorias/${id}`, token, { nombre });
+}
+
+export async function eliminarCategoria(token: string, id: number): Promise<void> {
+  await authSend('DELETE', `/api/comerciante/categorias/${id}`, token);
+}
+
+// ---------- Comerciante: CRUD de productos ----------
+
+/** Datos editables de un producto. */
+export type ProductoInput = {
+  nombre: string;
+  descripcion?: string | null;
+  precio: number;
+  unidad_medida?: string;
+  disponible?: boolean;
+  categoria_id?: number | null;
+};
+
+export async function crearProducto(token: string, body: ProductoInput): Promise<Producto> {
+  const d = await authSend('POST', '/api/comerciante/productos', token, body);
+  return d.producto as Producto;
+}
+
+export async function actualizarProducto(
+  token: string,
+  id: number,
+  body: ProductoInput,
+): Promise<Producto> {
+  const d = await authSend('PUT', `/api/comerciante/productos/${id}`, token, body);
+  return d.producto as Producto;
+}
+
+export async function eliminarProducto(token: string, id: number): Promise<void> {
+  await authSend('DELETE', `/api/comerciante/productos/${id}`, token);
+}
+
 /** Pedidos recibidos por mi negocio (comerciante). */
 export type ComercioPedido = {
   id: number;
@@ -164,9 +280,10 @@ export async function marcarPedidoListo(token: string, id: number): Promise<void
 
 // ---------- Cliente: explorar negocios y ver catálogo ----------
 
-/** Negocios abiertos. */
-export async function getNegocios(token: string): Promise<NegocioLista[]> {
-  const data = await authGet('/api/negocios', token);
+/** Negocios abiertos. Si se pasa `buscar`, filtra por nombre/descr./productos. */
+export async function getNegocios(token: string, buscar?: string): Promise<NegocioLista[]> {
+  const q = buscar && buscar.trim() ? `?buscar=${encodeURIComponent(buscar.trim())}` : '';
+  const data = await authGet(`/api/negocios${q}`, token);
   return (data.negocios ?? []) as NegocioLista[];
 }
 

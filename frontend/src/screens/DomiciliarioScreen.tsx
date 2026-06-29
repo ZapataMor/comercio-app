@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -30,18 +31,25 @@ export default function DomiciliarioScreen() {
   const [entregas, setEntregas] = useState<Pedido[]>([]);
   const [historial, setHistorial] = useState<Pedido[]>([]);
   const [cargando, setCargando] = useState(true);
+  const [refrescando, setRefrescando] = useState(false);
 
-  const cargar = useCallback(() => {
-    setCargando(true);
-    Promise.all([getDisponibles(token), getMisEntregas(token), getHistorialEntregas(token)])
-      .then(([d, e, h]) => {
-        setDisponibles(d);
-        setEntregas(e);
-        setHistorial(h);
-      })
-      .catch(err => Alert.alert('Error', err.message))
-      .finally(() => setCargando(false));
-  }, [token]);
+  const cargar = useCallback(
+    (refresco = false) => {
+      refresco ? setRefrescando(true) : setCargando(true);
+      Promise.all([getDisponibles(token), getMisEntregas(token), getHistorialEntregas(token)])
+        .then(([d, e, h]) => {
+          setDisponibles(d);
+          setEntregas(e);
+          setHistorial(h);
+        })
+        .catch(err => Alert.alert('Error', err.message))
+        .finally(() => {
+          setCargando(false);
+          setRefrescando(false);
+        });
+    },
+    [token],
+  );
 
   useEffect(() => cargar(), [cargar]);
 
@@ -68,7 +76,12 @@ export default function DomiciliarioScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ padding: 16 }}
+      refreshControl={
+        <RefreshControl refreshing={refrescando} onRefresh={() => cargar(true)} colors={['#4f46e5']} />
+      }>
       <Text style={styles.seccion}>Pedidos disponibles</Text>
       {disponibles.length === 0 ? (
         <Text style={styles.vacio}>No hay pedidos disponibles ahora.</Text>

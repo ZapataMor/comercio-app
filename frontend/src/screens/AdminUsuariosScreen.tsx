@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
@@ -21,6 +22,7 @@ export default function AdminUsuariosScreen() {
   const [rolActual, setRolActual] = useState<string>('administrador');
   const [usuarios, setUsuarios] = useState<AdminUsuario[]>([]);
   const [cargando, setCargando] = useState(true);
+  const [refrescando, setRefrescando] = useState(false);
 
   // Formulario de creación.
   const [mostrarForm, setMostrarForm] = useState(false);
@@ -31,8 +33,8 @@ export default function AdminUsuariosScreen() {
   const [enviando, setEnviando] = useState(false);
 
   const cargar = useCallback(
-    (rol: string) => {
-      setCargando(true);
+    (rol: string, refresco = false) => {
+      refresco ? setRefrescando(true) : setCargando(true);
       getAdminUsuarios(token, rol)
         .then(r => {
           setRoles(r.roles);
@@ -41,7 +43,10 @@ export default function AdminUsuariosScreen() {
           setUsuarios(r.usuarios);
         })
         .catch(e => Alert.alert('Error', e.message))
-        .finally(() => setCargando(false));
+        .finally(() => {
+          setCargando(false);
+          setRefrescando(false);
+        });
     },
     [token],
   );
@@ -131,6 +136,13 @@ export default function AdminUsuariosScreen() {
           data={usuarios}
           keyExtractor={u => String(u.id)}
           contentContainerStyle={{ padding: 16, paddingTop: 4 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refrescando}
+              onRefresh={() => cargar(rolActual, true)}
+              colors={['#4f46e5']}
+            />
+          }
           ListEmptyComponent={<Text style={styles.vacio}>No hay usuarios de este tipo.</Text>}
           renderItem={({ item }) => (
             <View style={styles.card}>

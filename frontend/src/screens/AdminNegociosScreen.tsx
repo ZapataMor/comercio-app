@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { AdminNegocio, getAdminNegocios } from '../api';
 import { useAuth } from '../AuthContext';
 
@@ -7,13 +7,23 @@ export default function AdminNegociosScreen() {
   const { auth } = useAuth();
   const [negocios, setNegocios] = useState<AdminNegocio[]>([]);
   const [cargando, setCargando] = useState(true);
+  const [refrescando, setRefrescando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  function cargar(refresco = false) {
+    refresco ? setRefrescando(true) : setCargando(true);
     getAdminNegocios(auth!.token)
       .then(setNegocios)
       .catch(e => setError(e.message))
-      .finally(() => setCargando(false));
+      .finally(() => {
+        setCargando(false);
+        setRefrescando(false);
+      });
+  }
+
+  useEffect(() => {
+    cargar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth]);
 
   if (cargando) {
@@ -27,6 +37,9 @@ export default function AdminNegociosScreen() {
     <FlatList
       style={styles.container}
       data={negocios}
+      refreshControl={
+        <RefreshControl refreshing={refrescando} onRefresh={() => cargar(true)} colors={['#4f46e5']} />
+      }
       keyExtractor={n => String(n.id)}
       contentContainerStyle={{ padding: 16 }}
       ListHeaderComponent={<Text style={styles.titulo}>Negocios ({negocios.length})</Text>}

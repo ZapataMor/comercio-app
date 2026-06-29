@@ -1,3 +1,4 @@
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -11,8 +12,11 @@ import {
 } from 'react-native';
 import { login } from '../api';
 import { useAuth } from '../AuthContext';
+import { RootStackParamList } from '../navTypes';
 
-export default function LoginScreen() {
+type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
+
+export default function LoginScreen({ navigation }: Props) {
   const { entrar: guardarSesion } = useAuth();
   // Prellenado con el usuario demo para probar rápido.
   const [email, setEmail] = useState('comerciante@demo.co');
@@ -75,6 +79,10 @@ export default function LoginScreen() {
           )}
         </TouchableOpacity>
 
+        <TouchableOpacity onPress={() => navigation.navigate('Register')} disabled={cargando}>
+          <Text style={styles.registro}>¿No tienes cuenta? Regístrate</Text>
+        </TouchableOpacity>
+
         <Text style={styles.hint}>Demo: comerciante@demo.co / password123</Text>
       </View>
     </KeyboardAvoidingView>
@@ -126,5 +134,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     fontSize: 13,
   },
-  hint: { textAlign: 'center', color: '#94a3b8', fontSize: 12, marginTop: 16 },
+  registro: { textAlign: 'center', color: '#4f46e5', fontSize: 14, marginTop: 18, fontWeight: '600' },
+  hint: { textAlign: 'center', color: '#94a3b8', fontSize: 12, marginTop: 12 },
 });

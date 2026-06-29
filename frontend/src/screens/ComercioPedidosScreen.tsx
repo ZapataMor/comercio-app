@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -21,12 +22,20 @@ export default function ComercioPedidosScreen() {
   const token = auth!.token;
   const [pedidos, setPedidos] = useState<ComercioPedido[]>([]);
   const [cargando, setCargando] = useState(true);
+  const [refrescando, setRefrescando] = useState(false);
 
-  const cargar = useCallback(() => {
-    getPedidosComercio(token)
-      .then(setPedidos)
-      .finally(() => setCargando(false));
-  }, [token]);
+  const cargar = useCallback(
+    (refresco = false) => {
+      if (refresco) setRefrescando(true);
+      getPedidosComercio(token)
+        .then(setPedidos)
+        .finally(() => {
+          setCargando(false);
+          setRefrescando(false);
+        });
+    },
+    [token],
+  );
 
   // Se recarga al entrar (para ver pedidos nuevos que llegan del cliente).
   useFocusEffect(
@@ -54,6 +63,9 @@ export default function ComercioPedidosScreen() {
       data={pedidos}
       keyExtractor={p => String(p.id)}
       contentContainerStyle={{ padding: 16 }}
+      refreshControl={
+        <RefreshControl refreshing={refrescando} onRefresh={() => cargar(true)} colors={['#4f46e5']} />
+      }
       ListEmptyComponent={<Text style={styles.vacio}>Aún no has recibido pedidos.</Text>}
       renderItem={({ item }) => (
         <View style={styles.card}>

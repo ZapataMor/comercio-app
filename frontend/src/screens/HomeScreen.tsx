@@ -43,6 +43,15 @@ export default function HomeScreen({ navigation }: Props) {
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
 
+          <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('MisCategorias')}>
+            <Text style={styles.itemEmoji}>🏷️</Text>
+            <View style={styles.itemTexto}>
+              <Text style={styles.itemTitulo}>Categorías</Text>
+              <Text style={styles.itemSub}>Organiza tu catálogo</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('ComercioPedidos')}>
             <Text style={styles.itemEmoji}>📥</Text>
             <View style={styles.itemTexto}>

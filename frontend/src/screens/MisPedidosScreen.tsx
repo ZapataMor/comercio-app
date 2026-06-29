@@ -1,7 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { getMisPedidos, MiPedido } from '../api';
 import { useAuth } from '../AuthContext';
 import { RootStackParamList } from '../navTypes';
@@ -16,6 +16,7 @@ export default function MisPedidosScreen({ navigation }: Props) {
   const { auth } = useAuth();
   const [pedidos, setPedidos] = useState<MiPedido[]>([]);
   const [cargando, setCargando] = useState(true);
+  const [refrescando, setRefrescando] = useState(false);
 
   // Se recarga cada vez que entras a la pantalla (para ver el avance de estado).
   useFocusEffect(
@@ -30,6 +31,13 @@ export default function MisPedidosScreen({ navigation }: Props) {
     }, [auth]),
   );
 
+  function refrescar() {
+    setRefrescando(true);
+    getMisPedidos(auth!.token)
+      .then(setPedidos)
+      .finally(() => setRefrescando(false));
+  }
+
   if (cargando) {
     return <ActivityIndicator size="large" color="#4f46e5" style={{ marginTop: 40 }} />;
   }
@@ -40,6 +48,9 @@ export default function MisPedidosScreen({ navigation }: Props) {
       data={pedidos}
       keyExtractor={p => String(p.id)}
       contentContainerStyle={{ padding: 16 }}
+      refreshControl={
+        <RefreshControl refreshing={refrescando} onRefresh={refrescar} colors={['#4f46e5']} />
+      }
       ListEmptyComponent={<Text style={styles.vacio}>Aún no has hecho pedidos.</Text>}
       renderItem={({ item }) => (
         <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('PedidoDetalle', { id: item.id })}>
