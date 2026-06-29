@@ -29,6 +29,7 @@ import {
 } from '../api';
 import { useAuth } from '../AuthContext';
 import { Dropdown } from '../components/Dropdown';
+import Icon from '../components/Icon';
 import SelectorImagen from '../components/SelectorImagen';
 import { RootStackParamList } from '../navTypes';
 import { useToast } from '../Toast';
@@ -230,7 +231,7 @@ export default function CategoriaProductosScreen({ route }: Props) {
               {item.imagen ? (
                 <Image source={{ uri: imagenUrl(item.imagen) }} style={styles.thumbImg} resizeMode="cover" />
               ) : (
-                <Text style={styles.thumbPlaceholder}>📦</Text>
+                <Icon name="caja" size={22} color="#94a3b8" />
               )}
             </View>
             <View style={styles.itemTexto}>
@@ -242,7 +243,7 @@ export default function CategoriaProductosScreen({ route }: Props) {
                 {item.disponible ? 'Disponible' : 'Oculto'}
               </Text>
               <TouchableOpacity onPress={() => onEliminar(item)} hitSlop={8}>
-                <Text style={styles.eliminar}>🗑️</Text>
+                <Icon name="basura" size={18} color="#ef4444" />
               </TouchableOpacity>
             </View>
           </TouchableOpacity>

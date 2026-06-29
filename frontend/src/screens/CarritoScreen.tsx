@@ -2,6 +2,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useCart } from '../CartContext';
+import Icon from '../components/Icon';
 import { RootStackParamList } from '../navTypes';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Carrito'>;
@@ -16,7 +17,7 @@ export default function CarritoScreen({ navigation }: Props) {
   if (items.length === 0) {
     return (
       <View style={styles.vacioBox}>
-        <Text style={styles.emoji}>🛒</Text>
+        <Icon name="carrito" size={48} color="#cbd5e1" />
         <Text style={styles.vacio}>Tu carrito está vacío.</Text>
         <TouchableOpacity onPress={() => navigation.navigate('Explorar')}>
           <Text style={styles.link}>Explorar negocios →</Text>
@@ -28,7 +29,12 @@ export default function CarritoScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={{ padding: 16 }}>
-        {!!negocioNombre && <Text style={styles.tienda}>🏪 {negocioNombre}</Text>}
+        {!!negocioNombre && (
+          <View style={[styles.tienda, styles.fila]}>
+            <Icon name="tienda" size={15} color="#334155" />
+            <Text style={styles.tienda}>{negocioNombre}</Text>
+          </View>
+        )}
         {items.map(i => (
           <View key={i.producto_id} style={styles.item}>
             <View style={{ flex: 1 }}>
@@ -44,7 +50,7 @@ export default function CarritoScreen({ navigation }: Props) {
                 <Text style={styles.qtyTxt}>+</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => quitar(i.producto_id)}>
-                <Text style={styles.quitar}>✕</Text>
+                <Icon name="cerrar" size={16} color="#ef4444" />
               </TouchableOpacity>
             </View>
           </View>
@@ -70,6 +76,7 @@ export default function CarritoScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f1f5f9' },
   tienda: { fontWeight: '700', color: '#334155', marginBottom: 12 },
+  fila: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   item: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff',
     borderRadius: 12, padding: 12, marginBottom: 10,

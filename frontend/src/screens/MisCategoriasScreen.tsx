@@ -20,6 +20,7 @@ import {
   getProductos,
 } from '../api';
 import { useAuth } from '../AuthContext';
+import Icon from '../components/Icon';
 import { RootStackParamList } from '../navTypes';
 import { useToast } from '../Toast';
 
@@ -166,7 +167,7 @@ export default function MisCategoriasScreen({ navigation }: Props) {
                 {sinCategoria} {sinCategoria === 1 ? 'producto' : 'productos'} por organizar
               </Text>
             </View>
-            <Text style={styles.chevron}>›</Text>
+            <Icon name="chevron" size={20} color="#cbd5e1" />
           </TouchableOpacity>
         ) : null
       }
@@ -209,7 +210,7 @@ export default function MisCategoriasScreen({ navigation }: Props) {
               <TouchableOpacity style={styles.iconBtn} onPress={() => onEliminar(item)}>
                 <Text style={styles.eliminar}>Eliminar</Text>
               </TouchableOpacity>
-              <Text style={styles.chevron}>›</Text>
+              <Icon name="chevron" size={20} color="#cbd5e1" />
             </>
           )}
         </TouchableOpacity>

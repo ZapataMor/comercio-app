@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -12,10 +11,12 @@ import {
 } from 'react-native';
 import { AdminUsuario, cambiarRol, crearUsuario, getAdminUsuarios } from '../api';
 import { useAuth } from '../AuthContext';
+import { useToast } from '../Toast';
 
 export default function AdminUsuariosScreen() {
   const { auth } = useAuth();
   const token = auth!.token;
+  const toast = useToast();
 
   const [roles, setRoles] = useState<string[]>([]);
   const [conteos, setConteos] = useState<Record<string, number>>({});
@@ -42,7 +43,7 @@ export default function AdminUsuariosScreen() {
           setRolActual(r.rol_actual);
           setUsuarios(r.usuarios);
         })
-        .catch(e => Alert.alert('Error', e.message))
+        .catch(e => toast.error('Error', e.message))
         .finally(() => {
           setCargando(false);
           setRefrescando(false);
@@ -61,7 +62,7 @@ export default function AdminUsuariosScreen() {
       await cambiarRol(token, u.id, nuevo);
       cargar(rolActual);
     } catch (e) {
-      Alert.alert('No se pudo cambiar', e instanceof Error ? e.message : 'Error');
+      toast.error('No se pudo cambiar', e instanceof Error ? e.message : 'Error');
     }
   }
 
@@ -74,9 +75,9 @@ export default function AdminUsuariosScreen() {
       setPassword('');
       setMostrarForm(false);
       cargar(formRol);
-      Alert.alert('Listo', 'Usuario creado.');
+      toast.exito('Listo', 'Usuario creado.');
     } catch (e) {
-      Alert.alert('No se pudo crear', e instanceof Error ? e.message : 'Error');
+      toast.error('No se pudo crear', e instanceof Error ? e.message : 'Error');
     } finally {
       setEnviando(false);
     }

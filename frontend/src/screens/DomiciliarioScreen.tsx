@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -19,6 +18,8 @@ import {
   tomarPedido,
 } from '../api';
 import { useAuth } from '../AuthContext';
+import Icon, { IconName } from '../components/Icon';
+import { useToast } from '../Toast';
 
 function cop(n: number) {
   return '$' + Math.round(n).toLocaleString('es-CO');
@@ -27,6 +28,7 @@ function cop(n: number) {
 export default function DomiciliarioScreen() {
   const { auth } = useAuth();
   const token = auth!.token;
+  const toast = useToast();
   const [disponibles, setDisponibles] = useState<Pedido[]>([]);
   const [entregas, setEntregas] = useState<Pedido[]>([]);
   const [historial, setHistorial] = useState<Pedido[]>([]);
@@ -42,7 +44,7 @@ export default function DomiciliarioScreen() {
           setEntregas(e);
           setHistorial(h);
         })
-        .catch(err => Alert.alert('Error', err.message))
+        .catch(err => toast.error('Error', err.message))
         .finally(() => {
           setCargando(false);
           setRefrescando(false);
@@ -58,7 +60,7 @@ export default function DomiciliarioScreen() {
       await tomarPedido(token, id, minutos);
       cargar();
     } catch (e) {
-      Alert.alert('No se pudo tomar', e instanceof Error ? e.message : 'Error');
+      toast.error('No se pudo tomar', e instanceof Error ? e.message : 'Error');
     }
   }
 
@@ -67,7 +69,7 @@ export default function DomiciliarioScreen() {
       await avanzarPedido(token, id, accion);
       cargar();
     } catch (e) {
-      Alert.alert('No se pudo actualizar', e instanceof Error ? e.message : 'Error');
+      toast.error('No se pudo actualizar', e instanceof Error ? e.message : 'Error');
     }
   }
 
@@ -99,17 +101,32 @@ export default function DomiciliarioScreen() {
               <Text style={styles.pedidoId}>Pedido #{p.id}</Text>
               <Text style={styles.badge}>{p.estado_label}</Text>
             </View>
-            <Text style={styles.linea}>🏪 Recoger: {p.negocio?.nombre} — {p.negocio?.direccion ?? 's/d'}</Text>
-            <Text style={styles.linea}>🏠 Entregar: {p.cliente?.name} — {p.direccion_entrega}</Text>
-            <Text style={styles.linea}>📞 {p.telefono_contacto} · 💳 {p.metodo_pago}</Text>
+            <View style={[styles.linea, styles.fila]}>
+              <Icon name="tienda" size={14} color="#334155" />
+              <Text style={[styles.linea, { flex: 1 }]}>
+                Recoger: {p.negocio?.nombre} — {p.negocio?.direccion ?? 's/d'}
+              </Text>
+            </View>
+            <View style={[styles.linea, styles.fila]}>
+              <Icon name="casa" size={14} color="#334155" />
+              <Text style={[styles.linea, { flex: 1 }]}>
+                Entregar: {p.cliente?.name} — {p.direccion_entrega}
+              </Text>
+            </View>
+            <View style={[styles.linea, styles.fila]}>
+              <Icon name="telefono" size={14} color="#334155" />
+              <Text style={styles.linea}>{p.telefono_contacto} ·</Text>
+              <Icon name="tarjeta" size={14} color="#334155" />
+              <Text style={styles.linea}>{p.metodo_pago}</Text>
+            </View>
             {p.estado === 'tomado' && (
-              <Boton texto="📦 Marcar recogido" onPress={() => onAvanzar(p.id, 'recogido')} />
+              <Boton icon="caja" texto="Marcar recogido" onPress={() => onAvanzar(p.id, 'recogido')} />
             )}
             {p.estado === 'recogido' && (
-              <Boton texto="🛵 Salir / En camino" onPress={() => onAvanzar(p.id, 'en-camino')} />
+              <Boton icon="moto" texto="Salir / En camino" onPress={() => onAvanzar(p.id, 'en-camino')} />
             )}
             {p.estado === 'en_camino' && (
-              <Boton texto="✓ Marcar entregado" color="#16a34a" onPress={() => onAvanzar(p.id, 'entregado')} />
+              <Boton icon="check" texto="Marcar entregado" color="#16a34a" onPress={() => onAvanzar(p.id, 'entregado')} />
             )}
           </View>
         ))
@@ -130,9 +147,20 @@ export default function DomiciliarioScreen() {
   );
 }
 
-function Boton({ texto, onPress, color = '#4f46e5' }: { texto: string; onPress: () => void; color?: string }) {
+function Boton({
+  texto,
+  onPress,
+  icon,
+  color = '#4f46e5',
+}: {
+  texto: string;
+  onPress: () => void;
+  icon?: IconName;
+  color?: string;
+}) {
   return (
-    <TouchableOpacity style={[styles.btn, { backgroundColor: color }]} onPress={onPress}>
+    <TouchableOpacity style={[styles.btn, styles.btnFila, { backgroundColor: color }]} onPress={onPress}>
+      {icon && <Icon name={icon} size={16} color="#fff" />}
       <Text style={styles.btnTxt}>{texto}</Text>
     </TouchableOpacity>
   );
@@ -146,8 +174,14 @@ function DisponibleCard({ pedido, onTomar }: { pedido: Pedido; onTomar: (id: num
         <Text style={styles.pedidoId}>Pedido #{pedido.id}</Text>
         <Text style={styles.total}>{cop(pedido.total)}</Text>
       </View>
-      <Text style={styles.linea}>🏪 {pedido.negocio?.nombre}</Text>
-      <Text style={styles.lineaSub}>📍 {pedido.negocio?.direccion ?? 'Sin dirección'}</Text>
+      <View style={[styles.linea, styles.fila]}>
+        <Icon name="tienda" size={14} color="#334155" />
+        <Text style={[styles.linea, { flex: 1 }]}>{pedido.negocio?.nombre}</Text>
+      </View>
+      <View style={[styles.lineaSub, styles.fila]}>
+        <Icon name="ubicacion" size={13} color="#94a3b8" />
+        <Text style={[styles.lineaSub, { flex: 1 }]}>{pedido.negocio?.direccion ?? 'Sin dirección'}</Text>
+      </View>
       <Text style={styles.lineaSub}>{pedido.items.reduce((s, i) => s + i.cantidad, 0)} producto(s)</Text>
       <View style={styles.tomarRow}>
         <View>
@@ -195,6 +229,8 @@ const styles = StyleSheet.create({
   },
   tomarBtn: { flex: 1, backgroundColor: '#4f46e5', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
   btn: { borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 12 },
+  btnFila: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
+  fila: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   btnTxt: { color: '#fff', fontWeight: '700' },
   histItem: {
     flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#fff',

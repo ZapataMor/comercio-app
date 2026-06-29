@@ -4,6 +4,7 @@ import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { getPedido, SeguimientoPedido } from '../api';
 import { useAuth } from '../AuthContext';
+import Icon from '../components/Icon';
 import { RootStackParamList } from '../navTypes';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PedidoDetalle'>;
@@ -49,7 +50,10 @@ export default function PedidoDetalleScreen({ route }: Props) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
       <Text style={styles.titulo}>Pedido #{pedido.id}</Text>
-      <Text style={styles.sub}>🏪 {pedido.negocio}</Text>
+      <View style={[styles.sub, styles.fila]}>
+        <Icon name="tienda" size={14} color="#64748b" />
+        <Text style={styles.sub}>{pedido.negocio}</Text>
+      </View>
 
       {/* Seguimiento */}
       <View style={styles.card}>
@@ -65,7 +69,11 @@ export default function PedidoDetalleScreen({ route }: Props) {
                   (hecho || actual) ? styles.bolitaOn : styles.bolitaOff,
                   actual && styles.bolitaActual,
                 ]}>
-                <Text style={styles.bolitaTxt}>{hecho ? '✓' : i + 1}</Text>
+                {hecho ? (
+                  <Icon name="check" size={14} color="#fff" />
+                ) : (
+                  <Text style={styles.bolitaTxt}>{i + 1}</Text>
+                )}
               </View>
               <Text style={[styles.pasoTxt, (hecho || actual) ? styles.pasoOn : styles.pasoOff]}>
                 {LABEL[estado] ?? estado}
@@ -75,7 +83,10 @@ export default function PedidoDetalleScreen({ route }: Props) {
           );
         })}
         {pedido.estado === 'tomado' && pedido.minutos_recogida != null && (
-          <Text style={styles.nota}>🛵 El domiciliario recoge en ~{pedido.minutos_recogida} min.</Text>
+          <View style={[styles.nota, styles.fila]}>
+            <Icon name="moto" size={14} color="#4f46e5" />
+            <Text style={styles.nota}>El domiciliario recoge en ~{pedido.minutos_recogida} min.</Text>
+          </View>
         )}
         {!!pedido.domiciliario && <Text style={styles.nota}>Domiciliario: {pedido.domiciliario}</Text>}
       </View>
@@ -93,7 +104,12 @@ export default function PedidoDetalleScreen({ route }: Props) {
           <Text style={styles.totalLabel}>Total</Text>
           <Text style={styles.totalLabel}>{cop(pedido.total)}</Text>
         </View>
-        <Text style={styles.info}>💳 {pedido.metodo_pago} · 📍 {pedido.direccion_entrega}</Text>
+        <View style={[styles.info, styles.fila]}>
+          <Icon name="tarjeta" size={13} color="#64748b" />
+          <Text style={styles.info}>{pedido.metodo_pago} ·</Text>
+          <Icon name="ubicacion" size={13} color="#64748b" />
+          <Text style={[styles.info, { flex: 1 }]}>{pedido.direccion_entrega}</Text>
+        </View>
       </View>
     </ScrollView>
   );
@@ -103,6 +119,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f1f5f9' },
   titulo: { fontSize: 22, fontWeight: 'bold', color: '#0f172a' },
   sub: { color: '#64748b', marginTop: 2, marginBottom: 16 },
+  fila: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   card: { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 14 },
   cardTitulo: { fontWeight: '700', color: '#334155', marginBottom: 12 },
   paso: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },

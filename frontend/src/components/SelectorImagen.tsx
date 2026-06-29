@@ -11,6 +11,7 @@
 import { errorCodes, isErrorWithCode, pick, types } from '@react-native-documents/picker';
 import React from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Icon from './Icon';
 
 type Props = {
   /** URL/URI a previsualizar (remota del servidor o local recién elegida). */
@@ -41,7 +42,7 @@ export default function SelectorImagen({ uri, onSelect, label = 'Imagen', disabl
           {uri ? (
             <Image source={{ uri }} style={styles.img} resizeMode="cover" />
           ) : (
-            <Text style={styles.placeholder}>🖼️</Text>
+            <Icon name="imagen" size={28} color="#94a3b8" />
           )}
         </View>
         <TouchableOpacity

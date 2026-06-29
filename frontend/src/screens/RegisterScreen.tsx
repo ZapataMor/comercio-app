@@ -13,15 +13,16 @@ import {
 } from 'react-native';
 import { register, RolPublico } from '../api';
 import { useAuth } from '../AuthContext';
+import Icon, { IconName } from '../components/Icon';
 import { RootStackParamList } from '../navTypes';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 
 // Solo se permiten estos dos roles al registrarse desde la app.
 // 'administrador' y 'domiciliario' NO se ofrecen (los crea un admin).
-const OPCIONES: { rol: RolPublico; titulo: string; sub: string; emoji: string }[] = [
-  { rol: 'usuario', titulo: 'Cliente', sub: 'Quiero comprar y pedir domicilios', emoji: '🛍️' },
-  { rol: 'comerciante', titulo: 'Comerciante', sub: 'Quiero vender en mi negocio', emoji: '🏪' },
+const OPCIONES: { rol: RolPublico; titulo: string; sub: string; icon: IconName }[] = [
+  { rol: 'usuario', titulo: 'Cliente', sub: 'Quiero comprar y pedir domicilios', icon: 'bolsa' },
+  { rol: 'comerciante', titulo: 'Comerciante', sub: 'Quiero vender en mi negocio', icon: 'tienda' },
 ];
 
 export default function RegisterScreen({ navigation }: Props) {
@@ -72,7 +73,10 @@ export default function RegisterScreen({ navigation }: Props) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.card}>
-          <Text style={styles.logo}>🛒 Crear cuenta</Text>
+          <View style={styles.logoRow}>
+            <Icon name="carrito" size={24} color="#4f46e5" />
+            <Text style={styles.logo}>Crear cuenta</Text>
+          </View>
           <Text style={styles.subtitle}>Únete a Comercio</Text>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -125,7 +129,12 @@ export default function RegisterScreen({ navigation }: Props) {
                 style={[styles.opcion, rol === o.rol && styles.opcionOn]}
                 onPress={() => setRol(o.rol)}
                 disabled={cargando}>
-                <Text style={styles.opcionEmoji}>{o.emoji}</Text>
+                <Icon
+                  name={o.icon}
+                  size={24}
+                  color={rol === o.rol ? '#4338ca' : '#334155'}
+                  style={styles.opcionEmoji}
+                />
                 <Text style={[styles.opcionTitulo, rol === o.rol && styles.opcionTituloOn]}>
                   {o.titulo}
                 </Text>
@@ -169,6 +178,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   logo: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', color: '#4f46e5' },
+  logoRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   subtitle: { textAlign: 'center', color: '#64748b', marginTop: 4, marginBottom: 20 },
   label: { fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 6 },
   input: {

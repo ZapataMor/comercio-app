@@ -13,6 +13,7 @@ import {
 import { getCatalogo, imagenUrl, Negocio, Producto } from '../api';
 import { useAuth } from '../AuthContext';
 import { useCart } from '../CartContext';
+import Icon from '../components/Icon';
 import { RootStackParamList } from '../navTypes';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Negocio'>;
@@ -80,7 +81,12 @@ export default function NegocioScreen({ route, navigation }: Props) {
               <Image source={{ uri: imagenUrl(negocio.imagen) }} style={styles.portada} resizeMode="cover" />
             )}
             {!!negocio.descripcion && <Text style={styles.desc}>{negocio.descripcion}</Text>}
-            {!!negocio.direccion && <Text style={styles.dato}>📍 {negocio.direccion}</Text>}
+            {!!negocio.direccion && (
+              <View style={[styles.dato, styles.fila]}>
+                <Icon name="ubicacion" size={13} color="#94a3b8" />
+                <Text style={styles.dato}>{negocio.direccion}</Text>
+              </View>
+            )}
           </View>
         ) : null
       }
@@ -91,7 +97,7 @@ export default function NegocioScreen({ route, navigation }: Props) {
             <Image source={{ uri: imagenUrl(item.imagen) }} style={styles.thumb} resizeMode="cover" />
           ) : (
             <View style={[styles.thumb, styles.thumbVacio]}>
-              <Text style={styles.thumbEmoji}>📦</Text>
+              <Icon name="caja" size={22} color="#94a3b8" />
             </View>
           )}
           <View style={styles.itemTexto}>
@@ -108,8 +114,11 @@ export default function NegocioScreen({ route, navigation }: Props) {
       )}
       ListFooterComponent={
         cart.count > 0 ? (
-          <TouchableOpacity style={styles.verCarrito} onPress={() => navigation.navigate('Carrito')}>
-            <Text style={styles.verCarritoTxt}>🛒 Ver carrito ({cart.count})</Text>
+          <TouchableOpacity
+            style={[styles.verCarrito, styles.filaCentro]}
+            onPress={() => navigation.navigate('Carrito')}>
+            <Icon name="carrito" size={18} color="#fff" />
+            <Text style={styles.verCarritoTxt}>Ver carrito ({cart.count})</Text>
           </TouchableOpacity>
         ) : null
       }
@@ -123,6 +132,8 @@ const styles = StyleSheet.create({
   portada: { width: '100%', height: 150, borderRadius: 14, marginBottom: 12, backgroundColor: '#e2e8f0' },
   desc: { color: '#475569', fontSize: 15 },
   dato: { color: '#94a3b8', fontSize: 13, marginTop: 6 },
+  fila: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  filaCentro: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   item: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10,

@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { AdminStats, getAdminStats } from '../api';
 import { useAuth } from '../AuthContext';
+import Icon from '../components/Icon';
 import { RootStackParamList } from '../navTypes';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AdminTablero'>;
@@ -47,14 +48,14 @@ export default function AdminTableroScreen({ navigation }: Props) {
       ) : null}
 
       <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('AdminUsuarios')}>
-        <Text style={styles.itemEmoji}>👥</Text>
+        <Icon name="usuarios" size={24} color="#4f46e5" style={styles.itemEmoji} />
         <Text style={styles.itemTitulo}>Usuarios y roles</Text>
-        <Text style={styles.chevron}>›</Text>
+        <Icon name="chevron" size={20} color="#cbd5e1" />
       </TouchableOpacity>
       <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('AdminNegocios')}>
-        <Text style={styles.itemEmoji}>🏪</Text>
+        <Icon name="tienda" size={24} color="#4f46e5" style={styles.itemEmoji} />
         <Text style={styles.itemTitulo}>Todos los negocios</Text>
-        <Text style={styles.chevron}>›</Text>
+        <Icon name="chevron" size={20} color="#cbd5e1" />
       </TouchableOpacity>
     </ScrollView>
   );

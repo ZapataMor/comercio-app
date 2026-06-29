@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { marcarPedidoListo } from '../api';
 import { useAuth } from '../AuthContext';
+import Icon from '../components/Icon';
 import { RootStackParamList } from '../navTypes';
 import { useToast } from '../Toast';
 
@@ -51,11 +52,30 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
 
         <View style={styles.bloque}>
           <Text style={styles.bloqueTitulo}>Cliente</Text>
-          <Text style={styles.cliente}>👤 {pedido.cliente ?? 'Cliente'}</Text>
-          <Text style={styles.linea}>📍 {pedido.direccion_entrega}</Text>
-          {!!pedido.telefono_contacto && <Text style={styles.linea}>📞 {pedido.telefono_contacto}</Text>}
-          <Text style={styles.linea}>💳 Pago: {pedido.metodo_pago}</Text>
-          {!!pedido.domiciliario && <Text style={styles.linea}>🛵 Domiciliario: {pedido.domiciliario}</Text>}
+          <View style={styles.filaInfo}>
+            <Icon name="usuario" size={15} color="#0f172a" />
+            <Text style={styles.cliente}>{pedido.cliente ?? 'Cliente'}</Text>
+          </View>
+          <View style={styles.filaInfo}>
+            <Icon name="ubicacion" size={15} color="#475569" />
+            <Text style={styles.linea}>{pedido.direccion_entrega}</Text>
+          </View>
+          {!!pedido.telefono_contacto && (
+            <View style={styles.filaInfo}>
+              <Icon name="telefono" size={15} color="#475569" />
+              <Text style={styles.linea}>{pedido.telefono_contacto}</Text>
+            </View>
+          )}
+          <View style={styles.filaInfo}>
+            <Icon name="tarjeta" size={15} color="#475569" />
+            <Text style={styles.linea}>Pago: {pedido.metodo_pago}</Text>
+          </View>
+          {!!pedido.domiciliario && (
+            <View style={styles.filaInfo}>
+              <Icon name="moto" size={15} color="#475569" />
+              <Text style={styles.linea}>Domiciliario: {pedido.domiciliario}</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.bloque}>
@@ -83,11 +103,20 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
           )}
         </TouchableOpacity>
       ) : pedido.estado === 'listo' ? (
-        <Text style={styles.nota}>⏳ Esperando que un domiciliario lo tome…</Text>
+        <View style={styles.filaNota}>
+          <Icon name="reloj" size={16} color="#64748b" />
+          <Text style={[styles.nota, styles.notaInline]}>Esperando que un domiciliario lo tome…</Text>
+        </View>
       ) : pedido.estado === 'entregado' ? (
-        <Text style={[styles.nota, { color: '#16a34a' }]}>✓ Entregado al cliente</Text>
+        <View style={styles.filaNota}>
+          <Icon name="check" size={16} color="#16a34a" />
+          <Text style={[styles.nota, styles.notaInline, { color: '#16a34a' }]}>Entregado al cliente</Text>
+        </View>
       ) : (
-        <Text style={styles.nota}>🛵 {pedido.estado_label}</Text>
+        <View style={styles.filaNota}>
+          <Icon name="moto" size={16} color="#64748b" />
+          <Text style={[styles.nota, styles.notaInline]}>{pedido.estado_label}</Text>
+        </View>
       )}
     </ScrollView>
   );
@@ -105,7 +134,12 @@ const styles = StyleSheet.create({
   bloque: { borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 12, marginTop: 12 },
   bloqueTitulo: { fontSize: 12, fontWeight: '700', color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase' },
   cliente: { fontWeight: '700', color: '#0f172a', fontSize: 15 },
-  linea: { color: '#475569', fontSize: 14, marginTop: 3 },
+  linea: { color: '#475569', fontSize: 14, flex: 1 },
+  filaInfo: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 5 },
+  filaNota: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 16,
+  },
+  notaInline: { marginTop: 0 },
   itemRow: { flexDirection: 'row', marginTop: 4 },
   itemCant: { fontWeight: '700', color: '#4f46e5', width: 36 },
   itemNombre: { color: '#334155', fontSize: 15, flex: 1 },

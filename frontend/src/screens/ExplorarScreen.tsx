@@ -14,6 +14,7 @@ import {
 import { getNegocios, imagenUrl, NegocioLista } from '../api';
 import { useAuth } from '../AuthContext';
 import { useCart } from '../CartContext';
+import Icon from '../components/Icon';
 import { RootStackParamList } from '../navTypes';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Explorar'>;
@@ -65,11 +66,17 @@ export default function ExplorarScreen({ navigation }: Props) {
       ListHeaderComponent={
         <View>
           <View style={styles.barra}>
-            <TouchableOpacity style={styles.accion} onPress={() => navigation.navigate('Carrito')}>
-              <Text style={styles.accionTxt}>🛒 Carrito{cart.count > 0 ? ` (${cart.count})` : ''}</Text>
+            <TouchableOpacity
+              style={[styles.accion, styles.filaAccion]}
+              onPress={() => navigation.navigate('Carrito')}>
+              <Icon name="carrito" size={15} color="#4338ca" />
+              <Text style={styles.accionTxt}>Carrito{cart.count > 0 ? ` (${cart.count})` : ''}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.accion} onPress={() => navigation.navigate('MisPedidos')}>
-              <Text style={styles.accionTxt}>📋 Mis pedidos</Text>
+            <TouchableOpacity
+              style={[styles.accion, styles.filaAccion]}
+              onPress={() => navigation.navigate('MisPedidos')}>
+              <Icon name="lista" size={15} color="#4338ca" />
+              <Text style={styles.accionTxt}>Mis pedidos</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.accion} onPress={salir}>
               <Text style={[styles.accionTxt, { color: '#ef4444' }]}>Salir</Text>
@@ -77,7 +84,7 @@ export default function ExplorarScreen({ navigation }: Props) {
           </View>
 
           <View style={styles.buscadorBox}>
-            <Text style={styles.lupa}>🔎</Text>
+            <Icon name="lupa" size={16} color="#94a3b8" style={styles.lupa} />
             <TextInput
               style={styles.buscador}
               value={busqueda}
@@ -89,7 +96,7 @@ export default function ExplorarScreen({ navigation }: Props) {
             />
             {busqueda.length > 0 && (
               <TouchableOpacity onPress={() => setBusqueda('')} hitSlop={8}>
-                <Text style={styles.limpiar}>✕</Text>
+                <Icon name="cerrar" size={16} color="#94a3b8" />
               </TouchableOpacity>
             )}
           </View>
@@ -117,7 +124,12 @@ export default function ExplorarScreen({ navigation }: Props) {
             <Text style={styles.abierto}>Abierto</Text>
           </View>
           {!!item.descripcion && <Text style={styles.desc} numberOfLines={2}>{item.descripcion}</Text>}
-          {!!item.direccion && <Text style={styles.dir}>📍 {item.direccion}</Text>}
+          {!!item.direccion && (
+            <View style={[styles.dir, styles.filaAccion]}>
+              <Icon name="ubicacion" size={13} color="#94a3b8" />
+              <Text style={styles.dir}>{item.direccion}</Text>
+            </View>
+          )}
           <Text style={styles.cont}>{item.productos} producto(s) →</Text>
         </TouchableOpacity>
       )}
@@ -130,6 +142,7 @@ const styles = StyleSheet.create({
   barra: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   accion: { backgroundColor: '#fff', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
   accionTxt: { fontWeight: '600', color: '#4338ca', fontSize: 13 },
+  filaAccion: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   buscadorBox: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff',
     borderRadius: 12, paddingHorizontal: 12, marginBottom: 12,

@@ -179,6 +179,11 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 ---
 
 ## 📜 Historial de cambios
+- **2026-06-29** — **Móvil: íconos de línea, toasts globales y limpieza**.
+  - **Íconos de borde fino**: se añadió `react-native-svg` y `src/components/Icon.tsx`, un set propio de íconos *solo borde* (estilo thin/uicons): tienda, etiqueta, bolsa, herramientas, moto, usuario(s), ubicación, teléfono, tarjeta, caja, basura, carrito, efectivo, banco, casa, check, cerrar, imagen, chevron, lista, lupa, reloj. **Se reemplazaron TODOS los emojis** de la app por estos íconos, contextualizados (Home, AdminTablero, Categorías/Productos, detalle de pedido, Explorar, Carrito, Negocio, Checkout, Domiciliario, Login, Register, SelectorImagen). No se usó la fuente Flaticon UICONS porque su paquete npm solo trae woff2/woff (RN no los carga sin convertir a TTF); el SVG logra el mismo estilo de forma fiable.
+  - **Toasts en los demás roles**: migrados los `Alert` informativos de cliente/admin/domiciliario (`AdminUsuarios`, `Domiciliario`, `Checkout`) a `useToast`. Se conservan como `Alert` solo las **confirmaciones** (Sí/No: vaciar carrito, borrar producto/categoría).
+  - **Limpieza**: eliminadas las pantallas huérfanas `MisProductosScreen.tsx` y `ComercioPedidosScreen.tsx`.
+  - **OJO**: requiere **rebuild nativo** (`npx react-native run-android`) porque `react-native-svg` es módulo nativo. `tsc --noEmit` verde.
 - **2026-06-29** — **Móvil: rediseño del flujo del comerciante**.
   - **Mi Tienda**: ahora se muestra como **tarjeta de solo lectura** con botón **"Editar información"**; el formulario solo aparece al crear/editar. Al **crear** el negocio, **redirige al Inicio**.
   - **Inicio del comerciante**: muestra **solo "Mi negocio" y "Categorías"**. **Switch Abierto/Cerrado** en la parte derecha de la topbar (reutiliza el campo `activo`: cerrado = oculto en Explorar). Los **pedidos en espera** se listan directamente en el Inicio; cada uno abre un **detalle** (`ComercioPedidoDetalle`) con toda su info y el botón **"Marcar listo"**.
@@ -187,7 +192,7 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
   - Infra nueva: `src/Toast.tsx` (ToastProvider/useToast), `src/NegocioContext.tsx` (estado del negocio compartido para el switch y Mi Tienda), `src/components/Dropdown.tsx`.
   - Backend: `CategoriaResource` con `productos` (conteo, `withCount`) y `ProductoController` con `?sin_categoria=1`. **+2 tests Pest** (conteo por categoría y filtro sin categoría) → **29 verdes**. `tsc --noEmit` verde.
   - El editor de productos de `CategoriaProductos` ya incluye `SelectorImagen` (foto del producto) y `crearProducto`/`actualizarProducto` suben la imagen, consistente con el flujo de imágenes en curso.
-  - Quedaron **sin uso** `MisProductosScreen.tsx` y `ComercioPedidosScreen.tsx` (su función se reorganizó); se dejaron en disco para no chocar con el trabajo de imágenes en curso. Pendiente: decidir si se borran.
+  - Quedaron sin uso `MisProductosScreen.tsx` y `ComercioPedidosScreen.tsx` (su función se reorganizó); **eliminadas** en la iteración siguiente.
 - **2026-06-28** — **Móvil: cierre de brechas de funcionalidad (registro + CRUD comerciante + búsqueda + pull-to-refresh)**. Tras una ronda de QA en el emulador se implementó lo que faltaba en la app:
   - **Registro de cuenta** desde la app: nueva `RegisterScreen` (nombre, correo, contraseña + confirmación, selector de rol) enlazada desde Login; **solo permite roles `usuario` (cliente) y `comerciante`** — admin y domiciliario NUNCA se ofrecen (consistente con `ROLES_PUBLICOS` del backend; los domiciliarios los creará luego un admin de domiciliarios). `api.register()` envía `password_confirmation`. Rutas `Login`/`Register` ahora conviven en el stack no-autenticado de `App.tsx`.
   - **Comerciante: gestión de su negocio**: `MiTiendaScreen` pasó de solo-lectura a **formulario** que crea (`POST`) o edita (`PUT`) el negocio (nombre, descripción, dirección, teléfono, switch abierto/cerrado).

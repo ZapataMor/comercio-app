@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "801366967290",
+    "project_id": "miproyecto-48045",
+    "storage_bucket": "miproyecto-48045.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:801366967290:android:6fbb3b99bd667d3ecc5a43",
+        "android_client_info": {
+          "package_name": "com.comercioapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAbNcPFl1hiRrB4r3OITw81x22F_2Ji_lA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

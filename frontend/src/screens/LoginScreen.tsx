@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { login } from '../api';
 import { useAuth } from '../AuthContext';
+import Icon from '../components/Icon';
 import { RootStackParamList } from '../navTypes';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
@@ -42,7 +43,10 @@ export default function LoginScreen({ navigation }: Props) {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.card}>
-        <Text style={styles.logo}>🛒 Comercio</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <Icon name="carrito" size={24} color="#4f46e5" />
+          <Text style={styles.logo}>Comercio</Text>
+        </View>
         <Text style={styles.subtitle}>Entra a tu cuenta</Text>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}

@@ -2,7 +2,6 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,7 +12,9 @@ import {
 import { crearPedido } from '../api';
 import { useAuth } from '../AuthContext';
 import { useCart } from '../CartContext';
+import Icon from '../components/Icon';
 import { RootStackParamList } from '../navTypes';
+import { useToast } from '../Toast';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Checkout'>;
 
@@ -24,6 +25,7 @@ function cop(n: number) {
 export default function CheckoutScreen({ navigation }: Props) {
   const { auth } = useAuth();
   const cart = useCart();
+  const toast = useToast();
   const [direccion, setDireccion] = useState('');
   const [telefono, setTelefono] = useState('');
   const [pago, setPago] = useState('efectivo');
@@ -31,7 +33,7 @@ export default function CheckoutScreen({ navigation }: Props) {
 
   async function confirmar() {
     if (!direccion.trim() || !telefono.trim()) {
-      Alert.alert('Faltan datos', 'Escribe la dirección y el teléfono.');
+      toast.error('Faltan datos', 'Escribe la dirección y el teléfono.');
       return;
     }
     setEnviando(true);
@@ -44,10 +46,10 @@ export default function CheckoutScreen({ navigation }: Props) {
         telefono_contacto: telefono,
       });
       cart.vaciar();
-      Alert.alert('¡Pedido confirmado!', 'El negocio ya recibió tu pedido.');
+      toast.exito('¡Pedido confirmado!', 'El negocio ya recibió tu pedido.');
       navigation.navigate('MisPedidos');
     } catch (e) {
-      Alert.alert('No se pudo confirmar', e instanceof Error ? e.message : 'Error');
+      toast.error('No se pudo confirmar', e instanceof Error ? e.message : 'Error');
     } finally {
       setEnviando(false);
     }
@@ -56,7 +58,10 @@ export default function CheckoutScreen({ navigation }: Props) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
       <View style={styles.resumen}>
-        <Text style={styles.resumenTitulo}>🏪 {cart.negocioNombre}</Text>
+        <View style={[styles.resumenTitulo, styles.fila]}>
+          <Icon name="tienda" size={15} color="#334155" />
+          <Text style={styles.resumenTitulo}>{cart.negocioNombre}</Text>
+        </View>
         {cart.items.map(i => (
           <View key={i.producto_id} style={styles.linea}>
             <Text style={styles.lineaTxt}>{i.cantidad}× {i.nombre}</Text>
@@ -78,13 +83,14 @@ export default function CheckoutScreen({ navigation }: Props) {
       <Text style={styles.label}>Forma de pago</Text>
       <View style={styles.pagos}>
         {[
-          { v: 'efectivo', t: '💵 Efectivo' },
-          { v: 'transferencia', t: '🏦 Transferencia' },
+          { v: 'efectivo', t: 'Efectivo', icon: 'efectivo' as const },
+          { v: 'transferencia', t: 'Transferencia', icon: 'banco' as const },
         ].map(op => (
           <TouchableOpacity
             key={op.v}
             style={[styles.pago, pago === op.v && styles.pagoOn]}
             onPress={() => setPago(op.v)}>
+            <Icon name={op.icon} size={20} color={pago === op.v ? '#4338ca' : '#475569'} />
             <Text style={[styles.pagoTxt, pago === op.v && styles.pagoTxtOn]}>{op.t}</Text>
           </TouchableOpacity>
         ))}
@@ -105,6 +111,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f1f5f9' },
   resumen: { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 16 },
   resumenTitulo: { fontWeight: '700', color: '#334155', marginBottom: 8 },
+  fila: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   linea: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
   lineaTxt: { color: '#475569' },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#e2e8f0' },
@@ -113,7 +120,7 @@ const styles = StyleSheet.create({
   label: { fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 6, marginTop: 6 },
   input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12 },
   pagos: { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  pago: { flex: 1, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingVertical: 14, alignItems: 'center', backgroundColor: '#fff' },
+  pago: { flex: 1, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingVertical: 14, alignItems: 'center', gap: 4, backgroundColor: '#fff' },
   pagoOn: { borderColor: '#4f46e5', backgroundColor: '#eef2ff' },
   pagoTxt: { color: '#475569', fontWeight: '600' },
   pagoTxtOn: { color: '#4338ca' },

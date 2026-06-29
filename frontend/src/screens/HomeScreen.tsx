@@ -4,6 +4,7 @@ import React, { useCallback, useLayoutEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { ComercioPedido, getPedidosComercio } from '../api';
 import { useAuth } from '../AuthContext';
+import Icon from '../components/Icon';
 import { useNegocio } from '../NegocioContext';
 import { RootStackParamList } from '../navTypes';
 import { useToast } from '../Toast';
@@ -90,7 +91,7 @@ export default function HomeScreen({ navigation }: Props) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.saludo}>¡Hola, {user.name}! 👋</Text>
+      <Text style={styles.saludo}>¡Hola, {user.name}!</Text>
       <View style={styles.rolesRow}>
         {user.roles.map(r => (
           <Text key={r} style={styles.rol}>{r}</Text>
@@ -100,23 +101,23 @@ export default function HomeScreen({ navigation }: Props) {
       {esComerciante && (
         <>
           <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('MiTienda')}>
-            <Text style={styles.itemEmoji}>🏪</Text>
+            <Icon name="tienda" size={26} color="#4f46e5" style={styles.itemEmoji} />
             <View style={styles.itemTexto}>
               <Text style={styles.itemTitulo}>Mi negocio</Text>
               <Text style={styles.itemSub}>
                 {negocio ? `${negocio.nombre} · ${negocio.activo ? 'Abierto' : 'Cerrado'}` : 'Crea tu negocio'}
               </Text>
             </View>
-            <Text style={styles.chevron}>›</Text>
+            <Icon name="chevron" size={20} color="#cbd5e1" />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('MisCategorias')}>
-            <Text style={styles.itemEmoji}>🏷️</Text>
+            <Icon name="etiqueta" size={26} color="#4f46e5" style={styles.itemEmoji} />
             <View style={styles.itemTexto}>
               <Text style={styles.itemTitulo}>Categorías</Text>
               <Text style={styles.itemSub}>Organiza tu catálogo y crea productos</Text>
             </View>
-            <Text style={styles.chevron}>›</Text>
+            <Icon name="chevron" size={20} color="#cbd5e1" />
           </TouchableOpacity>
 
           {/* Pedidos en espera, directamente en el Inicio. */}
@@ -137,10 +138,19 @@ export default function HomeScreen({ navigation }: Props) {
                   <Text style={styles.pedidoId}>Pedido #{p.id}</Text>
                   <Text style={styles.pedidoTotal}>{cop(p.total)}</Text>
                 </View>
-                <Text style={styles.pedidoCliente}>👤 {p.cliente ?? 'Cliente'}</Text>
-                <Text style={styles.pedidoItems}>
-                  {p.items.reduce((s, i) => s + i.cantidad, 0)} artículo(s) · 📍 {p.direccion_entrega}
-                </Text>
+                <View style={[styles.pedidoCliente, styles.fila]}>
+                  <Icon name="usuario" size={14} color="#334155" />
+                  <Text style={styles.pedidoCliente}>{p.cliente ?? 'Cliente'}</Text>
+                </View>
+                <View style={[styles.pedidoItems, styles.fila]}>
+                  <Text style={styles.pedidoItems}>
+                    {p.items.reduce((s, i) => s + i.cantidad, 0)} artículo(s) ·
+                  </Text>
+                  <Icon name="ubicacion" size={13} color="#64748b" />
+                  <Text style={[styles.pedidoItems, { flex: 1 }]} numberOfLines={1}>
+                    {p.direccion_entrega}
+                  </Text>
+                </View>
                 <Text style={styles.pedidoVer}>Ver y marcar listo ›</Text>
               </TouchableOpacity>
             ))
@@ -150,34 +160,34 @@ export default function HomeScreen({ navigation }: Props) {
 
       {esCliente && (
         <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('Explorar')}>
-          <Text style={styles.itemEmoji}>🛍️</Text>
+          <Icon name="bolsa" size={26} color="#4f46e5" style={styles.itemEmoji} />
           <View style={styles.itemTexto}>
             <Text style={styles.itemTitulo}>Explorar negocios</Text>
             <Text style={styles.itemSub}>Mira los comercios abiertos</Text>
           </View>
-          <Text style={styles.chevron}>›</Text>
+          <Icon name="chevron" size={20} color="#cbd5e1" />
         </TouchableOpacity>
       )}
 
       {esAdmin && (
         <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('AdminTablero')}>
-          <Text style={styles.itemEmoji}>🛠️</Text>
+          <Icon name="herramientas" size={26} color="#4f46e5" style={styles.itemEmoji} />
           <View style={styles.itemTexto}>
             <Text style={styles.itemTitulo}>Administración</Text>
             <Text style={styles.itemSub}>Usuarios, roles y negocios</Text>
           </View>
-          <Text style={styles.chevron}>›</Text>
+          <Icon name="chevron" size={20} color="#cbd5e1" />
         </TouchableOpacity>
       )}
 
       {esDomiciliario && (
         <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('Domiciliario')}>
-          <Text style={styles.itemEmoji}>🛵</Text>
+          <Icon name="moto" size={26} color="#4f46e5" style={styles.itemEmoji} />
           <View style={styles.itemTexto}>
             <Text style={styles.itemTitulo}>Mis entregas</Text>
             <Text style={styles.itemSub}>Pedidos para recoger y entregar</Text>
           </View>
-          <Text style={styles.chevron}>›</Text>
+          <Icon name="chevron" size={20} color="#cbd5e1" />
         </TouchableOpacity>
       )}
 
@@ -202,8 +212,9 @@ const styles = StyleSheet.create({
     borderRadius: 16, padding: 16, marginBottom: 12,
     shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
   },
-  itemEmoji: { fontSize: 28, marginRight: 14 },
+  itemEmoji: { marginRight: 14 },
   itemTexto: { flex: 1 },
+  fila: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   itemTitulo: { fontSize: 16, fontWeight: '700', color: '#0f172a' },
   itemSub: { color: '#64748b', fontSize: 13, marginTop: 2 },
   chevron: { fontSize: 28, color: '#cbd5e1' },
