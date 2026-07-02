@@ -57,7 +57,8 @@ export default function MisPedidosScreen({ navigation }: Props) {
       style={styles.container}
       data={pedidos}
       keyExtractor={p => String(p.id)}
-      contentContainerStyle={{ padding: 16 }}
+      // Aire abajo para la barra flotante fija (aquí solo se ve "Carrito").
+      contentContainerStyle={{ padding: 16, paddingBottom: 110 }}
       refreshControl={
         <RefreshControl refreshing={refrescando} onRefresh={refrescar} colors={[c.accent]} tintColor={c.accent} />
       }

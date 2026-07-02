@@ -10,6 +10,8 @@ type AuthContextType = {
   auth: Sesion;
   cargando: boolean; // true mientras se lee la sesión guardada al iniciar
   entrar: (token: string, user: Usuario) => void;
+  /** Refresca los datos del usuario en la sesión (p. ej. tras editar el perfil). */
+  actualizarUsuario: (user: Usuario) => void;
   salir: () => void;
 };
 
@@ -19,6 +21,7 @@ const AuthContext = createContext<AuthContextType>({
   auth: null,
   cargando: true,
   entrar: () => {},
+  actualizarUsuario: () => {},
   salir: () => {},
 });
 
@@ -66,6 +69,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.setItem(CLAVE, JSON.stringify(sesion));
   };
 
+  const actualizarUsuario = (user: Usuario) => {
+    setAuth(prev => {
+      if (!prev) {
+        return prev;
+      }
+      const sesion = { ...prev, user };
+      AsyncStorage.setItem(CLAVE, JSON.stringify(sesion));
+      return sesion;
+    });
+  };
+
   const salir = () => {
     if (auth?.token) {
       eliminarPush(auth.token);
@@ -75,7 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ auth, cargando, entrar, salir }}>
+    <AuthContext.Provider value={{ auth, cargando, entrar, actualizarUsuario, salir }}>
       {children}
     </AuthContext.Provider>
   );

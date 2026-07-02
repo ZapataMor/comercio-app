@@ -18,7 +18,6 @@ import {
   ProductoConNegocio,
 } from '../api';
 import { useAuth } from '../AuthContext';
-import { useCart } from '../CartContext';
 import { CardSkeletons, FadeInView, PressableScale } from '../components/anim';
 import Icon from '../components/Icon';
 import { RootStackParamList } from '../navTypes';
@@ -31,8 +30,7 @@ function precioCOP(n: number) {
 }
 
 export default function ExplorarScreen({ navigation }: Props) {
-  const { auth, salir } = useAuth();
-  const cart = useCart();
+  const { auth } = useAuth();
   const [negocios, setNegocios] = useState<NegocioLista[]>([]);
   const [productos, setProductos] = useState<ProductoConNegocio[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -72,7 +70,8 @@ export default function ExplorarScreen({ navigation }: Props) {
       style={styles.container}
       data={cargando ? [] : buscando ? productos : negocios}
       keyExtractor={item => String(item.id)}
-      contentContainerStyle={{ padding: 16 }}
+      // Aire abajo para la barra flotante fija (Carrito / Mis pedidos).
+      contentContainerStyle={{ padding: 16, paddingBottom: 110 }}
       keyboardShouldPersistTaps="handled"
       refreshControl={
         <RefreshControl
@@ -84,24 +83,8 @@ export default function ExplorarScreen({ navigation }: Props) {
       }
       ListHeaderComponent={
         <View>
-          <View style={styles.barra}>
-            <TouchableOpacity
-              style={[styles.accion, styles.filaAccion]}
-              onPress={() => navigation.navigate('Carrito')}>
-              <Icon name="carrito" size={15} color={c.accent} />
-              <Text style={styles.accionTxt}>Carrito{cart.count > 0 ? ` (${cart.count})` : ''}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.accion, styles.filaAccion]}
-              onPress={() => navigation.navigate('MisPedidos')}>
-              <Icon name="lista" size={15} color={c.accent} />
-              <Text style={styles.accionTxt}>Mis pedidos</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.accion} onPress={salir}>
-              <Text style={[styles.accionTxt, { color: c.danger }]}>Salir</Text>
-            </TouchableOpacity>
-          </View>
-
+          {/* Carrito y Mis pedidos viven ahora en la barra flotante inferior;
+              salir de la cuenta se hace desde "Mi perfil" (topbar). */}
           <View style={styles.buscadorBox}>
             <Icon name="lupa" size={16} color={c.muted} style={styles.lupa} />
             <TextInput
@@ -213,9 +196,6 @@ function renderNegocio(item: NegocioLista, navigation: Props['navigation'], inde
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg },
-  barra: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  accion: { backgroundColor: c.surface, borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 8, ...shadow.low },
-  accionTxt: { fontFamily: font.semibold, color: c.goldText, fontSize: 13 },
   filaAccion: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   buscadorBox: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: c.surface,

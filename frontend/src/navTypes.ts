@@ -5,6 +5,8 @@ export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
   Home: undefined;
+  // Perfil PERSONAL del usuario logueado (cualquier rol).
+  Perfil: undefined;
   // Comerciante
   MiTienda: undefined;
   MisCategorias: undefined;

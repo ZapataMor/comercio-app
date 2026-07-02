@@ -5,6 +5,7 @@ import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 're
 import { ComercioPedido, getPedidosComercio } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
+import HeaderPerfil from '../components/HeaderPerfil';
 import Icon from '../components/Icon';
 import { useNegocio } from '../NegocioContext';
 import { RootStackParamList } from '../navTypes';
@@ -70,10 +71,19 @@ export default function HomeScreen({ navigation }: Props) {
   const { negocio } = useNegocio();
   const [pedidos, setPedidos] = useState<ComercioPedido[]>([]);
 
-  // Switch Abierto/Cerrado en la topbar (solo para el comerciante).
+  // Topbar: el comerciante ve el switch Abierto/Cerrado junto a "Mi perfil".
+  // (Para el resto de roles aplica el headerRight global con solo "Mi perfil".)
   useLayoutEffect(() => {
+    if (!esComerciante) {
+      return;
+    }
     navigation.setOptions({
-      headerRight: esComerciante ? () => <HeaderEstadoNegocio /> : undefined,
+      headerRight: () => (
+        <View style={styles.headerDerecha}>
+          <HeaderEstadoNegocio />
+          <HeaderPerfil />
+        </View>
+      ),
     });
   }, [navigation, esComerciante]);
 
@@ -103,7 +113,10 @@ export default function HomeScreen({ navigation }: Props) {
   const enEspera = pedidos.filter(p => p.estado === 'pendiente');
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      // El cliente lleva la barra flotante abajo: dejamos aire para no taparla.
+      contentContainerStyle={[styles.content, esCliente && styles.contentCliente]}>
       <FadeInView>
         <Text style={styles.saludo}>¡Hola, {user.name}!</Text>
         <View style={styles.rolesRow}>
@@ -227,6 +240,8 @@ export default function HomeScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg },
   content: { padding: 20 },
+  contentCliente: { paddingBottom: 110 },
+  headerDerecha: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   saludo: { fontSize: 24, fontFamily: font.display, color: c.textStrong, marginTop: 8 },
   rolesRow: { flexDirection: 'row', gap: 8, marginTop: 8, marginBottom: 24 },
   rol: {

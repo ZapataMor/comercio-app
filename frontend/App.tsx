@@ -10,6 +10,9 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { c, font } from './src/theme';
 import { AuthProvider, useAuth } from './src/AuthContext';
 import { CartProvider } from './src/CartContext';
+import BarraCliente from './src/components/BarraCliente';
+import { FlyToCartProvider } from './src/components/FlyToCart';
+import HeaderPerfil from './src/components/HeaderPerfil';
 import { NegocioProvider } from './src/NegocioContext';
 import { configurarMensajesForeground } from './src/pushNotifications';
 import { navigationRef, procesarNotificacionPendiente } from './src/RootNavigation';
@@ -17,6 +20,7 @@ import { ToastProvider } from './src/Toast';
 import { useToast } from './src/Toast';
 import { RootStackParamList } from './src/navTypes';
 import HomeScreen from './src/screens/HomeScreen';
+import PerfilScreen from './src/screens/PerfilScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import MiTiendaScreen from './src/screens/MiTiendaScreen';
@@ -39,6 +43,9 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 function Navegacion() {
   const { auth, cargando } = useAuth();
   const roles = auth?.user.roles ?? [];
+  // Ruta actual: la barra flotante del cliente decide con ella qué mostrar.
+  const [ruta, setRuta] = React.useState<string | undefined>();
+  const actualizarRuta = () => setRuta(navigationRef.getCurrentRoute()?.name);
 
   if (cargando) {
     return (
@@ -51,7 +58,15 @@ function Navegacion() {
   const inicial = !auth ? 'Login' : roles.includes('usuario') ? 'Explorar' : 'Home';
 
   return (
-    <NavigationContainer ref={navigationRef} onReady={() => procesarNotificacionPendiente(auth?.user)}>
+    <FlyToCartProvider>
+      <View style={styles.raiz}>
+        <NavigationContainer
+          ref={navigationRef}
+          onReady={() => {
+            actualizarRuta();
+            procesarNotificacionPendiente(auth?.user);
+          }}
+          onStateChange={actualizarRuta}>
       <Stack.Navigator
         initialRouteName={inicial}
         screenOptions={{
@@ -60,6 +75,8 @@ function Navegacion() {
           headerTitleStyle: { fontWeight: '700', fontFamily: font.display, color: c.onBrand },
           headerShadowVisible: false,
           contentStyle: { backgroundColor: c.bg },
+          // "Mi perfil" (la persona, no el negocio) visible en todos los roles.
+          headerRight: auth ? () => <HeaderPerfil /> : undefined,
         }}>
         {!auth ? (
           <>
@@ -69,6 +86,11 @@ function Navegacion() {
         ) : (
           <>
             <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Vitrina' }} />
+            <Stack.Screen
+              name="Perfil"
+              component={PerfilScreen}
+              options={{ title: 'Mi perfil', headerRight: () => null }}
+            />
 
             {roles.includes('comerciante') && (
               <>
@@ -116,7 +138,10 @@ function Navegacion() {
           </>
         )}
       </Stack.Navigator>
-    </NavigationContainer>
+        </NavigationContainer>
+        <BarraCliente ruta={ruta} />
+      </View>
+    </FlyToCartProvider>
   );
 }
 
@@ -158,6 +183,7 @@ function App() {
 }
 
 const styles = StyleSheet.create({
+  raiz: { flex: 1 },
   centro: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: c.bg },
 });
 

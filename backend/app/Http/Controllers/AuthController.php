@@ -87,6 +87,48 @@ class AuthController extends Controller
     }
 
     /**
+     * Actualiza el perfil PERSONAL del usuario autenticado (cualquier rol).
+     *
+     * Es el perfil de la persona (nombre, email, contraseña), NO el del
+     * negocio: eso vive en /comerciante/negocio. Para cambiar la contraseña
+     * se exige la contraseña actual.
+     */
+    public function actualizarPerfil(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'password' => ['sometimes', 'nullable', 'string', 'min:8', 'confirmed'],
+            'password_actual' => ['required_with:password', 'string'],
+        ]);
+
+        if (! empty($data['password'])) {
+            if (! Hash::check($data['password_actual'], $user->password)) {
+                throw ValidationException::withMessages([
+                    'password_actual' => ['La contraseña actual no es correcta.'],
+                ]);
+            }
+            $user->password = $data['password']; // se hashea solo (cast 'hashed')
+        }
+
+        $user->name = $data['name'];
+        $user->email = $data['email'];
+        $user->save();
+
+        return response()->json([
+            'message' => 'Perfil actualizado.',
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'roles' => $user->getRoleNames(),
+            ],
+        ]);
+    }
+
+    /**
      * Logout: revoca SOLO el token con el que se hizo la petición.
      */
     public function logout(Request $request): JsonResponse

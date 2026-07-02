@@ -174,7 +174,12 @@ async function authSend(method: 'POST' | 'PUT' | 'DELETE', path: string, token: 
   }
   const data = await res.json().catch(() => ({} as any));
   if (!res.ok) {
-    throw new ApiError(data?.message ?? 'Error en la petición.', res.status);
+    // Si hay errores de validación, mostramos el primero (más útil que el genérico).
+    const primero =
+      data?.errors && typeof data.errors === 'object'
+        ? (Object.values(data.errors)[0] as string[])?.[0]
+        : undefined;
+    throw new ApiError(primero ?? data?.message ?? 'Error en la petición.', res.status);
   }
   return data;
 }
@@ -229,6 +234,27 @@ async function authUpload(
     throw new ApiError(primero ?? data?.message ?? 'Error en la petición.', res.status);
   }
   return data;
+}
+
+// ---------- Perfil personal (cualquier rol) ----------
+
+/** Datos editables del perfil de la PERSONA (no del negocio). */
+export type PerfilInput = {
+  name: string;
+  email: string;
+  /** Si viene, se exige también `password_actual`. */
+  password?: string;
+  password_actual?: string;
+};
+
+/** Actualiza mi perfil personal. Devuelve el usuario ya actualizado. */
+export async function actualizarPerfil(token: string, body: PerfilInput): Promise<Usuario> {
+  const d = await authSend('PUT', '/api/perfil', token, {
+    ...body,
+    // El backend exige confirmación (regla 'confirmed').
+    ...(body.password ? { password_confirmation: body.password } : {}),
+  });
+  return d.user as Usuario;
 }
 
 /** Mi negocio (o null si el comerciante aún no lo creó → 404). */

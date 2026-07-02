@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  GestureResponderEvent,
   Image,
   StyleSheet,
   Text,
@@ -13,6 +14,7 @@ import { getCatalogo, imagenUrl, Negocio, Producto } from '../api';
 import { useAuth } from '../AuthContext';
 import { useCart } from '../CartContext';
 import { FadeInView, PressableScale } from '../components/anim';
+import { useFlyToCart } from '../components/FlyToCart';
 import Icon from '../components/Icon';
 import { RootStackParamList } from '../navTypes';
 import { c, font, radius, shadow } from '../theme';
@@ -23,9 +25,10 @@ function precioCOP(n: number) {
   return '$' + Math.round(n).toLocaleString('es-CO');
 }
 
-export default function NegocioScreen({ route, navigation }: Props) {
+export default function NegocioScreen({ route }: Props) {
   const { auth } = useAuth();
   const cart = useCart();
+  const { volar } = useFlyToCart();
   const { id, nombre, productoId } = route.params;
   const [negocio, setNegocio] = useState<Negocio | null>(null);
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -55,24 +58,29 @@ export default function NegocioScreen({ route, navigation }: Props) {
     return () => clearTimeout(t);
   }, [productoId, productos]);
 
-  function onAgregar(p: Producto) {
+  function onAgregar(p: Producto, e: GestureResponderEvent) {
+    // Punto exacto del toque sobre "Pedir": desde ahí salta el paquetito
+    // que vuela hasta el botón flotante de Carrito.
+    const desde = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
     const ok = cart.agregar(id, nombre, p);
-    if (!ok) {
-      Alert.alert(
-        'Tienes otra tienda en el carrito',
-        `Tu carrito tiene productos de "${cart.negocioNombre}". Vacíalo para pedir de "${nombre}".`,
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          {
-            text: 'Vaciar y agregar',
-            onPress: () => {
-              cart.vaciar();
-              cart.agregar(id, nombre, p);
-            },
-          },
-        ],
-      );
+    if (ok) {
+      volar(desde);
+      return;
     }
+    Alert.alert(
+      'Tienes otra tienda en el carrito',
+      `Tu carrito tiene productos de "${cart.negocioNombre}". Vacíalo para pedir de "${nombre}".`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Vaciar y agregar',
+          onPress: () => {
+            cart.reemplazar(id, nombre, p);
+            volar(desde);
+          },
+        },
+      ],
+    );
   }
 
   if (cargando) {
@@ -88,7 +96,8 @@ export default function NegocioScreen({ route, navigation }: Props) {
       style={styles.container}
       data={productos}
       keyExtractor={p => String(p.id)}
-      contentContainerStyle={{ padding: 16, paddingBottom: 90 }}
+      // Aire abajo para la barra flotante fija (Carrito / Mis pedidos).
+      contentContainerStyle={{ padding: 16, paddingBottom: 110 }}
       // El scroll a un índice puede fallar si aún no se midió: reintentamos por
       // offset aproximado y luego al índice exacto.
       onScrollToIndexFailed={info => {
@@ -138,22 +147,12 @@ export default function NegocioScreen({ route, navigation }: Props) {
               </View>
               <Text style={styles.precio}>{item.precio_formateado ?? precioCOP(item.precio)}</Text>
             </View>
-            <PressableScale style={styles.addBtn} onPress={() => onAgregar(item)}>
+            <PressableScale style={styles.addBtn} onPress={e => onAgregar(item, e)}>
               <Text style={styles.addTxt}>+ Pedir</Text>
             </PressableScale>
           </View>
         </FadeInView>
       )}
-      ListFooterComponent={
-        cart.count > 0 ? (
-          <PressableScale
-            style={[styles.verCarrito, styles.filaCentro]}
-            onPress={() => navigation.navigate('Carrito')}>
-            <Icon name="carrito" size={18} color={c.onAccent} />
-            <Text style={styles.verCarritoTxt}>Ver carrito ({cart.count})</Text>
-          </PressableScale>
-        ) : null
-      }
     />
   );
 }
@@ -165,7 +164,6 @@ const styles = StyleSheet.create({
   desc: { color: c.text, fontSize: 15, fontFamily: font.regular },
   dato: { color: c.mutedSoft, fontSize: 13, marginTop: 6, fontFamily: font.regular },
   fila: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  filaCentro: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   item: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: c.surface, borderRadius: radius.md, padding: 14, marginBottom: 10, ...shadow.low,
@@ -183,10 +181,6 @@ const styles = StyleSheet.create({
   precio: { color: c.goldText, fontFamily: font.extra, fontSize: 15, marginTop: 4 },
   addBtn: { backgroundColor: c.accent, borderRadius: radius.sm, paddingHorizontal: 14, paddingVertical: 9, ...shadow.gold },
   addTxt: { color: c.onAccent, fontFamily: font.bold },
-  verCarrito: {
-    backgroundColor: c.accent, borderRadius: radius.md, paddingVertical: 15, alignItems: 'center', marginTop: 8, ...shadow.gold,
-  },
-  verCarritoTxt: { color: c.onAccent, fontFamily: font.bold, fontSize: 16 },
   vacio: { textAlign: 'center', color: c.muted, marginTop: 40, fontFamily: font.regular },
   error: { color: c.danger, backgroundColor: c.dangerSoft, padding: 12, borderRadius: radius.sm, margin: 16, fontFamily: font.medium },
 });

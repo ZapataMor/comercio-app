@@ -58,7 +58,10 @@ export default function CheckoutScreen({ navigation }: Props) {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
+    <ScrollView
+      style={styles.container}
+      // Aire abajo para la barra flotante fija (Carrito / Mis pedidos).
+      contentContainerStyle={{ padding: 16, paddingBottom: 110 }}>
       <FadeInView style={styles.resumen}>
         <View style={[styles.resumenTitulo, styles.fila]}>
           <Icon name="tienda" size={15} color={c.text} />

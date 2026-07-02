@@ -27,6 +27,9 @@ Route::middleware('auth:sanctum')->group(function () {
         return $request->user();
     });
 
+    // Perfil personal del usuario logueado (cualquier rol).
+    Route::put('/perfil', [AuthController::class, 'actualizarPerfil']);
+
     // Panel adaptativo: responde distinto según el rol del usuario logueado.
     // El frontend llama siempre aquí y pinta lo que reciba.
     Route::get('/dashboard', [DashboardController::class, 'index']);

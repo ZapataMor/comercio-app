@@ -11,6 +11,8 @@ type CartContextType = {
   total: number;
   /** Devuelve false si el producto es de otra tienda (carrito = 1 negocio). */
   agregar: (negocioId: number, negocioNombre: string, p: Producto) => boolean;
+  /** Vacía el carrito y lo deja SOLO con este producto (cambio de tienda). */
+  reemplazar: (negocioId: number, negocioNombre: string, p: Producto) => void;
   cambiar: (productoId: number, delta: number) => void;
   quitar: (productoId: number) => void;
   vaciar: () => void;
@@ -39,6 +41,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     return true;
   };
 
+  // "Vaciar y agregar" en un solo paso: llamar a vaciar() y agregar() seguidos
+  // no funciona porque agregar() leería el estado viejo (aún sin vaciar).
+  const reemplazar = (nid: number, nombre: string, p: Producto) => {
+    setNegocioId(nid);
+    setNegocioNombre(nombre);
+    setItems([{ producto_id: p.id, nombre: p.nombre, precio: p.precio, cantidad: 1 }]);
+  };
+
   const cambiar = (productoId: number, delta: number) => {
     setItems(prev =>
       prev
@@ -62,7 +72,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <CartContext.Provider
-      value={{ negocioId, negocioNombre, items, count, total, agregar, cambiar, quitar, vaciar }}>
+      value={{ negocioId, negocioNombre, items, count, total, agregar, reemplazar, cambiar, quitar, vaciar }}>
       {children}
     </CartContext.Provider>
   );
