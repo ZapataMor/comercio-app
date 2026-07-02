@@ -5,6 +5,7 @@
  */
 import React, { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { c, font, radius } from '../theme';
 
 export type OpcionDropdown<T extends string> = { label: string; value: T };
 
@@ -69,19 +70,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 12,
+    borderColor: c.borderStrong,
+    borderRadius: radius.md,
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginBottom: 14,
-    backgroundColor: '#fff',
+    backgroundColor: c.surface,
   },
   campoOff: { opacity: 0.5 },
-  valor: { fontSize: 16, color: '#0f172a' },
-  placeholder: { color: '#94a3b8' },
-  caret: { fontSize: 14, color: '#64748b', marginLeft: 8 },
-  fondo: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'center', padding: 32 },
-  menu: { backgroundColor: '#fff', borderRadius: 16, paddingVertical: 6, overflow: 'hidden' },
+  valor: { fontSize: 16, color: c.textStrong, fontFamily: font.regular },
+  placeholder: { color: c.mutedSoft },
+  caret: { fontSize: 14, color: c.muted, marginLeft: 8 },
+  fondo: { flex: 1, backgroundColor: c.scrim, justifyContent: 'center', padding: 32 },
+  menu: { backgroundColor: c.surface, borderRadius: radius.md, paddingVertical: 6, overflow: 'hidden' },
   opcion: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -89,7 +90,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 14,
   },
-  opcionTxt: { fontSize: 16, color: '#334155' },
-  opcionTxtOn: { color: '#4f46e5', fontWeight: '700' },
-  check: { color: '#4f46e5', fontWeight: '900', fontSize: 16 },
+  opcionTxt: { fontSize: 16, color: c.text, fontFamily: font.regular },
+  opcionTxtOn: { color: c.goldText, fontFamily: font.bold },
+  check: { color: c.goldText, fontWeight: '900', fontSize: 16 },
 });

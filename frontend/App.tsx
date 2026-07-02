@@ -5,8 +5,9 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
-import { ActivityIndicator, StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
+import { ActivityIndicator, StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { c, font } from './src/theme';
 import { AuthProvider, useAuth } from './src/AuthContext';
 import { CartProvider } from './src/CartContext';
 import { NegocioProvider } from './src/NegocioContext';
@@ -42,7 +43,7 @@ function Navegacion() {
   if (cargando) {
     return (
       <View style={styles.centro}>
-        <ActivityIndicator size="large" color="#4f46e5" />
+        <ActivityIndicator size="large" color={c.accent} />
       </View>
     );
   }
@@ -54,9 +55,11 @@ function Navegacion() {
       <Stack.Navigator
         initialRouteName={inicial}
         screenOptions={{
-          headerStyle: { backgroundColor: '#4f46e5' },
-          headerTintColor: '#fff',
-          headerTitleStyle: { fontWeight: '700' },
+          headerStyle: { backgroundColor: c.brand },
+          headerTintColor: c.onBrand,
+          headerTitleStyle: { fontWeight: '700', fontFamily: font.display, color: c.onBrand },
+          headerShadowVisible: false,
+          contentStyle: { backgroundColor: c.bg },
         }}>
         {!auth ? (
           <>
@@ -65,7 +68,7 @@ function Navegacion() {
           </>
         ) : (
           <>
-            <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Comercio' }} />
+            <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Vitrina' }} />
 
             {roles.includes('comerciante') && (
               <>
@@ -137,14 +140,13 @@ function PushBridge() {
 }
 
 function App() {
-  const isDarkMode = useColorScheme() === 'dark';
   return (
     <AuthProvider>
       <NegocioProvider>
         <CartProvider>
           <SafeAreaProvider>
             <ToastProvider>
-              <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+              <StatusBar barStyle="light-content" backgroundColor={c.brand} />
               <PushBridge />
               <Navegacion />
             </ToastProvider>
@@ -156,7 +158,7 @@ function App() {
 }
 
 const styles = StyleSheet.create({
-  centro: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f1f5f9' },
+  centro: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: c.bg },
 });
 
 export default App;

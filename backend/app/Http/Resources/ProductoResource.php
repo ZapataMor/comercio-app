@@ -30,6 +30,13 @@ class ProductoResource extends JsonResource
             'disponible' => $this->disponible,
             // Solo incluye la categoría si fue cargada (evita consultas N+1).
             'categoria' => new CategoriaResource($this->whenLoaded('categoria')),
+            // Negocio que vende el producto: solo se incluye cuando se cargó la
+            // relación (p. ej. en la búsqueda de productos del cliente), para
+            // no afectar a los endpoints del comerciante que no lo necesitan.
+            'negocio' => $this->whenLoaded('negocio', fn () => [
+                'id' => $this->negocio->id,
+                'nombre' => $this->negocio->nombre,
+            ]),
         ];
     }
 

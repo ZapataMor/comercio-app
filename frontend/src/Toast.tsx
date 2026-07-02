@@ -19,6 +19,7 @@ import React, {
 } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { c, font, radius } from './theme';
 
 type Tipo = 'exito' | 'error' | 'info';
 
@@ -91,9 +92,9 @@ function Overlay({ items, quitar }: { items: ToastItem[]; quitar: (id: number) =
 }
 
 const ESTILOS: Record<Tipo, { color: string; icono: string }> = {
-  exito: { color: '#16a34a', icono: '✓' },
-  error: { color: '#ef4444', icono: '!' },
-  info: { color: '#4f46e5', icono: 'i' },
+  exito: { color: c.success, icono: '✓' },
+  error: { color: c.danger, icono: '!' },
+  info: { color: c.brand, icono: 'i' },
 };
 
 function Tarjeta({ item, onClose }: { item: ToastItem; onClose: (id: number) => void }) {
@@ -143,18 +144,18 @@ const styles = StyleSheet.create({
   toast: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 14,
+    backgroundColor: c.surface,
+    borderRadius: radius.md,
     paddingVertical: 12,
     paddingRight: 16,
     marginBottom: 10,
     maxWidth: 360,
     minWidth: 220,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor: '#7A5A2A',
+    shadowOpacity: 0.22,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
     elevation: 6,
   },
   barra: { width: 5, alignSelf: 'stretch' },
@@ -168,6 +169,6 @@ const styles = StyleSheet.create({
   },
   icono: { color: '#fff', fontWeight: '900', fontSize: 14 },
   texto: { flex: 1 },
-  titulo: { color: '#0f172a', fontWeight: '700', fontSize: 14 },
-  mensaje: { color: '#64748b', fontSize: 12, marginTop: 2 },
+  titulo: { color: c.textStrong, fontFamily: font.bold, fontSize: 14 },
+  mensaje: { color: c.muted, fontSize: 12, marginTop: 2, fontFamily: font.regular },
 });

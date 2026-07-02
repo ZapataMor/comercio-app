@@ -12,7 +12,9 @@ export type RootStackParamList = {
   ComercioPedidoDetalle: { pedido?: ComercioPedido; pedidoId?: number };
   // Cliente
   Explorar: undefined;
-  Negocio: { id: number; nombre: string };
+  // `productoId` opcional: al entrar desde una búsqueda de producto, el catálogo
+  // resalta y hace scroll hasta ese producto.
+  Negocio: { id: number; nombre: string; productoId?: number };
   Carrito: undefined;
   Checkout: undefined;
   MisPedidos: undefined;

@@ -25,8 +25,11 @@ para los cuatro actores del ecosistema. Ver [[Propuesta de Valor]] y [[Modelo de
 ## Frase de marca
 > *"Tu barrio, en tu bolsillo."*
 
-> [!todo] Pendiente
-> Validar nombre comercial/marca de cara al usuario (hoy "comercio-api" es el nombre técnico).
+> [!info] Marca confirmada: **Vitrina**
+> El nombre de cara al usuario es **Vitrina**, porque **Maicao es la vitrina comercial de
+> Colombia**: la app es esa vitrina en el bolsillo. ("comercio-api" queda como nombre técnico
+> del repo.) Identidad visual y logo en [[Propuesta - Logo e identidad de marca]].
+> Falta reemplazar el nombre "Comercio" del Login/app por "Vitrina" en `frontend`.
 
 ## 🔗 Relacionado
 - [[_MOC Negocio]] · [[Propuesta de Valor]] · [[_MOC Actores]]

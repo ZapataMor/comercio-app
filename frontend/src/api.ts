@@ -402,6 +402,23 @@ export async function getNegocios(token: string, buscar?: string): Promise<Negoc
   return (data.negocios ?? []) as NegocioLista[];
 }
 
+/** Producto de la búsqueda del cliente, con el negocio que lo vende. */
+export type ProductoConNegocio = Producto & {
+  negocio: { id: number; nombre: string };
+};
+
+/**
+ * Búsqueda de productos para el cliente. Devuelve los productos disponibles de
+ * negocios abiertos que coinciden con `buscar`, ordenados por relevancia (de la
+ * coincidencia más cercana a la más lejana). Sin texto devuelve lista vacía.
+ */
+export async function buscarProductos(token: string, buscar: string): Promise<ProductoConNegocio[]> {
+  const texto = buscar.trim();
+  if (!texto) return [];
+  const data = await authGet(`/api/productos?buscar=${encodeURIComponent(texto)}`, token);
+  return (data.productos ?? []) as ProductoConNegocio[];
+}
+
 /** Catálogo de un negocio (negocio + productos disponibles). */
 export async function getCatalogo(
   token: string,

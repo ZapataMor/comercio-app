@@ -64,6 +64,7 @@ async function mostrarNotificacionForeground(message: FirebaseMessagingTypes.Rem
       data,
       android: {
         channelId,
+        color: '#E8A019', // dorado Vitrina: tiñe el acento de la notificación
         pressAction: { id: 'default' },
       },
     });

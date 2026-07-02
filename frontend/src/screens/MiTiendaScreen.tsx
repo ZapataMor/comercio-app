@@ -14,9 +14,11 @@ import {
   View,
 } from 'react-native';
 import { imagenUrl, Negocio } from '../api';
+import { FadeInView, PressableScale } from '../components/anim';
 import SelectorImagen from '../components/SelectorImagen';
 import { useNegocio } from '../NegocioContext';
 import { RootStackParamList } from '../navTypes';
+import { c, font, radius, shadow } from '../theme';
 import { useToast } from '../Toast';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MiTienda'>;
@@ -88,14 +90,14 @@ export default function MiTiendaScreen({ navigation }: Props) {
   }
 
   if (cargando && !negocio) {
-    return <ActivityIndicator size="large" color="#4f46e5" style={{ marginTop: 40 }} />;
+    return <ActivityIndicator size="large" color={c.accent} style={{ marginTop: 40 }} />;
   }
 
   // ---------------- Vista de solo lectura (tarjeta) ----------------
   if (modo === 'ver' && negocio) {
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <View style={styles.card}>
+        <FadeInView style={styles.card}>
           {!!imagenUrl(negocio.imagen) && (
             <Image source={{ uri: imagenUrl(negocio.imagen) }} style={styles.fotoNegocio} resizeMode="cover" />
           )}
@@ -109,11 +111,11 @@ export default function MiTiendaScreen({ navigation }: Props) {
           <Campo etiqueta="Descripción" valor={negocio.descripcion} />
           <Campo etiqueta="Dirección" valor={negocio.direccion} />
           <Campo etiqueta="Teléfono" valor={negocio.telefono} />
-        </View>
+        </FadeInView>
 
-        <TouchableOpacity style={styles.boton} onPress={() => empezarEdicion(negocio)}>
+        <PressableScale style={styles.boton} onPress={() => empezarEdicion(negocio)}>
           <Text style={styles.botonTexto}>Editar información</Text>
-        </TouchableOpacity>
+        </PressableScale>
       </ScrollView>
     );
   }
@@ -146,6 +148,7 @@ export default function MiTiendaScreen({ navigation }: Props) {
             value={nombre}
             onChangeText={setNombre}
             placeholder="Ej: Panadería La Espiga"
+            placeholderTextColor={c.mutedSoft}
             editable={!guardando}
           />
 
@@ -155,6 +158,7 @@ export default function MiTiendaScreen({ navigation }: Props) {
             value={descripcion}
             onChangeText={setDescripcion}
             placeholder="¿Qué vendes?"
+            placeholderTextColor={c.mutedSoft}
             multiline
             editable={!guardando}
           />
@@ -165,6 +169,7 @@ export default function MiTiendaScreen({ navigation }: Props) {
             value={direccion}
             onChangeText={setDireccion}
             placeholder="Calle 12 #8-30, Maicao"
+            placeholderTextColor={c.mutedSoft}
             editable={!guardando}
           />
 
@@ -174,6 +179,7 @@ export default function MiTiendaScreen({ navigation }: Props) {
             value={telefono}
             onChangeText={setTelefono}
             placeholder="3001234567"
+            placeholderTextColor={c.mutedSoft}
             keyboardType="phone-pad"
             editable={!guardando}
           />
@@ -185,20 +191,26 @@ export default function MiTiendaScreen({ navigation }: Props) {
                 {activo ? 'Visible para los clientes' : 'Oculto: no aparece en Explorar'}
               </Text>
             </View>
-            <Switch value={activo} onValueChange={setActivo} disabled={guardando} />
+            <Switch
+              value={activo}
+              onValueChange={setActivo}
+              disabled={guardando}
+              trackColor={{ true: c.accent, false: '#D8D0C4' }}
+              thumbColor={c.surface}
+            />
           </View>
         </View>
 
-        <TouchableOpacity
+        <PressableScale
           style={[styles.boton, guardando && styles.botonDisabled]}
           onPress={onGuardar}
           disabled={guardando}>
           {guardando ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={c.onBrand} />
           ) : (
             <Text style={styles.botonTexto}>{negocio ? 'Guardar cambios' : 'Crear negocio'}</Text>
           )}
-        </TouchableOpacity>
+        </PressableScale>
 
         {negocio && (
           <TouchableOpacity onPress={() => setModo('ver')} disabled={guardando}>
@@ -221,45 +233,33 @@ function Campo({ etiqueta, valor }: { etiqueta: string; valor: string | null }) 
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f1f5f9' },
+  container: { flex: 1, backgroundColor: c.bg },
   content: { padding: 20 },
-  aviso: { backgroundColor: '#fef9c3', borderRadius: 12, padding: 12, marginBottom: 16 },
-  avisoTxt: { color: '#854d0e', fontSize: 13 },
-  card: {
-    backgroundColor: '#fff', borderRadius: 16, padding: 20,
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
-  },
-  fotoNegocio: { width: '100%', height: 160, borderRadius: 12, marginBottom: 14, backgroundColor: '#f1f5f9' },
+  aviso: { backgroundColor: c.warningSoft, borderRadius: radius.md, padding: 12, marginBottom: 16 },
+  avisoTxt: { color: c.warning, fontSize: 13, fontFamily: font.medium },
+  card: { backgroundColor: c.surface, borderRadius: radius.lg, padding: 20, ...shadow.soft },
+  fotoNegocio: { width: '100%', height: 170, borderRadius: radius.md, marginBottom: 14, backgroundColor: c.surface2 },
   // Tarjeta de solo lectura
-  cardHead: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  negocioNombre: { fontSize: 20, fontWeight: '800', color: '#0f172a', flex: 1, marginRight: 10 },
-  estado: {
-    fontSize: 12, fontWeight: '800', paddingHorizontal: 10, paddingVertical: 4,
-    borderRadius: 999, overflow: 'hidden',
-  },
-  abierto: { backgroundColor: '#dcfce7', color: '#15803d' },
-  cerrado: { backgroundColor: '#fee2e2', color: '#b91c1c' },
-  campo: { borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingVertical: 10 },
-  campoEtiqueta: { fontSize: 12, fontWeight: '600', color: '#94a3b8', marginBottom: 2 },
-  campoValor: { fontSize: 15, color: '#0f172a' },
-  campoVacio: { color: '#cbd5e1', fontStyle: 'italic' },
+  cardHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  negocioNombre: { fontSize: 20, fontFamily: font.extra, color: c.textStrong, flex: 1, marginRight: 10 },
+  estado: { fontSize: 12, fontFamily: font.bold, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, overflow: 'hidden' },
+  abierto: { backgroundColor: c.successSoft, color: c.success },
+  cerrado: { backgroundColor: c.dangerSoft, color: c.danger },
+  campo: { borderTopWidth: 1, borderTopColor: c.border, paddingVertical: 10 },
+  campoEtiqueta: { fontSize: 12, fontFamily: font.semibold, color: c.mutedSoft, marginBottom: 2 },
+  campoValor: { fontSize: 15, color: c.textStrong, fontFamily: font.regular },
+  campoVacio: { color: c.mutedSoft, fontStyle: 'italic' },
   // Formulario
-  label: { fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 6 },
+  label: { fontSize: 13, fontFamily: font.semibold, color: c.text, marginBottom: 6 },
   input: {
-    borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12,
-    paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, marginBottom: 16, color: '#0f172a',
+    borderWidth: 1, borderColor: c.borderStrong, borderRadius: radius.md,
+    paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, marginBottom: 16, color: c.textStrong, fontFamily: font.regular,
   },
   area: { minHeight: 80, textAlignVertical: 'top' },
   switchRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  switchSub: { color: '#94a3b8', fontSize: 12, marginTop: 2 },
-  boton: {
-    backgroundColor: '#4f46e5', borderRadius: 12, paddingVertical: 14,
-    alignItems: 'center', marginTop: 20,
-  },
+  switchSub: { color: c.mutedSoft, fontSize: 12, marginTop: 2, fontFamily: font.regular },
+  boton: { backgroundColor: c.brand, borderRadius: radius.md, paddingVertical: 15, alignItems: 'center', marginTop: 20, ...shadow.soft },
   botonDisabled: { opacity: 0.7 },
-  botonTexto: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  cancelar: { textAlign: 'center', color: '#64748b', fontWeight: '600', marginTop: 14 },
+  botonTexto: { color: c.onBrand, fontFamily: font.bold, fontSize: 16 },
+  cancelar: { textAlign: 'center', color: c.muted, fontFamily: font.semibold, marginTop: 14 },
 });

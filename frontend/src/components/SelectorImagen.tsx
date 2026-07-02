@@ -11,6 +11,7 @@
 import { errorCodes, isErrorWithCode, pick, types } from '@react-native-documents/picker';
 import React from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { c, font, radius } from '../theme';
 import Icon from './Icon';
 
 type Props = {
@@ -42,7 +43,7 @@ export default function SelectorImagen({ uri, onSelect, label = 'Imagen', disabl
           {uri ? (
             <Image source={{ uri }} style={styles.img} resizeMode="cover" />
           ) : (
-            <Icon name="imagen" size={28} color="#94a3b8" />
+            <Icon name="imagen" size={28} color={c.mutedSoft} />
           )}
         </View>
         <TouchableOpacity
@@ -57,19 +58,18 @@ export default function SelectorImagen({ uri, onSelect, label = 'Imagen', disabl
 }
 
 const styles = StyleSheet.create({
-  label: { fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 6 },
+  label: { fontSize: 13, fontFamily: font.semibold, color: c.text, marginBottom: 6 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
   preview: {
-    width: 72, height: 72, borderRadius: 12, backgroundColor: '#f1f5f9',
+    width: 72, height: 72, borderRadius: radius.md, backgroundColor: c.surface2,
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-    borderWidth: 1, borderColor: '#e2e8f0',
+    borderWidth: 1, borderColor: c.border,
   },
   img: { width: '100%', height: '100%' },
-  placeholder: { fontSize: 28 },
   boton: {
-    backgroundColor: '#eef2ff', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 11,
-    borderWidth: 1, borderColor: '#c7d2fe',
+    backgroundColor: c.accentSoft, borderRadius: radius.sm, paddingHorizontal: 16, paddingVertical: 11,
+    borderWidth: 1, borderColor: c.accent,
   },
   botonDisabled: { opacity: 0.6 },
-  botonTxt: { color: '#4338ca', fontWeight: '700' },
+  botonTxt: { color: c.onAccent, fontFamily: font.bold },
 });

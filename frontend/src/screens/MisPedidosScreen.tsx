@@ -1,10 +1,12 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { getMisPedidos, MiPedido } from '../api';
 import { useAuth } from '../AuthContext';
+import { FadeInView, PressableScale } from '../components/anim';
 import { RootStackParamList } from '../navTypes';
+import { c, estadoColor, font, radius, shadow } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MisPedidos'>;
 
@@ -47,7 +49,7 @@ export default function MisPedidosScreen({ navigation }: Props) {
   }
 
   if (cargando) {
-    return <ActivityIndicator size="large" color="#4f46e5" style={{ marginTop: 40 }} />;
+    return <ActivityIndicator size="large" color={c.accent} style={{ marginTop: 40 }} />;
   }
 
   return (
@@ -57,39 +59,41 @@ export default function MisPedidosScreen({ navigation }: Props) {
       keyExtractor={p => String(p.id)}
       contentContainerStyle={{ padding: 16 }}
       refreshControl={
-        <RefreshControl refreshing={refrescando} onRefresh={refrescar} colors={['#4f46e5']} />
+        <RefreshControl refreshing={refrescando} onRefresh={refrescar} colors={[c.accent]} tintColor={c.accent} />
       }
       ListEmptyComponent={<Text style={styles.vacio}>Aún no has hecho pedidos.</Text>}
-      renderItem={({ item }) => (
-        <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('PedidoDetalle', { id: item.id })}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.nombre}>Pedido #{item.id} · {item.negocio}</Text>
-            <Text style={styles.fecha}>{item.fecha}</Text>
-          </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            <Text style={[styles.badge, item.estado === 'entregado' ? styles.entregado : styles.activo]}>
-              {item.estado_label}
-            </Text>
-            <Text style={styles.total}>{cop(item.total)}</Text>
-          </View>
-        </TouchableOpacity>
-      )}
+      renderItem={({ item, index }) => {
+        const ec = estadoColor(item.estado);
+        return (
+          <FadeInView delay={Math.min(index, 8) * 45}>
+            <PressableScale style={styles.card} onPress={() => navigation.navigate('PedidoDetalle', { id: item.id })}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.nombre}>Pedido #{item.id} · {item.negocio}</Text>
+                <Text style={styles.fecha}>{item.fecha}</Text>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={[styles.badge, { backgroundColor: ec.bg, color: ec.fg }]}>
+                  {item.estado_label}
+                </Text>
+                <Text style={styles.total}>{cop(item.total)}</Text>
+              </View>
+            </PressableScale>
+          </FadeInView>
+        );
+      }}
     />
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f1f5f9' },
+  container: { flex: 1, backgroundColor: c.bg },
   card: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff',
-    borderRadius: 14, padding: 14, marginBottom: 10,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, elevation: 1,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: c.surface,
+    borderRadius: radius.md, padding: 14, marginBottom: 10, ...shadow.low,
   },
-  nombre: { fontWeight: '600', color: '#0f172a' },
-  fecha: { color: '#94a3b8', fontSize: 12, marginTop: 2 },
-  badge: { fontSize: 11, fontWeight: '700', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, overflow: 'hidden' },
-  activo: { backgroundColor: '#e0e7ff', color: '#4338ca' },
-  entregado: { backgroundColor: '#dcfce7', color: '#15803d' },
-  total: { fontWeight: '700', marginTop: 4 },
-  vacio: { textAlign: 'center', color: '#64748b', marginTop: 40 },
+  nombre: { fontFamily: font.semibold, color: c.textStrong },
+  fecha: { color: c.mutedSoft, fontSize: 12, marginTop: 2, fontFamily: font.regular },
+  badge: { fontSize: 11, fontFamily: font.bold, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, overflow: 'hidden' },
+  total: { fontFamily: font.bold, marginTop: 4, color: c.textStrong },
+  vacio: { textAlign: 'center', color: c.muted, marginTop: 40, fontFamily: font.regular },
 });

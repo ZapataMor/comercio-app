@@ -4,9 +4,11 @@ import React, { useCallback, useLayoutEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { ComercioPedido, getPedidosComercio } from '../api';
 import { useAuth } from '../AuthContext';
+import { FadeInView, PressableScale } from '../components/anim';
 import Icon from '../components/Icon';
 import { useNegocio } from '../NegocioContext';
 import { RootStackParamList } from '../navTypes';
+import { c, font, radius, shadow } from '../theme';
 import { useToast } from '../Toast';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
@@ -42,15 +44,15 @@ function HeaderEstadoNegocio() {
 
   return (
     <View style={styles.headerSwitch}>
-      <Text style={[styles.headerSwitchTxt, { color: negocio.activo ? '#bbf7d0' : '#fecaca' }]}>
+      <Text style={[styles.headerSwitchTxt, { color: negocio.activo ? c.successSoft : c.dangerSoft }]}>
         {negocio.activo ? 'Abierto' : 'Cerrado'}
       </Text>
       <Switch
         value={negocio.activo}
         onValueChange={toggle}
         disabled={cambiando}
-        trackColor={{ true: '#22c55e', false: '#64748b' }}
-        thumbColor="#fff"
+        trackColor={{ true: c.success, false: '#6B6358' }}
+        thumbColor={c.onBrand}
       />
     </View>
   );
@@ -102,34 +104,40 @@ export default function HomeScreen({ navigation }: Props) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.saludo}>¡Hola, {user.name}!</Text>
-      <View style={styles.rolesRow}>
-        {user.roles.map(r => (
-          <Text key={r} style={styles.rol}>{r}</Text>
-        ))}
-      </View>
+      <FadeInView>
+        <Text style={styles.saludo}>¡Hola, {user.name}!</Text>
+        <View style={styles.rolesRow}>
+          {user.roles.map(r => (
+            <Text key={r} style={styles.rol}>{r}</Text>
+          ))}
+        </View>
+      </FadeInView>
 
       {esComerciante && (
         <>
-          <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('MiTienda')}>
-            <Icon name="tienda" size={26} color="#4f46e5" style={styles.itemEmoji} />
-            <View style={styles.itemTexto}>
-              <Text style={styles.itemTitulo}>Mi negocio</Text>
-              <Text style={styles.itemSub}>
-                {negocio ? `${negocio.nombre} · ${negocio.activo ? 'Abierto' : 'Cerrado'}` : 'Crea tu negocio'}
-              </Text>
-            </View>
-            <Icon name="chevron" size={20} color="#cbd5e1" />
-          </TouchableOpacity>
+          <FadeInView delay={60}>
+            <PressableScale style={styles.item} onPress={() => navigation.navigate('MiTienda')}>
+              <Icon name="tienda" size={26} color={c.accent} style={styles.itemEmoji} />
+              <View style={styles.itemTexto}>
+                <Text style={styles.itemTitulo}>Mi negocio</Text>
+                <Text style={styles.itemSub}>
+                  {negocio ? `${negocio.nombre} · ${negocio.activo ? 'Abierto' : 'Cerrado'}` : 'Crea tu negocio'}
+                </Text>
+              </View>
+              <Icon name="chevron" size={20} color={c.chevron} />
+            </PressableScale>
+          </FadeInView>
 
-          <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('MisCategorias')}>
-            <Icon name="etiqueta" size={26} color="#4f46e5" style={styles.itemEmoji} />
-            <View style={styles.itemTexto}>
-              <Text style={styles.itemTitulo}>Categorías</Text>
-              <Text style={styles.itemSub}>Organiza tu catálogo y crea productos</Text>
-            </View>
-            <Icon name="chevron" size={20} color="#cbd5e1" />
-          </TouchableOpacity>
+          <FadeInView delay={120}>
+            <PressableScale style={styles.item} onPress={() => navigation.navigate('MisCategorias')}>
+              <Icon name="etiqueta" size={26} color={c.accent} style={styles.itemEmoji} />
+              <View style={styles.itemTexto}>
+                <Text style={styles.itemTitulo}>Categorías</Text>
+                <Text style={styles.itemSub}>Organiza tu catálogo y crea productos</Text>
+              </View>
+              <Icon name="chevron" size={20} color={c.chevron} />
+            </PressableScale>
+          </FadeInView>
 
           {/* Pedidos en espera, directamente en el Inicio. */}
           <Text style={styles.seccion}>
@@ -140,66 +148,73 @@ export default function HomeScreen({ navigation }: Props) {
               <Text style={styles.vacioTxt}>No tienes pedidos en espera.</Text>
             </View>
           ) : (
-            enEspera.map(p => (
-              <TouchableOpacity
-                key={p.id}
-                style={styles.pedidoCard}
-                onPress={() => navigation.navigate('ComercioPedidoDetalle', { pedido: p })}>
-                <View style={styles.pedidoHead}>
-                  <Text style={styles.pedidoId}>Pedido #{p.id}</Text>
-                  <Text style={styles.pedidoTotal}>{cop(p.total)}</Text>
-                </View>
-                <View style={[styles.pedidoCliente, styles.fila]}>
-                  <Icon name="usuario" size={14} color="#334155" />
-                  <Text style={styles.pedidoCliente}>{p.cliente ?? 'Cliente'}</Text>
-                </View>
-                <View style={[styles.pedidoItems, styles.fila]}>
-                  <Text style={styles.pedidoItems}>
-                    {p.items.reduce((s, i) => s + i.cantidad, 0)} artículo(s) ·
-                  </Text>
-                  <Icon name="ubicacion" size={13} color="#64748b" />
-                  <Text style={[styles.pedidoItems, { flex: 1 }]} numberOfLines={1}>
-                    {p.direccion_entrega}
-                  </Text>
-                </View>
-                <Text style={styles.pedidoVer}>Ver y marcar listo ›</Text>
-              </TouchableOpacity>
+            enEspera.map((p, i) => (
+              <FadeInView key={p.id} delay={i * 60}>
+                <PressableScale
+                  style={styles.pedidoCard}
+                  onPress={() => navigation.navigate('ComercioPedidoDetalle', { pedido: p })}>
+                  <View style={styles.pedidoHead}>
+                    <Text style={styles.pedidoId}>Pedido #{p.id}</Text>
+                    <Text style={styles.pedidoTotal}>{cop(p.total)}</Text>
+                  </View>
+                  <View style={[styles.pedidoCliente, styles.fila]}>
+                    <Icon name="usuario" size={14} color={c.text} />
+                    <Text style={styles.pedidoCliente}>{p.cliente ?? 'Cliente'}</Text>
+                  </View>
+                  <View style={[styles.pedidoItems, styles.fila]}>
+                    <Text style={styles.pedidoItems}>
+                      {p.items.reduce((s, i2) => s + i2.cantidad, 0)} artículo(s) ·
+                    </Text>
+                    <Icon name="ubicacion" size={13} color={c.muted} />
+                    <Text style={[styles.pedidoItems, { flex: 1 }]} numberOfLines={1}>
+                      {p.direccion_entrega}
+                    </Text>
+                  </View>
+                  <Text style={styles.pedidoVer}>Ver y marcar listo ›</Text>
+                </PressableScale>
+              </FadeInView>
             ))
           )}
         </>
       )}
 
       {esCliente && (
-        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('Explorar')}>
-          <Icon name="bolsa" size={26} color="#4f46e5" style={styles.itemEmoji} />
-          <View style={styles.itemTexto}>
-            <Text style={styles.itemTitulo}>Explorar negocios</Text>
-            <Text style={styles.itemSub}>Mira los comercios abiertos</Text>
-          </View>
-          <Icon name="chevron" size={20} color="#cbd5e1" />
-        </TouchableOpacity>
+        <FadeInView delay={60}>
+          <PressableScale style={styles.item} onPress={() => navigation.navigate('Explorar')}>
+            <Icon name="bolsa" size={26} color={c.accent} style={styles.itemEmoji} />
+            <View style={styles.itemTexto}>
+              <Text style={styles.itemTitulo}>Explorar negocios</Text>
+              <Text style={styles.itemSub}>Mira los comercios abiertos</Text>
+            </View>
+            <Icon name="chevron" size={20} color={c.chevron} />
+          </PressableScale>
+        </FadeInView>
       )}
 
       {esAdmin && (
-        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('AdminTablero')}>
-          <Icon name="herramientas" size={26} color="#4f46e5" style={styles.itemEmoji} />
-          <View style={styles.itemTexto}>
-            <Text style={styles.itemTitulo}>Administración</Text>
-            <Text style={styles.itemSub}>Usuarios, roles y negocios</Text>
-          </View>
-          <Icon name="chevron" size={20} color="#cbd5e1" />
-        </TouchableOpacity>
+        <FadeInView delay={120}>
+          <PressableScale style={styles.item} onPress={() => navigation.navigate('AdminTablero')}>
+            <Icon name="herramientas" size={26} color={c.accent} style={styles.itemEmoji} />
+            <View style={styles.itemTexto}>
+              <Text style={styles.itemTitulo}>Administración</Text>
+              <Text style={styles.itemSub}>Usuarios, roles y negocios</Text>
+            </View>
+            <Icon name="chevron" size={20} color={c.chevron} />
+          </PressableScale>
+        </FadeInView>
       )}
 
       {esDomiciliario && (
-        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('Domiciliario')}>
-          <Icon name="moto" size={26} color="#4f46e5" style={styles.itemEmoji} />
-          <View style={styles.itemTexto}>
-            <Text style={styles.itemTitulo}>Mis entregas</Text>
-            <Text style={styles.itemSub}>Pedidos para recoger y entregar</Text>
-          </View>
-          <Icon name="chevron" size={20} color="#cbd5e1" />
-        </TouchableOpacity>
+        <FadeInView delay={180}>
+          <PressableScale style={styles.item} onPress={() => navigation.navigate('Domiciliario')}>
+            <Icon name="moto" size={26} color={c.accent} style={styles.itemEmoji} />
+            <View style={styles.itemTexto}>
+              <Text style={styles.itemTitulo}>Mis entregas</Text>
+              <Text style={styles.itemSub}>Pedidos para recoger y entregar</Text>
+            </View>
+            <Icon name="chevron" size={20} color={c.chevron} />
+          </PressableScale>
+        </FadeInView>
       )}
 
       <TouchableOpacity style={styles.logout} onPress={salir}>
@@ -210,43 +225,40 @@ export default function HomeScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f1f5f9' },
+  container: { flex: 1, backgroundColor: c.bg },
   content: { padding: 20 },
-  saludo: { fontSize: 24, fontWeight: 'bold', color: '#0f172a', marginTop: 8 },
+  saludo: { fontSize: 24, fontFamily: font.display, color: c.textStrong, marginTop: 8 },
   rolesRow: { flexDirection: 'row', gap: 8, marginTop: 8, marginBottom: 24 },
   rol: {
-    backgroundColor: '#e0e7ff', color: '#4338ca', fontWeight: '600', fontSize: 12,
-    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, overflow: 'hidden',
+    backgroundColor: c.accentSoft, color: c.goldText, fontFamily: font.bold, fontSize: 12,
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, overflow: 'hidden',
   },
   item: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff',
-    borderRadius: 16, padding: 16, marginBottom: 12,
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: c.surface,
+    borderRadius: radius.lg, padding: 16, marginBottom: 12, ...shadow.soft,
   },
   itemEmoji: { marginRight: 14 },
   itemTexto: { flex: 1 },
   fila: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  itemTitulo: { fontSize: 16, fontWeight: '700', color: '#0f172a' },
-  itemSub: { color: '#64748b', fontSize: 13, marginTop: 2 },
-  chevron: { fontSize: 28, color: '#cbd5e1' },
+  itemTitulo: { fontSize: 16, fontFamily: font.bold, color: c.textStrong },
+  itemSub: { color: c.muted, fontSize: 13, marginTop: 2, fontFamily: font.regular },
   // Topbar switch
   headerSwitch: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  headerSwitchTxt: { fontWeight: '700', fontSize: 13 },
+  headerSwitchTxt: { fontFamily: font.bold, fontSize: 13 },
   // Pedidos en espera
-  seccion: { fontSize: 16, fontWeight: '800', color: '#0f172a', marginTop: 14, marginBottom: 10 },
-  vacioBox: { backgroundColor: '#fff', borderRadius: 14, padding: 18, alignItems: 'center' },
-  vacioTxt: { color: '#94a3b8', fontSize: 14 },
+  seccion: { fontSize: 16, fontFamily: font.displaySemi, color: c.textStrong, marginTop: 14, marginBottom: 10 },
+  vacioBox: { backgroundColor: c.surface, borderRadius: radius.md, padding: 18, alignItems: 'center', ...shadow.low },
+  vacioTxt: { color: c.muted, fontSize: 14, fontFamily: font.regular },
   pedidoCard: {
-    backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 10,
-    borderLeftWidth: 4, borderLeftColor: '#f59e0b',
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, elevation: 1,
+    backgroundColor: c.surface, borderRadius: radius.md, padding: 16, marginBottom: 10,
+    borderLeftWidth: 4, borderLeftColor: c.accent, ...shadow.low,
   },
   pedidoHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  pedidoId: { fontWeight: '700', color: '#0f172a', fontSize: 15 },
-  pedidoTotal: { fontWeight: '800', color: '#0f172a' },
-  pedidoCliente: { color: '#334155', fontSize: 14, marginTop: 6 },
-  pedidoItems: { color: '#64748b', fontSize: 13, marginTop: 2 },
-  pedidoVer: { color: '#4f46e5', fontWeight: '700', fontSize: 13, marginTop: 8 },
+  pedidoId: { fontFamily: font.bold, color: c.textStrong, fontSize: 15 },
+  pedidoTotal: { fontFamily: font.extra, color: c.textStrong },
+  pedidoCliente: { color: c.text, fontSize: 14, marginTop: 6, fontFamily: font.medium },
+  pedidoItems: { color: c.muted, fontSize: 13, marginTop: 2, fontFamily: font.regular },
+  pedidoVer: { color: c.goldText, fontFamily: font.bold, fontSize: 13, marginTop: 8 },
   logout: { marginTop: 28, alignItems: 'center' },
-  logoutTexto: { color: '#ef4444', fontWeight: '700' },
+  logoutTexto: { color: c.danger, fontFamily: font.bold },
 });

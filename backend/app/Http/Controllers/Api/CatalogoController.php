@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ProductoResource;
 use App\Models\Negocio;
+use App\Models\Producto;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -58,6 +59,54 @@ class CatalogoController extends Controller
             ]);
 
         return response()->json(['negocios' => $negocios]);
+    }
+
+    /**
+     * Búsqueda de PRODUCTOS para el cliente (app móvil).
+     *
+     * Devuelve los productos disponibles de negocios abiertos cuyo nombre
+     * (o el de su categoría/descripción) coincide con ?buscar=texto, junto al
+     * negocio que los vende. El orden es por RELEVANCIA: de la coincidencia más
+     * cercana a la más lejana (nombre exacto → empieza por → contiene → otros),
+     * y a igualdad de relevancia, alfabético.
+     */
+    public function buscarProductos(Request $request): JsonResponse
+    {
+        $texto = trim((string) $request->string('buscar'));
+
+        // Sin texto no buscamos productos (la app muestra negocios en su lugar).
+        if ($texto === '') {
+            return response()->json(['productos' => []]);
+        }
+
+        $like = '%'.$texto.'%';
+
+        $productos = Producto::query()
+            ->where('disponible', true)
+            ->whereHas('negocio', fn ($n) => $n->where('activo', true))
+            ->where(function ($q) use ($texto, $like) {
+                $q->where('nombre', 'like', $like)
+                    ->orWhere('descripcion', 'like', $like)
+                    ->orWhereHas('categoria', fn ($c) => $c->where('nombre', 'like', $like));
+            })
+            ->with(['categoria', 'negocio'])
+            // Ranking de cercanía de la coincidencia (0 = más cercana).
+            ->orderByRaw(
+                'CASE
+                    WHEN nombre = ? THEN 0
+                    WHEN nombre LIKE ? THEN 1
+                    WHEN nombre LIKE ? THEN 2
+                    ELSE 3
+                END',
+                [$texto, $texto.'%', $like]
+            )
+            ->orderBy('nombre')
+            ->limit(50)
+            ->get();
+
+        return response()->json([
+            'productos' => ProductoResource::collection($productos),
+        ]);
     }
 
     /** Detalle de un negocio abierto + sus productos disponibles. */

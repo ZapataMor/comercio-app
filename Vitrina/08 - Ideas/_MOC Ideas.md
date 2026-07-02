@@ -2,7 +2,7 @@
 title: _MOC Ideas
 tags: [moc, idea]
 estado: en-progreso
-actualizado: 2026-06-28
+actualizado: 2026-06-29
 ---
 
 # 🗺️ MOC — Ideas
@@ -11,6 +11,8 @@ Backlog conceptual. No son compromisos: son semillas. Cada una con impacto y esf
 
 | Idea | Estado | Impacto | Esfuerzo |
 |---|---|---|---|
+| [[Idea - Orden por cercania]] | semilla | alto | alto |
+| [[Idea - Seguimiento del domiciliario]] | semilla | alto | alto |
 | [[Idea - Mapa en tiempo real]] | semilla | alto | alto |
 | [[Idea - Busqueda semantica]] | semilla | alto | alto |
 | [[Idea - Calificaciones y reseñas]] | semilla | medio | medio |

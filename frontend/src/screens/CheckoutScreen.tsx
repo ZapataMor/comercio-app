@@ -12,8 +12,10 @@ import {
 import { crearPedido } from '../api';
 import { useAuth } from '../AuthContext';
 import { useCart } from '../CartContext';
+import { FadeInView, PressableScale } from '../components/anim';
 import Icon from '../components/Icon';
 import { RootStackParamList } from '../navTypes';
+import { c, font, radius, shadow } from '../theme';
 import { useToast } from '../Toast';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Checkout'>;
@@ -57,9 +59,9 @@ export default function CheckoutScreen({ navigation }: Props) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
-      <View style={styles.resumen}>
+      <FadeInView style={styles.resumen}>
         <View style={[styles.resumenTitulo, styles.fila]}>
-          <Icon name="tienda" size={15} color="#334155" />
+          <Icon name="tienda" size={15} color={c.text} />
           <Text style={styles.resumenTitulo}>{cart.negocioNombre}</Text>
         </View>
         {cart.items.map(i => (
@@ -72,13 +74,13 @@ export default function CheckoutScreen({ navigation }: Props) {
           <Text style={styles.totalLabel}>Total</Text>
           <Text style={styles.totalValor}>{cop(cart.total)}</Text>
         </View>
-      </View>
+      </FadeInView>
 
       <Text style={styles.label}>Dirección de entrega</Text>
-      <TextInput style={styles.input} value={direccion} onChangeText={setDireccion} placeholder="Calle, número, barrio…" />
+      <TextInput style={styles.input} value={direccion} onChangeText={setDireccion} placeholder="Calle, número, barrio…" placeholderTextColor={c.mutedSoft} />
 
       <Text style={styles.label}>Teléfono de contacto</Text>
-      <TextInput style={styles.input} value={telefono} onChangeText={setTelefono} placeholder="300 123 4567" keyboardType="phone-pad" />
+      <TextInput style={styles.input} value={telefono} onChangeText={setTelefono} placeholder="300 123 4567" placeholderTextColor={c.mutedSoft} keyboardType="phone-pad" />
 
       <Text style={styles.label}>Forma de pago</Text>
       <View style={styles.pagos}>
@@ -90,40 +92,40 @@ export default function CheckoutScreen({ navigation }: Props) {
             key={op.v}
             style={[styles.pago, pago === op.v && styles.pagoOn]}
             onPress={() => setPago(op.v)}>
-            <Icon name={op.icon} size={20} color={pago === op.v ? '#4338ca' : '#475569'} />
+            <Icon name={op.icon} size={20} color={pago === op.v ? c.onAccent : c.muted} />
             <Text style={[styles.pagoTxt, pago === op.v && styles.pagoTxtOn]}>{op.t}</Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      <TouchableOpacity style={styles.btn} onPress={confirmar} disabled={enviando}>
+      <PressableScale style={styles.btn} onPress={confirmar} disabled={enviando}>
         {enviando ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={c.onAccent} />
         ) : (
           <Text style={styles.btnTxt}>Confirmar pedido · {cop(cart.total)}</Text>
         )}
-      </TouchableOpacity>
+      </PressableScale>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f1f5f9' },
-  resumen: { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 16 },
-  resumenTitulo: { fontWeight: '700', color: '#334155', marginBottom: 8 },
+  container: { flex: 1, backgroundColor: c.bg },
+  resumen: { backgroundColor: c.surface, borderRadius: radius.md, padding: 16, marginBottom: 16, ...shadow.soft },
+  resumenTitulo: { fontFamily: font.bold, color: c.text, marginBottom: 8 },
   fila: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   linea: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
-  lineaTxt: { color: '#475569' },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#e2e8f0' },
-  totalLabel: { fontWeight: '700' },
-  totalValor: { fontWeight: '700' },
-  label: { fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 6, marginTop: 6 },
-  input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12 },
+  lineaTxt: { color: c.text, fontFamily: font.regular },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: c.border },
+  totalLabel: { fontFamily: font.bold, color: c.textStrong },
+  totalValor: { fontFamily: font.extra, color: c.textStrong },
+  label: { fontSize: 13, fontFamily: font.semibold, color: c.text, marginBottom: 6, marginTop: 6 },
+  input: { backgroundColor: c.surface, borderWidth: 1, borderColor: c.borderStrong, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12, color: c.textStrong, fontFamily: font.regular },
   pagos: { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  pago: { flex: 1, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingVertical: 14, alignItems: 'center', gap: 4, backgroundColor: '#fff' },
-  pagoOn: { borderColor: '#4f46e5', backgroundColor: '#eef2ff' },
-  pagoTxt: { color: '#475569', fontWeight: '600' },
-  pagoTxtOn: { color: '#4338ca' },
-  btn: { backgroundColor: '#16a34a', borderRadius: 12, paddingVertical: 15, alignItems: 'center' },
-  btnTxt: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  pago: { flex: 1, borderWidth: 1, borderColor: c.borderStrong, borderRadius: radius.md, paddingVertical: 14, alignItems: 'center', gap: 4, backgroundColor: c.surface },
+  pagoOn: { borderColor: c.accent, backgroundColor: c.accentSoft },
+  pagoTxt: { color: c.muted, fontFamily: font.semibold },
+  pagoTxtOn: { color: c.onAccent },
+  btn: { backgroundColor: c.accent, borderRadius: radius.md, paddingVertical: 16, alignItems: 'center', ...shadow.gold },
+  btnTxt: { color: c.onAccent, fontFamily: font.bold, fontSize: 16 },
 });

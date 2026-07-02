@@ -37,6 +37,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // --- Catálogo público (cliente): explorar negocios y ver productos ---
     Route::get('/negocios', [CatalogoController::class, 'index']);
+    // Búsqueda de productos (por relevancia) con el negocio que los vende.
+    Route::get('/productos', [CatalogoController::class, 'buscarProductos']);
     Route::get('/negocios/{id}', [CatalogoController::class, 'show']);
 
     // --- Pedidos del cliente ---

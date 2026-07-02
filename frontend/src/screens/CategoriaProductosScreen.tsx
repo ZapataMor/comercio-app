@@ -28,10 +28,12 @@ import {
   Producto,
 } from '../api';
 import { useAuth } from '../AuthContext';
+import { FadeInView, PressableScale } from '../components/anim';
 import { Dropdown } from '../components/Dropdown';
 import Icon from '../components/Icon';
 import SelectorImagen from '../components/SelectorImagen';
 import { RootStackParamList } from '../navTypes';
+import { c, font, radius, shadow } from '../theme';
 import { useToast } from '../Toast';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CategoriaProductos'>;
@@ -186,7 +188,7 @@ export default function CategoriaProductosScreen({ route }: Props) {
   }
 
   if (cargando) {
-    return <ActivityIndicator size="large" color="#4f46e5" style={{ marginTop: 40 }} />;
+    return <ActivityIndicator size="large" color={c.accent} style={{ marginTop: 40 }} />;
   }
   if (error) {
     return <Text style={styles.error}>{error}</Text>;
@@ -195,7 +197,7 @@ export default function CategoriaProductosScreen({ route }: Props) {
   // Opciones del dropdown de categoría (solo se usa en el grupo "Sin categoría").
   const opcionesCategoria = [
     { label: 'Sin categoría', value: '0' },
-    ...categorias.map(c => ({ label: c.nombre, value: String(c.id) })),
+    ...categorias.map(cat => ({ label: cat.nombre, value: String(cat.id) })),
   ];
 
   return (
@@ -205,7 +207,7 @@ export default function CategoriaProductosScreen({ route }: Props) {
         keyExtractor={p => String(p.id)}
         contentContainerStyle={{ padding: 16 }}
         refreshControl={
-          <RefreshControl refreshing={refrescando} onRefresh={() => cargar(true)} colors={['#4f46e5']} />
+          <RefreshControl refreshing={refrescando} onRefresh={() => cargar(true)} colors={[c.accent]} tintColor={c.accent} />
         }
         ListHeaderComponent={
           esSinCategoria ? (
@@ -213,9 +215,9 @@ export default function CategoriaProductosScreen({ route }: Props) {
               Productos sin categoría. Edítalos para asignarles una categoría.
             </Text>
           ) : (
-            <TouchableOpacity style={styles.nuevoBtn} onPress={abrirNuevo}>
+            <PressableScale style={styles.nuevoBtn} onPress={abrirNuevo}>
               <Text style={styles.nuevoTxt}>+ Nuevo producto</Text>
-            </TouchableOpacity>
+            </PressableScale>
           )
         }
         ListEmptyComponent={
@@ -225,28 +227,30 @@ export default function CategoriaProductosScreen({ route }: Props) {
               : 'Aún no hay productos en esta categoría.\nToca "+ Nuevo producto" para crear el primero.'}
           </Text>
         }
-        renderItem={({ item }) => (
-          <TouchableOpacity style={styles.item} onPress={() => abrirEditar(item)}>
-            <View style={styles.thumb}>
-              {item.imagen ? (
-                <Image source={{ uri: imagenUrl(item.imagen) }} style={styles.thumbImg} resizeMode="cover" />
-              ) : (
-                <Icon name="caja" size={22} color="#94a3b8" />
-              )}
-            </View>
-            <View style={styles.itemTexto}>
-              <Text style={styles.nombre}>{item.nombre}</Text>
-              <Text style={styles.precio}>{item.precio_formateado ?? precioCOP(item.precio)}</Text>
-            </View>
-            <View style={styles.acciones}>
-              <Text style={[styles.estado, item.disponible ? styles.disp : styles.oculto]}>
-                {item.disponible ? 'Disponible' : 'Oculto'}
-              </Text>
-              <TouchableOpacity onPress={() => onEliminar(item)} hitSlop={8}>
-                <Icon name="basura" size={18} color="#ef4444" />
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
+        renderItem={({ item, index }) => (
+          <FadeInView delay={Math.min(index, 8) * 40}>
+            <TouchableOpacity style={styles.item} onPress={() => abrirEditar(item)}>
+              <View style={styles.thumb}>
+                {item.imagen ? (
+                  <Image source={{ uri: imagenUrl(item.imagen) }} style={styles.thumbImg} resizeMode="cover" />
+                ) : (
+                  <Icon name="caja" size={22} color={c.muted} />
+                )}
+              </View>
+              <View style={styles.itemTexto}>
+                <Text style={styles.nombre}>{item.nombre}</Text>
+                <Text style={styles.precio}>{item.precio_formateado ?? precioCOP(item.precio)}</Text>
+              </View>
+              <View style={styles.acciones}>
+                <Text style={[styles.estado, item.disponible ? styles.disp : styles.oculto]}>
+                  {item.disponible ? 'Disponible' : 'Oculto'}
+                </Text>
+                <TouchableOpacity onPress={() => onEliminar(item)} hitSlop={8}>
+                  <Icon name="basura" size={18} color={c.danger} />
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </FadeInView>
         )}
       />
 
@@ -272,6 +276,7 @@ export default function CategoriaProductosScreen({ route }: Props) {
                 value={nombre}
                 onChangeText={setNombre}
                 placeholder="Ej: Arroz con pollo"
+                placeholderTextColor={c.mutedSoft}
                 editable={!guardando}
               />
 
@@ -281,6 +286,7 @@ export default function CategoriaProductosScreen({ route }: Props) {
                 value={descripcion}
                 onChangeText={setDescripcion}
                 placeholder="Opcional"
+                placeholderTextColor={c.mutedSoft}
                 multiline
                 editable={!guardando}
               />
@@ -291,6 +297,7 @@ export default function CategoriaProductosScreen({ route }: Props) {
                 value={precio}
                 onChangeText={setPrecio}
                 placeholder="12000"
+                placeholderTextColor={c.mutedSoft}
                 keyboardType="numeric"
                 editable={!guardando}
               />
@@ -317,19 +324,25 @@ export default function CategoriaProductosScreen({ route }: Props) {
 
               <View style={styles.switchRow}>
                 <Text style={styles.label}>Disponible</Text>
-                <Switch value={disponible} onValueChange={setDisponible} disabled={guardando} />
+                <Switch
+                  value={disponible}
+                  onValueChange={setDisponible}
+                  disabled={guardando}
+                  trackColor={{ true: c.accent, false: '#D8D0C4' }}
+                  thumbColor={c.surface}
+                />
               </View>
 
-              <TouchableOpacity
+              <PressableScale
                 style={[styles.boton, guardando && { opacity: 0.7 }]}
                 onPress={guardar}
                 disabled={guardando}>
                 {guardando ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color={c.onBrand} />
                 ) : (
                   <Text style={styles.botonTxt}>{editando ? 'Guardar cambios' : 'Crear producto'}</Text>
                 )}
-              </TouchableOpacity>
+              </PressableScale>
               <TouchableOpacity onPress={() => setModal(false)} disabled={guardando}>
                 <Text style={styles.cancelar}>Cancelar</Text>
               </TouchableOpacity>
@@ -342,51 +355,48 @@ export default function CategoriaProductosScreen({ route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f1f5f9' },
+  container: { flex: 1, backgroundColor: c.bg },
   nuevoBtn: {
-    backgroundColor: '#4f46e5', borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginBottom: 14,
+    backgroundColor: c.brand, borderRadius: radius.md, paddingVertical: 14, alignItems: 'center', marginBottom: 14, ...shadow.soft,
   },
-  nuevoTxt: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  ayuda: { color: '#64748b', fontSize: 13, marginBottom: 14, textAlign: 'center' },
+  nuevoTxt: { color: c.onBrand, fontFamily: font.bold, fontSize: 15 },
+  ayuda: { color: c.muted, fontSize: 13, marginBottom: 14, textAlign: 'center', fontFamily: font.regular },
   item: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#fff', borderRadius: 14, padding: 12, marginBottom: 10,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, elevation: 1,
+    backgroundColor: c.surface, borderRadius: radius.md, padding: 12, marginBottom: 10, ...shadow.low,
   },
   thumb: {
-    width: 48, height: 48, borderRadius: 10, backgroundColor: '#f1f5f9',
+    width: 52, height: 52, borderRadius: radius.sm, backgroundColor: c.surface2,
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginRight: 12,
   },
   thumbImg: { width: '100%', height: '100%' },
-  thumbPlaceholder: { fontSize: 22 },
   itemTexto: { flex: 1 },
-  nombre: { fontSize: 15, fontWeight: '600', color: '#0f172a' },
-  precio: { color: '#475569', marginTop: 4, fontWeight: '600' },
+  nombre: { fontSize: 15, fontFamily: font.semibold, color: c.textStrong },
+  precio: { color: c.goldText, marginTop: 4, fontFamily: font.bold },
   acciones: { alignItems: 'flex-end', gap: 8, marginLeft: 8 },
   estado: {
-    fontSize: 11, fontWeight: '700', paddingHorizontal: 8, paddingVertical: 3,
-    borderRadius: 999, overflow: 'hidden',
+    fontSize: 11, fontFamily: font.bold, paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: radius.pill, overflow: 'hidden',
   },
-  disp: { backgroundColor: '#dcfce7', color: '#15803d' },
-  oculto: { backgroundColor: '#e2e8f0', color: '#64748b' },
-  eliminar: { fontSize: 18 },
-  vacio: { textAlign: 'center', color: '#64748b', marginTop: 40, lineHeight: 20 },
-  error: { color: '#b91c1c', backgroundColor: '#fee2e2', padding: 12, borderRadius: 10, margin: 20 },
+  disp: { backgroundColor: c.successSoft, color: c.success },
+  oculto: { backgroundColor: c.surface2, color: c.muted },
+  vacio: { textAlign: 'center', color: c.muted, marginTop: 40, lineHeight: 20, fontFamily: font.regular },
+  error: { color: c.danger, backgroundColor: c.dangerSoft, padding: 12, borderRadius: radius.sm, margin: 20, fontFamily: font.medium },
   // Modal
-  modalFondo: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'flex-end' },
+  modalFondo: { flex: 1, backgroundColor: c.scrim, justifyContent: 'flex-end' },
   modalCard: {
-    backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    backgroundColor: c.surface, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
     padding: 20, maxHeight: '90%',
   },
-  modalTitulo: { fontSize: 18, fontWeight: '700', color: '#0f172a', marginBottom: 16 },
-  label: { fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 6 },
+  modalTitulo: { fontSize: 18, fontFamily: font.display, color: c.textStrong, marginBottom: 16 },
+  label: { fontSize: 13, fontFamily: font.semibold, color: c.text, marginBottom: 6 },
   input: {
-    borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12,
-    paddingHorizontal: 14, paddingVertical: 11, fontSize: 16, marginBottom: 14, color: '#0f172a',
+    borderWidth: 1, borderColor: c.borderStrong, borderRadius: radius.md,
+    paddingHorizontal: 14, paddingVertical: 11, fontSize: 16, marginBottom: 14, color: c.textStrong, fontFamily: font.regular,
   },
   area: { minHeight: 70, textAlignVertical: 'top' },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: 10 },
-  boton: { backgroundColor: '#4f46e5', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 6 },
-  botonTxt: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  cancelar: { textAlign: 'center', color: '#64748b', fontWeight: '600', marginTop: 14, marginBottom: 4 },
+  boton: { backgroundColor: c.brand, borderRadius: radius.md, paddingVertical: 15, alignItems: 'center', marginTop: 6, ...shadow.soft },
+  botonTxt: { color: c.onBrand, fontFamily: font.bold, fontSize: 16 },
+  cancelar: { textAlign: 'center', color: c.muted, fontFamily: font.semibold, marginTop: 14, marginBottom: 4 },
 });

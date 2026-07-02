@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -12,8 +13,10 @@ import {
 } from 'react-native';
 import { login } from '../api';
 import { useAuth } from '../AuthContext';
-import Icon from '../components/Icon';
+import { FadeInView, PressableScale } from '../components/anim';
+import { VitrinaWordmark } from '../components/Logo';
 import { RootStackParamList } from '../navTypes';
+import { c, font, radius, shadow } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
@@ -42,12 +45,12 @@ export default function LoginScreen({ navigation }: Props) {
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={styles.card}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-          <Icon name="carrito" size={24} color="#4f46e5" />
-          <Text style={styles.logo}>Comercio</Text>
+      <StatusBar barStyle="dark-content" backgroundColor={c.bg} />
+      <FadeInView style={styles.card}>
+        <View style={styles.brandRow}>
+          <VitrinaWordmark size={30} />
         </View>
-        <Text style={styles.subtitle}>Entra a tu cuenta</Text>
+        <Text style={styles.subtitle}>Tu barrio, en tu bolsillo</Text>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -59,6 +62,7 @@ export default function LoginScreen({ navigation }: Props) {
           autoCapitalize="none"
           keyboardType="email-address"
           placeholder="correo@ejemplo.co"
+          placeholderTextColor={c.mutedSoft}
           editable={!cargando}
         />
 
@@ -69,26 +73,27 @@ export default function LoginScreen({ navigation }: Props) {
           onChangeText={setPassword}
           secureTextEntry
           placeholder="••••••••"
+          placeholderTextColor={c.mutedSoft}
           editable={!cargando}
         />
 
-        <TouchableOpacity
+        <PressableScale
           style={[styles.boton, cargando && styles.botonDisabled]}
           onPress={entrar}
           disabled={cargando}>
           {cargando ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={c.onBrand} />
           ) : (
             <Text style={styles.botonTexto}>Entrar</Text>
           )}
-        </TouchableOpacity>
+        </PressableScale>
 
         <TouchableOpacity onPress={() => navigation.navigate('Register')} disabled={cargando}>
           <Text style={styles.registro}>¿No tienes cuenta? Regístrate</Text>
         </TouchableOpacity>
 
         <Text style={styles.hint}>Demo: comerciante@demo.co / password123</Text>
-      </View>
+      </FadeInView>
     </KeyboardAvoidingView>
   );
 }
@@ -96,48 +101,61 @@ export default function LoginScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: c.bg,
     justifyContent: 'center',
     padding: 20,
   },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
+    backgroundColor: c.surface,
+    borderRadius: radius.xl,
+    padding: 26,
+    ...shadow.card,
   },
-  logo: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', color: '#4f46e5' },
-  subtitle: { textAlign: 'center', color: '#64748b', marginTop: 4, marginBottom: 20 },
-  label: { fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 6 },
+  brandRow: { alignItems: 'center', justifyContent: 'center' },
+  subtitle: {
+    textAlign: 'center',
+    color: c.muted,
+    fontFamily: font.medium,
+    marginTop: 8,
+    marginBottom: 22,
+  },
+  label: { fontSize: 13, fontFamily: font.semibold, color: c.text, marginBottom: 6 },
   input: {
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 12,
+    borderColor: c.borderStrong,
+    borderRadius: radius.md,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
+    fontFamily: font.regular,
     marginBottom: 16,
-    color: '#0f172a',
+    color: c.textStrong,
+    backgroundColor: c.surface,
   },
   boton: {
-    backgroundColor: '#4f46e5',
-    borderRadius: 12,
-    paddingVertical: 14,
+    backgroundColor: c.brand,
+    borderRadius: radius.md,
+    paddingVertical: 15,
     alignItems: 'center',
+    ...shadow.soft,
   },
   botonDisabled: { opacity: 0.7 },
-  botonTexto: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  botonTexto: { color: c.onBrand, fontFamily: font.bold, fontSize: 16 },
   error: {
-    backgroundColor: '#fee2e2',
-    color: '#b91c1c',
+    backgroundColor: c.dangerSoft,
+    color: c.danger,
+    fontFamily: font.medium,
     padding: 10,
-    borderRadius: 10,
+    borderRadius: radius.sm,
     marginBottom: 16,
     fontSize: 13,
   },
-  registro: { textAlign: 'center', color: '#4f46e5', fontSize: 14, marginTop: 18, fontWeight: '600' },
-  hint: { textAlign: 'center', color: '#94a3b8', fontSize: 12, marginTop: 12 },
+  registro: {
+    textAlign: 'center',
+    color: c.goldText,
+    fontSize: 14,
+    marginTop: 18,
+    fontFamily: font.semibold,
+  },
+  hint: { textAlign: 'center', color: c.mutedSoft, fontSize: 12, marginTop: 12, fontFamily: font.regular },
 });

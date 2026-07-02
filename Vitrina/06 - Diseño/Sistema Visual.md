@@ -1,25 +1,39 @@
 ---
 title: Sistema Visual
 tags: [diseño]
-estado: en-progreso
-actualizado: 2026-06-28
+estado: hecho
+actualizado: 2026-06-29
 ---
 
 # 🎨 Sistema Visual
 
 ## Estado actual
-- **Web**: Tailwind CSS por CDN (estilo utilitario, temporal para pruebas).
-- **Móvil**: estilos de React Native; Nativewind quedó anotado como siguiente paso.
+- **Móvil (React Native)**: ✅ **Identidad "Ámbar & Grafito" (Opción A) implementada.**
+  Se probó la Opción B "Esmeralda & Arena" pero se descartó; se volvió a la A. Cambiar entre
+  paletas es solo editar los tokens de color en `theme.ts`. Fuente única de verdad:
+  `frontend/src/theme.ts` (color, tipografía, radios, sombras). Logo en `Logo.tsx`
+  ("V-toldo") y animaciones en `anim.tsx`.
+- **Web**: Tailwind CSS por CDN (sin cambios todavía; el rediseño se aplicó solo a la app móvil).
 
-> [!todo] Pendiente — definir identidad
-> - Paleta de color (primario/secundario/acento, estados de pedido con color por estado).
-> - Tipografía.
-> - Componentes base (botón, tarjeta de producto, chip de estado, tarjeta de pedido).
-> - Logo y nombre de marca de cara al usuario (ver [[Pitch]]).
+> [!check] Identidad aplicada en toda la app móvil
+> Se aplicó a TODO: login/registro, vistas de los 4 roles, notificaciones y nombre de marca.
+> - 🎨 Paleta + estados de pedido → [[Propuesta - Paleta de color]] (**activa: Opción A**)
+> - 🔤 Tipografía **Sora + Inter** (en `assets/fonts`) → [[Propuesta - Tipografía y estilos]]
+> - 🎞️ Animaciones con `Animated` nativo → [[Propuesta - Animaciones y microinteracciones]]
+> - 🏷️ Logo y marca "Vitrina" → [[Propuesta - Logo e identidad de marca]]
+>
+> Para ver las fuentes hay que **reconstruir** la app (`npm run android`); el color y las
+> animaciones se ven recargando JS.
 
-## Sugerencia de color por estado de pedido
-Para la línea de tiempo del pedido conviene un color por estado (`pendiente`, `listo`,
-`tomado`, `recogido`, `en_camino`, `entregado`). Definir aquí cuando se decida la paleta.
+## Tokens de marca (activos — Opción A, ver `theme.ts`)
+- Fondo crema `#FAF8F4` · Grafito `#262019` (primario/header) · Dorado `#E8A019` (acento/CTA).
+- Texto `#1F1B16` · Dorado legible para texto `#9A6B0F`.
+
+## Color por estado de pedido
+Implementado en `theme.ts` (`estado`/`estadoColor`): `pendiente` ámbar, `listo` azul,
+`tomado` morado, `recogido`/`en_camino` teal, `entregado` verde, `cancelado` rojo.
+Tabla completa en [[Propuesta - Paleta de color]].
 
 ## 🔗 Relacionado
 - [[_MOC Diseño]] · [[Wireframes y Pantallas]] · [[Lógica de Negocio]]
+- [[Rol - Diseñador UX-UI Senior]] · [[Propuesta - Paleta de color]]

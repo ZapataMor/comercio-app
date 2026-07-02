@@ -5,6 +5,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -13,8 +14,11 @@ import {
 } from 'react-native';
 import { register, RolPublico } from '../api';
 import { useAuth } from '../AuthContext';
+import { FadeInView, PressableScale } from '../components/anim';
 import Icon, { IconName } from '../components/Icon';
+import { VitrinaMark } from '../components/Logo';
 import { RootStackParamList } from '../navTypes';
+import { c, font, radius, shadow } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 
@@ -71,13 +75,14 @@ export default function RegisterScreen({ navigation }: Props) {
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <StatusBar barStyle="dark-content" backgroundColor={c.bg} />
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <View style={styles.card}>
+        <FadeInView style={styles.card}>
           <View style={styles.logoRow}>
-            <Icon name="carrito" size={24} color="#4f46e5" />
+            <VitrinaMark size={30} />
             <Text style={styles.logo}>Crear cuenta</Text>
           </View>
-          <Text style={styles.subtitle}>Únete a Comercio</Text>
+          <Text style={styles.subtitle}>Únete a Vitrina</Text>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -87,6 +92,7 @@ export default function RegisterScreen({ navigation }: Props) {
             value={nombre}
             onChangeText={setNombre}
             placeholder="Tu nombre"
+            placeholderTextColor={c.mutedSoft}
             editable={!cargando}
           />
 
@@ -98,6 +104,7 @@ export default function RegisterScreen({ navigation }: Props) {
             autoCapitalize="none"
             keyboardType="email-address"
             placeholder="correo@ejemplo.co"
+            placeholderTextColor={c.mutedSoft}
             editable={!cargando}
           />
 
@@ -108,6 +115,7 @@ export default function RegisterScreen({ navigation }: Props) {
             onChangeText={setPassword}
             secureTextEntry
             placeholder="Mínimo 8 caracteres"
+            placeholderTextColor={c.mutedSoft}
             editable={!cargando}
           />
 
@@ -118,6 +126,7 @@ export default function RegisterScreen({ navigation }: Props) {
             onChangeText={setConfirmar}
             secureTextEntry
             placeholder="Repite la contraseña"
+            placeholderTextColor={c.mutedSoft}
             editable={!cargando}
           />
 
@@ -132,7 +141,7 @@ export default function RegisterScreen({ navigation }: Props) {
                 <Icon
                   name={o.icon}
                   size={24}
-                  color={rol === o.rol ? '#4338ca' : '#334155'}
+                  color={rol === o.rol ? c.onAccent : c.muted}
                   style={styles.opcionEmoji}
                 />
                 <Text style={[styles.opcionTitulo, rol === o.rol && styles.opcionTituloOn]}>
@@ -145,82 +154,82 @@ export default function RegisterScreen({ navigation }: Props) {
             ))}
           </View>
 
-          <TouchableOpacity
+          <PressableScale
             style={[styles.boton, cargando && styles.botonDisabled]}
             onPress={crearCuenta}
             disabled={cargando}>
             {cargando ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={c.onBrand} />
             ) : (
               <Text style={styles.botonTexto}>Crear cuenta</Text>
             )}
-          </TouchableOpacity>
+          </PressableScale>
 
           <TouchableOpacity onPress={() => navigation.goBack()} disabled={cargando}>
             <Text style={styles.hint}>¿Ya tienes cuenta? Inicia sesión</Text>
           </TouchableOpacity>
-        </View>
+        </FadeInView>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f1f5f9' },
+  container: { flex: 1, backgroundColor: c.bg },
   scroll: { flexGrow: 1, justifyContent: 'center', padding: 20 },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
+    backgroundColor: c.surface,
+    borderRadius: radius.xl,
     padding: 24,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
+    ...shadow.card,
   },
-  logo: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', color: '#4f46e5' },
-  logoRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  subtitle: { textAlign: 'center', color: '#64748b', marginTop: 4, marginBottom: 20 },
-  label: { fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 6 },
+  logo: { fontSize: 22, fontFamily: font.display, textAlign: 'center', color: c.textStrong },
+  logoRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  subtitle: { textAlign: 'center', color: c.muted, fontFamily: font.medium, marginTop: 6, marginBottom: 20 },
+  label: { fontSize: 13, fontFamily: font.semibold, color: c.text, marginBottom: 6 },
   input: {
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 12,
+    borderColor: c.borderStrong,
+    borderRadius: radius.md,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
+    fontFamily: font.regular,
     marginBottom: 16,
-    color: '#0f172a',
+    color: c.textStrong,
   },
   opciones: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   opcion: {
     flex: 1,
     borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    borderRadius: 14,
+    borderColor: c.border,
+    borderRadius: radius.md,
     padding: 14,
-    backgroundColor: '#f8fafc',
+    backgroundColor: c.surface2,
   },
-  opcionOn: { borderColor: '#4f46e5', backgroundColor: '#eef2ff' },
+  opcionOn: { borderColor: c.accent, backgroundColor: c.accentSoft },
   opcionEmoji: { fontSize: 24 },
-  opcionTitulo: { fontSize: 15, fontWeight: '700', color: '#334155', marginTop: 6 },
-  opcionTituloOn: { color: '#4338ca' },
-  opcionSub: { fontSize: 12, color: '#94a3b8', marginTop: 2 },
-  opcionSubOn: { color: '#6366f1' },
+  opcionTitulo: { fontSize: 15, fontFamily: font.bold, color: c.text, marginTop: 6 },
+  opcionTituloOn: { color: c.onAccent },
+  opcionSub: { fontSize: 12, color: c.muted, marginTop: 2, fontFamily: font.regular },
+  opcionSubOn: { color: c.onAccent },
   boton: {
-    backgroundColor: '#4f46e5',
-    borderRadius: 12,
-    paddingVertical: 14,
+    backgroundColor: c.brand,
+    borderRadius: radius.md,
+    paddingVertical: 15,
     alignItems: 'center',
+    ...shadow.soft,
   },
   botonDisabled: { opacity: 0.7 },
-  botonTexto: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  botonTexto: { color: c.onBrand, fontFamily: font.bold, fontSize: 16 },
   error: {
-    backgroundColor: '#fee2e2',
-    color: '#b91c1c',
+    backgroundColor: c.dangerSoft,
+    color: c.danger,
+    fontFamily: font.medium,
     padding: 10,
-    borderRadius: 10,
+    borderRadius: radius.sm,
     marginBottom: 16,
     fontSize: 13,
   },
-  hint: { textAlign: 'center', color: '#4f46e5', fontSize: 14, marginTop: 18, fontWeight: '600' },
+  hint: { textAlign: 'center', color: c.goldText, fontSize: 14, marginTop: 18, fontFamily: font.semibold },
 });

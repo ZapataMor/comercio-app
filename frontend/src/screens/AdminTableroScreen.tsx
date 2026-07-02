@@ -1,10 +1,12 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AdminStats, getAdminStats } from '../api';
 import { useAuth } from '../AuthContext';
+import { FadeInView, PressableScale } from '../components/anim';
 import Icon from '../components/Icon';
 import { RootStackParamList } from '../navTypes';
+import { c, font, radius, shadow } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AdminTablero'>;
 
@@ -35,49 +37,50 @@ export default function AdminTableroScreen({ navigation }: Props) {
       <Text style={styles.titulo}>Tablero</Text>
 
       {cargando ? (
-        <ActivityIndicator size="large" color="#4f46e5" style={{ marginTop: 40 }} />
+        <ActivityIndicator size="large" color={c.accent} style={{ marginTop: 40 }} />
       ) : error ? (
         <Text style={styles.error}>{error}</Text>
       ) : stats ? (
-        <View style={styles.grid}>
-          <Tarjeta valor={stats.usuarios} etiqueta="Usuarios" color="#4f46e5" />
-          <Tarjeta valor={stats.negocios} etiqueta="Negocios" color="#4f46e5" />
-          <Tarjeta valor={stats.negocios_activos} etiqueta="Abiertos" color="#16a34a" />
-          <Tarjeta valor={stats.productos} etiqueta="Productos" color="#4f46e5" />
-        </View>
+        <FadeInView style={styles.grid}>
+          <Tarjeta valor={stats.usuarios} etiqueta="Usuarios" color={c.goldText} />
+          <Tarjeta valor={stats.negocios} etiqueta="Negocios" color={c.goldText} />
+          <Tarjeta valor={stats.negocios_activos} etiqueta="Abiertos" color={c.success} />
+          <Tarjeta valor={stats.productos} etiqueta="Productos" color={c.goldText} />
+        </FadeInView>
       ) : null}
 
-      <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('AdminUsuarios')}>
-        <Icon name="usuarios" size={24} color="#4f46e5" style={styles.itemEmoji} />
-        <Text style={styles.itemTitulo}>Usuarios y roles</Text>
-        <Icon name="chevron" size={20} color="#cbd5e1" />
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('AdminNegocios')}>
-        <Icon name="tienda" size={24} color="#4f46e5" style={styles.itemEmoji} />
-        <Text style={styles.itemTitulo}>Todos los negocios</Text>
-        <Icon name="chevron" size={20} color="#cbd5e1" />
-      </TouchableOpacity>
+      <FadeInView delay={80}>
+        <PressableScale style={styles.item} onPress={() => navigation.navigate('AdminUsuarios')}>
+          <Icon name="usuarios" size={24} color={c.accent} style={styles.itemEmoji} />
+          <Text style={styles.itemTitulo}>Usuarios y roles</Text>
+          <Icon name="chevron" size={20} color={c.chevron} />
+        </PressableScale>
+      </FadeInView>
+      <FadeInView delay={140}>
+        <PressableScale style={styles.item} onPress={() => navigation.navigate('AdminNegocios')}>
+          <Icon name="tienda" size={24} color={c.accent} style={styles.itemEmoji} />
+          <Text style={styles.itemTitulo}>Todos los negocios</Text>
+          <Icon name="chevron" size={20} color={c.chevron} />
+        </PressableScale>
+      </FadeInView>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f1f5f9' },
-  titulo: { fontSize: 22, fontWeight: 'bold', color: '#0f172a', marginBottom: 16 },
+  container: { flex: 1, backgroundColor: c.bg },
+  titulo: { fontSize: 22, fontFamily: font.display, color: c.textStrong, marginBottom: 16 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 8 },
   tarjeta: {
-    backgroundColor: '#fff', borderRadius: 16, padding: 18, width: '47%',
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
+    backgroundColor: c.surface, borderRadius: radius.lg, padding: 18, width: '47%', ...shadow.soft,
   },
-  valor: { fontSize: 30, fontWeight: 'bold' },
-  etiqueta: { color: '#64748b', marginTop: 4 },
+  valor: { fontSize: 30, fontFamily: font.extra },
+  etiqueta: { color: c.muted, marginTop: 4, fontFamily: font.medium },
   item: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff',
-    borderRadius: 14, padding: 16, marginTop: 12,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, elevation: 1,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: c.surface,
+    borderRadius: radius.md, padding: 16, marginTop: 12, ...shadow.low,
   },
-  itemEmoji: { fontSize: 24, marginRight: 12 },
-  itemTitulo: { flex: 1, fontSize: 16, fontWeight: '600', color: '#0f172a' },
-  chevron: { fontSize: 26, color: '#cbd5e1' },
-  error: { color: '#b91c1c', backgroundColor: '#fee2e2', padding: 12, borderRadius: 10, marginTop: 16 },
+  itemEmoji: { marginRight: 12 },
+  itemTitulo: { flex: 1, fontSize: 16, fontFamily: font.semibold, color: c.textStrong },
+  error: { color: c.danger, backgroundColor: c.dangerSoft, padding: 12, borderRadius: radius.sm, marginTop: 16, fontFamily: font.medium },
 });

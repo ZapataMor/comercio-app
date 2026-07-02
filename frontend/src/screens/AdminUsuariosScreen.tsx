@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { AdminUsuario, cambiarRol, crearUsuario, getAdminUsuarios } from '../api';
 import { useAuth } from '../AuthContext';
+import { FadeInView, PressableScale } from '../components/anim';
+import { c, font, radius, shadow } from '../theme';
 import { useToast } from '../Toast';
 
 export default function AdminUsuariosScreen() {
@@ -92,10 +94,10 @@ export default function AdminUsuariosScreen() {
         </TouchableOpacity>
         {mostrarForm && (
           <View style={{ marginTop: 10 }}>
-            <TextInput style={styles.input} placeholder="Nombre" value={nombre} onChangeText={setNombre} />
-            <TextInput style={styles.input} placeholder="Correo" value={email} onChangeText={setEmail}
+            <TextInput style={styles.input} placeholder="Nombre" placeholderTextColor={c.mutedSoft} value={nombre} onChangeText={setNombre} />
+            <TextInput style={styles.input} placeholder="Correo" placeholderTextColor={c.mutedSoft} value={email} onChangeText={setEmail}
               autoCapitalize="none" keyboardType="email-address" />
-            <TextInput style={styles.input} placeholder="Contraseña (mín. 8)" value={password} onChangeText={setPassword} />
+            <TextInput style={styles.input} placeholder="Contraseña (mín. 8)" placeholderTextColor={c.mutedSoft} value={password} onChangeText={setPassword} />
             <View style={styles.chips}>
               {roles.map(r => (
                 <TouchableOpacity key={r} onPress={() => setFormRol(r)}
@@ -104,9 +106,9 @@ export default function AdminUsuariosScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-            <TouchableOpacity style={styles.btn} onPress={onCrear} disabled={enviando}>
-              {enviando ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnTxt}>Crear usuario</Text>}
-            </TouchableOpacity>
+            <PressableScale style={styles.btn} onPress={onCrear} disabled={enviando}>
+              {enviando ? <ActivityIndicator color={c.onBrand} /> : <Text style={styles.btnTxt}>Crear usuario</Text>}
+            </PressableScale>
           </View>
         )}
       </View>
@@ -131,7 +133,7 @@ export default function AdminUsuariosScreen() {
 
       {/* Lista */}
       {cargando ? (
-        <ActivityIndicator size="large" color="#4f46e5" style={{ marginTop: 40 }} />
+        <ActivityIndicator size="large" color={c.accent} style={{ marginTop: 40 }} />
       ) : (
         <FlatList
           data={usuarios}
@@ -141,23 +143,26 @@ export default function AdminUsuariosScreen() {
             <RefreshControl
               refreshing={refrescando}
               onRefresh={() => cargar(rolActual, true)}
-              colors={['#4f46e5']}
+              colors={[c.accent]}
+              tintColor={c.accent}
             />
           }
           ListEmptyComponent={<Text style={styles.vacio}>No hay usuarios de este tipo.</Text>}
-          renderItem={({ item }) => (
-            <View style={styles.card}>
-              <Text style={styles.nombre}>{item.name}</Text>
-              <Text style={styles.email}>{item.email}</Text>
-              <View style={styles.chips}>
-                {roles.map(r => (
-                  <TouchableOpacity key={r} onPress={() => onCambiarRol(item, r)}
-                    style={[styles.chip, item.rol === r && styles.chipOn]}>
-                    <Text style={[styles.chipTxt, item.rol === r && styles.chipTxtOn]}>{r}</Text>
-                  </TouchableOpacity>
-                ))}
+          renderItem={({ item, index }) => (
+            <FadeInView delay={Math.min(index, 8) * 40}>
+              <View style={styles.card}>
+                <Text style={styles.nombre}>{item.name}</Text>
+                <Text style={styles.email}>{item.email}</Text>
+                <View style={styles.chips}>
+                  {roles.map(r => (
+                    <TouchableOpacity key={r} onPress={() => onCambiarRol(item, r)}
+                      style={[styles.chip, item.rol === r && styles.chipOn]}>
+                      <Text style={[styles.chipTxt, item.rol === r && styles.chipTxtOn]}>{r}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
-            </View>
+            </FadeInView>
           )}
         />
       )}
@@ -166,27 +171,26 @@ export default function AdminUsuariosScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f1f5f9' },
-  formBox: { backgroundColor: '#fff', padding: 16, margin: 16, marginBottom: 8, borderRadius: 16 },
-  formToggle: { color: '#4f46e5', fontWeight: '700' },
-  input: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 8 },
-  btn: { backgroundColor: '#4f46e5', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 4 },
-  btnTxt: { color: '#fff', fontWeight: '700' },
+  container: { flex: 1, backgroundColor: c.bg },
+  formBox: { backgroundColor: c.surface, padding: 16, margin: 16, marginBottom: 8, borderRadius: radius.lg, ...shadow.low },
+  formToggle: { color: c.goldText, fontFamily: font.bold },
+  input: { borderWidth: 1, borderColor: c.borderStrong, borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 8, color: c.textStrong, fontFamily: font.regular },
+  btn: { backgroundColor: c.brand, borderRadius: radius.sm, paddingVertical: 12, alignItems: 'center', marginTop: 4 },
+  btnTxt: { color: c.onBrand, fontFamily: font.bold },
   tabs: { flexGrow: 0, marginBottom: 4 },
-  tab: { backgroundColor: '#fff', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
-  tabOn: { backgroundColor: '#4f46e5' },
-  tabTxt: { color: '#475569', fontSize: 13, fontWeight: '600' },
-  tabTxtOn: { color: '#fff' },
+  tab: { backgroundColor: c.surface, borderRadius: radius.pill, paddingHorizontal: 14, paddingVertical: 8, ...shadow.low },
+  tabOn: { backgroundColor: c.brand },
+  tabTxt: { color: c.muted, fontSize: 13, fontFamily: font.semibold },
+  tabTxtOn: { color: c.onBrand },
   card: {
-    backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, elevation: 1,
+    backgroundColor: c.surface, borderRadius: radius.md, padding: 14, marginBottom: 10, ...shadow.low,
   },
-  nombre: { fontSize: 15, fontWeight: '700', color: '#0f172a' },
-  email: { color: '#64748b', fontSize: 13, marginTop: 2 },
+  nombre: { fontSize: 15, fontFamily: font.bold, color: c.textStrong },
+  email: { color: c.muted, fontSize: 13, marginTop: 2, fontFamily: font.regular },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
-  chip: { backgroundColor: '#f1f5f9', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
-  chipOn: { backgroundColor: '#4f46e5' },
-  chipTxt: { fontSize: 11, color: '#475569', fontWeight: '600' },
-  chipTxtOn: { color: '#fff' },
-  vacio: { textAlign: 'center', color: '#64748b', marginTop: 40 },
+  chip: { backgroundColor: c.surface2, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 5 },
+  chipOn: { backgroundColor: c.accent },
+  chipTxt: { fontSize: 11, color: c.muted, fontFamily: font.semibold },
+  chipTxtOn: { color: c.onAccent },
+  vacio: { textAlign: 'center', color: c.muted, marginTop: 40, fontFamily: font.regular },
 });
