@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\ProductoResource;
 use App\Models\Negocio;
 use App\Models\Producto;
+use App\Models\TipoNegocio;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -30,6 +31,11 @@ class CatalogoController extends Controller
         $query = Negocio::query()
             ->with('tiposNegocio')
             ->withCount(['productos' => fn ($q) => $q->where('disponible', true)]);
+
+        if ($request->filled('tipo_negocio_id')) {
+            $tipoId = $request->integer('tipo_negocio_id');
+            $query->whereHas('tiposNegocio', fn ($q) => $q->where('tipos_negocio.id', $tipoId));
+        }
 
         if ($request->filled('buscar')) {
             $texto = trim((string) $request->string('buscar'));
@@ -78,6 +84,17 @@ class CatalogoController extends Controller
         ]);
     }
 
+    /** Tipos de negocio disponibles para filtrar la exploracion del cliente. */
+    public function tiposNegocio(): JsonResponse
+    {
+        $tipos = TipoNegocio::query()
+            ->whereHas('negocios')
+            ->orderBy('nombre')
+            ->get(['id', 'nombre', 'slug']);
+
+        return response()->json(['categorias' => $tipos]);
+    }
+
     /**
      * Búsqueda de PRODUCTOS para el cliente (app móvil).
      *
@@ -90,9 +107,10 @@ class CatalogoController extends Controller
     public function buscarProductos(Request $request): JsonResponse
     {
         $texto = trim((string) $request->string('buscar'));
+        $tipoNegocioId = $request->integer('tipo_negocio_id') ?: null;
 
-        // Sin texto no buscamos productos (la app muestra negocios en su lugar).
-        if ($texto === '') {
+        // Sin texto ni categoria no buscamos productos (la app muestra negocios).
+        if ($texto === '' && ! $tipoNegocioId) {
             return response()->json(['productos' => []]);
         }
 
@@ -100,11 +118,17 @@ class CatalogoController extends Controller
 
         $productos = Producto::query()
             ->where('disponible', true)
-            ->whereHas('negocio')
-            ->where(function ($q) use ($texto, $like) {
-                $q->where('nombre', 'like', $like)
-                    ->orWhere('descripcion', 'like', $like)
-                    ->orWhereHas('categoria', fn ($c) => $c->where('nombre', 'like', $like));
+            ->whereHas('negocio', function ($q) use ($tipoNegocioId) {
+                if ($tipoNegocioId) {
+                    $q->whereHas('tiposNegocio', fn ($t) => $t->where('tipos_negocio.id', $tipoNegocioId));
+                }
+            })
+            ->when($texto !== '', function ($q) use ($like) {
+                $q->where(function ($qq) use ($like) {
+                    $qq->where('nombre', 'like', $like)
+                        ->orWhere('descripcion', 'like', $like)
+                        ->orWhereHas('categoria', fn ($c) => $c->where('nombre', 'like', $like));
+                });
             })
             ->with(['categoria', 'negocio'])
             ->orderByDesc(

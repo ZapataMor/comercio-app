@@ -40,6 +40,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/device-tokens', [DeviceTokenController::class, 'destroy']);
 
     // --- Catálogo público (cliente): explorar negocios y ver productos ---
+    Route::get('/tipos-negocio', [CatalogoController::class, 'tiposNegocio']);
     Route::get('/negocios', [CatalogoController::class, 'index']);
     // Búsqueda de productos (por relevancia) con el negocio que los vende.
     Route::get('/productos', [CatalogoController::class, 'buscarProductos']);

@@ -28,6 +28,7 @@ export type Negocio = {
 };
 
 export type Categoria = { id: number; nombre: string; productos?: number };
+export type TipoNegocio = { id: number; nombre: string; slug: string };
 
 export type Producto = {
   id: number;
@@ -474,10 +475,12 @@ export async function getNegocios(
   token: string,
   buscar?: string,
   pagina = 1,
+  tipoNegocioId?: number | null,
 ): Promise<NegociosPagina> {
   const params = new URLSearchParams();
   if (buscar && buscar.trim()) params.set('buscar', buscar.trim());
   if (pagina > 1) params.set('page', String(pagina));
+  if (tipoNegocioId != null) params.set('tipo_negocio_id', String(tipoNegocioId));
   const q = params.toString() ? `?${params.toString()}` : '';
   const data = await authGet(`/api/negocios${q}`, token);
   const negocios = (data.negocios ?? []) as NegocioLista[];
@@ -494,15 +497,27 @@ export type ProductoConNegocio = Producto & {
   negocio: { id: number; nombre: string; abierto: boolean };
 };
 
+export async function getTiposNegocio(token: string): Promise<TipoNegocio[]> {
+  const data = await authGet('/api/tipos-negocio', token);
+  return (data.categorias ?? []) as TipoNegocio[];
+}
+
 /**
  * Búsqueda de productos para el cliente. Devuelve los productos disponibles de
  * negocios abiertos que coinciden con `buscar`, ordenados por relevancia (de la
  * coincidencia más cercana a la más lejana). Sin texto devuelve lista vacía.
  */
-export async function buscarProductos(token: string, buscar: string): Promise<ProductoConNegocio[]> {
+export async function buscarProductos(
+  token: string,
+  buscar: string,
+  tipoNegocioId?: number | null,
+): Promise<ProductoConNegocio[]> {
   const texto = buscar.trim();
-  if (!texto) return [];
-  const data = await authGet(`/api/productos?buscar=${encodeURIComponent(texto)}`, token);
+  if (!texto && tipoNegocioId == null) return [];
+  const params = new URLSearchParams();
+  if (texto) params.set('buscar', texto);
+  if (tipoNegocioId != null) params.set('tipo_negocio_id', String(tipoNegocioId));
+  const data = await authGet(`/api/productos?${params.toString()}`, token);
   return (data.productos ?? []) as ProductoConNegocio[];
 }
 

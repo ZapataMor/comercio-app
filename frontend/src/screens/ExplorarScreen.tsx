@@ -5,6 +5,7 @@ import {
   FlatList,
   Image,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -14,9 +15,11 @@ import {
 import {
   buscarProductos,
   getNegocios,
+  getTiposNegocio,
   imagenUrl,
   NegocioLista,
   ProductoConNegocio,
+  TipoNegocio,
 } from '../api';
 import { useAuth } from '../AuthContext';
 import { CardSkeletons, Desplegable, FadeInView, PressableScale } from '../components/anim';
@@ -38,6 +41,8 @@ export default function ExplorarScreen({ navigation }: Props) {
   const { auth } = useAuth();
   const [negocios, setNegocios] = useState<NegocioLista[]>([]);
   const [productos, setProductos] = useState<ProductoConNegocio[]>([]);
+  const [tiposNegocio, setTiposNegocio] = useState<TipoNegocio[]>([]);
+  const [tipoSeleccionadoId, setTipoSeleccionadoId] = useState<number | null>(null);
   const [cargando, setCargando] = useState(true);
   const [cargandoMas, setCargandoMas] = useState(false);
   const [refrescando, setRefrescando] = useState(false);
@@ -58,17 +63,25 @@ export default function ExplorarScreen({ navigation }: Props) {
     setExpandidaId(prev => (prev === id ? null : id));
   }, []);
 
-  // Con texto buscamos PRODUCTOS; sin texto mostramos todos los negocios.
-  const buscando = busqueda.trim().length > 0;
+  // Con texto solo buscamos productos; con categoria seleccionada mostramos negocios filtrados.
+  const mostrandoProductos = busqueda.trim().length > 0 && tipoSeleccionadoId == null;
+  const tipoSeleccionado = tiposNegocio.find(tipo => tipo.id === tipoSeleccionadoId) ?? null;
+
+  useEffect(() => {
+    if (!auth?.token) return;
+    getTiposNegocio(auth.token)
+      .then(setTiposNegocio)
+      .catch(() => {});
+  }, [auth]);
 
   const cargar = useCallback(
     (texto: string, refresco = false) => {
       refresco ? setRefrescando(true) : setCargando(true);
       setError(null);
       const t = texto.trim();
-      const peticion = t
+      const peticion = t && tipoSeleccionadoId == null
         ? buscarProductos(auth!.token, t).then(setProductos)
-        : getNegocios(auth!.token).then(p => {
+        : getNegocios(auth!.token, t || undefined, 1, tipoSeleccionadoId).then(p => {
             setNegocios(p.negocios);
             setPagina(p.pagina);
             setUltimaPagina(p.ultimaPagina);
@@ -80,16 +93,16 @@ export default function ExplorarScreen({ navigation }: Props) {
           setRefrescando(false);
         });
     },
-    [auth],
+    [auth, tipoSeleccionadoId],
   );
 
   // Carga la siguiente página de negocios al llegar al final de la lista.
   const cargarMas = useCallback(() => {
-    if (buscando || cargando || refrescando) return;
+    if (mostrandoProductos || cargando || refrescando) return;
     if (cargandoMasRef.current || pagina >= ultimaPagina) return;
     cargandoMasRef.current = true;
     setCargandoMas(true);
-    getNegocios(auth!.token, undefined, pagina + 1)
+    getNegocios(auth!.token, busqueda.trim() || undefined, pagina + 1, tipoSeleccionadoId)
       .then(p => {
         setNegocios(prev => {
           // Evita duplicados si una página se repite (p. ej. tras un refresco).
@@ -104,20 +117,20 @@ export default function ExplorarScreen({ navigation }: Props) {
         cargandoMasRef.current = false;
         setCargandoMas(false);
       });
-  }, [auth, buscando, cargando, refrescando, pagina, ultimaPagina]);
+  }, [auth, mostrandoProductos, cargando, refrescando, pagina, ultimaPagina, tipoSeleccionadoId, busqueda]);
 
   // Búsqueda con "debounce": espera 350 ms tras dejar de teclear.
   useEffect(() => {
     const t = setTimeout(() => cargar(busqueda), 350);
     return () => clearTimeout(t);
-  }, [busqueda, cargar]);
+  }, [busqueda, tipoSeleccionadoId, cargar]);
 
   return (
     <FlatList<NegocioLista | ProductoConNegocio>
       style={styles.container}
-      data={cargando ? [] : buscando ? productos : negocios}
-      keyExtractor={item => String(item.id)}
-      extraData={expandidaId}
+      data={cargando ? [] : mostrandoProductos ? productos : negocios}
+      keyExtractor={item => `${mostrandoProductos ? 'p' : 'n'}-${item.id}`}
+      extraData={`${expandidaId}-${tipoSeleccionadoId}`}
       // Aire abajo para la barra flotante fija (Carrito / Mis pedidos).
       contentContainerStyle={{ padding: 16, paddingBottom: 110 }}
       keyboardShouldPersistTaps="handled"
@@ -151,6 +164,35 @@ export default function ExplorarScreen({ navigation }: Props) {
             )}
           </View>
 
+          {tiposNegocio.length > 0 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.categoriasFiltro}
+              contentContainerStyle={styles.categoriasFiltroContent}>
+              <TouchableOpacity
+                style={[styles.filtroChip, tipoSeleccionadoId == null && styles.filtroChipActivo]}
+                onPress={() => setTipoSeleccionadoId(null)}>
+                <Text style={[styles.filtroChipTxt, tipoSeleccionadoId == null && styles.filtroChipTxtActivo]}>
+                  Todos
+                </Text>
+              </TouchableOpacity>
+              {tiposNegocio.map(tipo => {
+                const activa = tipo.id === tipoSeleccionadoId;
+                return (
+                  <TouchableOpacity
+                    key={tipo.id}
+                    style={[styles.filtroChip, activa && styles.filtroChipActivo]}
+                    onPress={() => setTipoSeleccionadoId(prev => (prev === tipo.id ? null : tipo.id))}>
+                    <Text style={[styles.filtroChipTxt, activa && styles.filtroChipTxtActivo]}>
+                      {tipo.nombre}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          )}
+
           {cargando && <CardSkeletons count={4} />}
           {error ? <Text style={styles.error}>{error}</Text> : null}
         </View>
@@ -165,12 +207,18 @@ export default function ExplorarScreen({ navigation }: Props) {
       ListEmptyComponent={
         !cargando ? (
           <Text style={styles.vacio}>
-            {buscando ? `Sin resultados para "${busqueda}".` : 'Aún no hay negocios registrados.'}
+            {mostrandoProductos
+              ? busqueda.trim()
+                ? `Sin resultados para "${busqueda}".`
+                : 'Sin productos.'
+              : tipoSeleccionado
+                ? `Sin negocios en ${tipoSeleccionado.nombre}.`
+              : 'Aún no hay negocios registrados.'}
           </Text>
         ) : null
       }
       renderItem={({ item, index }) =>
-        buscando ? (
+        mostrandoProductos ? (
           renderProducto(item as ProductoConNegocio, navigation, index)
         ) : (
           <CardNegocio
@@ -328,6 +376,19 @@ const styles = StyleSheet.create({
   },
   lupa: { fontSize: 15, marginRight: 6 },
   buscador: { flex: 1, paddingVertical: 11, fontSize: 15, color: c.textStrong, fontFamily: font.regular },
+  categoriasFiltro: { marginBottom: 12 },
+  categoriasFiltroContent: { gap: 8, paddingRight: 18 },
+  filtroChip: {
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    borderRadius: radius.pill,
+    backgroundColor: c.surface,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+  },
+  filtroChipActivo: { backgroundColor: c.brand, borderColor: c.brand },
+  filtroChipTxt: { color: c.text, fontFamily: font.semibold, fontSize: 13 },
+  filtroChipTxtActivo: { color: c.onBrand },
   card: {
     backgroundColor: c.surface, borderRadius: radius.lg, padding: 16, marginBottom: 12, ...shadow.soft,
   },

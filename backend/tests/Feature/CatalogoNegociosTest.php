@@ -56,6 +56,40 @@ test('el listado incluye todos los negocios, abiertos y cerrados', function () {
     expect($negocios->firstWhere('nombre', 'Cerrado SA')['abierto'])->toBeFalse();
 });
 
+test('lista los tipos de negocio disponibles para filtrar', function () {
+    clienteCatalogo();
+
+    $dueno = User::factory()->create();
+    $negocio = $dueno->negocio()->create(['nombre' => 'Pan Dorado', 'activo' => true]);
+    $panaderia = TipoNegocio::firstOrCreate(['slug' => 'panaderia'], ['nombre' => 'Panadería']);
+    $negocio->tiposNegocio()->attach($panaderia->id);
+
+    $this->getJson('/api/tipos-negocio')
+        ->assertOk()
+        ->assertJsonPath('categorias.0.nombre', 'Panadería');
+});
+
+test('se pueden filtrar negocios por tipo de negocio', function () {
+    clienteCatalogo();
+
+    $panaderia = TipoNegocio::firstOrCreate(['slug' => 'panaderia'], ['nombre' => 'Panadería']);
+    $ferreteria = TipoNegocio::firstOrCreate(['slug' => 'ferreteria'], ['nombre' => 'Ferretería']);
+
+    $duenoPan = User::factory()->create();
+    $negocioPan = $duenoPan->negocio()->create(['nombre' => 'Pan Dorado', 'activo' => true]);
+    $negocioPan->tiposNegocio()->attach($panaderia->id);
+
+    $duenoFerre = User::factory()->create();
+    $negocioFerre = $duenoFerre->negocio()->create(['nombre' => 'El Tornillo', 'activo' => true]);
+    $negocioFerre->tiposNegocio()->attach($ferreteria->id);
+
+    $resp = $this->getJson("/api/negocios?tipo_negocio_id={$panaderia->id}")
+        ->assertOk();
+
+    expect($resp->json('negocios'))->toHaveCount(1);
+    expect($resp->json('negocios.0.nombre'))->toBe('Pan Dorado');
+});
+
 test('el listado se pagina de 50 en 50', function () {
     clienteCatalogo();
 
