@@ -18,7 +18,9 @@ import {
 import { useAuth } from '../AuthContext';
 import { useCart } from '../CartContext';
 import { FadeInView, PressableScale } from '../components/anim';
+import FieldError from '../components/FieldError';
 import Icon from '../components/Icon';
+import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
 import { c, font, radius, shadow } from '../theme';
 import { useToast } from '../Toast';
@@ -46,6 +48,15 @@ export default function CheckoutScreen({ navigation }: Props) {
   const [telefono, setTelefono] = useState('');
   const [pago, setPago] = useState('efectivo');
   const [enviando, setEnviando] = useState(false);
+  const [errores, setErrores] = useState<FieldErrors>({});
+
+  function limpiarError(campo: string) {
+    setErrores(prev => {
+      const next = { ...prev };
+      delete next[campo];
+      return next;
+    });
+  }
 
   useEffect(() => {
     let activo = true;
@@ -80,16 +91,20 @@ export default function CheckoutScreen({ navigation }: Props) {
   );
 
   async function confirmar() {
+    setErrores({});
     if (!telefono.trim()) {
-      toast.error('Faltan datos', 'Escribe el telefono de contacto.');
+      setErrores({ telefono: 'El campo telefono de contacto es obligatorio.' });
       return;
     }
 
     let direccionEntrega = ubicacionSeleccionada ? textoUbicacion(ubicacionSeleccionada) : '';
 
     if (seleccion === 'nueva') {
-      if (!nuevaDireccion.trim() || !nuevoBarrio.trim()) {
-        toast.error('Faltan datos', 'Escribe la nueva direccion y el barrio.');
+      const nuevosErrores: FieldErrors = {};
+      if (!nuevaDireccion.trim()) nuevosErrores.nuevaDireccion = 'El campo direccion es obligatorio.';
+      if (!nuevoBarrio.trim()) nuevosErrores.nuevoBarrio = 'El campo barrio es obligatorio.';
+      if (Object.keys(nuevosErrores).length > 0) {
+        setErrores(nuevosErrores);
         return;
       }
       direccionEntrega = textoUbicacion({
@@ -99,7 +114,7 @@ export default function CheckoutScreen({ navigation }: Props) {
     }
 
     if (!direccionEntrega) {
-      toast.error('Faltan datos', 'Selecciona o agrega una ubicacion de entrega.');
+      setErrores({ ubicacion: 'Selecciona o agrega una ubicacion de entrega.' });
       return;
     }
 
@@ -125,7 +140,18 @@ export default function CheckoutScreen({ navigation }: Props) {
       toast.exito('Pedido confirmado', 'El negocio ya recibio tu pedido.');
       navigation.navigate('MisPedidos');
     } catch (e) {
-      toast.error('No se pudo confirmar', e instanceof Error ? e.message : 'Error');
+      const campos = fieldErrorsFromError(e, {
+        direccion: 'nuevaDireccion',
+        barrio: 'nuevoBarrio',
+        direccion_entrega: 'ubicacion',
+        telefono_contacto: 'telefono',
+        metodo_pago: 'pago',
+      });
+      if (Object.keys(campos).length > 0) {
+        setErrores(campos);
+      } else {
+        toast.error('No se pudo confirmar', messageFromError(e, 'Error'));
+      }
     } finally {
       setEnviando(false);
     }
@@ -165,7 +191,10 @@ export default function CheckoutScreen({ navigation }: Props) {
               <TouchableOpacity
                 key={d.id}
                 style={[styles.ubicacion, activa && styles.ubicacionOn]}
-                onPress={() => setSeleccion(d.id)}>
+                onPress={() => {
+                  setSeleccion(d.id);
+                  limpiarError('ubicacion');
+                }}>
                 <View style={styles.ubicacionIcono}>
                   <Icon name={activa ? 'check' : 'ubicacion'} size={18} color={activa ? c.onAccent : c.muted} />
                 </View>
@@ -183,7 +212,10 @@ export default function CheckoutScreen({ navigation }: Props) {
 
           <TouchableOpacity
             style={[styles.ubicacion, seleccion === 'nueva' && styles.ubicacionOn]}
-            onPress={() => setSeleccion('nueva')}>
+            onPress={() => {
+              setSeleccion('nueva');
+              limpiarError('ubicacion');
+            }}>
             <View style={styles.ubicacionIcono}>
               <Icon name={seleccion === 'nueva' ? 'check' : 'ubicacion'} size={18} color={seleccion === 'nueva' ? c.onAccent : c.muted} />
             </View>
@@ -198,28 +230,41 @@ export default function CheckoutScreen({ navigation }: Props) {
           </TouchableOpacity>
         </View>
       )}
+      <FieldError mensaje={errores.ubicacion} />
 
       {seleccion === 'nueva' ? (
         <View style={styles.nuevaBox}>
           <TextInput
             style={styles.input}
             value={nuevaDireccion}
-            onChangeText={setNuevaDireccion}
+            onChangeText={valor => {
+              setNuevaDireccion(valor);
+              limpiarError('nuevaDireccion');
+            }}
             placeholder="Calle, numero, referencia"
             placeholderTextColor={c.mutedSoft}
           />
+          <FieldError mensaje={errores.nuevaDireccion} />
           <TextInput
             style={styles.input}
             value={nuevoBarrio}
-            onChangeText={setNuevoBarrio}
+            onChangeText={valor => {
+              setNuevoBarrio(valor);
+              limpiarError('nuevoBarrio');
+            }}
             placeholder="Barrio"
             placeholderTextColor={c.mutedSoft}
           />
+          <FieldError mensaje={errores.nuevoBarrio} />
         </View>
       ) : null}
 
       <Text style={styles.label}>Telefono de contacto</Text>
-      <TextInput style={styles.input} value={telefono} onChangeText={setTelefono} placeholder="300 123 4567" placeholderTextColor={c.mutedSoft} keyboardType="phone-pad" />
+      <TextInput style={styles.input} value={telefono} onChangeText={valor => {
+        setTelefono(valor);
+        limpiarError('telefono');
+      }} placeholder="300 123 4567" placeholderTextColor={c.mutedSoft} keyboardType="phone-pad" />
+      <FieldError mensaje={errores.telefono} />
 
       <Text style={styles.label}>Forma de pago</Text>
       <View style={styles.pagos}>
@@ -230,12 +275,16 @@ export default function CheckoutScreen({ navigation }: Props) {
           <TouchableOpacity
             key={op.v}
             style={[styles.pago, pago === op.v && styles.pagoOn]}
-            onPress={() => setPago(op.v)}>
+            onPress={() => {
+              setPago(op.v);
+              limpiarError('pago');
+            }}>
             <Icon name={op.icon} size={20} color={pago === op.v ? c.onAccent : c.muted} />
             <Text style={[styles.pagoTxt, pago === op.v && styles.pagoTxtOn]}>{op.t}</Text>
           </TouchableOpacity>
         ))}
       </View>
+      <FieldError mensaje={errores.pago} />
 
       <PressableScale style={styles.btn} onPress={confirmar} disabled={enviando || cargandoDirecciones}>
         {enviando ? (

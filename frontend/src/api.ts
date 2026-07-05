@@ -69,11 +69,25 @@ export function imagenUrl(path?: string | null): string | undefined {
 }
 
 /** Error de API que conserva el código HTTP (para distinguir 404, 422, etc.). */
+export type ApiValidationErrors = Record<string, string[]>;
+
+function validationErrors(data: any): ApiValidationErrors | undefined {
+  if (!data?.errors || typeof data.errors !== 'object') return undefined;
+  return data.errors as ApiValidationErrors;
+}
+
+function firstValidationMessage(errors?: ApiValidationErrors): string | undefined {
+  if (!errors) return undefined;
+  return (Object.values(errors)[0] as string[] | undefined)?.[0];
+}
+
 export class ApiError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  errors?: ApiValidationErrors;
+  constructor(message: string, status: number, errors?: ApiValidationErrors) {
     super(message);
     this.status = status;
+    this.errors = errors;
   }
 }
 
@@ -100,7 +114,8 @@ export async function login(email: string, password: string): Promise<LoginRespo
   const data = await res.json().catch(() => ({} as any));
 
   if (!res.ok) {
-    throw new Error(data?.message ?? 'No se pudo iniciar sesión.');
+    const errors = validationErrors(data);
+    throw new ApiError(firstValidationMessage(errors) ?? data?.message ?? 'No se pudo iniciar sesión.', res.status, errors);
   }
 
   return data as LoginResponse;
@@ -141,11 +156,8 @@ export async function register(body: {
 
   if (!res.ok) {
     // El backend puede devolver errores de validación en data.errors.
-    const primero =
-      data?.errors && typeof data.errors === 'object'
-        ? (Object.values(data.errors)[0] as string[])?.[0]
-        : undefined;
-    throw new Error(primero ?? data?.message ?? 'No se pudo crear la cuenta.');
+    const errors = validationErrors(data);
+    throw new ApiError(firstValidationMessage(errors) ?? data?.message ?? 'No se pudo crear la cuenta.', res.status, errors);
   }
 
   return data as LoginResponse;
@@ -163,7 +175,8 @@ async function authGet(path: string, token: string): Promise<any> {
   }
   const data = await res.json().catch(() => ({} as any));
   if (!res.ok) {
-    throw new ApiError(data?.message ?? 'Error en la petición.', res.status);
+    const errors = validationErrors(data);
+    throw new ApiError(firstValidationMessage(errors) ?? data?.message ?? 'Error en la petición.', res.status, errors);
   }
   return data;
 }
@@ -187,11 +200,8 @@ async function authSend(method: 'POST' | 'PUT' | 'DELETE', path: string, token: 
   const data = await res.json().catch(() => ({} as any));
   if (!res.ok) {
     // Si hay errores de validación, mostramos el primero (más útil que el genérico).
-    const primero =
-      data?.errors && typeof data.errors === 'object'
-        ? (Object.values(data.errors)[0] as string[])?.[0]
-        : undefined;
-    throw new ApiError(primero ?? data?.message ?? 'Error en la petición.', res.status);
+    const errors = validationErrors(data);
+    throw new ApiError(firstValidationMessage(errors) ?? data?.message ?? 'Error en la petición.', res.status, errors);
   }
   return data;
 }
@@ -241,11 +251,8 @@ async function authUpload(
   }
   const data = await res.json().catch(() => ({} as any));
   if (!res.ok) {
-    const primero =
-      data?.errors && typeof data.errors === 'object'
-        ? (Object.values(data.errors)[0] as string[])?.[0]
-        : undefined;
-    throw new ApiError(primero ?? data?.message ?? 'Error en la petición.', res.status);
+    const errors = validationErrors(data);
+    throw new ApiError(firstValidationMessage(errors) ?? data?.message ?? 'Error en la petición.', res.status, errors);
   }
   return data;
 }

@@ -12,6 +12,8 @@ import {
 import { AdminUsuario, cambiarRol, crearUsuario, getAdminUsuarios } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
+import FieldError from '../components/FieldError';
+import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { c, font, radius, shadow } from '../theme';
 import { useToast } from '../Toast';
 
@@ -34,6 +36,15 @@ export default function AdminUsuariosScreen() {
   const [password, setPassword] = useState('');
   const [formRol, setFormRol] = useState('usuario');
   const [enviando, setEnviando] = useState(false);
+  const [errores, setErrores] = useState<FieldErrors>({});
+
+  function limpiarError(campo: string) {
+    setErrores(prev => {
+      const next = { ...prev };
+      delete next[campo];
+      return next;
+    });
+  }
 
   const cargar = useCallback(
     (rol: string, refresco = false) => {
@@ -69,17 +80,34 @@ export default function AdminUsuariosScreen() {
   }
 
   async function onCrear() {
+    setErrores({});
+    const nuevosErrores: FieldErrors = {};
+    if (!nombre.trim()) nuevosErrores.name = 'El campo nombre es obligatorio.';
+    if (!email.trim()) nuevosErrores.email = 'El campo correo es obligatorio.';
+    if (!password) nuevosErrores.password = 'El campo contrasena es obligatorio.';
+    if (!formRol) nuevosErrores.rol = 'Selecciona un rol.';
+    if (Object.keys(nuevosErrores).length > 0) {
+      setErrores(nuevosErrores);
+      return;
+    }
+
     setEnviando(true);
     try {
       await crearUsuario(token, { name: nombre, email, password, rol: formRol });
       setNombre('');
       setEmail('');
       setPassword('');
+      setErrores({});
       setMostrarForm(false);
       cargar(formRol);
       toast.exito('Listo', 'Usuario creado.');
     } catch (e) {
-      toast.error('No se pudo crear', e instanceof Error ? e.message : 'Error');
+      const campos = fieldErrorsFromError(e);
+      if (Object.keys(campos).length > 0) {
+        setErrores(campos);
+      } else {
+        toast.error('No se pudo crear', messageFromError(e, 'Error'));
+      }
     } finally {
       setEnviando(false);
     }
@@ -94,18 +122,34 @@ export default function AdminUsuariosScreen() {
         </TouchableOpacity>
         {mostrarForm && (
           <View style={{ marginTop: 10 }}>
-            <TextInput style={styles.input} placeholder="Nombre" placeholderTextColor={c.mutedSoft} value={nombre} onChangeText={setNombre} />
-            <TextInput style={styles.input} placeholder="Correo" placeholderTextColor={c.mutedSoft} value={email} onChangeText={setEmail}
+            <TextInput style={styles.input} placeholder="Nombre" placeholderTextColor={c.mutedSoft} value={nombre} onChangeText={valor => {
+              setNombre(valor);
+              limpiarError('name');
+            }} />
+            <FieldError mensaje={errores.name} />
+            <TextInput style={styles.input} placeholder="Correo" placeholderTextColor={c.mutedSoft} value={email} onChangeText={valor => {
+              setEmail(valor);
+              limpiarError('email');
+            }}
               autoCapitalize="none" keyboardType="email-address" />
-            <TextInput style={styles.input} placeholder="Contraseña (mín. 8)" placeholderTextColor={c.mutedSoft} value={password} onChangeText={setPassword} />
+            <FieldError mensaje={errores.email} />
+            <TextInput style={styles.input} placeholder="Contraseña (mín. 8)" placeholderTextColor={c.mutedSoft} value={password} onChangeText={valor => {
+              setPassword(valor);
+              limpiarError('password');
+            }} />
+            <FieldError mensaje={errores.password} />
             <View style={styles.chips}>
               {roles.map(r => (
-                <TouchableOpacity key={r} onPress={() => setFormRol(r)}
+                <TouchableOpacity key={r} onPress={() => {
+                  setFormRol(r);
+                  limpiarError('rol');
+                }}
                   style={[styles.chip, formRol === r && styles.chipOn]}>
                   <Text style={[styles.chipTxt, formRol === r && styles.chipTxtOn]}>{r}</Text>
                 </TouchableOpacity>
               ))}
             </View>
+            <FieldError mensaje={errores.rol} />
             <PressableScale style={styles.btn} onPress={onCrear} disabled={enviando}>
               {enviando ? <ActivityIndicator color={c.onBrand} /> : <Text style={styles.btnTxt}>Crear usuario</Text>}
             </PressableScale>

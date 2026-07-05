@@ -15,8 +15,10 @@ import {
 import { register, RolPublico } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
+import FieldError from '../components/FieldError';
 import Icon, { IconName } from '../components/Icon';
 import { VitrinaMark } from '../components/Logo';
+import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
 import { c, font, radius, shadow } from '../theme';
 
@@ -40,24 +42,36 @@ export default function RegisterScreen({ navigation }: Props) {
   const [rol, setRol] = useState<RolPublico>('usuario');
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errores, setErrores] = useState<FieldErrors>({});
+
+  function limpiarError(campo: string) {
+    setErrores(prev => {
+      const next = { ...prev };
+      delete next[campo];
+      return next;
+    });
+  }
 
   async function crearCuenta() {
     setError(null);
+    setErrores({});
 
-    if (!nombre.trim() || !email.trim() || !password) {
-      setError('Completa nombre, correo y contraseña.');
-      return;
-    }
-    if (rol === 'usuario' && (!direccion.trim() || !barrio.trim())) {
-      setError('Completa direccion y barrio para tus pedidos.');
+    const nuevosErrores: FieldErrors = {};
+    if (!nombre.trim()) nuevosErrores.name = 'El campo nombre es obligatorio.';
+    if (!email.trim()) nuevosErrores.email = 'El campo correo es obligatorio.';
+    if (!password) nuevosErrores.password = 'El campo contrasena es obligatorio.';
+    if (rol === 'usuario' && !direccion.trim()) nuevosErrores.direccion = 'El campo direccion es obligatorio.';
+    if (rol === 'usuario' && !barrio.trim()) nuevosErrores.barrio = 'El campo barrio es obligatorio.';
+    if (Object.keys(nuevosErrores).length > 0) {
+      setErrores(nuevosErrores);
       return;
     }
     if (password.length < 8) {
-      setError('La contraseña debe tener al menos 8 caracteres.');
+      setErrores({ password: 'La contrasena debe tener al menos 8 caracteres.' });
       return;
     }
     if (password !== confirmar) {
-      setError('Las contraseñas no coinciden.');
+      setErrores({ confirmar: 'La contrasena y su confirmacion deben ser iguales.' });
       return;
     }
 
@@ -73,7 +87,12 @@ export default function RegisterScreen({ navigation }: Props) {
       });
       guardarSesion(token, user);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error inesperado.');
+      const campos = fieldErrorsFromError(e, { password_confirmation: 'confirmar' });
+      if (Object.keys(campos).length > 0) {
+        setErrores(campos);
+      } else {
+        setError(messageFromError(e));
+      }
     } finally {
       setCargando(false);
     }
@@ -98,45 +117,61 @@ export default function RegisterScreen({ navigation }: Props) {
           <TextInput
             style={styles.input}
             value={nombre}
-            onChangeText={setNombre}
+            onChangeText={valor => {
+              setNombre(valor);
+              limpiarError('name');
+            }}
             placeholder="Tu nombre"
             placeholderTextColor={c.mutedSoft}
             editable={!cargando}
           />
+          <FieldError mensaje={errores.name} />
 
           <Text style={styles.label}>Correo</Text>
           <TextInput
             style={styles.input}
             value={email}
-            onChangeText={setEmail}
+            onChangeText={valor => {
+              setEmail(valor);
+              limpiarError('email');
+            }}
             autoCapitalize="none"
             keyboardType="email-address"
             placeholder="correo@ejemplo.co"
             placeholderTextColor={c.mutedSoft}
             editable={!cargando}
           />
+          <FieldError mensaje={errores.email} />
 
           <Text style={styles.label}>Contraseña</Text>
           <TextInput
             style={styles.input}
             value={password}
-            onChangeText={setPassword}
+            onChangeText={valor => {
+              setPassword(valor);
+              limpiarError('password');
+            }}
             secureTextEntry
             placeholder="Mínimo 8 caracteres"
             placeholderTextColor={c.mutedSoft}
             editable={!cargando}
           />
+          <FieldError mensaje={errores.password} />
 
           <Text style={styles.label}>Confirmar contraseña</Text>
           <TextInput
             style={styles.input}
             value={confirmar}
-            onChangeText={setConfirmar}
+            onChangeText={valor => {
+              setConfirmar(valor);
+              limpiarError('confirmar');
+            }}
             secureTextEntry
             placeholder="Repite la contraseña"
             placeholderTextColor={c.mutedSoft}
             editable={!cargando}
           />
+          <FieldError mensaje={errores.confirmar} />
 
           <Text style={styles.label}>¿Cómo quieres usar la app?</Text>
           <View style={styles.opciones}>
@@ -168,21 +203,29 @@ export default function RegisterScreen({ navigation }: Props) {
               <TextInput
                 style={styles.input}
                 value={direccion}
-                onChangeText={setDireccion}
+                onChangeText={valor => {
+                  setDireccion(valor);
+                  limpiarError('direccion');
+                }}
                 placeholder="Calle, numero, referencia"
                 placeholderTextColor={c.mutedSoft}
                 editable={!cargando}
               />
+              <FieldError mensaje={errores.direccion} />
 
               <Text style={styles.label}>Barrio</Text>
               <TextInput
                 style={styles.input}
                 value={barrio}
-                onChangeText={setBarrio}
+                onChangeText={valor => {
+                  setBarrio(valor);
+                  limpiarError('barrio');
+                }}
                 placeholder="Barrio"
                 placeholderTextColor={c.mutedSoft}
                 editable={!cargando}
               />
+              <FieldError mensaje={errores.barrio} />
             </>
           ) : null}
 

@@ -30,8 +30,10 @@ import {
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import { Dropdown } from '../components/Dropdown';
+import FieldError from '../components/FieldError';
 import Icon from '../components/Icon';
 import SelectorImagen from '../components/SelectorImagen';
+import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
 import { c, font, radius, shadow } from '../theme';
 import { useToast } from '../Toast';
@@ -83,6 +85,15 @@ export default function CategoriaProductosScreen({ route }: Props) {
   const [imagenUri, setImagenUri] = useState<string | null>(null);
   const [disponible, setDisponible] = useState(true);
   const [guardando, setGuardando] = useState(false);
+  const [errores, setErrores] = useState<FieldErrors>({});
+
+  function limpiarError(campo: string) {
+    setErrores(prev => {
+      const next = { ...prev };
+      delete next[campo];
+      return next;
+    });
+  }
 
   const cargar = useCallback(
     (refresco = false) => {
@@ -115,6 +126,7 @@ export default function CategoriaProductosScreen({ route }: Props) {
     setCatId(categoriaId);
     setImagenUri(null);
     setDisponible(true);
+    setErrores({});
     setModal(true);
   }
 
@@ -127,17 +139,19 @@ export default function CategoriaProductosScreen({ route }: Props) {
     setCatId(p.categoria?.id ?? null);
     setImagenUri(null);
     setDisponible(p.disponible);
+    setErrores({});
     setModal(true);
   }
 
   async function guardar() {
+    setErrores({});
     const precioNum = Number(precio.replace(/[^0-9.]/g, ''));
     if (!nombre.trim()) {
-      toast.error('Falta el nombre', 'El nombre del producto es obligatorio.');
+      setErrores({ nombre: 'El campo nombre es obligatorio.' });
       return;
     }
     if (!precio || isNaN(precioNum) || precioNum < 0) {
-      toast.error('Precio inválido', 'Ingresa un precio válido.');
+      setErrores({ precio: 'Ingresa un precio valido.' });
       return;
     }
     const u = UNIDADES.find(x => x.value === unidad)!;
@@ -162,7 +176,12 @@ export default function CategoriaProductosScreen({ route }: Props) {
       setModal(false);
       cargar();
     } catch (e) {
-      toast.error('No se pudo guardar', e instanceof Error ? e.message : 'Error');
+      const campos = fieldErrorsFromError(e, { categoria_id: 'categoria' });
+      if (Object.keys(campos).length > 0) {
+        setErrores(campos);
+      } else {
+        toast.error('No se pudo guardar', messageFromError(e, 'Error'));
+      }
     } finally {
       setGuardando(false);
     }

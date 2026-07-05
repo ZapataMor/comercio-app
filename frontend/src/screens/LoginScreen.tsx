@@ -14,7 +14,9 @@ import {
 import { login } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
+import FieldError from '../components/FieldError';
 import { VitrinaWordmark } from '../components/Logo';
+import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
 import { c, font, radius, shadow } from '../theme';
 
@@ -27,15 +29,37 @@ export default function LoginScreen({ navigation }: Props) {
   const [password, setPassword] = useState('password123');
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errores, setErrores] = useState<FieldErrors>({});
+
+  function limpiarError(campo: string) {
+    setErrores(prev => {
+      const next = { ...prev };
+      delete next[campo];
+      return next;
+    });
+  }
 
   async function entrar() {
     setError(null);
+    setErrores({});
+    const nuevosErrores: FieldErrors = {};
+    if (!email.trim()) nuevosErrores.email = 'El campo correo es obligatorio.';
+    if (!password) nuevosErrores.password = 'El campo contrasena es obligatorio.';
+    if (Object.keys(nuevosErrores).length > 0) {
+      setErrores(nuevosErrores);
+      return;
+    }
     setCargando(true);
     try {
       const { token, user } = await login(email.trim(), password);
       guardarSesion(token, user);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error inesperado.');
+      const campos = fieldErrorsFromError(e);
+      if (Object.keys(campos).length > 0) {
+        setErrores(campos);
+      } else {
+        setError(messageFromError(e));
+      }
     } finally {
       setCargando(false);
     }
@@ -58,24 +82,32 @@ export default function LoginScreen({ navigation }: Props) {
         <TextInput
           style={styles.input}
           value={email}
-          onChangeText={setEmail}
+          onChangeText={valor => {
+            setEmail(valor);
+            limpiarError('email');
+          }}
           autoCapitalize="none"
           keyboardType="email-address"
           placeholder="correo@ejemplo.co"
           placeholderTextColor={c.mutedSoft}
           editable={!cargando}
         />
+        <FieldError mensaje={errores.email} />
 
         <Text style={styles.label}>Contraseña</Text>
         <TextInput
           style={styles.input}
           value={password}
-          onChangeText={setPassword}
+          onChangeText={valor => {
+            setPassword(valor);
+            limpiarError('password');
+          }}
           secureTextEntry
           placeholder="••••••••"
           placeholderTextColor={c.mutedSoft}
           editable={!cargando}
         />
+        <FieldError mensaje={errores.password} />
 
         <PressableScale
           style={[styles.boton, cargando && styles.botonDisabled]}

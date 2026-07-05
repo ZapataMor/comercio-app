@@ -19,7 +19,9 @@ import {
 import { actualizarPerfil } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
+import FieldError from '../components/FieldError';
 import Icon from '../components/Icon';
+import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
 import { c, font, radius, shadow } from '../theme';
 import { useToast } from '../Toast';
@@ -37,25 +39,42 @@ export default function PerfilScreen(_props: Props) {
   const [passNueva, setPassNueva] = useState('');
   const [passConfirma, setPassConfirma] = useState('');
   const [guardando, setGuardando] = useState(false);
+  const [errores, setErrores] = useState<FieldErrors>({});
 
   const cambiaPass = passActual.length > 0 || passNueva.length > 0 || passConfirma.length > 0;
 
+  function limpiarError(campo: string) {
+    setErrores(prev => {
+      const next = { ...prev };
+      delete next[campo];
+      return next;
+    });
+  }
+
   async function guardar() {
-    if (!nombre.trim() || !email.trim()) {
-      toast.error('Faltan datos', 'El nombre y el email son obligatorios.');
+    setErrores({});
+    const nuevosErrores: FieldErrors = {};
+    if (!nombre.trim()) nuevosErrores.name = 'El campo nombre es obligatorio.';
+    if (!email.trim()) nuevosErrores.email = 'El campo correo es obligatorio.';
+    if (Object.keys(nuevosErrores).length > 0) {
+      setErrores(nuevosErrores);
       return;
     }
     if (cambiaPass) {
-      if (!passActual || !passNueva || !passConfirma) {
-        toast.error('Contraseña incompleta', 'Llena la actual, la nueva y su confirmación.');
+      const passErrores: FieldErrors = {};
+      if (!passActual) passErrores.password_actual = 'El campo contrasena actual es obligatorio.';
+      if (!passNueva) passErrores.password = 'El campo nueva contrasena es obligatorio.';
+      if (!passConfirma) passErrores.confirmar = 'Confirma la nueva contrasena.';
+      if (Object.keys(passErrores).length > 0) {
+        setErrores(passErrores);
         return;
       }
       if (passNueva !== passConfirma) {
-        toast.error('No coinciden', 'La nueva contraseña y su confirmación deben ser iguales.');
+        setErrores({ confirmar: 'La nueva contrasena y su confirmacion deben ser iguales.' });
         return;
       }
       if (passNueva.length < 8) {
-        toast.error('Muy corta', 'La nueva contraseña debe tener al menos 8 caracteres.');
+        setErrores({ password: 'La nueva contrasena debe tener al menos 8 caracteres.' });
         return;
       }
     }
@@ -73,7 +92,12 @@ export default function PerfilScreen(_props: Props) {
       setPassConfirma('');
       toast.exito('Perfil actualizado', 'Tus datos personales quedaron guardados.');
     } catch (e) {
-      toast.error('No se pudo guardar', e instanceof Error ? e.message : 'Error');
+      const campos = fieldErrorsFromError(e, { password_confirmation: 'confirmar' });
+      if (Object.keys(campos).length > 0) {
+        setErrores(campos);
+      } else {
+        toast.error('No se pudo guardar', messageFromError(e, 'Error'));
+      }
     } finally {
       setGuardando(false);
     }
@@ -100,20 +124,28 @@ export default function PerfilScreen(_props: Props) {
           <TextInput
             style={styles.input}
             value={nombre}
-            onChangeText={setNombre}
+            onChangeText={valor => {
+              setNombre(valor);
+              limpiarError('name');
+            }}
             placeholder="Tu nombre"
             placeholderTextColor={c.mutedSoft}
           />
+          <FieldError mensaje={errores.name} />
           <Text style={styles.label}>Email</Text>
           <TextInput
             style={styles.input}
             value={email}
-            onChangeText={setEmail}
+            onChangeText={valor => {
+              setEmail(valor);
+              limpiarError('email');
+            }}
             placeholder="tu@correo.com"
             placeholderTextColor={c.mutedSoft}
             autoCapitalize="none"
             keyboardType="email-address"
           />
+          <FieldError mensaje={errores.email} />
         </View>
       </FadeInView>
 
@@ -125,29 +157,41 @@ export default function PerfilScreen(_props: Props) {
           <TextInput
             style={styles.input}
             value={passActual}
-            onChangeText={setPassActual}
+            onChangeText={valor => {
+              setPassActual(valor);
+              limpiarError('password_actual');
+            }}
             placeholder="••••••••"
             placeholderTextColor={c.mutedSoft}
             secureTextEntry
           />
+          <FieldError mensaje={errores.password_actual} />
           <Text style={styles.label}>Nueva contraseña</Text>
           <TextInput
             style={styles.input}
             value={passNueva}
-            onChangeText={setPassNueva}
+            onChangeText={valor => {
+              setPassNueva(valor);
+              limpiarError('password');
+            }}
             placeholder="Mínimo 8 caracteres"
             placeholderTextColor={c.mutedSoft}
             secureTextEntry
           />
+          <FieldError mensaje={errores.password} />
           <Text style={styles.label}>Confirmar nueva contraseña</Text>
           <TextInput
             style={[styles.input, styles.inputUltimo]}
             value={passConfirma}
-            onChangeText={setPassConfirma}
+            onChangeText={valor => {
+              setPassConfirma(valor);
+              limpiarError('confirmar');
+            }}
             placeholder="Repite la nueva contraseña"
             placeholderTextColor={c.mutedSoft}
             secureTextEntry
           />
+          <FieldError mensaje={errores.confirmar} />
         </View>
       </FadeInView>
 
