@@ -15,7 +15,7 @@ import { login } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import FieldError from '../components/FieldError';
-import { VitrinaWordmark } from '../components/Logo';
+import { VitrinaLogo } from '../components/Logo';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
 import { c, font, radius, shadow } from '../theme';
@@ -72,7 +72,7 @@ export default function LoginScreen({ navigation }: Props) {
       <StatusBar barStyle="dark-content" backgroundColor={c.bg} />
       <FadeInView style={styles.card}>
         <View style={styles.brandRow}>
-          <VitrinaWordmark size={30} />
+          <VitrinaLogo height={52} />
         </View>
         <Text style={styles.subtitle}>Tu barrio, en tu bolsillo</Text>
 

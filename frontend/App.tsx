@@ -13,6 +13,8 @@ import { CartProvider } from './src/CartContext';
 import BarraCliente from './src/components/BarraCliente';
 import { FlyToCartProvider } from './src/components/FlyToCart';
 import HeaderPerfil from './src/components/HeaderPerfil';
+import { VitrinaHeaderLogo } from './src/components/Logo';
+import SplashVitrina from './src/components/SplashVitrina';
 import { NegocioProvider } from './src/NegocioContext';
 import { configurarMensajesForeground } from './src/pushNotifications';
 import { navigationRef, procesarNotificacionPendiente } from './src/RootNavigation';
@@ -40,6 +42,9 @@ import MisPedidosScreen from './src/screens/MisPedidosScreen';
 import PedidoDetalleScreen from './src/screens/PedidoDetalleScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+// Logo de la marca (día/noche según la hora) como título del header.
+const tituloVitrina = () => <VitrinaHeaderLogo />;
 
 function Navegacion() {
   const { auth, cargando } = useAuth();
@@ -90,7 +95,11 @@ function Navegacion() {
                 negocios). El menú Home solo existe para los demás roles. */}
             {roles.includes('usuario') && (
               <>
-                <Stack.Screen name="Explorar" component={ExplorarScreen} options={{ title: 'Negocios abiertos' }} />
+                <Stack.Screen
+                  name="Explorar"
+                  component={ExplorarScreen}
+                  options={{ title: 'Vitrina', headerTitle: tituloVitrina }}
+                />
                 <Stack.Screen
                   name="Negocio"
                   component={NegocioScreen}
@@ -104,7 +113,11 @@ function Navegacion() {
             )}
 
             {roles.some(r => r !== 'usuario') && (
-              <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Vitrina' }} />
+              <Stack.Screen
+                name="Home"
+                component={HomeScreen}
+                options={{ title: 'Vitrina', headerTitle: tituloVitrina }}
+              />
             )}
             <Stack.Screen
               name="Perfil"
@@ -171,6 +184,11 @@ function PushBridge() {
 }
 
 function App() {
+  // Splash animado de la marca (toldo → V → foco → destello → nombre) al
+  // abrir la app; tapa la carga inicial y luego se desvanece.
+  const [splashVisible, setSplashVisible] = React.useState(true);
+  const ocultarSplash = React.useCallback(() => setSplashVisible(false), []);
+
   return (
     <AuthProvider>
       <NegocioProvider>
@@ -179,7 +197,10 @@ function App() {
             <ToastProvider>
               <StatusBar barStyle="light-content" backgroundColor={c.brand} />
               <PushBridge />
-              <Navegacion />
+              <View style={styles.raiz}>
+                <Navegacion />
+                {splashVisible && <SplashVitrina onFin={ocultarSplash} />}
+              </View>
             </ToastProvider>
           </SafeAreaProvider>
         </CartProvider>

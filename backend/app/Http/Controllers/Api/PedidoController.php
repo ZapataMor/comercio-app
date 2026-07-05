@@ -80,6 +80,13 @@ class PedidoController extends Controller
             return $pedido;
         });
 
+        // Si el cliente aún no tenía teléfono guardado, el que escribió aquí
+        // queda en su perfil como opción para los próximos pedidos.
+        $user = $request->user();
+        if (blank($user->telefono)) {
+            $user->update(['telefono' => $datos['telefono_contacto']]);
+        }
+
         // Avisa al comercio (su dueño) que entró un pedido nuevo.
         if ($negocio->user) {
             Push::enviar($negocio->user, new NuevoPedidoParaComercio($pedido));

@@ -1,3 +1,4 @@
+import { CommonActions } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -38,7 +39,7 @@ function textoUbicacion(ubicacion: Pick<ClienteDireccion, 'direccion' | 'barrio'
 }
 
 export default function CheckoutScreen({ navigation }: Props) {
-  const { auth } = useAuth();
+  const { auth, actualizarUsuario } = useAuth();
   const cart = useCart();
   const toast = useToast();
   const [direcciones, setDirecciones] = useState<ClienteDireccion[]>([]);
@@ -135,16 +136,38 @@ export default function CheckoutScreen({ navigation }: Props) {
         setSeleccion(guardada.id);
       }
 
+      // Se capturan antes de vaciar el carrito: se usan para rearmar la navegación.
+      const negocioId = cart.negocioId!;
+      const negocioNombre = cart.negocioNombre ?? '';
+
       await crearPedido(auth!.token, {
-        negocio_id: cart.negocioId!,
+        negocio_id: negocioId,
         items: cart.items.map(i => ({ producto_id: i.producto_id, cantidad: i.cantidad })),
         metodo_pago: pago,
         direccion_entrega: direccionEntrega,
         telefono_contacto: telefonoContacto,
       });
+
+      // El backend guarda este teléfono en el perfil cuando no había uno;
+      // se refleja en la sesión local para que aparezca en el próximo pedido.
+      if (!telefonoGuardado) {
+        actualizarUsuario({ ...auth!.user, telefono: telefonoContacto });
+      }
+
       cart.vaciar();
       toast.exito('Pedido confirmado', 'El negocio ya recibio tu pedido.');
-      navigation.navigate('MisPedidos');
+      // Se rearma la pila para que "atrás" desde Mis pedidos lleve al catálogo
+      // del negocio donde pidió, y no de vuelta al formulario de confirmación.
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 2,
+          routes: [
+            { name: 'Home' },
+            { name: 'Negocio', params: { id: negocioId, nombre: negocioNombre } },
+            { name: 'MisPedidos' },
+          ],
+        }),
+      );
     } catch (e) {
       const campos = fieldErrorsFromError(e, {
         direccion: 'nuevaDireccion',
