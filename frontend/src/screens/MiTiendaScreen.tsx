@@ -15,7 +15,9 @@ import {
 } from 'react-native';
 import { imagenUrl, Negocio } from '../api';
 import { FadeInView, PressableScale } from '../components/anim';
+import FieldError from '../components/FieldError';
 import SelectorImagen from '../components/SelectorImagen';
+import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { useNegocio } from '../NegocioContext';
 import { RootStackParamList } from '../navTypes';
 import { c, font, radius, shadow } from '../theme';
@@ -71,6 +73,15 @@ export default function MiTiendaScreen({ navigation }: Props) {
   const [activo, setActivo] = useState(true);
   // URI local de una imagen recién elegida (sin subir aún). null = sin cambios.
   const [imagenUri, setImagenUri] = useState<string | null>(null);
+  const [errores, setErrores] = useState<FieldErrors>({});
+
+  function limpiarError(campo: string) {
+    setErrores(prev => {
+      const next = { ...prev };
+      delete next[campo];
+      return next;
+    });
+  }
 
   // Si el comerciante aún no tiene negocio, se entra directo al formulario.
   useEffect(() => {
@@ -92,12 +103,14 @@ export default function MiTiendaScreen({ navigation }: Props) {
     setTelefono(n?.telefono ?? '');
     setActivo(n?.activo ?? true);
     setImagenUri(null);
+    setErrores({});
     setModo('editar');
   }
 
   async function onGuardar() {
+    setErrores({});
     if (!nombre.trim()) {
-      toast.error('Falta el nombre', 'El nombre del negocio es obligatorio.');
+      setErrores({ nombre: 'El campo nombre del negocio es obligatorio.' });
       return;
     }
     const categoriasFinales = [
@@ -106,7 +119,7 @@ export default function MiTiendaScreen({ navigation }: Props) {
     ];
 
     if (categoriasFinales.length === 0) {
-      toast.error('Falta la categoría', 'Indica qué tipo de negocio es (restaurante, farmacia…).');
+      setErrores({ categorias: 'Selecciona al menos una categoria para el negocio.' });
       return;
     }
     setGuardando(true);
@@ -132,7 +145,12 @@ export default function MiTiendaScreen({ navigation }: Props) {
         setModo('ver');
       }
     } catch (e) {
-      toast.error('No se pudo guardar', e instanceof Error ? e.message : 'Error');
+      const campos = fieldErrorsFromError(e, { categoria: 'categorias', 'categorias.0': 'categorias' });
+      if (Object.keys(campos).length > 0) {
+        setErrores(campos);
+      } else {
+        toast.error('No se pudo guardar', messageFromError(e, 'Error'));
+      }
     } finally {
       setGuardando(false);
     }
@@ -193,19 +211,27 @@ export default function MiTiendaScreen({ navigation }: Props) {
           <SelectorImagen
             label="Foto del negocio"
             uri={imagenUri ?? imagenUrl(negocio?.imagen)}
-            onSelect={setImagenUri}
+            onSelect={uri => {
+              setImagenUri(uri);
+              limpiarError('imagen');
+            }}
             disabled={guardando}
           />
+          <FieldError mensaje={errores.imagen} />
 
           <Text style={styles.label}>Nombre del negocio *</Text>
           <TextInput
             style={styles.input}
             value={nombre}
-            onChangeText={setNombre}
+            onChangeText={valor => {
+              setNombre(valor);
+              limpiarError('nombre');
+            }}
             placeholder="Ej: Panadería La Espiga"
             placeholderTextColor={c.mutedSoft}
             editable={!guardando}
           />
+          <FieldError mensaje={errores.nombre} />
 
           <Text style={styles.label}>Categorías (tipo de negocio) *</Text>
           <View style={styles.chips}>
@@ -219,16 +245,18 @@ export default function MiTiendaScreen({ navigation }: Props) {
                   disabled={guardando}
                   onPress={() => {
                     if (cat === 'Otro') {
-                      setCategoriaOtra(prev => !prev);
-                      if (categoriaOtra) {
-                        setCategoriaPersonalizada('');
+                        setCategoriaOtra(prev => !prev);
+                        if (categoriaOtra) {
+                          setCategoriaPersonalizada('');
+                        }
+                        limpiarError('categorias');
+                      } else {
+                        setCategorias(prev =>
+                          prev.includes(cat) ? prev.filter(item => item !== cat) : [...prev, cat],
+                        );
+                        limpiarError('categorias');
                       }
-                    } else {
-                      setCategorias(prev =>
-                        prev.includes(cat) ? prev.filter(item => item !== cat) : [...prev, cat],
-                      );
-                    }
-                  }}>
+                    }}>
                   <Text style={[styles.chipTxt, activa && styles.chipTxtActiva]}>{cat}</Text>
                 </TouchableOpacity>
               );
@@ -238,44 +266,60 @@ export default function MiTiendaScreen({ navigation }: Props) {
             <TextInput
               style={styles.input}
               value={categoriaPersonalizada}
-              onChangeText={setCategoriaPersonalizada}
+              onChangeText={valor => {
+                setCategoriaPersonalizada(valor);
+                limpiarError('categorias');
+              }}
               placeholder="Ej: Licorería, Óptica…"
               placeholderTextColor={c.mutedSoft}
               editable={!guardando}
             />
           )}
+          <FieldError mensaje={errores.categorias} />
 
           <Text style={styles.label}>Descripción</Text>
           <TextInput
             style={[styles.input, styles.area]}
             value={descripcion}
-            onChangeText={setDescripcion}
+            onChangeText={valor => {
+              setDescripcion(valor);
+              limpiarError('descripcion');
+            }}
             placeholder="¿Qué vendes?"
             placeholderTextColor={c.mutedSoft}
             multiline
             editable={!guardando}
           />
+          <FieldError mensaje={errores.descripcion} />
 
           <Text style={styles.label}>Dirección</Text>
           <TextInput
             style={styles.input}
             value={direccion}
-            onChangeText={setDireccion}
+            onChangeText={valor => {
+              setDireccion(valor);
+              limpiarError('direccion');
+            }}
             placeholder="Calle 12 #8-30, Maicao"
             placeholderTextColor={c.mutedSoft}
             editable={!guardando}
           />
+          <FieldError mensaje={errores.direccion} />
 
           <Text style={styles.label}>Teléfono</Text>
           <TextInput
             style={styles.input}
             value={telefono}
-            onChangeText={setTelefono}
+            onChangeText={valor => {
+              setTelefono(valor);
+              limpiarError('telefono');
+            }}
             placeholder="3001234567"
             placeholderTextColor={c.mutedSoft}
             keyboardType="phone-pad"
             editable={!guardando}
           />
+          <FieldError mensaje={errores.telefono} />
 
           <View style={styles.switchRow}>
             <View style={{ flex: 1 }}>

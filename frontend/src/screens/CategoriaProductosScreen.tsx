@@ -285,41 +285,57 @@ export default function CategoriaProductosScreen({ route }: Props) {
               <SelectorImagen
                 label="Foto del producto"
                 uri={imagenUri ?? imagenUrl(editando?.imagen)}
-                onSelect={setImagenUri}
+                onSelect={uri => {
+                  setImagenUri(uri);
+                  limpiarError('imagen');
+                }}
                 disabled={guardando}
               />
+              <FieldError mensaje={errores.imagen} />
 
               <Text style={styles.label}>Nombre *</Text>
               <TextInput
                 style={styles.input}
                 value={nombre}
-                onChangeText={setNombre}
+                onChangeText={valor => {
+                  setNombre(valor);
+                  limpiarError('nombre');
+                }}
                 placeholder="Ej: Arroz con pollo"
                 placeholderTextColor={c.mutedSoft}
                 editable={!guardando}
               />
+              <FieldError mensaje={errores.nombre} />
 
               <Text style={styles.label}>Descripción</Text>
               <TextInput
                 style={[styles.input, styles.area]}
                 value={descripcion}
-                onChangeText={setDescripcion}
+                onChangeText={valor => {
+                  setDescripcion(valor);
+                  limpiarError('descripcion');
+                }}
                 placeholder="Opcional"
                 placeholderTextColor={c.mutedSoft}
                 multiline
                 editable={!guardando}
               />
+              <FieldError mensaje={errores.descripcion} />
 
               <Text style={styles.label}>Precio *</Text>
               <TextInput
                 style={styles.input}
                 value={precio}
-                onChangeText={setPrecio}
+                onChangeText={valor => {
+                  setPrecio(valor);
+                  limpiarError('precio');
+                }}
                 placeholder="12000"
                 placeholderTextColor={c.mutedSoft}
                 keyboardType="numeric"
                 editable={!guardando}
               />
+              <FieldError mensaje={errores.precio} />
 
               <Text style={styles.label}>Unidad de venta</Text>
               <Dropdown<UnidadKey>
@@ -335,9 +351,13 @@ export default function CategoriaProductosScreen({ route }: Props) {
                   <Dropdown
                     valor={catId == null ? '0' : String(catId)}
                     opciones={opcionesCategoria}
-                    onChange={v => setCatId(v === '0' ? null : Number(v))}
+                    onChange={v => {
+                      setCatId(v === '0' ? null : Number(v));
+                      limpiarError('categoria');
+                    }}
                     disabled={guardando}
                   />
+                  <FieldError mensaje={errores.categoria} />
                 </>
               )}
 

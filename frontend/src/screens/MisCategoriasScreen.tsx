@@ -21,7 +21,9 @@ import {
 } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
+import FieldError from '../components/FieldError';
 import Icon from '../components/Icon';
+import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
 import { c, font, radius, shadow } from '../theme';
 import { useToast } from '../Toast';
@@ -41,10 +43,12 @@ export default function MisCategoriasScreen({ navigation }: Props) {
 
   const [nueva, setNueva] = useState('');
   const [creando, setCreando] = useState(false);
+  const [errores, setErrores] = useState<FieldErrors>({});
 
   // Edición en línea.
   const [editId, setEditId] = useState<number | null>(null);
   const [editNombre, setEditNombre] = useState('');
+  const [editErrores, setEditErrores] = useState<FieldErrors>({});
 
   const cargar = useCallback(
     (refresco = false) => {
