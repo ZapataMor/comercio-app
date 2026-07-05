@@ -18,6 +18,7 @@ import {
 import { useAuth } from '../AuthContext';
 import { useCart } from '../CartContext';
 import { FadeInView, PressableScale } from '../components/anim';
+import BarrioSelect from '../components/BarrioSelect';
 import FieldError from '../components/FieldError';
 import Icon from '../components/Icon';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
@@ -45,6 +46,9 @@ export default function CheckoutScreen({ navigation }: Props) {
   const [cargandoDirecciones, setCargandoDirecciones] = useState(true);
   const [nuevaDireccion, setNuevaDireccion] = useState('');
   const [nuevoBarrio, setNuevoBarrio] = useState('');
+  // Telefono guardado en el perfil del cliente (se pidio al registrarse).
+  const telefonoGuardado = auth?.user.telefono?.trim() || null;
+  const [usarOtroTelefono, setUsarOtroTelefono] = useState(!telefonoGuardado);
   const [telefono, setTelefono] = useState('');
   const [pago, setPago] = useState('efectivo');
   const [enviando, setEnviando] = useState(false);
@@ -90,9 +94,11 @@ export default function CheckoutScreen({ navigation }: Props) {
     [direcciones, seleccion],
   );
 
+  const telefonoContacto = usarOtroTelefono ? telefono.trim() : telefonoGuardado ?? '';
+
   async function confirmar() {
     setErrores({});
-    if (!telefono.trim()) {
+    if (!telefonoContacto) {
       setErrores({ telefono: 'El campo telefono de contacto es obligatorio.' });
       return;
     }
@@ -134,7 +140,7 @@ export default function CheckoutScreen({ navigation }: Props) {
         items: cart.items.map(i => ({ producto_id: i.producto_id, cantidad: i.cantidad })),
         metodo_pago: pago,
         direccion_entrega: direccionEntrega,
-        telefono_contacto: telefono.trim(),
+        telefono_contacto: telefonoContacto,
       });
       cart.vaciar();
       toast.exito('Pedido confirmado', 'El negocio ya recibio tu pedido.');
@@ -245,25 +251,69 @@ export default function CheckoutScreen({ navigation }: Props) {
             placeholderTextColor={c.mutedSoft}
           />
           <FieldError mensaje={errores.nuevaDireccion} />
-          <TextInput
-            style={styles.input}
-            value={nuevoBarrio}
-            onChangeText={valor => {
-              setNuevoBarrio(valor);
+          <BarrioSelect
+            valor={nuevoBarrio}
+            onSeleccionar={nombre => {
+              setNuevoBarrio(nombre);
               limpiarError('nuevoBarrio');
             }}
             placeholder="Barrio"
-            placeholderTextColor={c.mutedSoft}
           />
           <FieldError mensaje={errores.nuevoBarrio} />
         </View>
       ) : null}
 
       <Text style={styles.label}>Telefono de contacto</Text>
-      <TextInput style={styles.input} value={telefono} onChangeText={valor => {
-        setTelefono(valor);
-        limpiarError('telefono');
-      }} placeholder="300 123 4567" placeholderTextColor={c.mutedSoft} keyboardType="phone-pad" />
+      <View style={styles.ubicaciones}>
+        {telefonoGuardado ? (
+          <TouchableOpacity
+            style={[styles.ubicacion, !usarOtroTelefono && styles.ubicacionOn]}
+            onPress={() => {
+              setUsarOtroTelefono(false);
+              limpiarError('telefono');
+            }}>
+            <View style={styles.ubicacionIcono}>
+              <Icon name={!usarOtroTelefono ? 'check' : 'telefono'} size={18} color={!usarOtroTelefono ? c.onAccent : c.muted} />
+            </View>
+            <View style={styles.ubicacionTexto}>
+              <Text style={[styles.ubicacionTitulo, !usarOtroTelefono && styles.ubicacionTituloOn]}>
+                Mi telefono
+              </Text>
+              <Text style={[styles.ubicacionDetalle, !usarOtroTelefono && styles.ubicacionDetalleOn]}>
+                {telefonoGuardado}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        ) : null}
+
+        {telefonoGuardado ? (
+          <TouchableOpacity
+            style={[styles.ubicacion, usarOtroTelefono && styles.ubicacionOn]}
+            onPress={() => {
+              setUsarOtroTelefono(true);
+              limpiarError('telefono');
+            }}>
+            <View style={styles.ubicacionIcono}>
+              <Icon name={usarOtroTelefono ? 'check' : 'telefono'} size={18} color={usarOtroTelefono ? c.onAccent : c.muted} />
+            </View>
+            <View style={styles.ubicacionTexto}>
+              <Text style={[styles.ubicacionTitulo, usarOtroTelefono && styles.ubicacionTituloOn]}>
+                Usar otro numero
+              </Text>
+              <Text style={[styles.ubicacionDetalle, usarOtroTelefono && styles.ubicacionDetalleOn]}>
+                Solo para este pedido.
+              </Text>
+            </View>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+
+      {usarOtroTelefono ? (
+        <TextInput style={styles.input} value={telefono} onChangeText={valor => {
+          setTelefono(valor);
+          limpiarError('telefono');
+        }} placeholder="300 123 4567" placeholderTextColor={c.mutedSoft} keyboardType="phone-pad" />
+      ) : null}
       <FieldError mensaje={errores.telefono} />
 
       <Text style={styles.label}>Forma de pago</Text>

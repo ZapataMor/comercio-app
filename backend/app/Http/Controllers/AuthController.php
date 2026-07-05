@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Barrio;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -35,6 +36,7 @@ class AuthController extends Controller
             'role' => ['sometimes', Rule::in(self::ROLES_PUBLICOS)],
             'direccion' => [Rule::requiredIf($role === 'usuario'), 'nullable', 'string', 'max:255'],
             'barrio' => [Rule::requiredIf($role === 'usuario'), 'nullable', 'string', 'max:120'],
+            'telefono' => [Rule::requiredIf($role === 'usuario'), 'nullable', 'string', 'max:30'],
         ]);
 
         $user = DB::transaction(function () use ($data, $role) {
@@ -44,11 +46,16 @@ class AuthController extends Controller
                 'password' => $data['password'], // se hashea solo (cast 'hashed' en el modelo)
                 'direccion' => $role === 'usuario' ? $data['direccion'] : null,
                 'barrio' => $role === 'usuario' ? $data['barrio'] : null,
+                'telefono' => $role === 'usuario' ? $data['telefono'] : null,
             ]);
 
             $user->assignRole($role);
 
             if ($role === 'usuario') {
+                // Si escribió un barrio que no está en el catálogo, queda como
+                // sugerencia pendiente: solo él lo usa hasta que el admin lo apruebe.
+                Barrio::registrarSiEsNuevo($data['barrio'], $user->id);
+
                 $user->clienteDirecciones()->create([
                     'direccion' => $data['direccion'],
                     'barrio' => $data['barrio'],
@@ -104,12 +111,17 @@ class AuthController extends Controller
     public function actualizarPerfil(Request $request): JsonResponse
     {
         $user = $request->user();
+        $esCliente = $user->hasRole('usuario');
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'password' => ['sometimes', 'nullable', 'string', 'min:8', 'confirmed'],
             'password_actual' => ['required_with:password', 'string'],
+            // Datos de contacto: obligatorios para clientes, opcionales para el resto.
+            'direccion' => [$esCliente ? 'required' : 'sometimes', 'nullable', 'string', 'max:255'],
+            'barrio' => [$esCliente ? 'required' : 'sometimes', 'nullable', 'string', 'max:120'],
+            'telefono' => [$esCliente ? 'required' : 'sometimes', 'nullable', 'string', 'max:30'],
         ]);
 
         if (! empty($data['password'])) {
@@ -123,7 +135,33 @@ class AuthController extends Controller
 
         $user->name = $data['name'];
         $user->email = $data['email'];
+        if (array_key_exists('direccion', $data)) {
+            $user->direccion = $data['direccion'];
+        }
+        if (array_key_exists('barrio', $data)) {
+            $user->barrio = $data['barrio'];
+        }
+        if (array_key_exists('telefono', $data)) {
+            $user->telefono = $data['telefono'];
+        }
         $user->save();
+
+        // Mantener sincronizada la ubicación principal del cliente con su perfil.
+        if ($esCliente && ! empty($data['direccion']) && ! empty($data['barrio'])) {
+            // Si escribió un barrio nuevo, queda como sugerencia pendiente (igual que en el registro).
+            Barrio::registrarSiEsNuevo($data['barrio'], $user->id);
+
+            $principal = $user->clienteDirecciones()->where('es_principal', true)->first();
+            if ($principal) {
+                $principal->update(['direccion' => $data['direccion'], 'barrio' => $data['barrio']]);
+            } else {
+                $user->clienteDirecciones()->create([
+                    'direccion' => $data['direccion'],
+                    'barrio' => $data['barrio'],
+                    'es_principal' => true,
+                ]);
+            }
+        }
 
         return response()->json([
             'message' => 'Perfil actualizado.',
@@ -152,6 +190,7 @@ class AuthController extends Controller
             'roles' => $user->getRoleNames(),
             'direccion' => $user->direccion,
             'barrio' => $user->barrio,
+            'telefono' => $user->telefono,
         ];
     }
 }

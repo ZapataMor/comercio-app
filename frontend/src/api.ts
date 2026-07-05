@@ -7,6 +7,7 @@ export type Usuario = {
   roles: string[];
   direccion?: string | null;
   barrio?: string | null;
+  telefono?: string | null;
 };
 
 export type LoginResponse = {
@@ -136,6 +137,7 @@ export async function register(body: {
   role: RolPublico;
   direccion?: string;
   barrio?: string;
+  telefono?: string;
 }): Promise<LoginResponse> {
   let res: Response;
   try {
@@ -161,6 +163,30 @@ export async function register(body: {
   }
 
   return data as LoginResponse;
+}
+
+// ---------- Barrios (Maicao) ----------
+
+export type Barrio = { id: number; nombre: string };
+
+/**
+ * Lista pública de barrios aprobados de Maicao (para el selector de barrio).
+ * No requiere token: se usa en el registro, antes de iniciar sesión.
+ */
+export async function getBarrios(): Promise<Barrio[]> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/api/barrios`, {
+      headers: { Accept: 'application/json' },
+    });
+  } catch (e) {
+    throw new Error('No se pudo conectar con el servidor.');
+  }
+  const data = await res.json().catch(() => ({} as any));
+  if (!res.ok) {
+    throw new ApiError(data?.message ?? 'No se pudo cargar la lista de barrios.', res.status);
+  }
+  return (data.barrios ?? []) as Barrio[];
 }
 
 /** GET autenticado con el token Sanctum. Lanza ApiError con el código HTTP. */
@@ -266,6 +292,10 @@ export type PerfilInput = {
   /** Si viene, se exige también `password_actual`. */
   password?: string;
   password_actual?: string;
+  /** Datos de contacto: obligatorios para clientes, opcionales para el resto. */
+  direccion?: string;
+  barrio?: string;
+  telefono?: string;
 };
 
 /** Actualiza mi perfil personal. Devuelve el usuario ya actualizado. */
@@ -585,6 +615,29 @@ export async function cambiarRol(token: string, id: number, rol: string): Promis
 export async function getAdminNegocios(token: string): Promise<AdminNegocio[]> {
   const data = await authGet('/api/admin/negocios', token);
   return (data.negocios ?? []) as AdminNegocio[];
+}
+
+/** Barrio sugerido por un cliente, pendiente de que el admin lo apruebe. */
+export type BarrioPendiente = {
+  id: number;
+  nombre: string;
+  sugerido_por: string | null;
+  fecha: string | null;
+};
+
+export async function getBarriosPendientes(token: string): Promise<BarrioPendiente[]> {
+  const d = await authGet('/api/admin/barrios/pendientes', token);
+  return (d.barrios ?? []) as BarrioPendiente[];
+}
+
+/** Aprueba un barrio sugerido: entra a la lista pública del selector. */
+export async function aprobarBarrio(token: string, id: number): Promise<void> {
+  await authSend('PUT', `/api/admin/barrios/${id}/aprobar`, token);
+}
+
+/** Rechaza (elimina) la sugerencia. El usuario conserva el texto que escribió. */
+export async function rechazarBarrio(token: string, id: number): Promise<void> {
+  await authSend('DELETE', `/api/admin/barrios/${id}`, token);
 }
 
 // ---------- Push notifications ----------

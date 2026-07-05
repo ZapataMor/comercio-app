@@ -77,7 +77,11 @@ export default function MisCategoriasScreen({ navigation }: Props) {
   }, [navigation, cargar]);
 
   async function onCrear() {
-    if (!nueva.trim()) return;
+    setErrores({});
+    if (!nueva.trim()) {
+      setErrores({ nombre: 'El campo nueva categoria es obligatorio.' });
+      return;
+    }
     setCreando(true);
     try {
       await crearCategoria(token, nueva.trim());
@@ -85,14 +89,23 @@ export default function MisCategoriasScreen({ navigation }: Props) {
       setNueva('');
       cargar();
     } catch (e) {
-      toast.error('No se pudo crear', e instanceof Error ? e.message : 'Error');
+      const campos = fieldErrorsFromError(e);
+      if (Object.keys(campos).length > 0) {
+        setErrores(campos);
+      } else {
+        toast.error('No se pudo crear', messageFromError(e, 'Error'));
+      }
     } finally {
       setCreando(false);
     }
   }
 
   async function onGuardarEdicion(id: number) {
-    if (!editNombre.trim()) return;
+    setEditErrores({});
+    if (!editNombre.trim()) {
+      setEditErrores({ nombre: 'El campo nombre es obligatorio.' });
+      return;
+    }
     try {
       await actualizarCategoria(token, id, editNombre.trim());
       toast.exito('Listo', 'Categoría actualizada.');
@@ -100,7 +113,12 @@ export default function MisCategoriasScreen({ navigation }: Props) {
       setEditNombre('');
       cargar();
     } catch (e) {
-      toast.error('No se pudo actualizar', e instanceof Error ? e.message : 'Error');
+      const campos = fieldErrorsFromError(e);
+      if (Object.keys(campos).length > 0) {
+        setEditErrores(campos);
+      } else {
+        toast.error('No se pudo actualizar', messageFromError(e, 'Error'));
+      }
     }
   }
 
@@ -150,7 +168,10 @@ export default function MisCategoriasScreen({ navigation }: Props) {
             <TextInput
               style={styles.input}
               value={nueva}
-              onChangeText={setNueva}
+              onChangeText={valor => {
+                setNueva(valor);
+                setErrores({});
+              }}
               placeholder="Ej: Comida"
               placeholderTextColor={c.mutedSoft}
               editable={!creando}
@@ -159,6 +180,7 @@ export default function MisCategoriasScreen({ navigation }: Props) {
               {creando ? <ActivityIndicator color={c.onBrand} /> : <Text style={styles.addTxt}>Agregar</Text>}
             </PressableScale>
           </View>
+          <FieldError mensaje={errores.nombre} />
           <Text style={styles.ayuda}>Toca una categoría para ver y crear sus productos.</Text>
         </View>
       }
@@ -186,12 +208,18 @@ export default function MisCategoriasScreen({ navigation }: Props) {
             onPress={editId === item.id ? undefined : () => abrirProductos(item)}>
             {editId === item.id ? (
               <>
-                <TextInput
-                  style={[styles.input, { flex: 1 }]}
-                  value={editNombre}
-                  onChangeText={setEditNombre}
-                  autoFocus
-                />
+                <View style={{ flex: 1 }}>
+                  <TextInput
+                    style={styles.input}
+                    value={editNombre}
+                    onChangeText={valor => {
+                      setEditNombre(valor);
+                      setEditErrores({});
+                    }}
+                    autoFocus
+                  />
+                  <FieldError mensaje={editErrores.nombre} />
+                </View>
                 <TouchableOpacity style={styles.iconBtn} onPress={() => onGuardarEdicion(item.id)}>
                   <Text style={styles.guardar}>Guardar</Text>
                 </TouchableOpacity>
@@ -212,6 +240,7 @@ export default function MisCategoriasScreen({ navigation }: Props) {
                   onPress={() => {
                     setEditId(item.id);
                     setEditNombre(item.nombre);
+                    setEditErrores({});
                   }}>
                   <Text style={styles.editar}>Editar</Text>
                 </TouchableOpacity>

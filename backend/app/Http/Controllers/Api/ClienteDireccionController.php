@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Barrio;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -30,6 +31,9 @@ class ClienteDireccionController extends Controller
             'direccion' => ['required', 'string', 'max:255'],
             'barrio' => ['required', 'string', 'max:120'],
         ]);
+
+        // Barrio escrito a mano → sugerencia pendiente para el admin.
+        Barrio::registrarSiEsNuevo($data['barrio'], $request->user()->id);
 
         $direccion = $request->user()->clienteDirecciones()->create([
             'direccion' => $data['direccion'],

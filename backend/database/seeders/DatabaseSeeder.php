@@ -17,6 +17,9 @@ class DatabaseSeeder extends Seeder
         // Primero los roles, para poder asignarlos a los usuarios.
         $this->call(RoleSeeder::class);
 
+        // Catálogo oficial de barrios de Maicao (para el selector de la app).
+        $this->call(BarriosSeeder::class);
+
         // Usuarios de prueba (uno por rol, contraseña conocida) para desarrollo.
         $this->call(DemoUsersSeeder::class);
 

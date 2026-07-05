@@ -63,6 +63,13 @@ export default function AdminTableroScreen({ navigation }: Props) {
           <Icon name="chevron" size={20} color={c.chevron} />
         </PressableScale>
       </FadeInView>
+      <FadeInView delay={200}>
+        <PressableScale style={styles.item} onPress={() => navigation.navigate('AdminBarrios')}>
+          <Icon name="ubicacion" size={24} color={c.accent} style={styles.itemEmoji} />
+          <Text style={styles.itemTitulo}>Barrios sugeridos</Text>
+          <Icon name="chevron" size={20} color={c.chevron} />
+        </PressableScale>
+      </FadeInView>
     </ScrollView>
   );
 }

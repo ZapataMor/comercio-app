@@ -32,6 +32,7 @@ import NegocioScreen from './src/screens/NegocioScreen';
 import AdminTableroScreen from './src/screens/AdminTableroScreen';
 import AdminUsuariosScreen from './src/screens/AdminUsuariosScreen';
 import AdminNegociosScreen from './src/screens/AdminNegociosScreen';
+import AdminBarriosScreen from './src/screens/AdminBarriosScreen';
 import DomiciliarioScreen from './src/screens/DomiciliarioScreen';
 import CarritoScreen from './src/screens/CarritoScreen';
 import CheckoutScreen from './src/screens/CheckoutScreen';
@@ -85,7 +86,26 @@ function Navegacion() {
           </>
         ) : (
           <>
-            <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Vitrina' }} />
+            {/* El cliente entra directo a Explorar (su "Home" es la lista de
+                negocios). El menú Home solo existe para los demás roles. */}
+            {roles.includes('usuario') && (
+              <>
+                <Stack.Screen name="Explorar" component={ExplorarScreen} options={{ title: 'Negocios abiertos' }} />
+                <Stack.Screen
+                  name="Negocio"
+                  component={NegocioScreen}
+                  options={({ route }) => ({ title: route.params.nombre })}
+                />
+                <Stack.Screen name="Carrito" component={CarritoScreen} options={{ title: 'Carrito' }} />
+                <Stack.Screen name="Checkout" component={CheckoutScreen} options={{ title: 'Confirmar pedido' }} />
+                <Stack.Screen name="MisPedidos" component={MisPedidosScreen} options={{ title: 'Mis pedidos' }} />
+                <Stack.Screen name="PedidoDetalle" component={PedidoDetalleScreen} options={{ title: 'Seguimiento' }} />
+              </>
+            )}
+
+            {roles.some(r => r !== 'usuario') && (
+              <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Vitrina' }} />
+            )}
             <Stack.Screen
               name="Perfil"
               component={PerfilScreen}
@@ -109,26 +129,12 @@ function Navegacion() {
               </>
             )}
 
-            {roles.includes('usuario') && (
-              <>
-                <Stack.Screen name="Explorar" component={ExplorarScreen} options={{ title: 'Negocios abiertos' }} />
-                <Stack.Screen
-                  name="Negocio"
-                  component={NegocioScreen}
-                  options={({ route }) => ({ title: route.params.nombre })}
-                />
-                <Stack.Screen name="Carrito" component={CarritoScreen} options={{ title: 'Carrito' }} />
-                <Stack.Screen name="Checkout" component={CheckoutScreen} options={{ title: 'Confirmar pedido' }} />
-                <Stack.Screen name="MisPedidos" component={MisPedidosScreen} options={{ title: 'Mis pedidos' }} />
-                <Stack.Screen name="PedidoDetalle" component={PedidoDetalleScreen} options={{ title: 'Seguimiento' }} />
-              </>
-            )}
-
             {roles.includes('administrador') && (
               <>
                 <Stack.Screen name="AdminTablero" component={AdminTableroScreen} options={{ title: 'Administración' }} />
                 <Stack.Screen name="AdminUsuarios" component={AdminUsuariosScreen} options={{ title: 'Usuarios' }} />
                 <Stack.Screen name="AdminNegocios" component={AdminNegociosScreen} options={{ title: 'Negocios' }} />
+                <Stack.Screen name="AdminBarrios" component={AdminBarriosScreen} options={{ title: 'Barrios sugeridos' }} />
               </>
             )}
 

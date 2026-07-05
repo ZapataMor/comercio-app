@@ -15,6 +15,7 @@ import {
 import { register, RolPublico } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
+import BarrioSelect from '../components/BarrioSelect';
 import FieldError from '../components/FieldError';
 import Icon, { IconName } from '../components/Icon';
 import { VitrinaMark } from '../components/Logo';
@@ -39,6 +40,7 @@ export default function RegisterScreen({ navigation }: Props) {
   const [confirmar, setConfirmar] = useState('');
   const [direccion, setDireccion] = useState('');
   const [barrio, setBarrio] = useState('');
+  const [telefono, setTelefono] = useState('');
   const [rol, setRol] = useState<RolPublico>('usuario');
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +64,7 @@ export default function RegisterScreen({ navigation }: Props) {
     if (!password) nuevosErrores.password = 'El campo contrasena es obligatorio.';
     if (rol === 'usuario' && !direccion.trim()) nuevosErrores.direccion = 'El campo direccion es obligatorio.';
     if (rol === 'usuario' && !barrio.trim()) nuevosErrores.barrio = 'El campo barrio es obligatorio.';
+    if (rol === 'usuario' && !telefono.trim()) nuevosErrores.telefono = 'El campo telefono es obligatorio.';
     if (Object.keys(nuevosErrores).length > 0) {
       setErrores(nuevosErrores);
       return;
@@ -84,6 +87,7 @@ export default function RegisterScreen({ navigation }: Props) {
         role: rol,
         direccion: rol === 'usuario' ? direccion.trim() : undefined,
         barrio: rol === 'usuario' ? barrio.trim() : undefined,
+        telefono: rol === 'usuario' ? telefono.trim() : undefined,
       });
       guardarSesion(token, user);
     } catch (e) {
@@ -214,18 +218,30 @@ export default function RegisterScreen({ navigation }: Props) {
               <FieldError mensaje={errores.direccion} />
 
               <Text style={styles.label}>Barrio</Text>
-              <TextInput
-                style={styles.input}
-                value={barrio}
-                onChangeText={valor => {
-                  setBarrio(valor);
+              <BarrioSelect
+                valor={barrio}
+                onSeleccionar={nombre => {
+                  setBarrio(nombre);
                   limpiarError('barrio');
                 }}
-                placeholder="Barrio"
+                disabled={cargando}
+              />
+              <FieldError mensaje={errores.barrio} />
+
+              <Text style={styles.label}>Telefono</Text>
+              <TextInput
+                style={styles.input}
+                value={telefono}
+                onChangeText={valor => {
+                  setTelefono(valor);
+                  limpiarError('telefono');
+                }}
+                keyboardType="phone-pad"
+                placeholder="300 123 4567"
                 placeholderTextColor={c.mutedSoft}
                 editable={!cargando}
               />
-              <FieldError mensaje={errores.barrio} />
+              <FieldError mensaje={errores.telefono} />
             </>
           ) : null}
 

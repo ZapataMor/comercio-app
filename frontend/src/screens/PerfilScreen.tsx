@@ -19,6 +19,7 @@ import {
 import { actualizarPerfil } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
+import BarrioSelect from '../components/BarrioSelect';
 import FieldError from '../components/FieldError';
 import Icon from '../components/Icon';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
@@ -33,8 +34,13 @@ export default function PerfilScreen(_props: Props) {
   const toast = useToast();
   const user = auth!.user;
 
+  const esCliente = user.roles.includes('usuario');
+
   const [nombre, setNombre] = useState(user.name);
   const [email, setEmail] = useState(user.email);
+  const [telefono, setTelefono] = useState(user.telefono ?? '');
+  const [direccion, setDireccion] = useState(user.direccion ?? '');
+  const [barrio, setBarrio] = useState(user.barrio ?? '');
   const [passActual, setPassActual] = useState('');
   const [passNueva, setPassNueva] = useState('');
   const [passConfirma, setPassConfirma] = useState('');
@@ -56,6 +62,11 @@ export default function PerfilScreen(_props: Props) {
     const nuevosErrores: FieldErrors = {};
     if (!nombre.trim()) nuevosErrores.name = 'El campo nombre es obligatorio.';
     if (!email.trim()) nuevosErrores.email = 'El campo correo es obligatorio.';
+    if (esCliente) {
+      if (!telefono.trim()) nuevosErrores.telefono = 'El campo teléfono es obligatorio.';
+      if (!direccion.trim()) nuevosErrores.direccion = 'El campo dirección es obligatorio.';
+      if (!barrio.trim()) nuevosErrores.barrio = 'El campo barrio es obligatorio.';
+    }
     if (Object.keys(nuevosErrores).length > 0) {
       setErrores(nuevosErrores);
       return;
@@ -84,6 +95,13 @@ export default function PerfilScreen(_props: Props) {
       const actualizado = await actualizarPerfil(auth!.token, {
         name: nombre.trim(),
         email: email.trim(),
+        ...(esCliente || telefono.trim() || direccion.trim() || barrio.trim()
+          ? {
+              telefono: telefono.trim(),
+              direccion: direccion.trim(),
+              barrio: barrio.trim(),
+            }
+          : {}),
         ...(cambiaPass ? { password: passNueva, password_actual: passActual } : {}),
       });
       actualizarUsuario(actualizado);
@@ -146,6 +164,50 @@ export default function PerfilScreen(_props: Props) {
             keyboardType="email-address"
           />
           <FieldError mensaje={errores.email} />
+          <Text style={styles.label}>Teléfono</Text>
+          <TextInput
+            style={styles.input}
+            value={telefono}
+            onChangeText={valor => {
+              setTelefono(valor);
+              limpiarError('telefono');
+            }}
+            placeholder="Tu número de contacto"
+            placeholderTextColor={c.mutedSoft}
+            keyboardType="phone-pad"
+          />
+          <FieldError mensaje={errores.telefono} />
+        </View>
+      </FadeInView>
+
+      <FadeInView delay={90}>
+        <Text style={styles.seccion}>Mi dirección</Text>
+        {esCliente ? (
+          <Text style={styles.ayuda}>Se usa como tu ubicación principal para los pedidos.</Text>
+        ) : null}
+        <View style={styles.tarjeta}>
+          <Text style={styles.label}>Dirección</Text>
+          <TextInput
+            style={styles.input}
+            value={direccion}
+            onChangeText={valor => {
+              setDireccion(valor);
+              limpiarError('direccion');
+            }}
+            placeholder="Calle, número, referencias"
+            placeholderTextColor={c.mutedSoft}
+          />
+          <FieldError mensaje={errores.direccion} />
+          <Text style={styles.label}>Barrio</Text>
+          <BarrioSelect
+            valor={barrio}
+            onSeleccionar={valor => {
+              setBarrio(valor);
+              limpiarError('barrio');
+            }}
+            placeholder="Tu barrio"
+          />
+          <FieldError mensaje={errores.barrio} />
         </View>
       </FadeInView>
 

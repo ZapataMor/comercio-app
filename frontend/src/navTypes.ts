@@ -25,6 +25,8 @@ export type RootStackParamList = {
   AdminTablero: undefined;
   AdminUsuarios: undefined;
   AdminNegocios: undefined;
+  // Barrios sugeridos por clientes, pendientes de aprobación.
+  AdminBarrios: undefined;
   // Domiciliario
   Domiciliario: undefined;
 };

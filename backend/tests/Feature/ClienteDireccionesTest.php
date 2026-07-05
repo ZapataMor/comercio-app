@@ -10,7 +10,7 @@ beforeEach(function () {
     }
 });
 
-test('el cliente debe registrar direccion y barrio', function () {
+test('el cliente debe registrar direccion, barrio y telefono', function () {
     $this->postJson('/api/register', [
         'name' => 'Cliente',
         'email' => 'cliente@correo.com',
@@ -18,7 +18,7 @@ test('el cliente debe registrar direccion y barrio', function () {
         'password_confirmation' => 'password123',
         'role' => 'usuario',
     ])->assertStatus(422)
-        ->assertJsonValidationErrors(['direccion', 'barrio']);
+        ->assertJsonValidationErrors(['direccion', 'barrio', 'telefono']);
 });
 
 test('la direccion del registro queda como ubicacion principal', function () {
@@ -30,14 +30,17 @@ test('la direccion del registro queda como ubicacion principal', function () {
         'role' => 'usuario',
         'direccion' => 'Calle 10 # 20-30',
         'barrio' => 'Centro',
+        'telefono' => '3001234567',
     ])->assertCreated()
         ->assertJsonPath('user.direccion', 'Calle 10 # 20-30')
-        ->assertJsonPath('user.barrio', 'Centro');
+        ->assertJsonPath('user.barrio', 'Centro')
+        ->assertJsonPath('user.telefono', '3001234567');
 
     $this->assertDatabaseHas('users', [
         'email' => 'cliente@correo.com',
         'direccion' => 'Calle 10 # 20-30',
         'barrio' => 'Centro',
+        'telefono' => '3001234567',
     ]);
 
     $this->assertDatabaseHas('cliente_direcciones', [

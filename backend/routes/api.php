@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\DomiciliarioController as ApiDomiciliarioController;
 use App\Http\Controllers\Api\PedidoController as ApiPedidoController;
 use App\Http\Controllers\Api\ComercioPedidoController;
+use App\Http\Controllers\Api\BarrioController;
 use App\Http\Controllers\Api\ClienteDireccionController;
 use App\Http\Controllers\Api\DeviceTokenController;
 use Illuminate\Http\Request;
@@ -19,6 +20,9 @@ use Illuminate\Support\Facades\Route;
 // throttle:6,1 = máximo 6 intentos por minuto por IP (anti fuerza bruta).
 Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:6,1');
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:6,1');
+
+// Barrios aprobados de Maicao. Pública: el registro la necesita sin token.
+Route::get('/barrios', [BarrioController::class, 'index'])->middleware('throttle:30,1');
 
 // Rutas que requieren un token Sanctum válido.
 Route::middleware('auth:sanctum')->group(function () {
@@ -84,6 +88,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/usuarios', [AdminController::class, 'storeUsuario']);
         Route::put('/usuarios/{usuario}/rol', [AdminController::class, 'updateRol']);
         Route::get('/negocios', [AdminController::class, 'negocios']);
+        // Barrios sugeridos por clientes (aprobar → entra a la lista pública).
+        Route::get('/barrios/pendientes', [BarrioController::class, 'pendientes']);
+        Route::put('/barrios/{id}/aprobar', [BarrioController::class, 'aprobar']);
+        Route::delete('/barrios/{id}', [BarrioController::class, 'rechazar']);
     });
 
     // --- Zona del DOMICILIARIO (pedidos) ---
