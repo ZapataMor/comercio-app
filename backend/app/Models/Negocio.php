@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Negocio extends Model
@@ -53,6 +54,14 @@ class Negocio extends Model
     public function categorias(): HasMany
     {
         return $this->hasMany(Categoria::class);
+    }
+
+    /**
+     * Tipos del negocio para busqueda y filtros: panaderia, ferreteria, etc.
+     */
+    public function tiposNegocio(): BelongsToMany
+    {
+        return $this->belongsToMany(TipoNegocio::class, 'negocio_tipo_negocio');
     }
 
     /** Pedidos recibidos por este negocio. */

@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\DomiciliarioController as ApiDomiciliarioController;
 use App\Http\Controllers\Api\PedidoController as ApiPedidoController;
 use App\Http\Controllers\Api\ComercioPedidoController;
+use App\Http\Controllers\Api\ClienteDireccionController;
 use App\Http\Controllers\Api\DeviceTokenController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -45,6 +46,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/negocios/{id}', [CatalogoController::class, 'show']);
 
     // --- Pedidos del cliente ---
+    Route::get('/cliente/direcciones', [ClienteDireccionController::class, 'index']);
+    Route::post('/cliente/direcciones', [ClienteDireccionController::class, 'store']);
     Route::post('/pedidos', [ApiPedidoController::class, 'store']);
     Route::get('/pedidos', [ApiPedidoController::class, 'index']);
     Route::get('/pedidos/{id}', [ApiPedidoController::class, 'show']);

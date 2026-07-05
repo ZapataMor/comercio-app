@@ -4,14 +4,12 @@ use App\Models\User;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
 
-// Antes de cada test: crear los 4 roles (la BD se reinicia en cada test).
 beforeEach(function () {
     foreach (['administrador', 'comerciante', 'usuario', 'domiciliario'] as $rol) {
         Role::findOrCreate($rol, 'web');
     }
 });
 
-/** Cliente autenticado vía Sanctum. */
 function clienteAutenticado(): User
 {
     $user = User::factory()->create();
@@ -21,11 +19,11 @@ function clienteAutenticado(): User
     return $user;
 }
 
-test('la búsqueda de productos exige autenticación', function () {
+test('la busqueda de productos exige autenticacion', function () {
     $this->getJson('/api/productos?buscar=arroz')->assertStatus(401);
 });
 
-test('sin texto la búsqueda de productos devuelve lista vacía', function () {
+test('sin texto la busqueda de productos devuelve lista vacia', function () {
     clienteAutenticado();
 
     $this->getJson('/api/productos')
@@ -33,41 +31,43 @@ test('sin texto la búsqueda de productos devuelve lista vacía', function () {
         ->assertExactJson(['productos' => []]);
 });
 
-test('la búsqueda devuelve productos disponibles con su negocio, por relevancia', function () {
+test('la busqueda devuelve productos disponibles con su negocio, por relevancia', function () {
     clienteAutenticado();
 
     $dueno = User::factory()->create();
     $negocio = $dueno->negocio()->create(['nombre' => 'Donde Pepe', 'activo' => true]);
     $negocio->productos()->createMany([
-        ['nombre' => 'Arroz con pollo', 'precio' => 12000],      // contiene
-        ['nombre' => 'Arroz', 'precio' => 3000],                 // exacto
-        ['nombre' => 'Arroz chino', 'precio' => 9000],           // empieza por
-        ['nombre' => 'Pollo asado', 'precio' => 15000],          // no coincide
+        ['nombre' => 'Arroz con pollo', 'precio' => 12000],
+        ['nombre' => 'Arroz', 'precio' => 3000],
+        ['nombre' => 'Arroz chino', 'precio' => 9000],
+        ['nombre' => 'Pollo asado', 'precio' => 15000],
     ]);
 
     $resp = $this->getJson('/api/productos?buscar=Arroz')->assertOk();
 
     $nombres = collect($resp->json('productos'))->pluck('nombre')->all();
 
-    // Orden por cercanía: exacto, empieza por, contiene. "Pollo asado" no entra.
     expect($nombres)->toBe(['Arroz', 'Arroz chino', 'Arroz con pollo']);
-
-    // Cada producto trae el negocio que lo vende.
     expect($resp->json('productos.0.negocio.nombre'))->toBe('Donde Pepe');
+    expect($resp->json('productos.0.negocio.abierto'))->toBeTrue();
 });
 
-test('la búsqueda ignora productos no disponibles y negocios cerrados', function () {
+test('la busqueda incluye cerrados despues de abiertos e ignora productos no disponibles', function () {
     clienteAutenticado();
 
     $dueno = User::factory()->create();
     $abierto = $dueno->negocio()->create(['nombre' => 'Abierto', 'activo' => true]);
+    $abierto->productos()->create(['nombre' => 'Pan blanco', 'precio' => 1000]);
     $abierto->productos()->create(['nombre' => 'Pan dulce', 'precio' => 1000, 'disponible' => false]);
 
     $otroDueno = User::factory()->create();
     $cerrado = $otroDueno->negocio()->create(['nombre' => 'Cerrado', 'activo' => false]);
     $cerrado->productos()->create(['nombre' => 'Pan salado', 'precio' => 1000]);
 
-    $this->getJson('/api/productos?buscar=Pan')
-        ->assertOk()
-        ->assertJsonCount(0, 'productos');
+    $resp = $this->getJson('/api/productos?buscar=Pan')->assertOk();
+    $productos = collect($resp->json('productos'));
+
+    expect($productos->pluck('nombre')->all())->toBe(['Pan blanco', 'Pan salado']);
+    expect($productos[0]['negocio']['abierto'])->toBeTrue();
+    expect($productos[1]['negocio']['abierto'])->toBeFalse();
 });

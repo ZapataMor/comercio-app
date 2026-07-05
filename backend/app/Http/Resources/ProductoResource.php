@@ -36,6 +36,7 @@ class ProductoResource extends JsonResource
             'negocio' => $this->whenLoaded('negocio', fn () => [
                 'id' => $this->negocio->id,
                 'nombre' => $this->negocio->nombre,
+                'abierto' => (bool) $this->negocio->activo,
             ]),
         ];
     }

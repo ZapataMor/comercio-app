@@ -29,6 +29,10 @@ function precioCOP(n: number) {
   return '$' + Math.round(n).toLocaleString('es-CO');
 }
 
+function categoriasNegocio(negocio: Negocio) {
+  return negocio.categorias?.length ? negocio.categorias : negocio.categoria ? [negocio.categoria] : [];
+}
+
 function construirCatalogo(productos: Producto[]): CatalogoFila[] {
   const grupos = new Map<string, Producto[]>();
   productos.forEach(producto => {
@@ -53,6 +57,7 @@ export default function NegocioScreen({ route }: Props) {
   const [error, setError] = useState<string | null>(null);
   const catalogo = useMemo(() => construirCatalogo(productos), [productos]);
   const listaRef = useRef<FlatList<CatalogoFila>>(null);
+  const negocioAbierto = negocio?.activo !== false;
 
   useEffect(() => {
     getCatalogo(auth!.token, id)
@@ -77,6 +82,11 @@ export default function NegocioScreen({ route }: Props) {
   }, [productoId, catalogo]);
 
   function onAgregar(p: Producto, e: GestureResponderEvent) {
+    if (!negocioAbierto) {
+      Alert.alert('Negocio cerrado', 'Este negocio está cerrado ahora. Puedes revisar el catálogo, pero no hacer pedidos.');
+      return;
+    }
+
     // Punto exacto del toque sobre "Pedir": desde ahí salta el paquetito
     // que vuela hasta el botón flotante de Carrito.
     const desde = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
@@ -151,6 +161,9 @@ export default function NegocioScreen({ route }: Props) {
               <View style={styles.heroContenido}>
                 {!!negocio.categoria && <Text style={styles.heroCategoria}>{negocio.categoria}</Text>}
                 <Text style={styles.heroNombre} numberOfLines={2}>{negocio.nombre}</Text>
+                <Text style={negocio.activo ? styles.heroEstadoAbierto : styles.heroEstadoCerrado}>
+                  {negocio.activo ? 'Abierto' : 'Cerrado'}
+                </Text>
                 {!!negocio.direccion && (
                   <View style={styles.heroDato}>
                     <Icon name="ubicacion" size={13} color="rgba(255,255,255,0.78)" />
@@ -160,6 +173,15 @@ export default function NegocioScreen({ route }: Props) {
               </View>
             </View>
             {!!negocio.descripcion && <Text style={styles.desc}>{negocio.descripcion}</Text>}
+            {categoriasNegocio(negocio).length > 0 && (
+              <View style={styles.categoriasChips}>
+                {categoriasNegocio(negocio).map(categoria => (
+                  <View key={categoria} style={styles.categoriaChip}>
+                    <Text style={styles.categoriaChipTxt}>{categoria}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
             <Text style={styles.catalogoTitulo}>Catálogo</Text>
           </View>
         ) : null
@@ -190,8 +212,13 @@ export default function NegocioScreen({ route }: Props) {
                 {item.producto.precio_formateado ?? precioCOP(item.producto.precio)}
               </Text>
             </View>
-            <PressableScale style={styles.addBtn} onPress={e => onAgregar(item.producto, e)}>
-              <Text style={styles.addTxt}>+ Pedir</Text>
+            <PressableScale
+              style={[styles.addBtn, !negocioAbierto && styles.addBtnOff]}
+              disabled={!negocioAbierto}
+              onPress={e => onAgregar(item.producto, e)}>
+              <Text style={[styles.addTxt, !negocioAbierto && styles.addTxtOff]}>
+                {negocioAbierto ? '+ Pedir' : 'Cerrado'}
+              </Text>
             </PressableScale>
           </View>
         </FadeInView>
@@ -239,9 +266,27 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 8,
   },
+  heroEstadoAbierto: {
+    marginTop: 12, color: c.success, backgroundColor: c.successSoft, fontFamily: font.bold,
+    fontSize: 12, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, overflow: 'hidden',
+  },
+  heroEstadoCerrado: {
+    marginTop: 12, color: c.danger, backgroundColor: c.dangerSoft, fontFamily: font.bold,
+    fontSize: 12, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, overflow: 'hidden',
+  },
   heroDato: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 12, maxWidth: '92%' },
   heroDatoTxt: { color: 'rgba(255,255,255,0.78)', fontSize: 13, fontFamily: font.medium, flexShrink: 1 },
   desc: { color: c.text, fontSize: 15, lineHeight: 21, fontFamily: font.regular, marginBottom: 14 },
+  categoriasChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
+  categoriaChip: {
+    backgroundColor: c.accentSoft,
+    borderColor: c.accent,
+    borderWidth: 1,
+    borderRadius: radius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  categoriaChipTxt: { color: c.goldText, fontFamily: font.semibold, fontSize: 12 },
   catalogoTitulo: { color: c.textStrong, fontSize: 22, fontFamily: font.display, marginBottom: 2 },
   seccionHead: {
     flexDirection: 'row',
@@ -265,6 +310,8 @@ const styles = StyleSheet.create({
   precio: { color: c.goldText, fontFamily: font.extra, fontSize: 15, marginTop: 4 },
   addBtn: { backgroundColor: c.accent, borderRadius: radius.sm, paddingHorizontal: 14, paddingVertical: 9, ...shadow.gold },
   addTxt: { color: c.onAccent, fontFamily: font.bold },
+  addBtnOff: { backgroundColor: c.surface2, shadowOpacity: 0, elevation: 0 },
+  addTxtOff: { color: c.mutedSoft },
   vacio: { textAlign: 'center', color: c.muted, marginTop: 40, fontFamily: font.regular },
   error: { color: c.danger, backgroundColor: c.dangerSoft, padding: 12, borderRadius: radius.sm, margin: 16, fontFamily: font.medium },
 });

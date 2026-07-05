@@ -28,6 +28,7 @@ class CatalogoController extends Controller
     public function index(Request $request): JsonResponse
     {
         $query = Negocio::query()
+            ->with('tiposNegocio')
             ->withCount(['productos' => fn ($q) => $q->where('disponible', true)]);
 
         if ($request->filled('buscar')) {
@@ -36,6 +37,7 @@ class CatalogoController extends Controller
             $query->where(function ($q) use ($texto) {
                 $q->where('nombre', 'like', "%{$texto}%")
                     ->orWhere('descripcion', 'like', "%{$texto}%")
+                    ->orWhereHas('tiposNegocio', fn ($c) => $c->where('nombre', 'like', "%{$texto}%"))
                     // Negocios con productos disponibles que coincidan por
                     // nombre o por el nombre de su categoría.
                     ->orWhereHas('productos', function ($p) use ($texto) {
@@ -58,7 +60,8 @@ class CatalogoController extends Controller
             'id' => $n->id,
             'nombre' => $n->nombre,
             'descripcion' => $n->descripcion,
-            'categoria' => $n->categoria,
+            'categoria' => $n->tiposNegocio->first()?->nombre ?? $n->categoria,
+            'categorias' => $n->tiposNegocio->pluck('nombre')->values()->all(),
             'direccion' => $n->direccion,
             'imagen' => $n->imagen ? '/storage/'.$n->imagen : null,
             'productos' => $n->productos_count,
@@ -97,13 +100,18 @@ class CatalogoController extends Controller
 
         $productos = Producto::query()
             ->where('disponible', true)
-            ->whereHas('negocio', fn ($n) => $n->where('activo', true))
+            ->whereHas('negocio')
             ->where(function ($q) use ($texto, $like) {
                 $q->where('nombre', 'like', $like)
                     ->orWhere('descripcion', 'like', $like)
                     ->orWhereHas('categoria', fn ($c) => $c->where('nombre', 'like', $like));
             })
             ->with(['categoria', 'negocio'])
+            ->orderByDesc(
+                Negocio::select('activo')
+                    ->whereColumn('negocios.id', 'productos.negocio_id')
+                    ->limit(1)
+            )
             // Ranking de cercanía de la coincidencia (0 = más cercana).
             ->orderByRaw(
                 'CASE
@@ -123,13 +131,13 @@ class CatalogoController extends Controller
         ]);
     }
 
-    /** Detalle de un negocio abierto + sus productos disponibles. */
+    /** Detalle de un negocio + sus productos disponibles. */
     public function show(int $id): JsonResponse
     {
-        $negocio = Negocio::where('activo', true)->find($id);
+        $negocio = Negocio::with('tiposNegocio')->find($id);
 
         if (! $negocio) {
-            return response()->json(['message' => 'Negocio no disponible.'], 404);
+            return response()->json(['message' => 'Negocio no encontrado.'], 404);
         }
 
         $productos = $negocio->productos()
@@ -143,9 +151,11 @@ class CatalogoController extends Controller
                 'id' => $negocio->id,
                 'nombre' => $negocio->nombre,
                 'descripcion' => $negocio->descripcion,
-                'categoria' => $negocio->categoria,
+                'categoria' => $negocio->tiposNegocio->first()?->nombre ?? $negocio->categoria,
+                'categorias' => $negocio->tiposNegocio->pluck('nombre')->values()->all(),
                 'direccion' => $negocio->direccion,
                 'telefono' => $negocio->telefono,
+                'activo' => (bool) $negocio->activo,
                 'imagen' => $negocio->imagen ? '/storage/'.$negocio->imagen : null,
             ],
             'productos' => ProductoResource::collection($productos),

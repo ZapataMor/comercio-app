@@ -30,6 +30,10 @@ function precioCOP(n: number) {
   return '$' + Math.round(n).toLocaleString('es-CO');
 }
 
+function categoriasNegocio(item: { categorias?: string[]; categoria?: string | null }) {
+  return item.categorias?.length ? item.categorias : item.categoria ? [item.categoria] : [];
+}
+
 export default function ExplorarScreen({ navigation }: Props) {
   const { auth } = useAuth();
   const [negocios, setNegocios] = useState<NegocioLista[]>([]);
@@ -217,6 +221,9 @@ function renderProducto(
             <View style={[styles.negocioFila, styles.filaAccion]}>
               <Icon name="tienda" size={13} color={c.accent} />
               <Text style={styles.negocioTxt} numberOfLines={1}>{item.negocio.nombre}</Text>
+              <Text style={item.negocio.abierto ? styles.abiertoMini : styles.cerradoMini}>
+                {item.negocio.abierto ? 'Abierto' : 'Cerrado'}
+              </Text>
             </View>
           </View>
           <Icon name="chevron" size={18} color={c.chevron} />
@@ -270,7 +277,7 @@ const CardNegocio = React.memo(function CardNegocio({
           </Text>
         </View>
 
-        {!!item.categoria && (
+        {!expandida && !!item.categoria && (
           <View style={[styles.categoriaFila, styles.filaAccion]}>
             <Icon name="tienda" size={13} color={c.accent} />
             <Text style={styles.categoriaTxt}>{item.categoria}</Text>
@@ -284,6 +291,15 @@ const CardNegocio = React.memo(function CardNegocio({
         )}
 
         <Desplegable abierto={expandida}>
+          {categoriasNegocio(item).length > 0 && (
+            <View style={styles.categoriasChips}>
+              {categoriasNegocio(item).map(categoria => (
+                <View key={categoria} style={styles.categoriaChip}>
+                  <Text style={styles.categoriaChipTxt}>{categoria}</Text>
+                </View>
+              ))}
+            </View>
+          )}
           {!!item.descripcion && (
             <Text style={styles.desc} numberOfLines={3}>{item.descripcion}</Text>
           )}
@@ -333,6 +349,16 @@ const styles = StyleSheet.create({
   dir: { color: c.mutedSoft, fontSize: 12, marginTop: 8, fontFamily: font.regular },
   categoriaFila: { marginTop: 7 },
   categoriaTxt: { color: c.goldText, fontFamily: font.semibold, fontSize: 13 },
+  categoriasChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+  categoriaChip: {
+    backgroundColor: c.accentSoft,
+    borderColor: c.accent,
+    borderWidth: 1,
+    borderRadius: radius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  categoriaChipTxt: { color: c.goldText, fontFamily: font.semibold, fontSize: 12 },
   // Botón minimalista "Entrar a la tienda" de la card extendida.
   botonEntrar: {
     marginTop: 14, paddingVertical: 11, borderRadius: radius.md, alignItems: 'center',
@@ -350,6 +376,14 @@ const styles = StyleSheet.create({
   precio: { color: c.goldText, fontFamily: font.extra, fontSize: 15, marginTop: 2 },
   negocioFila: { marginTop: 8 },
   negocioTxt: { color: c.goldText, fontFamily: font.semibold, fontSize: 13, flexShrink: 1 },
+  abiertoMini: {
+    fontSize: 10, fontFamily: font.bold, backgroundColor: c.successSoft, color: c.success,
+    paddingHorizontal: 6, paddingVertical: 2, borderRadius: radius.pill, overflow: 'hidden',
+  },
+  cerradoMini: {
+    fontSize: 10, fontFamily: font.bold, backgroundColor: c.dangerSoft, color: c.danger,
+    paddingHorizontal: 6, paddingVertical: 2, borderRadius: radius.pill, overflow: 'hidden',
+  },
   vacio: { textAlign: 'center', color: c.muted, marginTop: 40, fontFamily: font.regular },
   error: { color: c.danger, backgroundColor: c.dangerSoft, padding: 12, borderRadius: radius.sm, marginBottom: 12, fontFamily: font.medium },
 });

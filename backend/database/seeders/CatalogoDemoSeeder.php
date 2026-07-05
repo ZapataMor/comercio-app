@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Models\TipoNegocio;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -49,10 +50,13 @@ class CatalogoDemoSeeder extends Seeder
             'nombre' => $nombre,
         ], [
             'descripcion' => $this->descripcionPorTipo($tipo),
+            'categoria' => $this->categoriasNegocio($tipo)[0] ?? null,
             'direccion' => 'Calle '.rand(1, 90).' # '.rand(1, 50).'-'.rand(1, 99),
             'telefono' => '3'.rand(0, 1).rand(10_000_000, 99_999_999),
             'activo' => true,
         ]);
+
+        $this->sincronizarCategoriasNegocio($negocio, $tipo);
 
         // Si el negocio ya tiene productos, no volvemos a sembrar (idempotente).
         if ($negocio->productos()->exists()) {
@@ -102,6 +106,42 @@ class CatalogoDemoSeeder extends Seeder
             'licoreria' => 'Licores nacionales e importados.',
             'minimercado' => 'Víveres, abarrotes y productos de la canasta familiar.',
             default => 'Negocio local.',
+        };
+    }
+
+    private function sincronizarCategoriasNegocio(\App\Models\Negocio $negocio, string $tipo): void
+    {
+        $ids = collect($this->categoriasNegocio($tipo))->map(function (string $nombre) {
+            return TipoNegocio::firstOrCreate(
+                ['slug' => Str::slug($nombre)],
+                ['nombre' => $nombre],
+            )->id;
+        });
+
+        $negocio->tiposNegocio()->syncWithoutDetaching($ids);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function categoriasNegocio(string $tipo): array
+    {
+        return match ($tipo) {
+            'restaurante' => ['Restaurante', 'Comidas rápidas'],
+            'asadero' => ['Comidas rápidas', 'Restaurante'],
+            'cafeteria' => ['Café', 'Panadería'],
+            'bar' => ['Bar', 'Licorería'],
+            'heladeria' => ['Heladería', 'Postres'],
+            'panaderia' => ['Panadería', 'Café'],
+            'papeleria' => ['Papelería', 'Miscelánea'],
+            'ferreteria' => ['Ferretería', 'Construcción'],
+            'ropa' => ['Ropa', 'Calzado'],
+            'fruteria' => ['Frutería', 'Verduras'],
+            'carniceria' => ['Carnicería'],
+            'drogueria' => ['Droguería', 'Belleza'],
+            'licoreria' => ['Licorería'],
+            'minimercado' => ['Minimercado', 'Supermercado'],
+            default => ['Miscelánea'],
         };
     }
 

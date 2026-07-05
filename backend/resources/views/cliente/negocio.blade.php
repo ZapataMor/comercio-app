@@ -7,7 +7,12 @@
 
 {{-- Cabecera del negocio --}}
 <div class="bg-white rounded-2xl shadow p-6 mt-3 mb-5">
-    <h2 class="text-2xl font-bold">{{ $negocio->nombre }}</h2>
+    <div class="flex items-start justify-between gap-3">
+        <h2 class="text-2xl font-bold">{{ $negocio->nombre }}</h2>
+        <span class="text-xs font-semibold rounded-full px-2 py-1 {{ $negocio->activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700' }}">
+            {{ $negocio->activo ? 'Abierto' : 'Cerrado' }}
+        </span>
+    </div>
     @if ($negocio->descripcion)
         <p class="text-slate-500 mt-1">{{ $negocio->descripcion }}</p>
     @endif
@@ -34,8 +39,10 @@
                         <span class="font-semibold text-slate-800">${{ number_format($p->precio, 0, ',', '.') }}</span>
                         <form method="POST" action="{{ route('carrito.agregar', $p->id) }}">
                             @csrf
-                            <button class="text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-1.5">
-                                + Pedir
+                            <button
+                                @disabled(! $negocio->activo)
+                                class="text-sm rounded-lg px-3 py-1.5 {{ $negocio->activo ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed' }}">
+                                {{ $negocio->activo ? '+ Pedir' : 'Cerrado' }}
                             </button>
                         </form>
                     </div>

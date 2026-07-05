@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -25,31 +26,43 @@ class AuthController extends Controller
      */
     public function register(Request $request): JsonResponse
     {
+        $role = $request->input('role', 'usuario');
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'role' => ['sometimes', Rule::in(self::ROLES_PUBLICOS)],
+            'direccion' => [Rule::requiredIf($role === 'usuario'), 'nullable', 'string', 'max:255'],
+            'barrio' => [Rule::requiredIf($role === 'usuario'), 'nullable', 'string', 'max:120'],
         ]);
 
-        $user = User::create([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'password' => $data['password'], // se hashea solo (cast 'hashed' en el modelo)
-        ]);
+        $user = DB::transaction(function () use ($data, $role) {
+            $user = User::create([
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'password' => $data['password'], // se hashea solo (cast 'hashed' en el modelo)
+                'direccion' => $role === 'usuario' ? $data['direccion'] : null,
+                'barrio' => $role === 'usuario' ? $data['barrio'] : null,
+            ]);
 
-        // Si no envían rol, por defecto es 'usuario' (cliente).
-        $user->assignRole($data['role'] ?? 'usuario');
+            $user->assignRole($role);
+
+            if ($role === 'usuario') {
+                $user->clienteDirecciones()->create([
+                    'direccion' => $data['direccion'],
+                    'barrio' => $data['barrio'],
+                    'es_principal' => true,
+                ]);
+            }
+
+            return $user;
+        });
 
         $token = $user->createToken('api')->plainTextToken;
 
         return response()->json([
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'roles' => $user->getRoleNames(),
-            ],
+            'user' => $this->userPayload($user),
             'token' => $token,
         ], 201);
     }
@@ -76,12 +89,7 @@ class AuthController extends Controller
         $token = $user->createToken('api')->plainTextToken;
 
         return response()->json([
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'roles' => $user->getRoleNames(),
-            ],
+            'user' => $this->userPayload($user),
             'token' => $token,
         ]);
     }
@@ -119,12 +127,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Perfil actualizado.',
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'roles' => $user->getRoleNames(),
-            ],
+            'user' => $this->userPayload($user),
         ]);
     }
 
@@ -138,5 +141,17 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'Sesión cerrada correctamente.',
         ]);
+    }
+
+    private function userPayload(User $user): array
+    {
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'roles' => $user->getRoleNames(),
+            'direccion' => $user->direccion,
+            'barrio' => $user->barrio,
+        ];
     }
 }

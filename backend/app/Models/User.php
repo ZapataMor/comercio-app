@@ -12,7 +12,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
-#[Fillable(['name', 'email', 'password'])]
+#[Fillable(['name', 'email', 'password', 'direccion', 'barrio'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -50,6 +50,12 @@ class User extends Authenticatable
     public function pedidos(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(Pedido::class, 'user_id');
+    }
+
+    /** Ubicaciones guardadas por el cliente para sus pedidos. */
+    public function clienteDirecciones(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ClienteDireccion::class);
     }
 
     /** Pedidos que lleva como domiciliario. */

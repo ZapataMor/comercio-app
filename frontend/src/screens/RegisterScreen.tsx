@@ -35,6 +35,8 @@ export default function RegisterScreen({ navigation }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmar, setConfirmar] = useState('');
+  const [direccion, setDireccion] = useState('');
+  const [barrio, setBarrio] = useState('');
   const [rol, setRol] = useState<RolPublico>('usuario');
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +46,10 @@ export default function RegisterScreen({ navigation }: Props) {
 
     if (!nombre.trim() || !email.trim() || !password) {
       setError('Completa nombre, correo y contraseña.');
+      return;
+    }
+    if (rol === 'usuario' && (!direccion.trim() || !barrio.trim())) {
+      setError('Completa direccion y barrio para tus pedidos.');
       return;
     }
     if (password.length < 8) {
@@ -62,6 +68,8 @@ export default function RegisterScreen({ navigation }: Props) {
         email: email.trim(),
         password,
         role: rol,
+        direccion: rol === 'usuario' ? direccion.trim() : undefined,
+        barrio: rol === 'usuario' ? barrio.trim() : undefined,
       });
       guardarSesion(token, user);
     } catch (e) {
@@ -153,6 +161,30 @@ export default function RegisterScreen({ navigation }: Props) {
               </TouchableOpacity>
             ))}
           </View>
+
+          {rol === 'usuario' ? (
+            <>
+              <Text style={styles.label}>Direccion</Text>
+              <TextInput
+                style={styles.input}
+                value={direccion}
+                onChangeText={setDireccion}
+                placeholder="Calle, numero, referencia"
+                placeholderTextColor={c.mutedSoft}
+                editable={!cargando}
+              />
+
+              <Text style={styles.label}>Barrio</Text>
+              <TextInput
+                style={styles.input}
+                value={barrio}
+                onChangeText={setBarrio}
+                placeholder="Barrio"
+                placeholderTextColor={c.mutedSoft}
+                editable={!cargando}
+              />
+            </>
+          ) : null}
 
           <PressableScale
             style={[styles.boton, cargando && styles.botonDisabled]}

@@ -5,6 +5,8 @@ export type Usuario = {
   name: string;
   email: string;
   roles: string[];
+  direccion?: string | null;
+  barrio?: string | null;
 };
 
 export type LoginResponse = {
@@ -18,6 +20,7 @@ export type Negocio = {
   descripcion: string | null;
   /** Tipo de negocio: Restaurante, Almacén de ropa, Farmacia, etc. */
   categoria: string | null;
+  categorias: string[];
   direccion: string | null;
   telefono: string | null;
   activo: boolean;
@@ -46,6 +49,7 @@ export type NegocioLista = {
   descripcion: string | null;
   /** Tipo de negocio: Restaurante, Almacén de ropa, Farmacia, etc. */
   categoria: string | null;
+  categorias: string[];
   direccion: string | null;
   imagen?: string | null;
   productos: number;
@@ -114,6 +118,8 @@ export async function register(body: {
   email: string;
   password: string;
   role: RolPublico;
+  direccion?: string;
+  barrio?: string;
 }): Promise<LoginResponse> {
   let res: Response;
   try {
@@ -208,7 +214,9 @@ async function authUpload(
   }
   for (const [k, v] of Object.entries(campos)) {
     if (v === undefined) continue;
-    if (typeof v === 'boolean') form.append(k, v ? '1' : '0');
+    if (Array.isArray(v)) {
+      v.forEach(item => form.append(`${k}[]`, String(item)));
+    } else if (typeof v === 'boolean') form.append(k, v ? '1' : '0');
     else if (v === null) form.append(k, ''); // '' -> null en el backend
     else form.append(k, String(v));
   }
@@ -262,6 +270,28 @@ export async function actualizarPerfil(token: string, body: PerfilInput): Promis
   return d.user as Usuario;
 }
 
+// ---------- Cliente: ubicaciones ----------
+
+export type ClienteDireccion = {
+  id: number;
+  direccion: string;
+  barrio: string;
+  es_principal: boolean;
+};
+
+export async function getClienteDirecciones(token: string): Promise<ClienteDireccion[]> {
+  const d = await authGet('/api/cliente/direcciones', token);
+  return (d.direcciones ?? []) as ClienteDireccion[];
+}
+
+export async function crearClienteDireccion(
+  token: string,
+  body: { direccion: string; barrio: string },
+): Promise<ClienteDireccion> {
+  const d = await authSend('POST', '/api/cliente/direcciones', token, body);
+  return d.direccion as ClienteDireccion;
+}
+
 /** Mi negocio (o null si el comerciante aún no lo creó → 404). */
 export async function getNegocio(token: string): Promise<Negocio | null> {
   try {
@@ -304,6 +334,7 @@ export type NegocioInput = {
   nombre: string;
   descripcion?: string | null;
   categoria?: string | null;
+  categorias?: string[];
   direccion?: string | null;
   telefono?: string | null;
   activo?: boolean;
@@ -460,7 +491,7 @@ export async function getNegocios(
 
 /** Producto de la búsqueda del cliente, con el negocio que lo vende. */
 export type ProductoConNegocio = Producto & {
-  negocio: { id: number; nombre: string };
+  negocio: { id: number; nombre: string; abierto: boolean };
 };
 
 /**

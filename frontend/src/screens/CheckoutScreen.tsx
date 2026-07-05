@@ -1,5 +1,5 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -9,7 +9,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { crearPedido } from '../api';
+import {
+  ClienteDireccion,
+  crearClienteDireccion,
+  crearPedido,
+  getClienteDirecciones,
+} from '../api';
 import { useAuth } from '../AuthContext';
 import { useCart } from '../CartContext';
 import { FadeInView, PressableScale } from '../components/anim';
@@ -19,36 +24,105 @@ import { c, font, radius, shadow } from '../theme';
 import { useToast } from '../Toast';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Checkout'>;
+type SeleccionUbicacion = number | 'nueva' | null;
 
 function cop(n: number) {
   return '$' + Math.round(n).toLocaleString('es-CO');
+}
+
+function textoUbicacion(ubicacion: Pick<ClienteDireccion, 'direccion' | 'barrio'>) {
+  return `${ubicacion.direccion} - Barrio ${ubicacion.barrio}`;
 }
 
 export default function CheckoutScreen({ navigation }: Props) {
   const { auth } = useAuth();
   const cart = useCart();
   const toast = useToast();
-  const [direccion, setDireccion] = useState('');
+  const [direcciones, setDirecciones] = useState<ClienteDireccion[]>([]);
+  const [seleccion, setSeleccion] = useState<SeleccionUbicacion>(null);
+  const [cargandoDirecciones, setCargandoDirecciones] = useState(true);
+  const [nuevaDireccion, setNuevaDireccion] = useState('');
+  const [nuevoBarrio, setNuevoBarrio] = useState('');
   const [telefono, setTelefono] = useState('');
   const [pago, setPago] = useState('efectivo');
   const [enviando, setEnviando] = useState(false);
 
+  useEffect(() => {
+    let activo = true;
+
+    async function cargarDirecciones() {
+      if (!auth?.token) return;
+      try {
+        const lista = await getClienteDirecciones(auth.token);
+        if (!activo) return;
+        setDirecciones(lista);
+        const principal = lista.find(d => d.es_principal) ?? lista[0];
+        setSeleccion(principal?.id ?? 'nueva');
+      } catch (e) {
+        if (activo) {
+          setSeleccion('nueva');
+          toast.error('Ubicaciones no disponibles', e instanceof Error ? e.message : 'Intenta de nuevo.');
+        }
+      } finally {
+        if (activo) setCargandoDirecciones(false);
+      }
+    }
+
+    cargarDirecciones();
+    return () => {
+      activo = false;
+    };
+  }, [auth?.token, toast]);
+
+  const ubicacionSeleccionada = useMemo(
+    () => direcciones.find(d => d.id === seleccion) ?? null,
+    [direcciones, seleccion],
+  );
+
   async function confirmar() {
-    if (!direccion.trim() || !telefono.trim()) {
-      toast.error('Faltan datos', 'Escribe la dirección y el teléfono.');
+    if (!telefono.trim()) {
+      toast.error('Faltan datos', 'Escribe el telefono de contacto.');
       return;
     }
+
+    let direccionEntrega = ubicacionSeleccionada ? textoUbicacion(ubicacionSeleccionada) : '';
+
+    if (seleccion === 'nueva') {
+      if (!nuevaDireccion.trim() || !nuevoBarrio.trim()) {
+        toast.error('Faltan datos', 'Escribe la nueva direccion y el barrio.');
+        return;
+      }
+      direccionEntrega = textoUbicacion({
+        direccion: nuevaDireccion.trim(),
+        barrio: nuevoBarrio.trim(),
+      });
+    }
+
+    if (!direccionEntrega) {
+      toast.error('Faltan datos', 'Selecciona o agrega una ubicacion de entrega.');
+      return;
+    }
+
     setEnviando(true);
     try {
+      if (seleccion === 'nueva') {
+        const guardada = await crearClienteDireccion(auth!.token, {
+          direccion: nuevaDireccion.trim(),
+          barrio: nuevoBarrio.trim(),
+        });
+        setDirecciones(prev => [guardada, ...prev]);
+        setSeleccion(guardada.id);
+      }
+
       await crearPedido(auth!.token, {
         negocio_id: cart.negocioId!,
         items: cart.items.map(i => ({ producto_id: i.producto_id, cantidad: i.cantidad })),
         metodo_pago: pago,
-        direccion_entrega: direccion,
-        telefono_contacto: telefono,
+        direccion_entrega: direccionEntrega,
+        telefono_contacto: telefono.trim(),
       });
       cart.vaciar();
-      toast.exito('¡Pedido confirmado!', 'El negocio ya recibió tu pedido.');
+      toast.exito('Pedido confirmado', 'El negocio ya recibio tu pedido.');
       navigation.navigate('MisPedidos');
     } catch (e) {
       toast.error('No se pudo confirmar', e instanceof Error ? e.message : 'Error');
@@ -60,7 +134,6 @@ export default function CheckoutScreen({ navigation }: Props) {
   return (
     <ScrollView
       style={styles.container}
-      // Aire abajo para la barra flotante fija (Carrito / Mis pedidos).
       contentContainerStyle={{ padding: 16, paddingBottom: 110 }}>
       <FadeInView style={styles.resumen}>
         <View style={[styles.resumenTitulo, styles.fila]}>
@@ -69,7 +142,7 @@ export default function CheckoutScreen({ navigation }: Props) {
         </View>
         {cart.items.map(i => (
           <View key={i.producto_id} style={styles.linea}>
-            <Text style={styles.lineaTxt}>{i.cantidad}× {i.nombre}</Text>
+            <Text style={styles.lineaTxt}>{i.cantidad}x {i.nombre}</Text>
             <Text style={styles.lineaTxt}>{cop(i.precio * i.cantidad)}</Text>
           </View>
         ))}
@@ -79,10 +152,73 @@ export default function CheckoutScreen({ navigation }: Props) {
         </View>
       </FadeInView>
 
-      <Text style={styles.label}>Dirección de entrega</Text>
-      <TextInput style={styles.input} value={direccion} onChangeText={setDireccion} placeholder="Calle, número, barrio…" placeholderTextColor={c.mutedSoft} />
+      <Text style={styles.label}>Ubicacion de entrega</Text>
+      {cargandoDirecciones ? (
+        <View style={styles.cargandoUbicaciones}>
+          <ActivityIndicator color={c.accent} />
+        </View>
+      ) : (
+        <View style={styles.ubicaciones}>
+          {direcciones.map(d => {
+            const activa = seleccion === d.id;
+            return (
+              <TouchableOpacity
+                key={d.id}
+                style={[styles.ubicacion, activa && styles.ubicacionOn]}
+                onPress={() => setSeleccion(d.id)}>
+                <View style={styles.ubicacionIcono}>
+                  <Icon name={activa ? 'check' : 'ubicacion'} size={18} color={activa ? c.onAccent : c.muted} />
+                </View>
+                <View style={styles.ubicacionTexto}>
+                  <Text style={[styles.ubicacionTitulo, activa && styles.ubicacionTituloOn]}>
+                    {d.es_principal ? 'Direccion principal' : 'Otra ubicacion'}
+                  </Text>
+                  <Text style={[styles.ubicacionDetalle, activa && styles.ubicacionDetalleOn]}>
+                    {textoUbicacion(d)}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
 
-      <Text style={styles.label}>Teléfono de contacto</Text>
+          <TouchableOpacity
+            style={[styles.ubicacion, seleccion === 'nueva' && styles.ubicacionOn]}
+            onPress={() => setSeleccion('nueva')}>
+            <View style={styles.ubicacionIcono}>
+              <Icon name={seleccion === 'nueva' ? 'check' : 'ubicacion'} size={18} color={seleccion === 'nueva' ? c.onAccent : c.muted} />
+            </View>
+            <View style={styles.ubicacionTexto}>
+              <Text style={[styles.ubicacionTitulo, seleccion === 'nueva' && styles.ubicacionTituloOn]}>
+                Agregar otra ubicacion
+              </Text>
+              <Text style={[styles.ubicacionDetalle, seleccion === 'nueva' && styles.ubicacionDetalleOn]}>
+                Guardala para usarla en otros pedidos.
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {seleccion === 'nueva' ? (
+        <View style={styles.nuevaBox}>
+          <TextInput
+            style={styles.input}
+            value={nuevaDireccion}
+            onChangeText={setNuevaDireccion}
+            placeholder="Calle, numero, referencia"
+            placeholderTextColor={c.mutedSoft}
+          />
+          <TextInput
+            style={styles.input}
+            value={nuevoBarrio}
+            onChangeText={setNuevoBarrio}
+            placeholder="Barrio"
+            placeholderTextColor={c.mutedSoft}
+          />
+        </View>
+      ) : null}
+
+      <Text style={styles.label}>Telefono de contacto</Text>
       <TextInput style={styles.input} value={telefono} onChangeText={setTelefono} placeholder="300 123 4567" placeholderTextColor={c.mutedSoft} keyboardType="phone-pad" />
 
       <Text style={styles.label}>Forma de pago</Text>
@@ -101,11 +237,11 @@ export default function CheckoutScreen({ navigation }: Props) {
         ))}
       </View>
 
-      <PressableScale style={styles.btn} onPress={confirmar} disabled={enviando}>
+      <PressableScale style={styles.btn} onPress={confirmar} disabled={enviando || cargandoDirecciones}>
         {enviando ? (
           <ActivityIndicator color={c.onAccent} />
         ) : (
-          <Text style={styles.btnTxt}>Confirmar pedido · {cop(cart.total)}</Text>
+          <Text style={styles.btnTxt}>Confirmar pedido - {cop(cart.total)}</Text>
         )}
       </PressableScale>
     </ScrollView>
@@ -117,13 +253,24 @@ const styles = StyleSheet.create({
   resumen: { backgroundColor: c.surface, borderRadius: radius.md, padding: 16, marginBottom: 16, ...shadow.soft },
   resumenTitulo: { fontFamily: font.bold, color: c.text, marginBottom: 8 },
   fila: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  linea: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
-  lineaTxt: { color: c.text, fontFamily: font.regular },
+  linea: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3, gap: 12 },
+  lineaTxt: { color: c.text, fontFamily: font.regular, flexShrink: 1 },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: c.border },
   totalLabel: { fontFamily: font.bold, color: c.textStrong },
   totalValor: { fontFamily: font.extra, color: c.textStrong },
   label: { fontSize: 13, fontFamily: font.semibold, color: c.text, marginBottom: 6, marginTop: 6 },
   input: { backgroundColor: c.surface, borderWidth: 1, borderColor: c.borderStrong, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12, color: c.textStrong, fontFamily: font.regular },
+  cargandoUbicaciones: { backgroundColor: c.surface, borderRadius: radius.md, padding: 18, marginBottom: 12, alignItems: 'center' },
+  ubicaciones: { gap: 10, marginBottom: 12 },
+  ubicacion: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: c.borderStrong, borderRadius: radius.md, padding: 12, backgroundColor: c.surface },
+  ubicacionOn: { borderColor: c.accent, backgroundColor: c.accentSoft },
+  ubicacionIcono: { width: 24, alignItems: 'center' },
+  ubicacionTexto: { flex: 1 },
+  ubicacionTitulo: { color: c.textStrong, fontFamily: font.bold, fontSize: 14 },
+  ubicacionTituloOn: { color: c.onAccent },
+  ubicacionDetalle: { color: c.muted, fontFamily: font.regular, fontSize: 12, marginTop: 2 },
+  ubicacionDetalleOn: { color: c.onAccent },
+  nuevaBox: { marginBottom: 2 },
   pagos: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   pago: { flex: 1, borderWidth: 1, borderColor: c.borderStrong, borderRadius: radius.md, paddingVertical: 14, alignItems: 'center', gap: 4, backgroundColor: c.surface },
   pagoOn: { borderColor: c.accent, backgroundColor: c.accentSoft },

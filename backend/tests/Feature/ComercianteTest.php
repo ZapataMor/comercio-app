@@ -54,14 +54,17 @@ test('un comerciante crea su negocio', function () {
 
     $this->postJson('/api/comerciante/negocio', [
         'nombre' => 'Donde Pepe',
-        'categoria' => 'Restaurante',
+        'categorias' => ['Restaurante', 'Comidas rápidas'],
     ])
         ->assertStatus(201)
         ->assertJsonPath('negocio.nombre', 'Donde Pepe')
         ->assertJsonPath('negocio.categoria', 'Restaurante')
+        ->assertJsonPath('negocio.categorias.0', 'Restaurante')
+        ->assertJsonPath('negocio.categorias.1', 'Comidas rápidas')
         ->assertJsonPath('negocio.activo', true);
 
     $this->assertDatabaseHas('negocios', ['nombre' => 'Donde Pepe', 'categoria' => 'Restaurante']);
+    $this->assertDatabaseHas('tipos_negocio', ['nombre' => 'Comidas rápidas']);
 });
 
 test('crear un negocio exige la categoría (tipo de negocio)', function () {
@@ -75,7 +78,7 @@ test('crear un negocio exige la categoría (tipo de negocio)', function () {
 test('un comerciante no puede tener dos negocios', function () {
     comercianteConNegocio();
 
-    $this->postJson('/api/comerciante/negocio', ['nombre' => 'Otro', 'categoria' => 'Farmacia'])
+    $this->postJson('/api/comerciante/negocio', ['nombre' => 'Otro', 'categorias' => ['Farmacia']])
         ->assertStatus(409);
 });
 

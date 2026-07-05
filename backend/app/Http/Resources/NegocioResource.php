@@ -14,11 +14,17 @@ class NegocioResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $categorias = $this->tiposNegocio
+            ->pluck('nombre')
+            ->values()
+            ->all();
+
         return [
             'id' => $this->id,
             'nombre' => $this->nombre,
             'descripcion' => $this->descripcion,
-            'categoria' => $this->categoria,
+            'categoria' => $categorias[0] ?? $this->categoria,
+            'categorias' => $categorias,
             'direccion' => $this->direccion,
             'telefono' => $this->telefono,
             'activo' => $this->activo,

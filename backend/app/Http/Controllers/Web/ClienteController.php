@@ -29,8 +29,8 @@ class ClienteController extends Controller
     /** Catálogo de un negocio (solo productos disponibles, agrupados por categoría). */
     public function verNegocio(Request $request, int $id): View
     {
-        // Solo negocios activos son visibles para el cliente.
-        $negocio = Negocio::where('activo', true)->findOrFail($id);
+        // Los negocios cerrados siguen siendo visibles, pero no se puede pedir.
+        $negocio = Negocio::findOrFail($id);
 
         $productos = $negocio->productos()
             ->where('disponible', true)
@@ -62,7 +62,7 @@ class ClienteController extends Controller
 
             $query = Producto::query()
                 ->where('disponible', true)
-                ->whereHas('negocio', fn ($n) => $n->where('activo', true))
+                ->whereHas('negocio')
                 ->with(['categoria', 'negocio']);
 
             // Cada palabra debe coincidir en algún campo (AND entre palabras).
@@ -76,7 +76,15 @@ class ClienteController extends Controller
                 });
             }
 
-            $resultados = $query->orderBy('nombre')->limit(50)->get();
+            $resultados = $query
+                ->orderByDesc(
+                    Negocio::select('activo')
+                        ->whereColumn('negocios.id', 'productos.negocio_id')
+                        ->limit(1)
+                )
+                ->orderBy('nombre')
+                ->limit(50)
+                ->get();
         }
 
         return view('cliente.buscar', compact('q', 'resultados'));

@@ -1,17 +1,16 @@
 <?php
 
 use App\Models\User;
+use App\Models\TipoNegocio;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
 
-// Antes de cada test: crear los 4 roles (la BD se reinicia en cada test).
 beforeEach(function () {
     foreach (['administrador', 'comerciante', 'usuario', 'domiciliario'] as $rol) {
         Role::findOrCreate($rol, 'web');
     }
 });
 
-/** Cliente autenticado vía Sanctum. */
 function clienteCatalogo(): User
 {
     $user = User::factory()->create();
@@ -21,7 +20,6 @@ function clienteCatalogo(): User
     return $user;
 }
 
-/** Crea `$cantidad` negocios, cada uno con su comerciante dueño. */
 function crearNegocios(int $cantidad, bool $activo = true): void
 {
     User::factory($cantidad)->create()->each(
@@ -32,7 +30,7 @@ function crearNegocios(int $cantidad, bool $activo = true): void
     );
 }
 
-test('el listado de negocios exige autenticación', function () {
+test('el listado de negocios exige autenticacion', function () {
     $this->getJson('/api/negocios')->assertStatus(401);
 });
 
@@ -40,7 +38,8 @@ test('el listado incluye todos los negocios, abiertos y cerrados', function () {
     clienteCatalogo();
 
     $dueno = User::factory()->create();
-    $dueno->negocio()->create(['nombre' => 'Abierto SA', 'activo' => true, 'categoria' => 'Restaurante']);
+    $abierto = $dueno->negocio()->create(['nombre' => 'Abierto SA', 'activo' => true, 'categoria' => 'Restaurante']);
+    $abierto->tiposNegocio()->attach(TipoNegocio::firstOrCreate(['slug' => 'restaurante'], ['nombre' => 'Restaurante'])->id);
 
     $otroDueno = User::factory()->create();
     $otroDueno->negocio()->create(['nombre' => 'Cerrado SA', 'activo' => false]);
@@ -50,10 +49,10 @@ test('el listado incluye todos los negocios, abiertos y cerrados', function () {
     $negocios = collect($resp->json('negocios'));
     expect($negocios)->toHaveCount(2);
 
-    // Los abiertos van primero y cada negocio dice si está abierto.
     expect($negocios->pluck('nombre')->all())->toBe(['Abierto SA', 'Cerrado SA']);
     expect($negocios->firstWhere('nombre', 'Abierto SA')['abierto'])->toBeTrue();
     expect($negocios->firstWhere('nombre', 'Abierto SA')['categoria'])->toBe('Restaurante');
+    expect($negocios->firstWhere('nombre', 'Abierto SA')['categorias'])->toBe(['Restaurante']);
     expect($negocios->firstWhere('nombre', 'Cerrado SA')['abierto'])->toBeFalse();
 });
 
@@ -74,9 +73,22 @@ test('el listado se pagina de 50 en 50', function () {
     expect($pagina2->json('negocios'))->toHaveCount(5);
     expect($pagina2->json('meta.pagina'))->toBe(2);
 
-    // Ningún negocio se repite entre páginas: entre ambas están los 55.
     $ids = collect($pagina1->json('negocios'))
         ->merge($pagina2->json('negocios'))
         ->pluck('id');
     expect($ids->unique())->toHaveCount(55);
+});
+
+test('el catalogo de un negocio cerrado sigue visible con estado cerrado', function () {
+    clienteCatalogo();
+
+    $dueno = User::factory()->create();
+    $negocio = $dueno->negocio()->create(['nombre' => 'Tienda Cerrada', 'activo' => false]);
+    $negocio->productos()->create(['nombre' => 'Arepa', 'precio' => 2000]);
+
+    $resp = $this->getJson("/api/negocios/{$negocio->id}")->assertOk();
+
+    expect($resp->json('negocio.nombre'))->toBe('Tienda Cerrada');
+    expect($resp->json('negocio.activo'))->toBeFalse();
+    expect($resp->json('productos.0.nombre'))->toBe('Arepa');
 });

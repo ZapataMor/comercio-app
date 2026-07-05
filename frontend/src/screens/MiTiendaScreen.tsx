@@ -26,13 +26,26 @@ type Props = NativeStackScreenProps<RootStackParamList, 'MiTienda'>;
 /** Tipos de negocio sugeridos. "Otro" habilita un campo de texto libre. */
 const CATEGORIAS_NEGOCIO = [
   'Restaurante',
+  'Panadería',
+  'Ferretería',
+  'Taller de carros',
+  'Taller de motos',
+  'Repuestos',
+  'Heladería',
+  'Corresponsal',
+  'Droguería',
+  'Papelería',
+  'Minimercado',
   'Comidas rápidas',
   'Supermercado',
   'Almacén de ropa',
   'Farmacia',
   'Tecnología',
-  'Ferretería',
-  'Papelería',
+  'Café',
+  'Licorería',
+  'Frutería',
+  'Carnicería',
+  'Barbería',
   'Belleza',
   'Mascotas',
   'Otro',
@@ -49,7 +62,8 @@ export default function MiTiendaScreen({ navigation }: Props) {
   // Campos del formulario.
   const [nombre, setNombre] = useState('');
   const [descripcion, setDescripcion] = useState('');
-  const [categoria, setCategoria] = useState('');
+  const [categorias, setCategorias] = useState<string[]>([]);
+  const [categoriaPersonalizada, setCategoriaPersonalizada] = useState('');
   // true cuando el tipo no está en la lista y se escribe a mano ("Otro").
   const [categoriaOtra, setCategoriaOtra] = useState(false);
   const [direccion, setDireccion] = useState('');
@@ -68,9 +82,12 @@ export default function MiTiendaScreen({ navigation }: Props) {
   function empezarEdicion(n: Negocio | null) {
     setNombre(n?.nombre ?? '');
     setDescripcion(n?.descripcion ?? '');
-    const cat = n?.categoria ?? '';
-    setCategoria(cat);
-    setCategoriaOtra(cat !== '' && !CATEGORIAS_NEGOCIO.includes(cat));
+    const cats = n?.categorias?.length ? n.categorias : n?.categoria ? [n.categoria] : [];
+    const conocidas = cats.filter(cat => CATEGORIAS_NEGOCIO.includes(cat));
+    const personalizada = cats.find(cat => !CATEGORIAS_NEGOCIO.includes(cat) && cat !== 'Otro') ?? '';
+    setCategorias(conocidas);
+    setCategoriaPersonalizada(personalizada);
+    setCategoriaOtra(personalizada !== '');
     setDireccion(n?.direccion ?? '');
     setTelefono(n?.telefono ?? '');
     setActivo(n?.activo ?? true);
@@ -83,7 +100,12 @@ export default function MiTiendaScreen({ navigation }: Props) {
       toast.error('Falta el nombre', 'El nombre del negocio es obligatorio.');
       return;
     }
-    if (!categoria.trim()) {
+    const categoriasFinales = [
+      ...categorias,
+      ...(categoriaPersonalizada.trim() ? [categoriaPersonalizada.trim()] : []),
+    ];
+
+    if (categoriasFinales.length === 0) {
       toast.error('Falta la categoría', 'Indica qué tipo de negocio es (restaurante, farmacia…).');
       return;
     }
@@ -94,7 +116,8 @@ export default function MiTiendaScreen({ navigation }: Props) {
         {
           nombre: nombre.trim(),
           descripcion: descripcion.trim() || null,
-          categoria: categoria.trim(),
+          categoria: categoriasFinales[0],
+          categorias: categoriasFinales,
           direccion: direccion.trim() || null,
           telefono: telefono.trim() || null,
           activo,
@@ -134,7 +157,12 @@ export default function MiTiendaScreen({ navigation }: Props) {
             </Text>
           </View>
 
-          <Campo etiqueta="Categoría" valor={negocio.categoria} />
+          <Campo
+            etiqueta="Categorías"
+            valor={(negocio.categorias?.length ? negocio.categorias : [negocio.categoria])
+              .filter(Boolean)
+              .join(', ')}
+          />
           <Campo etiqueta="Descripción" valor={negocio.descripcion} />
           <Campo etiqueta="Dirección" valor={negocio.direccion} />
           <Campo etiqueta="Teléfono" valor={negocio.telefono} />
@@ -179,11 +207,11 @@ export default function MiTiendaScreen({ navigation }: Props) {
             editable={!guardando}
           />
 
-          <Text style={styles.label}>Categoría (tipo de negocio) *</Text>
+          <Text style={styles.label}>Categorías (tipo de negocio) *</Text>
           <View style={styles.chips}>
             {CATEGORIAS_NEGOCIO.map(cat => {
               const activa =
-                cat === 'Otro' ? categoriaOtra : !categoriaOtra && categoria === cat;
+                cat === 'Otro' ? categoriaOtra : categorias.includes(cat);
               return (
                 <TouchableOpacity
                   key={cat}
@@ -191,11 +219,14 @@ export default function MiTiendaScreen({ navigation }: Props) {
                   disabled={guardando}
                   onPress={() => {
                     if (cat === 'Otro') {
-                      setCategoriaOtra(true);
-                      setCategoria('');
+                      setCategoriaOtra(prev => !prev);
+                      if (categoriaOtra) {
+                        setCategoriaPersonalizada('');
+                      }
                     } else {
-                      setCategoriaOtra(false);
-                      setCategoria(cat);
+                      setCategorias(prev =>
+                        prev.includes(cat) ? prev.filter(item => item !== cat) : [...prev, cat],
+                      );
                     }
                   }}>
                   <Text style={[styles.chipTxt, activa && styles.chipTxtActiva]}>{cat}</Text>
@@ -206,8 +237,8 @@ export default function MiTiendaScreen({ navigation }: Props) {
           {categoriaOtra && (
             <TextInput
               style={styles.input}
-              value={categoria}
-              onChangeText={setCategoria}
+              value={categoriaPersonalizada}
+              onChangeText={setCategoriaPersonalizada}
               placeholder="Ej: Licorería, Óptica…"
               placeholderTextColor={c.mutedSoft}
               editable={!guardando}
