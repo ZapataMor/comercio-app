@@ -18,6 +18,7 @@ class Negocio extends Model
     protected $fillable = [
         'nombre',
         'descripcion',
+        'categoria',
         'direccion',
         'telefono',
         'activo',

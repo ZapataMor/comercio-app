@@ -52,18 +52,30 @@ test('un usuario cliente no puede entrar a la zona comerciante', function () {
 test('un comerciante crea su negocio', function () {
     actuarComo('comerciante');
 
-    $this->postJson('/api/comerciante/negocio', ['nombre' => 'Donde Pepe'])
+    $this->postJson('/api/comerciante/negocio', [
+        'nombre' => 'Donde Pepe',
+        'categoria' => 'Restaurante',
+    ])
         ->assertStatus(201)
         ->assertJsonPath('negocio.nombre', 'Donde Pepe')
+        ->assertJsonPath('negocio.categoria', 'Restaurante')
         ->assertJsonPath('negocio.activo', true);
 
-    $this->assertDatabaseHas('negocios', ['nombre' => 'Donde Pepe']);
+    $this->assertDatabaseHas('negocios', ['nombre' => 'Donde Pepe', 'categoria' => 'Restaurante']);
+});
+
+test('crear un negocio exige la categoría (tipo de negocio)', function () {
+    actuarComo('comerciante');
+
+    $this->postJson('/api/comerciante/negocio', ['nombre' => 'Sin Tipo'])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('categoria');
 });
 
 test('un comerciante no puede tener dos negocios', function () {
     comercianteConNegocio();
 
-    $this->postJson('/api/comerciante/negocio', ['nombre' => 'Otro'])
+    $this->postJson('/api/comerciante/negocio', ['nombre' => 'Otro', 'categoria' => 'Farmacia'])
         ->assertStatus(409);
 });
 

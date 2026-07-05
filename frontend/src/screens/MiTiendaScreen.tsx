@@ -23,6 +23,21 @@ import { useToast } from '../Toast';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MiTienda'>;
 
+/** Tipos de negocio sugeridos. "Otro" habilita un campo de texto libre. */
+const CATEGORIAS_NEGOCIO = [
+  'Restaurante',
+  'Comidas rápidas',
+  'Supermercado',
+  'Almacén de ropa',
+  'Farmacia',
+  'Tecnología',
+  'Ferretería',
+  'Papelería',
+  'Belleza',
+  'Mascotas',
+  'Otro',
+];
+
 export default function MiTiendaScreen({ navigation }: Props) {
   const { negocio, cargando, guardar } = useNegocio();
   const toast = useToast();
@@ -34,6 +49,9 @@ export default function MiTiendaScreen({ navigation }: Props) {
   // Campos del formulario.
   const [nombre, setNombre] = useState('');
   const [descripcion, setDescripcion] = useState('');
+  const [categoria, setCategoria] = useState('');
+  // true cuando el tipo no está en la lista y se escribe a mano ("Otro").
+  const [categoriaOtra, setCategoriaOtra] = useState(false);
   const [direccion, setDireccion] = useState('');
   const [telefono, setTelefono] = useState('');
   const [activo, setActivo] = useState(true);
@@ -50,6 +68,9 @@ export default function MiTiendaScreen({ navigation }: Props) {
   function empezarEdicion(n: Negocio | null) {
     setNombre(n?.nombre ?? '');
     setDescripcion(n?.descripcion ?? '');
+    const cat = n?.categoria ?? '';
+    setCategoria(cat);
+    setCategoriaOtra(cat !== '' && !CATEGORIAS_NEGOCIO.includes(cat));
     setDireccion(n?.direccion ?? '');
     setTelefono(n?.telefono ?? '');
     setActivo(n?.activo ?? true);
@@ -62,6 +83,10 @@ export default function MiTiendaScreen({ navigation }: Props) {
       toast.error('Falta el nombre', 'El nombre del negocio es obligatorio.');
       return;
     }
+    if (!categoria.trim()) {
+      toast.error('Falta la categoría', 'Indica qué tipo de negocio es (restaurante, farmacia…).');
+      return;
+    }
     setGuardando(true);
     const eraNuevo = !negocio;
     try {
@@ -69,6 +94,7 @@ export default function MiTiendaScreen({ navigation }: Props) {
         {
           nombre: nombre.trim(),
           descripcion: descripcion.trim() || null,
+          categoria: categoria.trim(),
           direccion: direccion.trim() || null,
           telefono: telefono.trim() || null,
           activo,
@@ -108,6 +134,7 @@ export default function MiTiendaScreen({ navigation }: Props) {
             </Text>
           </View>
 
+          <Campo etiqueta="Categoría" valor={negocio.categoria} />
           <Campo etiqueta="Descripción" valor={negocio.descripcion} />
           <Campo etiqueta="Dirección" valor={negocio.direccion} />
           <Campo etiqueta="Teléfono" valor={negocio.telefono} />
@@ -151,6 +178,41 @@ export default function MiTiendaScreen({ navigation }: Props) {
             placeholderTextColor={c.mutedSoft}
             editable={!guardando}
           />
+
+          <Text style={styles.label}>Categoría (tipo de negocio) *</Text>
+          <View style={styles.chips}>
+            {CATEGORIAS_NEGOCIO.map(cat => {
+              const activa =
+                cat === 'Otro' ? categoriaOtra : !categoriaOtra && categoria === cat;
+              return (
+                <TouchableOpacity
+                  key={cat}
+                  style={[styles.chip, activa && styles.chipActiva]}
+                  disabled={guardando}
+                  onPress={() => {
+                    if (cat === 'Otro') {
+                      setCategoriaOtra(true);
+                      setCategoria('');
+                    } else {
+                      setCategoriaOtra(false);
+                      setCategoria(cat);
+                    }
+                  }}>
+                  <Text style={[styles.chipTxt, activa && styles.chipTxtActiva]}>{cat}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          {categoriaOtra && (
+            <TextInput
+              style={styles.input}
+              value={categoria}
+              onChangeText={setCategoria}
+              placeholder="Ej: Licorería, Óptica…"
+              placeholderTextColor={c.mutedSoft}
+              editable={!guardando}
+            />
+          )}
 
           <Text style={styles.label}>Descripción</Text>
           <TextInput
@@ -256,6 +318,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, marginBottom: 16, color: c.textStrong, fontFamily: font.regular,
   },
   area: { minHeight: 80, textAlignVertical: 'top' },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  chip: {
+    borderWidth: 1, borderColor: c.borderStrong, borderRadius: radius.pill,
+    paddingHorizontal: 12, paddingVertical: 7, backgroundColor: c.surface,
+  },
+  chipActiva: { backgroundColor: c.brand, borderColor: c.brand },
+  chipTxt: { fontSize: 13, fontFamily: font.semibold, color: c.text },
+  chipTxtActiva: { color: c.onBrand },
   switchRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
   switchSub: { color: c.mutedSoft, fontSize: 12, marginTop: 2, fontFamily: font.regular },
   boton: { backgroundColor: c.brand, borderRadius: radius.md, paddingVertical: 15, alignItems: 'center', marginTop: 20, ...shadow.soft },

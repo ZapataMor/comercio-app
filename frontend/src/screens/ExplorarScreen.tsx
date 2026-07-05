@@ -1,6 +1,7 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   Image,
   RefreshControl,
@@ -18,7 +19,7 @@ import {
   ProductoConNegocio,
 } from '../api';
 import { useAuth } from '../AuthContext';
-import { CardSkeletons, FadeInView, PressableScale } from '../components/anim';
+import { CardSkeletons, Desplegable, FadeInView, PressableScale } from '../components/anim';
 import Icon from '../components/Icon';
 import { RootStackParamList } from '../navTypes';
 import { c, font, radius, shadow } from '../theme';
@@ -34,11 +35,26 @@ export default function ExplorarScreen({ navigation }: Props) {
   const [negocios, setNegocios] = useState<NegocioLista[]>([]);
   const [productos, setProductos] = useState<ProductoConNegocio[]>([]);
   const [cargando, setCargando] = useState(true);
+  const [cargandoMas, setCargandoMas] = useState(false);
   const [refrescando, setRefrescando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
+  // Paginación del listado de negocios (50 por página).
+  const [pagina, setPagina] = useState(1);
+  const [ultimaPagina, setUltimaPagina] = useState(1);
+  const cargandoMasRef = useRef(false);
 
-  // Con texto buscamos PRODUCTOS; sin texto mostramos los negocios abiertos.
+  // Id del negocio con la card extendida (imagen + botón). Solo puede haber
+  // una a la vez: tocar otra card recoge la anterior.
+  const [expandidaId, setExpandidaId] = useState<number | null>(null);
+
+  // Estable entre renders para que React.memo de CardNegocio surta efecto:
+  // al tocar, solo se redibujan la card que se abre y la que se cierra.
+  const alternarCard = useCallback((id: number) => {
+    setExpandidaId(prev => (prev === id ? null : id));
+  }, []);
+
+  // Con texto buscamos PRODUCTOS; sin texto mostramos todos los negocios.
   const buscando = busqueda.trim().length > 0;
 
   const cargar = useCallback(
@@ -48,7 +64,11 @@ export default function ExplorarScreen({ navigation }: Props) {
       const t = texto.trim();
       const peticion = t
         ? buscarProductos(auth!.token, t).then(setProductos)
-        : getNegocios(auth!.token).then(setNegocios);
+        : getNegocios(auth!.token).then(p => {
+            setNegocios(p.negocios);
+            setPagina(p.pagina);
+            setUltimaPagina(p.ultimaPagina);
+          });
       peticion
         .catch(e => setError(e.message))
         .finally(() => {
@@ -58,6 +78,29 @@ export default function ExplorarScreen({ navigation }: Props) {
     },
     [auth],
   );
+
+  // Carga la siguiente página de negocios al llegar al final de la lista.
+  const cargarMas = useCallback(() => {
+    if (buscando || cargando || refrescando) return;
+    if (cargandoMasRef.current || pagina >= ultimaPagina) return;
+    cargandoMasRef.current = true;
+    setCargandoMas(true);
+    getNegocios(auth!.token, undefined, pagina + 1)
+      .then(p => {
+        setNegocios(prev => {
+          // Evita duplicados si una página se repite (p. ej. tras un refresco).
+          const vistos = new Set(prev.map(n => n.id));
+          return [...prev, ...p.negocios.filter(n => !vistos.has(n.id))];
+        });
+        setPagina(p.pagina);
+        setUltimaPagina(p.ultimaPagina);
+      })
+      .catch(e => setError(e.message))
+      .finally(() => {
+        cargandoMasRef.current = false;
+        setCargandoMas(false);
+      });
+  }, [auth, buscando, cargando, refrescando, pagina, ultimaPagina]);
 
   // Búsqueda con "debounce": espera 350 ms tras dejar de teclear.
   useEffect(() => {
@@ -70,6 +113,7 @@ export default function ExplorarScreen({ navigation }: Props) {
       style={styles.container}
       data={cargando ? [] : buscando ? productos : negocios}
       keyExtractor={item => String(item.id)}
+      extraData={expandidaId}
       // Aire abajo para la barra flotante fija (Carrito / Mis pedidos).
       contentContainerStyle={{ padding: 16, paddingBottom: 110 }}
       keyboardShouldPersistTaps="handled"
@@ -107,17 +151,32 @@ export default function ExplorarScreen({ navigation }: Props) {
           {error ? <Text style={styles.error}>{error}</Text> : null}
         </View>
       }
+      onEndReached={cargarMas}
+      onEndReachedThreshold={0.4}
+      ListFooterComponent={
+        cargandoMas ? (
+          <ActivityIndicator color={c.accent} style={styles.pieCarga} />
+        ) : null
+      }
       ListEmptyComponent={
         !cargando ? (
           <Text style={styles.vacio}>
-            {buscando ? `Sin resultados para "${busqueda}".` : 'No hay negocios abiertos ahora.'}
+            {buscando ? `Sin resultados para "${busqueda}".` : 'Aún no hay negocios registrados.'}
           </Text>
         ) : null
       }
       renderItem={({ item, index }) =>
-        buscando
-          ? renderProducto(item as ProductoConNegocio, navigation, index)
-          : renderNegocio(item as NegocioLista, navigation, index)
+        buscando ? (
+          renderProducto(item as ProductoConNegocio, navigation, index)
+        ) : (
+          <CardNegocio
+            item={item as NegocioLista}
+            index={index}
+            navigation={navigation}
+            expandida={expandidaId === item.id}
+            onToggle={alternarCard}
+          />
+        )
       }
     />
   );
@@ -167,32 +226,82 @@ function renderProducto(
   );
 }
 
-/** Tarjeta de negocio abierto (vista por defecto, sin búsqueda). */
-function renderNegocio(item: NegocioLista, navigation: Props['navigation'], index: number) {
+/**
+ * Tarjeta de negocio (vista por defecto, sin búsqueda).
+ *
+ * Recogida muestra nombre, categoría, dirección y si está abierto. Al tocarla
+ * se extiende: aparece la imagen del negocio arriba y el botón "Entrar a la
+ * tienda". Solo una card puede estar extendida a la vez (lo controla el padre
+ * con `expandida`/`onToggle`).
+ */
+const CardNegocio = React.memo(function CardNegocio({
+  item,
+  navigation,
+  index,
+  expandida,
+  onToggle,
+}: {
+  item: NegocioLista;
+  navigation: Props['navigation'];
+  index: number;
+  expandida: boolean;
+  onToggle: (id: number) => void;
+}) {
+  const img = imagenUrl(item.imagen);
   return (
     <FadeInView delay={Math.min(index, 8) * 45}>
       <PressableScale
-        style={styles.card}
-        onPress={() => navigation.navigate('Negocio', { id: item.id, nombre: item.nombre })}>
-        {!!imagenUrl(item.imagen) && (
-          <Image source={{ uri: imagenUrl(item.imagen) }} style={styles.portada} resizeMode="cover" />
-        )}
+        style={[styles.card, !item.abierto && styles.cardCerrada]}
+        onPress={() => onToggle(item.id)}>
+        <Desplegable abierto={expandida}>
+          {img ? (
+            <Image source={{ uri: img }} style={styles.portada} resizeMode="cover" />
+          ) : (
+            <View style={[styles.portada, styles.portadaVacia]}>
+              <Icon name="tienda" size={40} color={c.mutedSoft} />
+            </View>
+          )}
+        </Desplegable>
+
         <View style={styles.cardHead}>
           <Text style={styles.nombre}>{item.nombre}</Text>
-          <Text style={styles.abierto}>Abierto</Text>
+          <Text style={item.abierto ? styles.abierto : styles.cerrado}>
+            {item.abierto ? 'Abierto' : 'Cerrado'}
+          </Text>
         </View>
-        {!!item.descripcion && <Text style={styles.desc} numberOfLines={2}>{item.descripcion}</Text>}
+
+        {!!item.categoria && (
+          <View style={[styles.categoriaFila, styles.filaAccion]}>
+            <Icon name="tienda" size={13} color={c.accent} />
+            <Text style={styles.categoriaTxt}>{item.categoria}</Text>
+          </View>
+        )}
         {!!item.direccion && (
           <View style={[styles.dir, styles.filaAccion]}>
             <Icon name="ubicacion" size={13} color={c.mutedSoft} />
             <Text style={styles.dir}>{item.direccion}</Text>
           </View>
         )}
-        <Text style={styles.cont}>{item.productos} producto(s) →</Text>
+
+        <Desplegable abierto={expandida}>
+          {!!item.descripcion && (
+            <Text style={styles.desc} numberOfLines={3}>{item.descripcion}</Text>
+          )}
+          <TouchableOpacity
+            style={[styles.botonEntrar, !item.abierto && styles.botonEntrarOff]}
+            disabled={!item.abierto || !expandida}
+            onPress={() =>
+              navigation.navigate('Negocio', { id: item.id, nombre: item.nombre })
+            }>
+            <Text style={[styles.botonEntrarTxt, !item.abierto && styles.botonEntrarTxtOff]}>
+              {item.abierto ? 'Entrar a la tienda' : 'Tienda cerrada'}
+            </Text>
+          </TouchableOpacity>
+        </Desplegable>
       </PressableScale>
     </FadeInView>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg },
@@ -207,15 +316,31 @@ const styles = StyleSheet.create({
     backgroundColor: c.surface, borderRadius: radius.lg, padding: 16, marginBottom: 12, ...shadow.soft,
   },
   portada: { width: '100%', height: 140, borderRadius: radius.md, marginBottom: 10, backgroundColor: c.surface2 },
+  portadaVacia: { alignItems: 'center', justifyContent: 'center' },
   cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   nombre: { fontSize: 17, fontFamily: font.bold, color: c.textStrong, flex: 1 },
   abierto: {
     fontSize: 11, fontFamily: font.bold, backgroundColor: c.successSoft, color: c.success,
     paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, overflow: 'hidden',
   },
-  desc: { color: c.muted, marginTop: 6, fontFamily: font.regular },
+  cerrado: {
+    fontSize: 11, fontFamily: font.bold, backgroundColor: c.dangerSoft, color: c.danger,
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, overflow: 'hidden',
+  },
+  cardCerrada: { opacity: 0.55 },
+  pieCarga: { marginVertical: 16 },
+  desc: { color: c.muted, marginTop: 10, fontFamily: font.regular },
   dir: { color: c.mutedSoft, fontSize: 12, marginTop: 8, fontFamily: font.regular },
-  cont: { color: c.goldText, fontFamily: font.bold, marginTop: 10 },
+  categoriaFila: { marginTop: 7 },
+  categoriaTxt: { color: c.goldText, fontFamily: font.semibold, fontSize: 13 },
+  // Botón minimalista "Entrar a la tienda" de la card extendida.
+  botonEntrar: {
+    marginTop: 14, paddingVertical: 11, borderRadius: radius.md, alignItems: 'center',
+    borderWidth: 1.2, borderColor: c.accent, backgroundColor: 'transparent',
+  },
+  botonEntrarOff: { borderColor: c.border },
+  botonEntrarTxt: { color: c.goldText, fontFamily: font.bold, fontSize: 14 },
+  botonEntrarTxtOff: { color: c.mutedSoft },
   // --- Tarjeta de producto (búsqueda) ---
   prodFila: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   prodThumb: { width: 64, height: 64, borderRadius: radius.md, backgroundColor: c.surface2 },

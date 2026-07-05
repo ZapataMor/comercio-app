@@ -16,6 +16,8 @@ export type Negocio = {
   id: number;
   nombre: string;
   descripcion: string | null;
+  /** Tipo de negocio: Restaurante, Almacén de ropa, Farmacia, etc. */
+  categoria: string | null;
   direccion: string | null;
   telefono: string | null;
   activo: boolean;
@@ -42,9 +44,12 @@ export type NegocioLista = {
   id: number;
   nombre: string;
   descripcion: string | null;
+  /** Tipo de negocio: Restaurante, Almacén de ropa, Farmacia, etc. */
+  categoria: string | null;
   direccion: string | null;
   imagen?: string | null;
   productos: number;
+  abierto: boolean;
 };
 
 /**
@@ -294,10 +299,11 @@ export async function getProductos(
 
 // ---------- Comerciante: crear / editar su negocio ----------
 
-/** Datos editables del negocio. */
+/** Datos editables del negocio. `categoria` es obligatoria al crear. */
 export type NegocioInput = {
   nombre: string;
   descripcion?: string | null;
+  categoria?: string | null;
   direccion?: string | null;
   telefono?: string | null;
   activo?: boolean;
@@ -421,11 +427,35 @@ export async function marcarPedidoListo(token: string, id: number): Promise<void
 
 // ---------- Cliente: explorar negocios y ver catálogo ----------
 
-/** Negocios abiertos. Si se pasa `buscar`, filtra por nombre/descr./productos. */
-export async function getNegocios(token: string, buscar?: string): Promise<NegocioLista[]> {
-  const q = buscar && buscar.trim() ? `?buscar=${encodeURIComponent(buscar.trim())}` : '';
+/** Página del listado de negocios (50 por página). */
+export type NegociosPagina = {
+  negocios: NegocioLista[];
+  pagina: number;
+  ultimaPagina: number;
+  total: number;
+};
+
+/**
+ * Todos los negocios registrados (abiertos y cerrados), paginados de 50 en 50.
+ * Si se pasa `buscar`, filtra por nombre/descr./productos.
+ */
+export async function getNegocios(
+  token: string,
+  buscar?: string,
+  pagina = 1,
+): Promise<NegociosPagina> {
+  const params = new URLSearchParams();
+  if (buscar && buscar.trim()) params.set('buscar', buscar.trim());
+  if (pagina > 1) params.set('page', String(pagina));
+  const q = params.toString() ? `?${params.toString()}` : '';
   const data = await authGet(`/api/negocios${q}`, token);
-  return (data.negocios ?? []) as NegocioLista[];
+  const negocios = (data.negocios ?? []) as NegocioLista[];
+  return {
+    negocios,
+    pagina: data.meta?.pagina ?? 1,
+    ultimaPagina: data.meta?.ultima_pagina ?? 1,
+    total: data.meta?.total ?? negocios.length,
+  };
 }
 
 /** Producto de la búsqueda del cliente, con el negocio que lo vende. */

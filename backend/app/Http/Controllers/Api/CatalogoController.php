@@ -16,16 +16,18 @@ use Illuminate\Http\Request;
 class CatalogoController extends Controller
 {
     /**
-     * Lista de negocios abiertos, con su número de productos disponibles.
+     * Lista de TODOS los negocios registrados (abiertos y cerrados), con su
+     * número de productos disponibles, paginados de 50 en 50.
      *
-     * Parámetro opcional:
+     * Parámetros opcionales:
+     *   ?page=N       -> página a consultar (50 negocios por página).
      *   ?buscar=texto -> filtra por nombre/descripción del negocio, o por
      *                    negocios que tengan algún producto disponible que
      *                    coincida (por nombre o por su categoría).
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Negocio::where('activo', true)
+        $query = Negocio::query()
             ->withCount(['productos' => fn ($q) => $q->where('disponible', true)]);
 
         if ($request->filled('buscar')) {
@@ -46,19 +48,31 @@ class CatalogoController extends Controller
             });
         }
 
-        $negocios = $query
+        $pagina = $query
+            // Primero los abiertos, y dentro de cada grupo por nombre.
+            ->orderByDesc('activo')
             ->orderBy('nombre')
-            ->get()
-            ->map(fn ($n) => [
-                'id' => $n->id,
-                'nombre' => $n->nombre,
-                'descripcion' => $n->descripcion,
-                'direccion' => $n->direccion,
-                'imagen' => $n->imagen ? '/storage/'.$n->imagen : null,
-                'productos' => $n->productos_count,
-            ]);
+            ->paginate(50);
 
-        return response()->json(['negocios' => $negocios]);
+        $negocios = collect($pagina->items())->map(fn ($n) => [
+            'id' => $n->id,
+            'nombre' => $n->nombre,
+            'descripcion' => $n->descripcion,
+            'categoria' => $n->categoria,
+            'direccion' => $n->direccion,
+            'imagen' => $n->imagen ? '/storage/'.$n->imagen : null,
+            'productos' => $n->productos_count,
+            'abierto' => (bool) $n->activo,
+        ]);
+
+        return response()->json([
+            'negocios' => $negocios,
+            'meta' => [
+                'pagina' => $pagina->currentPage(),
+                'ultima_pagina' => $pagina->lastPage(),
+                'total' => $pagina->total(),
+            ],
+        ]);
     }
 
     /**
@@ -129,6 +143,7 @@ class CatalogoController extends Controller
                 'id' => $negocio->id,
                 'nombre' => $negocio->nombre,
                 'descripcion' => $negocio->descripcion,
+                'categoria' => $negocio->categoria,
                 'direccion' => $negocio->direccion,
                 'telefono' => $negocio->telefono,
                 'imagen' => $negocio->imagen ? '/storage/'.$negocio->imagen : null,

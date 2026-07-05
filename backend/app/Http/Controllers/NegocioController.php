@@ -39,6 +39,8 @@ class NegocioController extends Controller
         $data = $request->validate([
             'nombre' => ['required', 'string', 'max:255'],
             'descripcion' => ['nullable', 'string'],
+            // Tipo de negocio: restaurante, almacén de ropa, farmacia, etc.
+            'categoria' => ['required', 'string', 'max:100'],
             'direccion' => ['nullable', 'string', 'max:255'],
             'telefono' => ['nullable', 'string', 'max:30'],
             'activo' => ['sometimes', 'boolean'],
@@ -69,6 +71,7 @@ class NegocioController extends Controller
         $data = $request->validate([
             'nombre' => ['sometimes', 'required', 'string', 'max:255'],
             'descripcion' => ['nullable', 'string'],
+            'categoria' => ['sometimes', 'required', 'string', 'max:100'],
             'direccion' => ['nullable', 'string', 'max:255'],
             'telefono' => ['nullable', 'string', 'max:30'],
             'activo' => ['sometimes', 'boolean'],

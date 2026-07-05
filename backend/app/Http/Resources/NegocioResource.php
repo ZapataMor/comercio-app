@@ -18,6 +18,7 @@ class NegocioResource extends JsonResource
             'id' => $this->id,
             'nombre' => $this->nombre,
             'descripcion' => $this->descripcion,
+            'categoria' => $this->categoria,
             'direccion' => $this->direccion,
             'telefono' => $this->telefono,
             'activo' => $this->activo,
