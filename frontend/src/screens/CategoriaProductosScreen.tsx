@@ -24,14 +24,17 @@ import {
   eliminarProducto,
   getCategoriasComerciante,
   getProductos,
+  getTiposProducto,
   imagenUrl,
   Producto,
+  TipoProducto,
 } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import { Dropdown } from '../components/Dropdown';
 import FieldError from '../components/FieldError';
 import Icon from '../components/Icon';
+import ListaAtributos from '../components/ListaAtributos';
 import SelectorImagen from '../components/SelectorImagen';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
@@ -70,6 +73,7 @@ export default function CategoriaProductosScreen({ route }: Props) {
 
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [tipos, setTipos] = useState<TipoProducto[]>([]);
   const [cargando, setCargando] = useState(true);
   const [refrescando, setRefrescando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +86,10 @@ export default function CategoriaProductosScreen({ route }: Props) {
   const [precio, setPrecio] = useState('');
   const [unidad, setUnidad] = useState<UnidadKey>('cantidad');
   const [catId, setCatId] = useState<number | null>(categoriaId);
+  const [tipoId, setTipoId] = useState<number | null>(null);
+  const [atributos, setAtributos] = useState<string[]>([]);
+  // Valores con los que se monta ListaAtributos (se limpia al cambiar de tipo).
+  const [atributosIniciales, setAtributosIniciales] = useState<string[]>([]);
   const [imagenUri, setImagenUri] = useState<string | null>(null);
   const [disponible, setDisponible] = useState(true);
   const [guardando, setGuardando] = useState(false);
@@ -101,10 +109,12 @@ export default function CategoriaProductosScreen({ route }: Props) {
       Promise.all([
         getProductos(token, esSinCategoria ? { sinCategoria: true } : { categoriaId }),
         getCategoriasComerciante(token),
+        getTiposProducto(token),
       ])
-        .then(([ps, cs]) => {
+        .then(([ps, cs, ts]) => {
           setProductos(ps);
           setCategorias(cs);
+          setTipos(ts);
         })
         .catch(e => setError(e.message))
         .finally(() => {
@@ -124,6 +134,9 @@ export default function CategoriaProductosScreen({ route }: Props) {
     setPrecio('');
     setUnidad('cantidad');
     setCatId(categoriaId);
+    setTipoId(null);
+    setAtributos([]);
+    setAtributosIniciales([]);
     setImagenUri(null);
     setDisponible(true);
     setErrores({});
@@ -137,6 +150,9 @@ export default function CategoriaProductosScreen({ route }: Props) {
     setPrecio(String(Math.round(p.precio)));
     setUnidad(unidadDesdeProducto(p));
     setCatId(p.categoria?.id ?? null);
+    setTipoId(p.tipo_producto?.id ?? null);
+    setAtributos(p.atributos ?? []);
+    setAtributosIniciales(p.atributos ?? []);
     setImagenUri(null);
     setDisponible(p.disponible);
     setErrores({});
@@ -145,16 +161,23 @@ export default function CategoriaProductosScreen({ route }: Props) {
 
   async function guardar() {
     setErrores({});
-    const precioNum = Number(precio.replace(/[^0-9.]/g, ''));
+    if (!tipoId) {
+      setErrores({ tipo_producto: 'Selecciona el tipo de producto.' });
+      return;
+    }
     if (!nombre.trim()) {
       setErrores({ nombre: 'El campo nombre es obligatorio.' });
       return;
     }
-    if (!precio || isNaN(precioNum) || precioNum < 0) {
-      setErrores({ precio: 'Ingresa un precio valido.' });
+    // Solo dígitos: en pesos colombianos, sin puntos ni comas.
+    if (!/^\d+$/.test(precio)) {
+      setErrores({ precio: 'Ingresa el precio en pesos, sin puntos ni comas. Ej: 12000' });
       return;
     }
+    const precioNum = Number(precio);
     const u = UNIDADES.find(x => x.value === unidad)!;
+    // Atributos limpios: sin espacios sobrantes, vacíos ni repetidos.
+    const atributosLimpios = [...new Set(atributos.map(a => a.trim()).filter(Boolean))];
     setGuardando(true);
     try {
       const body = {
@@ -164,6 +187,9 @@ export default function CategoriaProductosScreen({ route }: Props) {
         tipo_venta: u.tipo_venta,
         unidad_medida: u.unidad_medida,
         categoria_id: catId,
+        tipo_producto_id: tipoId,
+        // null (y no []) para que también se limpien al subir con imagen.
+        atributos: atributosLimpios.length ? atributosLimpios : null,
         disponible,
       };
       if (editando) {
@@ -176,7 +202,10 @@ export default function CategoriaProductosScreen({ route }: Props) {
       setModal(false);
       cargar();
     } catch (e) {
-      const campos = fieldErrorsFromError(e, { categoria_id: 'categoria' });
+      const campos = fieldErrorsFromError(e, {
+        categoria_id: 'categoria',
+        tipo_producto_id: 'tipo_producto',
+      });
       if (Object.keys(campos).length > 0) {
         setErrores(campos);
       } else {
@@ -212,6 +241,9 @@ export default function CategoriaProductosScreen({ route }: Props) {
   if (error) {
     return <Text style={styles.error}>{error}</Text>;
   }
+
+  // Tipo global elegido: define qué sección de atributos muestra el formulario.
+  const tipoSeleccionado = tipos.find(t => t.id === tipoId) ?? null;
 
   // Opciones del dropdown de categoría (solo se usa en el grupo "Sin categoría").
   const opcionesCategoria = [
@@ -282,6 +314,22 @@ export default function CategoriaProductosScreen({ route }: Props) {
             <ScrollView keyboardShouldPersistTaps="handled">
               <Text style={styles.modalTitulo}>{editando ? 'Editar producto' : 'Nuevo producto'}</Text>
 
+              <Text style={styles.label}>Tipo de producto *</Text>
+              <Dropdown
+                valor={tipoId == null ? null : String(tipoId)}
+                opciones={tipos.map(t => ({ label: t.nombre, value: String(t.id) }))}
+                onChange={v => {
+                  setTipoId(Number(v));
+                  // Al cambiar de tipo, los atributos anteriores ya no aplican.
+                  setAtributos([]);
+                  setAtributosIniciales([]);
+                  limpiarError('tipo_producto');
+                }}
+                placeholder="¿Qué vas a vender?"
+                disabled={guardando}
+              />
+              <FieldError mensaje={errores.tipo_producto} />
+
               <SelectorImagen
                 label="Foto del producto"
                 uri={imagenUri ?? imagenUrl(editando?.imagen)}
@@ -322,17 +370,36 @@ export default function CategoriaProductosScreen({ route }: Props) {
               />
               <FieldError mensaje={errores.descripcion} />
 
-              <Text style={styles.label}>Precio *</Text>
+              {tipoSeleccionado && (
+                <>
+                  <ListaAtributos
+                    key={`${editando?.id ?? 'nuevo'}-${tipoSeleccionado.id}`}
+                    label={tipoSeleccionado.atributo_label}
+                    textoBoton={tipoSeleccionado.atributo_boton}
+                    sugerencias={tipoSeleccionado.sugerencias}
+                    iniciales={atributosIniciales}
+                    onChange={setAtributos}
+                    disabled={guardando}
+                  />
+                  <FieldError mensaje={errores.atributos} />
+                </>
+              )}
+
+              <Text style={styles.label}>Precio (COP) *</Text>
+              <Text style={styles.ayudaCampo}>
+                En pesos colombianos, sin puntos ni comas. Ej: 12000
+              </Text>
               <TextInput
                 style={styles.input}
                 value={precio}
                 onChangeText={valor => {
-                  setPrecio(valor);
+                  // Solo dígitos: se descartan puntos, comas y letras.
+                  setPrecio(valor.replace(/[^0-9]/g, ''));
                   limpiarError('precio');
                 }}
                 placeholder="12000"
                 placeholderTextColor={c.mutedSoft}
-                keyboardType="numeric"
+                keyboardType="number-pad"
                 editable={!guardando}
               />
               <FieldError mensaje={errores.precio} />
@@ -429,6 +496,7 @@ const styles = StyleSheet.create({
   },
   modalTitulo: { fontSize: 18, fontFamily: font.display, color: c.textStrong, marginBottom: 16 },
   label: { fontSize: 13, fontFamily: font.semibold, color: c.text, marginBottom: 6 },
+  ayudaCampo: { fontSize: 12, color: c.muted, fontFamily: font.regular, marginBottom: 6 },
   input: {
     borderWidth: 1, borderColor: c.borderStrong, borderRadius: radius.md,
     paddingHorizontal: 14, paddingVertical: 11, fontSize: 16, marginBottom: 14, color: c.textStrong, fontFamily: font.regular,

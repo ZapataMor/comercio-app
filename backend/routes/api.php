@@ -45,6 +45,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // --- Catálogo público (cliente): explorar negocios y ver productos ---
     Route::get('/tipos-negocio', [CatalogoController::class, 'tiposNegocio']);
+    // Tipos globales de producto (Comida, Medicamento...) con la config del
+    // formulario de creación (atributos y sugerencias).
+    Route::get('/tipos-producto', [CatalogoController::class, 'tiposProducto']);
     Route::get('/negocios', [CatalogoController::class, 'index']);
     // Búsqueda de productos (por relevancia) con el negocio que los vende.
     Route::get('/productos', [CatalogoController::class, 'buscarProductos']);

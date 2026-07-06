@@ -31,6 +31,20 @@ export type Negocio = {
 export type Categoria = { id: number; nombre: string; productos?: number };
 export type TipoNegocio = { id: number; nombre: string; slug: string };
 
+/**
+ * Tipo GLOBAL de producto (Comida, Medicamento, Herramienta...), pre-creado
+ * por la app. Define la sección de atributos del formulario: la pregunta
+ * (atributo_label), el texto del botón de añadir y las sugerencias.
+ */
+export type TipoProducto = {
+  id: number;
+  nombre: string;
+  slug: string;
+  atributo_label: string;
+  atributo_boton: string;
+  sugerencias: string[] | null;
+};
+
 export type Producto = {
   id: number;
   nombre: string;
@@ -42,6 +56,10 @@ export type Producto = {
   imagen?: string | null; // ruta relativa "/storage/productos/x.jpg"
   disponible: boolean;
   categoria: Categoria | null;
+  /** Ingredientes, usos, tallas... según el tipo de producto. */
+  atributos?: string[];
+  /** Tipo global; null en productos creados antes de existir esta función. */
+  tipo_producto?: { id: number; nombre: string; slug: string; atributo_label: string } | null;
 };
 
 /** Negocio tal como aparece en la lista de "Explorar". */
@@ -437,12 +455,23 @@ export async function eliminarCategoria(token: string, id: number): Promise<void
 export type ProductoInput = {
   nombre: string;
   descripcion?: string | null;
+  /** En pesos colombianos, entero: sin puntos ni comas. */
   precio: number;
   tipo_venta?: string;
   unidad_medida?: string;
   disponible?: boolean;
   categoria_id?: number | null;
+  /** Tipo global (Comida, Medicamento...): obligatorio al crear. */
+  tipo_producto_id?: number;
+  /** Ingredientes, usos, tallas... `null` los borra (lista vacía). */
+  atributos?: string[] | null;
 };
+
+/** Tipos globales de producto con su configuración de atributos. */
+export async function getTiposProducto(token: string): Promise<TipoProducto[]> {
+  const data = await authGet('/api/tipos-producto', token);
+  return (data.tipos_producto ?? []) as TipoProducto[];
+}
 
 export async function crearProducto(
   token: string,

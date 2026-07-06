@@ -7,6 +7,7 @@ use App\Http\Resources\ProductoResource;
 use App\Models\Negocio;
 use App\Models\Producto;
 use App\Models\TipoNegocio;
+use App\Models\TipoProducto;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -50,6 +51,7 @@ class CatalogoController extends Controller
                         $p->where('disponible', true)
                             ->where(function ($pp) use ($texto) {
                                 $pp->where('nombre', 'like', "%{$texto}%")
+                                    ->orWhere('atributos', 'like', "%{$texto}%")
                                     ->orWhereHas('categoria', fn ($c) => $c->where('nombre', 'like', "%{$texto}%"));
                             });
                     });
@@ -96,6 +98,21 @@ class CatalogoController extends Controller
     }
 
     /**
+     * Tipos globales de producto (Comida, Medicamento...) con la configuración
+     * del formulario: qué pregunta hacer (atributo_label), el texto del botón
+     * de añadir y las sugerencias pre-creadas.
+     */
+    public function tiposProducto(): JsonResponse
+    {
+        $tipos = TipoProducto::query()
+            ->orderBy('orden')
+            ->orderBy('nombre')
+            ->get(['id', 'nombre', 'slug', 'atributo_label', 'atributo_boton', 'sugerencias']);
+
+        return response()->json(['tipos_producto' => $tipos]);
+    }
+
+    /**
      * Búsqueda de PRODUCTOS para el cliente (app móvil).
      *
      * Devuelve los productos disponibles de negocios abiertos cuyo nombre
@@ -127,6 +144,9 @@ class CatalogoController extends Controller
                 $q->where(function ($qq) use ($like) {
                     $qq->where('nombre', 'like', $like)
                         ->orWhere('descripcion', 'like', $like)
+                        // Atributos (ingredientes, usos...): el JSON se guarda
+                        // como texto, así que LIKE encuentra "gripa" o "pollo".
+                        ->orWhere('atributos', 'like', $like)
                         ->orWhereHas('categoria', fn ($c) => $c->where('nombre', 'like', $like));
                 });
             })

@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Negocio;
+use App\Models\TipoProducto;
 use App\Models\User;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
@@ -95,14 +96,58 @@ test('crear producto sin tener negocio devuelve 409', function () {
 
 test('un comerciante crea un producto en su negocio', function () {
     comercianteConNegocio();
+    $comida = TipoProducto::where('slug', 'comida')->firstOrFail();
 
     $this->postJson('/api/comerciante/productos', [
         'nombre' => 'Empanada',
         'precio' => 2500,
+        'tipo_producto_id' => $comida->id,
+        'atributos' => ['Carne', 'Papa', '  Carne ', ''],
     ])
         ->assertStatus(201)
         ->assertJsonPath('producto.nombre', 'Empanada')
-        ->assertJsonPath('producto.precio', 2500);
+        ->assertJsonPath('producto.precio', 2500)
+        ->assertJsonPath('producto.tipo_producto.nombre', 'Comida')
+        // Los atributos se limpian: sin vacíos ni duplicados.
+        ->assertJsonPath('producto.atributos', ['Carne', 'Papa']);
+});
+
+test('crear un producto exige el tipo de producto', function () {
+    comercianteConNegocio();
+
+    $this->postJson('/api/comerciante/productos', ['nombre' => 'X', 'precio' => 100])
+        ->assertStatus(422)
+        ->assertJsonValidationErrorFor('tipo_producto_id');
+});
+
+test('el precio debe ser un entero sin puntos ni comas', function () {
+    comercianteConNegocio();
+    $comida = TipoProducto::where('slug', 'comida')->firstOrFail();
+
+    $this->postJson('/api/comerciante/productos', [
+        'nombre' => 'X',
+        'precio' => '12.500',
+        'tipo_producto_id' => $comida->id,
+    ])
+        ->assertStatus(422)
+        ->assertJsonValidationErrorFor('precio');
+});
+
+test('los tipos de producto vienen con su configuración de atributos', function () {
+    actuarComo('usuario');
+
+    $respuesta = $this->getJson('/api/tipos-producto')->assertOk();
+
+    $tipos = collect($respuesta->json('tipos_producto'));
+    expect($tipos->pluck('nombre'))->toContain('Comida', 'Medicamento', 'Otro');
+
+    $medicamento = $tipos->firstWhere('slug', 'medicamento');
+    expect($medicamento['atributo_label'])->toBe('¿Para qué sirve?')
+        ->and($medicamento['sugerencias'])->toContain('Gripa');
+
+    $comida = $tipos->firstWhere('slug', 'comida');
+    expect($comida['atributo_label'])->toBe('Ingredientes')
+        ->and($comida['atributo_boton'])->toBe('Añadir ingrediente');
 });
 
 test('el precio no puede ser negativo', function () {

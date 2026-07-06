@@ -28,8 +28,17 @@ class ProductoResource extends JsonResource
             // Ruta relativa (ej "/storage/productos/x.jpg") o null; la app le antepone la API_URL.
             'imagen' => $this->imagen ? '/storage/'.$this->imagen : null,
             'disponible' => $this->disponible,
+            // Ingredientes, usos, tallas... según el tipo de producto.
+            'atributos' => $this->atributos ?? [],
             // Solo incluye la categoría si fue cargada (evita consultas N+1).
             'categoria' => new CategoriaResource($this->whenLoaded('categoria')),
+            // Tipo global (Comida, Medicamento...); null en productos antiguos.
+            'tipo_producto' => $this->whenLoaded('tipoProducto', fn () => $this->tipoProducto ? [
+                'id' => $this->tipoProducto->id,
+                'nombre' => $this->tipoProducto->nombre,
+                'slug' => $this->tipoProducto->slug,
+                'atributo_label' => $this->tipoProducto->atributo_label,
+            ] : null),
             // Negocio que vende el producto: solo se incluye cuando se cargó la
             // relación (p. ej. en la búsqueda de productos del cliente), para
             // no afectar a los endpoints del comerciante que no lo necesitan.

@@ -27,6 +27,8 @@ class Producto extends Model
         'unidad_medida',
         'disponible',
         'categoria_id',
+        'tipo_producto_id',
+        'atributos',
     ];
 
     /** Tipos de venta válidos (cómo se selecciona la cantidad del producto). */
@@ -37,6 +39,7 @@ class Producto extends Model
         return [
             'precio' => 'decimal:2',
             'disponible' => 'boolean',
+            'atributos' => 'array',
         ];
     }
 
@@ -54,5 +57,14 @@ class Producto extends Model
     public function categoria(): BelongsTo
     {
         return $this->belongsTo(Categoria::class);
+    }
+
+    /**
+     * Tipo global del producto (Comida, Medicamento...). Null solo en
+     * productos creados antes de existir esta función.
+     */
+    public function tipoProducto(): BelongsTo
+    {
+        return $this->belongsTo(TipoProducto::class);
     }
 }

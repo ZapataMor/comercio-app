@@ -31,7 +31,7 @@ class ProductoController extends Controller
             return $this->sinNegocio();
         }
 
-        $query = $negocio->productos()->with('categoria')->latest();
+        $query = $negocio->productos()->with(['categoria', 'tipoProducto'])->latest();
 
         if ($request->filled('buscar')) {
             $query->where('nombre', 'like', '%'.$request->string('buscar').'%');
@@ -64,14 +64,14 @@ class ProductoController extends Controller
             return $this->sinNegocio();
         }
 
-        $data = $request->validate($this->reglas($negocio, creando: true));
+        $data = $this->normalizarAtributos($request->validate($this->reglas($negocio, creando: true)));
 
         $producto = $negocio->productos()->create($data);
 
         $this->guardarImagen($request, $producto);
 
         return response()->json([
-            'producto' => new ProductoResource($producto->load('categoria')),
+            'producto' => new ProductoResource($producto->load(['categoria', 'tipoProducto'])),
         ], 201);
     }
 
@@ -87,7 +87,7 @@ class ProductoController extends Controller
         }
 
         return response()->json([
-            'producto' => new ProductoResource($producto->load('categoria')),
+            'producto' => new ProductoResource($producto->load(['categoria', 'tipoProducto'])),
         ]);
     }
 
@@ -102,14 +102,14 @@ class ProductoController extends Controller
             return $this->noEncontrado();
         }
 
-        $data = $request->validate($this->reglas($producto->negocio, creando: false));
+        $data = $this->normalizarAtributos($request->validate($this->reglas($producto->negocio, creando: false)));
 
         $producto->update($data);
 
         $this->guardarImagen($request, $producto);
 
         return response()->json([
-            'producto' => new ProductoResource($producto->load('categoria')),
+            'producto' => new ProductoResource($producto->load(['categoria', 'tipoProducto'])),
         ]);
     }
 
@@ -145,8 +145,16 @@ class ProductoController extends Controller
         return [
             'nombre' => [$requerido, 'string', 'max:255'],
             'descripcion' => ['nullable', 'string'],
-            // El precio se entiende "por unidad_medida" (por unidad, por kg, por litro...).
-            'precio' => [$requerido, 'numeric', 'min:0'],
+            // Precio en pesos colombianos, SIN puntos ni comas (entero).
+            // Se entiende "por unidad_medida" (por unidad, por kg, por litro...).
+            'precio' => [$requerido, 'integer', 'min:0'],
+            // Tipo global del producto (Comida, Medicamento...): obligatorio
+            // al crear; define qué atributos pide la app.
+            'tipo_producto_id' => [$requerido, Rule::exists('tipos_producto', 'id')],
+            // Ingredientes, usos, tallas... según el tipo de producto.
+            'atributos' => ['sometimes', 'nullable', 'array', 'max:30'],
+            // nullable: Laravel convierte '' en null; luego se descartan.
+            'atributos.*' => ['nullable', 'string', 'max:100'],
             // Cómo se selecciona la cantidad: cantidad | peso | volumen | longitud.
             'tipo_venta' => ['sometimes', Rule::in(Producto::TIPOS_VENTA)],
             // Etiqueta de la medida del precio: 'unidad', 'kg', 'litro', 'metro', 'combo'...
@@ -158,6 +166,29 @@ class ProductoController extends Controller
             ],
             'imagen' => ['sometimes', 'image', 'max:4096'], // máx 4 MB
         ];
+    }
+
+    /**
+     * Limpia los atributos validados: recorta espacios, descarta vacíos y
+     * duplicados. Deja un array plano de textos listo para guardar.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function normalizarAtributos(array $data): array
+    {
+        if (! array_key_exists('atributos', $data)) {
+            return $data;
+        }
+
+        $data['atributos'] = collect($data['atributos'] ?? [])
+            ->map(fn ($a) => trim((string) $a))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        return $data;
     }
 
     /**
