@@ -4,6 +4,8 @@
     <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
         <!-- Customize your theme here. -->
         <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
+        <!-- Arena mientras arranca JS, para empalmar con el splash animado. -->
+        <item name="android:windowBackground">@color/vitrina_arena</item>
     </style>
 
 </resources>

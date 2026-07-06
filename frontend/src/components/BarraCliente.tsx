@@ -4,9 +4,8 @@
  *
  * Reglas:
  *  - Solo aparece para usuarios con rol 'usuario' y en rutas del cliente.
- *  - Dentro de "Carrito" desaparece el botón Carrito; dentro de "Mis pedidos"
- *    desaparece el botón Mis pedidos (el otro queda solo, centrado).
- *  - En Carrito la barra "sube" para no tapar el pie de Total/Pagar.
+ *  - En "Carrito", "Confirmar pedido" (Checkout) y "Mis pedidos" la barra no
+ *    se muestra: son pasos de compra/consulta y sobraría un botón flotante.
  *  - El botón Carrito es, además, el DESTINO de la animación del paquete:
  *    registra su posición y rebota cuando un paquete aterriza.
  */
@@ -26,15 +25,9 @@ const RUTAS_CLIENTE = new Set([
   'Home',
   'Explorar',
   'Negocio',
-  'Carrito',
-  'Checkout',
-  'MisPedidos',
   'PedidoDetalle',
   'Perfil',
 ]);
-
-/** Altura aproximada del pie fijo de Carrito (Total + botón de pago). */
-const ALTO_PIE_CARRITO = 132;
 
 type Props = { ruta?: string };
 
@@ -55,8 +48,7 @@ function Barra({ ruta }: { ruta: string }) {
 
   const mostrarCarrito = ruta !== 'Carrito';
   const mostrarPedidos = ruta !== 'MisPedidos';
-  // En Carrito la barra flota por encima del pie de Total/Pagar.
-  const bottom = insets.bottom + 14 + (ruta === 'Carrito' ? ALTO_PIE_CARRITO : 0);
+  const bottom = insets.bottom + 14;
 
   // --- Destino del paquete volador: centro del botón Carrito ---
   const carritoRef = useRef<View>(null);

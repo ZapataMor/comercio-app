@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Arena, fondo de la marca Vitrina (modo día). -->
+    <color name="vitrina_arena">#F7EBD8</color>
+</resources>

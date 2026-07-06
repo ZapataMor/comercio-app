@@ -30,9 +30,7 @@ export default function CarritoScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* Aire abajo: el botón flotante "Mis pedidos" queda sobre la lista,
-          por encima del pie de Total/Pagar. */}
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 96 }}>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 24 }}>
         {!!negocioNombre && (
           <View style={[styles.tienda, styles.fila]}>
             <Icon name="tienda" size={15} color={c.text} />

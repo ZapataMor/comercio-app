@@ -158,11 +158,13 @@ export default function CheckoutScreen({ navigation }: Props) {
       toast.exito('Pedido confirmado', 'El negocio ya recibio tu pedido.');
       // Se rearma la pila para que "atrás" desde Mis pedidos lleve al catálogo
       // del negocio donde pidió, y no de vuelta al formulario de confirmación.
+      // La base es Explorar: el "Home" del cliente (la pantalla Home no existe
+      // en la pila del rol usuario).
       navigation.dispatch(
         CommonActions.reset({
           index: 2,
           routes: [
-            { name: 'Home' },
+            { name: 'Explorar' },
             { name: 'Negocio', params: { id: negocioId, nombre: negocioNombre } },
             { name: 'MisPedidos' },
           ],
@@ -189,7 +191,7 @@ export default function CheckoutScreen({ navigation }: Props) {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{ padding: 16, paddingBottom: 110 }}>
+      contentContainerStyle={{ padding: 16, paddingBottom: 24 }}>
       <FadeInView style={styles.resumen}>
         <View style={[styles.resumenTitulo, styles.fila]}>
           <Icon name="tienda" size={15} color={c.text} />
