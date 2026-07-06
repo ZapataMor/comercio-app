@@ -1,12 +1,15 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Dimensions,
   FlatList,
   Image,
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Platform,
   RefreshControl,
   ScrollView,
@@ -19,10 +22,8 @@ import {
 } from 'react-native';
 import {
   actualizarProducto,
-  Categoria,
   crearProducto,
   eliminarProducto,
-  getCategoriasComerciante,
   getProductos,
   getTiposProducto,
   imagenUrl,
@@ -41,7 +42,7 @@ import { RootStackParamList } from '../navTypes';
 import { c, font, radius, shadow } from '../theme';
 import { useToast } from '../Toast';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'CategoriaProductos'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'MisProductos'>;
 
 /**
  * Unidad de venta tal como la elige el comerciante en la app (3 opciones),
@@ -64,15 +65,17 @@ function precioCOP(n: number) {
   return '$' + Math.round(n).toLocaleString('es-CO');
 }
 
-export default function CategoriaProductosScreen({ route }: Props) {
-  const { categoriaId } = route.params;
-  const esSinCategoria = categoriaId == null;
+/**
+ * Catálogo del comerciante: TODOS los productos de su negocio, con el botón
+ * "Añadir producto". El tipo de producto (Comida, Medicamento...) se elige en
+ * el formulario y define qué atributos se piden.
+ */
+export default function MisProductosScreen({}: Props) {
   const { auth } = useAuth();
   const token = auth!.token;
   const toast = useToast();
 
   const [productos, setProductos] = useState<Producto[]>([]);
-  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [tipos, setTipos] = useState<TipoProducto[]>([]);
   const [cargando, setCargando] = useState(true);
   const [refrescando, setRefrescando] = useState(false);
@@ -85,7 +88,6 @@ export default function CategoriaProductosScreen({ route }: Props) {
   const [descripcion, setDescripcion] = useState('');
   const [precio, setPrecio] = useState('');
   const [unidad, setUnidad] = useState<UnidadKey>('cantidad');
-  const [catId, setCatId] = useState<number | null>(categoriaId);
   const [tipoId, setTipoId] = useState<number | null>(null);
   const [atributos, setAtributos] = useState<string[]>([]);
   // Valores con los que se monta ListaAtributos (se limpia al cambiar de tipo).
@@ -94,6 +96,55 @@ export default function CategoriaProductosScreen({ route }: Props) {
   const [disponible, setDisponible] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [errores, setErrores] = useState<FieldErrors>({});
+
+  // --- Cierre del formulario deslizando hacia abajo (desde la barra de agarre) ---
+  // Espejo de `guardando` para leerlo dentro del PanResponder (se crea una sola
+  // vez y capturaría el valor viejo del estado).
+  const guardandoRef = useRef(false);
+  useEffect(() => {
+    guardandoRef.current = guardando;
+  }, [guardando]);
+
+  const dragY = useRef(new Animated.Value(0)).current;
+
+  const cerrarDeslizando = useCallback(() => {
+    // Termina de deslizar la tarjeta fuera de la pantalla y recién ahí cierra.
+    Animated.timing(dragY, {
+      toValue: Dimensions.get('window').height,
+      duration: 180,
+      useNativeDriver: true,
+    }).start(() => {
+      setModal(false);
+      dragY.setValue(0);
+    });
+  }, [dragY]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      // La zona de agarre no tiene botones, así que reclamamos el gesto desde
+      // que el dedo toca (no solo al moverse): más confiable en Android.
+      onStartShouldSetPanResponder: () => !guardandoRef.current,
+      onMoveShouldSetPanResponder: (_e, g) =>
+        !guardandoRef.current && g.dy > 4 && Math.abs(g.dy) > Math.abs(g.dx),
+      // Nadie (ScrollView, Modal) puede robarnos el gesto a mitad de arrastre.
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
+      onPanResponderMove: (_e, g) => {
+        if (g.dy > 0) dragY.setValue(g.dy);
+      },
+      onPanResponderRelease: (_e, g) => {
+        if (g.dy > 90 || g.vy > 0.5) {
+          cerrarDeslizando();
+        } else {
+          // No alcanzó el umbral: la tarjeta rebota a su lugar.
+          Animated.spring(dragY, { toValue: 0, useNativeDriver: true }).start();
+        }
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(dragY, { toValue: 0, useNativeDriver: true }).start();
+      },
+    }),
+  ).current;
 
   function limpiarError(campo: string) {
     setErrores(prev => {
@@ -106,14 +157,9 @@ export default function CategoriaProductosScreen({ route }: Props) {
   const cargar = useCallback(
     (refresco = false) => {
       refresco ? setRefrescando(true) : setCargando(true);
-      Promise.all([
-        getProductos(token, esSinCategoria ? { sinCategoria: true } : { categoriaId }),
-        getCategoriasComerciante(token),
-        getTiposProducto(token),
-      ])
-        .then(([ps, cs, ts]) => {
+      Promise.all([getProductos(token, { porPagina: 100 }), getTiposProducto(token)])
+        .then(([ps, ts]) => {
           setProductos(ps);
-          setCategorias(cs);
           setTipos(ts);
         })
         .catch(e => setError(e.message))
@@ -122,7 +168,7 @@ export default function CategoriaProductosScreen({ route }: Props) {
           setRefrescando(false);
         });
     },
-    [token, categoriaId, esSinCategoria],
+    [token],
   );
 
   useEffect(() => cargar(), [cargar]);
@@ -133,7 +179,6 @@ export default function CategoriaProductosScreen({ route }: Props) {
     setDescripcion('');
     setPrecio('');
     setUnidad('cantidad');
-    setCatId(categoriaId);
     setTipoId(null);
     setAtributos([]);
     setAtributosIniciales([]);
@@ -149,7 +194,6 @@ export default function CategoriaProductosScreen({ route }: Props) {
     setDescripcion(p.descripcion ?? '');
     setPrecio(String(Math.round(p.precio)));
     setUnidad(unidadDesdeProducto(p));
-    setCatId(p.categoria?.id ?? null);
     setTipoId(p.tipo_producto?.id ?? null);
     setAtributos(p.atributos ?? []);
     setAtributosIniciales(p.atributos ?? []);
@@ -186,7 +230,6 @@ export default function CategoriaProductosScreen({ route }: Props) {
         precio: precioNum,
         tipo_venta: u.tipo_venta,
         unidad_medida: u.unidad_medida,
-        categoria_id: catId,
         tipo_producto_id: tipoId,
         // null (y no []) para que también se limpien al subir con imagen.
         atributos: atributosLimpios.length ? atributosLimpios : null,
@@ -202,10 +245,7 @@ export default function CategoriaProductosScreen({ route }: Props) {
       setModal(false);
       cargar();
     } catch (e) {
-      const campos = fieldErrorsFromError(e, {
-        categoria_id: 'categoria',
-        tipo_producto_id: 'tipo_producto',
-      });
+      const campos = fieldErrorsFromError(e, { tipo_producto_id: 'tipo_producto' });
       if (Object.keys(campos).length > 0) {
         setErrores(campos);
       } else {
@@ -245,12 +285,6 @@ export default function CategoriaProductosScreen({ route }: Props) {
   // Tipo global elegido: define qué sección de atributos muestra el formulario.
   const tipoSeleccionado = tipos.find(t => t.id === tipoId) ?? null;
 
-  // Opciones del dropdown de categoría (solo se usa en el grupo "Sin categoría").
-  const opcionesCategoria = [
-    { label: 'Sin categoría', value: '0' },
-    ...categorias.map(cat => ({ label: cat.nombre, value: String(cat.id) })),
-  ];
-
   return (
     <View style={styles.container}>
       <FlatList
@@ -261,21 +295,13 @@ export default function CategoriaProductosScreen({ route }: Props) {
           <RefreshControl refreshing={refrescando} onRefresh={() => cargar(true)} colors={[c.accent]} tintColor={c.accent} />
         }
         ListHeaderComponent={
-          esSinCategoria ? (
-            <Text style={styles.ayuda}>
-              Productos sin categoría. Edítalos para asignarles una categoría.
-            </Text>
-          ) : (
-            <PressableScale style={styles.nuevoBtn} onPress={abrirNuevo}>
-              <Text style={styles.nuevoTxt}>+ Nuevo producto</Text>
-            </PressableScale>
-          )
+          <PressableScale style={styles.nuevoBtn} onPress={abrirNuevo}>
+            <Text style={styles.nuevoTxt}>+ Añadir producto</Text>
+          </PressableScale>
         }
         ListEmptyComponent={
           <Text style={styles.vacio}>
-            {esSinCategoria
-              ? 'No hay productos sin categoría.'
-              : 'Aún no hay productos en esta categoría.\nToca "+ Nuevo producto" para crear el primero.'}
+            {'Aún no tienes productos.\nToca "+ Añadir producto" para crear el primero.'}
           </Text>
         }
         renderItem={({ item, index }) => (
@@ -290,6 +316,7 @@ export default function CategoriaProductosScreen({ route }: Props) {
               </View>
               <View style={styles.itemTexto}>
                 <Text style={styles.nombre}>{item.nombre}</Text>
+                {item.tipo_producto && <Text style={styles.tipo}>{item.tipo_producto.nombre}</Text>}
                 <Text style={styles.precio}>{item.precio_formateado ?? precioCOP(item.precio)}</Text>
               </View>
               <View style={styles.acciones}>
@@ -310,10 +337,13 @@ export default function CategoriaProductosScreen({ route }: Props) {
         <KeyboardAvoidingView
           style={styles.modalFondo}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={styles.modalCard}>
-            <ScrollView keyboardShouldPersistTaps="handled">
+          <Animated.View style={[styles.modalCard, { transform: [{ translateY: dragY }] }]}>
+            {/* Barra de agarre: arrastrar hacia abajo cierra el formulario. */}
+            <View style={styles.dragZona} {...panResponder.panHandlers}>
+              <View style={styles.dragHandle} />
               <Text style={styles.modalTitulo}>{editando ? 'Editar producto' : 'Nuevo producto'}</Text>
-
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled">
               <Text style={styles.label}>Tipo de producto *</Text>
               <Dropdown
                 valor={tipoId == null ? null : String(tipoId)}
@@ -412,22 +442,6 @@ export default function CategoriaProductosScreen({ route }: Props) {
                 disabled={guardando}
               />
 
-              {esSinCategoria && (
-                <>
-                  <Text style={styles.label}>Categoría</Text>
-                  <Dropdown
-                    valor={catId == null ? '0' : String(catId)}
-                    opciones={opcionesCategoria}
-                    onChange={v => {
-                      setCatId(v === '0' ? null : Number(v));
-                      limpiarError('categoria');
-                    }}
-                    disabled={guardando}
-                  />
-                  <FieldError mensaje={errores.categoria} />
-                </>
-              )}
-
               <View style={styles.switchRow}>
                 <Text style={styles.label}>Disponible</Text>
                 <Switch
@@ -453,7 +467,7 @@ export default function CategoriaProductosScreen({ route }: Props) {
                 <Text style={styles.cancelar}>Cancelar</Text>
               </TouchableOpacity>
             </ScrollView>
-          </View>
+          </Animated.View>
         </KeyboardAvoidingView>
       </Modal>
     </View>
@@ -466,7 +480,6 @@ const styles = StyleSheet.create({
     backgroundColor: c.brand, borderRadius: radius.md, paddingVertical: 14, alignItems: 'center', marginBottom: 14, ...shadow.soft,
   },
   nuevoTxt: { color: c.onBrand, fontFamily: font.bold, fontSize: 15 },
-  ayuda: { color: c.muted, fontSize: 13, marginBottom: 14, textAlign: 'center', fontFamily: font.regular },
   item: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: c.surface, borderRadius: radius.md, padding: 12, marginBottom: 10, ...shadow.low,
@@ -478,6 +491,7 @@ const styles = StyleSheet.create({
   thumbImg: { width: '100%', height: '100%' },
   itemTexto: { flex: 1 },
   nombre: { fontSize: 15, fontFamily: font.semibold, color: c.textStrong },
+  tipo: { fontSize: 12, color: c.mutedSoft, marginTop: 2, fontFamily: font.regular },
   precio: { color: c.goldText, marginTop: 4, fontFamily: font.bold },
   acciones: { alignItems: 'flex-end', gap: 8, marginLeft: 8 },
   estado: {
@@ -493,6 +507,12 @@ const styles = StyleSheet.create({
   modalCard: {
     backgroundColor: c.surface, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
     padding: 20, maxHeight: '90%',
+  },
+  // Zona de agarre generosa (incluye el título) para iniciar el gesto fácil.
+  dragZona: { paddingTop: 6, paddingBottom: 6, marginTop: -20, marginHorizontal: -20, paddingHorizontal: 20 },
+  dragHandle: {
+    alignSelf: 'center', width: 44, height: 5, borderRadius: radius.pill,
+    backgroundColor: c.borderStrong, marginTop: 8, marginBottom: 12,
   },
   modalTitulo: { fontSize: 18, fontFamily: font.display, color: c.textStrong, marginBottom: 16 },
   label: { fontSize: 13, fontFamily: font.semibold, color: c.text, marginBottom: 6 },

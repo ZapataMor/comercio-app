@@ -26,8 +26,7 @@ import PerfilScreen from './src/screens/PerfilScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import MiTiendaScreen from './src/screens/MiTiendaScreen';
-import MisCategoriasScreen from './src/screens/MisCategoriasScreen';
-import CategoriaProductosScreen from './src/screens/CategoriaProductosScreen';
+import MisProductosScreen from './src/screens/MisProductosScreen';
 import ComercioPedidoDetalleScreen from './src/screens/ComercioPedidoDetalleScreen';
 import ExplorarScreen from './src/screens/ExplorarScreen';
 import NegocioScreen from './src/screens/NegocioScreen';
@@ -128,12 +127,7 @@ function Navegacion() {
             {roles.includes('comerciante') && (
               <>
                 <Stack.Screen name="MiTienda" component={MiTiendaScreen} options={{ title: 'Mi Tienda' }} />
-                <Stack.Screen name="MisCategorias" component={MisCategoriasScreen} options={{ title: 'Categorías' }} />
-                <Stack.Screen
-                  name="CategoriaProductos"
-                  component={CategoriaProductosScreen}
-                  options={({ route }) => ({ title: route.params.nombre })}
-                />
+                <Stack.Screen name="MisProductos" component={MisProductosScreen} options={{ title: 'Productos' }} />
                 <Stack.Screen
                   name="ComercioPedidoDetalle"
                   component={ComercioPedidoDetalleScreen}

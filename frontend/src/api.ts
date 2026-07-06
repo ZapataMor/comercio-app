@@ -361,24 +361,12 @@ export async function getNegocio(token: string): Promise<Negocio | null> {
   }
 }
 
-/**
- * Mis productos. Sin opciones trae la primera página; con `categoriaId`
- * filtra por categoría y con `sinCategoria` los que no tienen categoría.
- */
+/** Mis productos. Sin opciones trae la primera página (15). */
 export async function getProductos(
   token: string,
-  opts?: { categoriaId?: number | null; sinCategoria?: boolean; porPagina?: number },
+  opts?: { porPagina?: number },
 ): Promise<Producto[]> {
-  const partes: string[] = [];
-  if (opts?.sinCategoria) {
-    partes.push('sin_categoria=1');
-  } else if (opts?.categoriaId != null) {
-    partes.push(`categoria_id=${opts.categoriaId}`);
-  }
-  if (opts) {
-    partes.push(`por_pagina=${opts.porPagina ?? 100}`);
-  }
-  const qs = partes.length ? `?${partes.join('&')}` : '';
+  const qs = opts?.porPagina ? `?por_pagina=${opts.porPagina}` : '';
   const data = await authGet(`/api/comerciante/productos${qs}`, token);
   return (data.data ?? []) as Producto[];
 }
@@ -429,26 +417,6 @@ export async function cambiarEstadoNegocio(token: string, activo: boolean): Prom
   return d.negocio as Negocio;
 }
 
-// ---------- Comerciante: categorías ----------
-
-export async function getCategoriasComerciante(token: string): Promise<Categoria[]> {
-  const d = await authGet('/api/comerciante/categorias', token);
-  return (d.data ?? []) as Categoria[];
-}
-
-export async function crearCategoria(token: string, nombre: string): Promise<Categoria> {
-  const d = await authSend('POST', '/api/comerciante/categorias', token, { nombre });
-  return d.categoria as Categoria;
-}
-
-export async function actualizarCategoria(token: string, id: number, nombre: string): Promise<void> {
-  await authSend('PUT', `/api/comerciante/categorias/${id}`, token, { nombre });
-}
-
-export async function eliminarCategoria(token: string, id: number): Promise<void> {
-  await authSend('DELETE', `/api/comerciante/categorias/${id}`, token);
-}
-
 // ---------- Comerciante: CRUD de productos ----------
 
 /** Datos editables de un producto. */
@@ -460,7 +428,6 @@ export type ProductoInput = {
   tipo_venta?: string;
   unidad_medida?: string;
   disponible?: boolean;
-  categoria_id?: number | null;
   /** Tipo global (Comida, Medicamento...): obligatorio al crear. */
   tipo_producto_id?: number;
   /** Ingredientes, usos, tallas... `null` los borra (lista vacía). */

@@ -9,8 +9,8 @@ export type RootStackParamList = {
   Perfil: undefined;
   // Comerciante
   MiTienda: undefined;
-  MisCategorias: undefined;
-  CategoriaProductos: { categoriaId: number | null; nombre: string };
+  // Catálogo del comerciante: lista de productos + "Añadir producto".
+  MisProductos: undefined;
   ComercioPedidoDetalle: { pedido?: ComercioPedido; pedidoId?: number };
   // Cliente
   Explorar: undefined;

@@ -142,11 +142,11 @@ export default function HomeScreen({ navigation }: Props) {
           </FadeInView>
 
           <FadeInView delay={120}>
-            <PressableScale style={styles.item} onPress={() => navigation.navigate('MisCategorias')}>
-              <Icon name="etiqueta" size={26} color={c.accent} style={styles.itemEmoji} />
+            <PressableScale style={styles.item} onPress={() => navigation.navigate('MisProductos')}>
+              <Icon name="caja" size={26} color={c.accent} style={styles.itemEmoji} />
               <View style={styles.itemTexto}>
-                <Text style={styles.itemTitulo}>Categorías</Text>
-                <Text style={styles.itemSub}>Organiza tu catálogo y crea productos</Text>
+                <Text style={styles.itemTitulo}>Productos</Text>
+                <Text style={styles.itemSub}>Tu catálogo: añade y edita productos</Text>
               </View>
               <Icon name="chevron" size={20} color={c.chevron} />
             </PressableScale>
