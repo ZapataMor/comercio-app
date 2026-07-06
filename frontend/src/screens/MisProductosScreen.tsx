@@ -114,8 +114,10 @@ export default function MisProductosScreen({}: Props) {
       duration: 180,
       useNativeDriver: true,
     }).start(() => {
+      // OJO: la posición NO se resetea aquí. El Modal todavía reproduce su
+      // animación de salida y la tarjeta reaparecería un instante; dragY
+      // vuelve a 0 recién al abrir el formulario de nuevo.
       setModal(false);
-      dragY.setValue(0);
     });
   }, [dragY]);
 
@@ -174,6 +176,7 @@ export default function MisProductosScreen({}: Props) {
   useEffect(() => cargar(), [cargar]);
 
   function abrirNuevo() {
+    dragY.setValue(0);
     setEditando(null);
     setNombre('');
     setDescripcion('');
@@ -189,6 +192,7 @@ export default function MisProductosScreen({}: Props) {
   }
 
   function abrirEditar(p: Producto) {
+    dragY.setValue(0);
     setEditando(p);
     setNombre(p.nombre);
     setDescripcion(p.descripcion ?? '');
@@ -503,10 +507,11 @@ const styles = StyleSheet.create({
   vacio: { textAlign: 'center', color: c.muted, marginTop: 40, lineHeight: 20, fontFamily: font.regular },
   error: { color: c.danger, backgroundColor: c.dangerSoft, padding: 12, borderRadius: radius.sm, margin: 20, fontFamily: font.medium },
   // Modal
-  modalFondo: { flex: 1, backgroundColor: c.scrim, justifyContent: 'flex-end' },
+  // Sin scrim: el fondo de la app queda visible tal cual detrás de la tarjeta.
+  modalFondo: { flex: 1, justifyContent: 'flex-end' },
   modalCard: {
     backgroundColor: c.surface, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
-    padding: 20, maxHeight: '90%',
+    padding: 20, maxHeight: '90%', ...shadow.soft,
   },
   // Zona de agarre generosa (incluye el título) para iniciar el gesto fácil.
   dragZona: { paddingTop: 6, paddingBottom: 6, marginTop: -20, marginHorizontal: -20, paddingHorizontal: 20 },
