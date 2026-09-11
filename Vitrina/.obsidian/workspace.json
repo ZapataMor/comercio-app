@@ -4,17 +4,21 @@
     "type": "split",
     "children": [
       {
-        "id": "d810765709a24d2d",
+        "id": "932a437b491a402b",
         "type": "tabs",
         "children": [
           {
-            "id": "ac1ecd726afbdac6",
+            "id": "bdeb0393eab75e78",
             "type": "leaf",
             "state": {
-              "type": "graph",
-              "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Vista gráfica"
+              "type": "markdown",
+              "state": {
+                "file": "00 - Inicio/Estado Actual.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Estado Actual"
             }
           }
         ]
@@ -37,7 +41,9 @@
               "type": "file-explorer",
               "state": {
                 "sortOrder": "alphabetical",
-                "autoReveal": false
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
               },
               "icon": "lucide-folder-closed",
               "title": "Explorador de archivos"
@@ -176,8 +182,9 @@
       "bases:Crear nueva base": false
     }
   },
-  "active": "ac1ecd726afbdac6",
+  "active": "bdeb0393eab75e78",
   "lastOpenFiles": [
+    "00 - Inicio/Estado Actual.md",
     "08 - Ideas/ADR/ADR-003 Botón llamar o WhatsApp al cliente.md",
     "08 - Ideas/ADR/ADR-002 Notificaciones en tiempo real.md",
     "08 - Ideas/ADR/ADR-001 Inicio de sesión con Google.md",
@@ -211,7 +218,6 @@
     "01 - Negocio/Pitch.md",
     "05 - Casos de Prueba/CP-004 Comercio marca listo.md",
     "05 - Casos de Prueba/CP-003 Buscar productos.md",
-    "05 - Casos de Prueba/CP-002 Un carrito un negocio.md",
     "05 - Casos de Prueba/_MOC Casos de Prueba.md.tmp.24444.6d32efc23f4b",
     "05 - Casos de Prueba"
   ]
