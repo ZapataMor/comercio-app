@@ -23,12 +23,10 @@ class ProductoController extends Controller
      *   ?por_pagina=15       -> tamaño de página (máx 100)
      *   ?page=2              -> número de página
      */
-    public function index(Request $request): AnonymousResourceCollection|JsonResponse
+    public function index(Request $request, Negocio $negocio): AnonymousResourceCollection|JsonResponse
     {
-        $negocio = $this->negocioDe($request);
-
-        if (! $negocio) {
-            return $this->sinNegocio();
+        if (! $negocio->esMiembroActivo($request->user())) {
+            return $this->sinAcceso();
         }
 
         $query = $negocio->productos()->with(['categoria', 'tipoProducto'])->latest();
@@ -56,12 +54,10 @@ class ProductoController extends Controller
     /**
      * Crear un producto en MI negocio.
      */
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, Negocio $negocio): JsonResponse
     {
-        $negocio = $this->negocioDe($request);
-
-        if (! $negocio) {
-            return $this->sinNegocio();
+        if (! $negocio->esMiembroActivo($request->user())) {
+            return $this->sinAcceso();
         }
 
         $data = $this->normalizarAtributos($request->validate($this->reglas($negocio, creando: true)));
@@ -78,9 +74,13 @@ class ProductoController extends Controller
     /**
      * Ver UN producto mío.
      */
-    public function show(Request $request, int $id): JsonResponse
+    public function show(Request $request, Negocio $negocio, int $id): JsonResponse
     {
-        $producto = $this->productoDe($request, $id);
+        if (! $negocio->esMiembroActivo($request->user())) {
+            return $this->sinAcceso();
+        }
+
+        $producto = $negocio->productos()->find($id);
 
         if (! $producto) {
             return $this->noEncontrado();
@@ -94,15 +94,19 @@ class ProductoController extends Controller
     /**
      * Actualizar UN producto mío (incluye activar/desactivar y cambiar categoría).
      */
-    public function update(Request $request, int $id): JsonResponse
+    public function update(Request $request, Negocio $negocio, int $id): JsonResponse
     {
-        $producto = $this->productoDe($request, $id);
+        if (! $negocio->esMiembroActivo($request->user())) {
+            return $this->sinAcceso();
+        }
+
+        $producto = $negocio->productos()->find($id);
 
         if (! $producto) {
             return $this->noEncontrado();
         }
 
-        $data = $this->normalizarAtributos($request->validate($this->reglas($producto->negocio, creando: false)));
+        $data = $this->normalizarAtributos($request->validate($this->reglas($negocio, creando: false)));
 
         $producto->update($data);
 
@@ -117,9 +121,13 @@ class ProductoController extends Controller
      * Borrar UN producto mío (borrado suave: queda recuperable y no rompe
      * el historial de pedidos que lo referencien).
      */
-    public function destroy(Request $request, int $id): JsonResponse
+    public function destroy(Request $request, Negocio $negocio, int $id): JsonResponse
     {
-        $producto = $this->productoDe($request, $id);
+        if (! $negocio->esMiembroActivo($request->user())) {
+            return $this->sinAcceso();
+        }
+
+        $producto = $negocio->productos()->find($id);
 
         if (! $producto) {
             return $this->noEncontrado();
@@ -209,22 +217,9 @@ class ProductoController extends Controller
         $producto->save();
     }
 
-    private function negocioDe(Request $request): ?Negocio
+    private function sinAcceso(): JsonResponse
     {
-        return $request->user()->negocio;
-    }
-
-    /**
-     * Busca un producto SOLO dentro del negocio del comerciante.
-     */
-    private function productoDe(Request $request, int $id): ?Producto
-    {
-        return $this->negocioDe($request)?->productos()->find($id);
-    }
-
-    private function sinNegocio(): JsonResponse
-    {
-        return response()->json(['message' => 'Primero debes crear tu negocio.'], 409);
+        return response()->json(['message' => 'No tienes acceso a este negocio.'], 403);
     }
 
     private function noEncontrado(): JsonResponse

@@ -87,9 +87,11 @@ class PedidoController extends Controller
             $user->update(['telefono' => $datos['telefono_contacto']]);
         }
 
-        // Avisa al comercio (su dueño) que entró un pedido nuevo.
-        if ($negocio->user) {
-            Push::enviar($negocio->user, new NuevoPedidoParaComercio($pedido));
+        // Avisa a TODO el equipo del negocio (propietarios y trabajadores
+        // activos) que entró un pedido nuevo.
+        $miembros = $negocio->miembrosActivos()->get();
+        if ($miembros->isNotEmpty()) {
+            Push::enviar($miembros, new NuevoPedidoParaComercio($pedido));
         }
 
         return response()->json(['id' => $pedido->id, 'message' => '¡Pedido confirmado!'], 201);

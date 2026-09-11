@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Negocio;
 use App\Models\User;
 use App\Notifications\EstadoPedidoActualizado;
 use App\Notifications\PedidoDisponibleParaDomiciliario;
@@ -11,17 +12,17 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * API de pedidos del lado del COMERCIANTE (app móvil): ver los pedidos que
- * recibe su negocio y marcarlos como "listos para recoger".
+ * API de pedidos del lado del NEGOCIO (app móvil): ver los pedidos que
+ * recibe un negocio y marcarlos como "listos para recoger". Puede hacerlo
+ * cualquier miembro activo (propietario o trabajador).
  */
 class ComercioPedidoController extends Controller
 {
-    /** Pedidos recibidos por MI negocio. */
-    public function index(Request $request): JsonResponse
+    /** Pedidos recibidos por el negocio. */
+    public function index(Request $request, Negocio $negocio): JsonResponse
     {
-        $negocio = $request->user()->negocio;
-        if (! $negocio) {
-            return response()->json(['pedidos' => []]);
+        if (! $negocio->esMiembroActivo($request->user())) {
+            return $this->sinAcceso();
         }
 
         $pedidos = $negocio->pedidos()
@@ -45,14 +46,13 @@ class ComercioPedidoController extends Controller
     }
 
     /** Marcar un pedido pendiente como "listo" (lo verán los domiciliarios). */
-    public function marcarListo(Request $request, int $id): JsonResponse
+    public function marcarListo(Request $request, Negocio $negocio, int $id): JsonResponse
     {
-        $negocio = $request->user()->negocio;
-        if (! $negocio) {
-            return response()->json(['message' => 'Primero crea tu negocio.'], 409);
+        if (! $negocio->esMiembroActivo($request->user())) {
+            return $this->sinAcceso();
         }
 
-        // Solo pedidos de MI negocio y que estén pendientes.
+        // Solo pedidos de ESTE negocio y que estén pendientes.
         $pedido = $negocio->pedidos()->where('id', $id)->where('estado', 'pendiente')->first();
         if (! $pedido) {
             return response()->json(['message' => 'No se puede marcar listo ese pedido.'], 409);
@@ -69,5 +69,10 @@ class ComercioPedidoController extends Controller
         }
 
         return response()->json(['message' => 'Pedido listo. Los domiciliarios ya pueden tomarlo.']);
+    }
+
+    private function sinAcceso(): JsonResponse
+    {
+        return response()->json(['message' => 'No tienes acceso a este negocio.'], 403);
     }
 }

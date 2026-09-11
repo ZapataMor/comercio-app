@@ -33,11 +33,64 @@ class User extends Authenticatable
     }
 
     /**
-     * El negocio del usuario (cuando es comerciante).
+     * Al crear un usuario se le asigna su código público único (ej. "U34F4D"):
+     * lo comparte para que un negocio lo invite como trabajador. NUNCA se usa
+     * para autenticación, solo para invitaciones.
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (User $user) {
+            if (blank($user->codigo_publico)) {
+                $user->codigo_publico = self::generarCodigoPublico();
+            }
+        });
+    }
+
+    /** Código de 6 caracteres sin ambiguos (sin 0/O ni 1/I/L), único. */
+    public static function generarCodigoPublico(): string
+    {
+        $alfabeto = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+        do {
+            $codigo = 'U';
+            for ($i = 0; $i < 5; $i++) {
+                $codigo .= $alfabeto[random_int(0, strlen($alfabeto) - 1)];
+            }
+        } while (self::where('codigo_publico', $codigo)->exists());
+
+        return $codigo;
+    }
+
+    /**
+     * El negocio del que este usuario es dueño "original" (negocios.user_id).
+     * Se mantiene para el panel web legado; la app usa negocios() (membresías).
      */
     public function negocio(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
         return $this->hasOne(Negocio::class);
+    }
+
+    /**
+     * Negocios donde el usuario es miembro (propietario o trabajador).
+     * El rol vive en la tabla pivote: una persona puede ser propietaria de un
+     * negocio y trabajadora de otro a la vez.
+     */
+    public function negocios(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Negocio::class, 'negocio_user')
+            ->withPivot(['rol', 'activo'])
+            ->withTimestamps();
+    }
+
+    /** Solo las membresías activas (no suspendidas). */
+    public function negociosActivos(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->negocios()->wherePivot('activo', true);
+    }
+
+    /** Invitaciones de trabajo que ha recibido este usuario. */
+    public function invitacionesTrabajo(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(InvitacionTrabajo::class);
     }
 
     /** Ítems en el carrito de compras (cuando es cliente). */

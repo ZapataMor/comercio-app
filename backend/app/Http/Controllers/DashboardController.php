@@ -46,14 +46,16 @@ class DashboardController extends Controller
                 ],
                 'menu' => ['usuarios', 'comercios', 'reportes', 'configuracion'],
             ],
-            $user->hasRole('comerciante') => [
-                'titulo' => 'Panel del comerciante',
+            // Modelo unificado: tiene panel de negocio quien es MIEMBRO de al
+            // menos un negocio (propietario o trabajador), no por rol global.
+            $user->negociosActivos()->exists() => [
+                'titulo' => 'Panel de mis negocios',
                 'puede' => [
-                    'Gestionar mi tienda y productos',
-                    'Ver mis pedidos entrantes',
-                    'Consultar mis ventas',
+                    'Gestionar mis negocios y productos',
+                    'Ver los pedidos entrantes',
+                    'Invitar trabajadores',
                 ],
-                'menu' => ['mi-tienda', 'productos', 'pedidos', 'ventas'],
+                'menu' => ['mis-negocios', 'productos', 'pedidos', 'trabajadores'],
             ],
             $user->hasRole('domiciliario') => [
                 'titulo' => 'Panel del domiciliario',

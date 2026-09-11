@@ -32,12 +32,67 @@ class Negocio extends Model
         ];
     }
 
+    /** Roles posibles de un miembro dentro del negocio. */
+    public const ROL_PROPIETARIO = 'propietario';
+
+    public const ROL_TRABAJADOR = 'trabajador';
+
     /**
-     * El comerciante dueño del negocio.
+     * Al crear un negocio, su creador (user_id) queda automáticamente como
+     * miembro 'propietario'. Cubre también seeders y código legado que crean
+     * negocios con $user->negocio()->create(...).
+     */
+    protected static function booted(): void
+    {
+        static::created(function (Negocio $negocio) {
+            $negocio->miembros()->syncWithoutDetaching([
+                $negocio->user_id => ['rol' => self::ROL_PROPIETARIO, 'activo' => true],
+            ]);
+        });
+    }
+
+    /**
+     * El dueño "original" del negocio (quien lo creó). Las autorizaciones se
+     * hacen contra miembros(); esto queda para auditoría y compatibilidad.
      */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /** Miembros del negocio (propietarios y trabajadores) con su rol. */
+    public function miembros(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'negocio_user')
+            ->withPivot(['rol', 'activo'])
+            ->withTimestamps();
+    }
+
+    /** Solo miembros activos (los que reciben pedidos y administran). */
+    public function miembrosActivos(): BelongsToMany
+    {
+        return $this->miembros()->wherePivot('activo', true);
+    }
+
+    /** ¿Este usuario es miembro ACTIVO del negocio (cualquier rol)? */
+    public function esMiembroActivo(User $user): bool
+    {
+        return $this->miembrosActivos()->whereKey($user->id)->exists();
+    }
+
+    /** ¿Este usuario es propietario activo del negocio? */
+    public function esPropietario(User $user): bool
+    {
+        return $this->miembrosActivos()
+            ->wherePivot('rol', self::ROL_PROPIETARIO)
+            ->whereKey($user->id)
+            ->exists();
+    }
+
+    /** Invitaciones de trabajo enviadas por este negocio. */
+    public function invitaciones(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(InvitacionTrabajo::class);
     }
 
     /**

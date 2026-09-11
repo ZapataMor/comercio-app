@@ -3,24 +3,26 @@
 namespace App\Http\Controllers;
 
 use App\Http\Resources\CategoriaResource;
-use App\Models\Categoria;
 use App\Models\Negocio;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Validation\Rule;
 
+/**
+ * Categorías del catálogo de UN negocio. Puede gestionarlas cualquier
+ * miembro activo (propietario o trabajador): organizar el catálogo es
+ * parte del trabajo del equipo del negocio.
+ */
 class CategoriaController extends Controller
 {
     /**
-     * Listar las categorías de MI negocio.
+     * Listar las categorías del negocio.
      */
-    public function index(Request $request): AnonymousResourceCollection|JsonResponse
+    public function index(Request $request, Negocio $negocio): AnonymousResourceCollection|JsonResponse
     {
-        $negocio = $this->negocioDe($request);
-
-        if (! $negocio) {
-            return $this->sinNegocio();
+        if (! $negocio->esMiembroActivo($request->user())) {
+            return $this->sinAcceso();
         }
 
         // withCount('productos') agrega `productos_count` a cada categoría
@@ -31,14 +33,12 @@ class CategoriaController extends Controller
     }
 
     /**
-     * Crear una categoría en MI negocio.
+     * Crear una categoría en el negocio.
      */
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, Negocio $negocio): JsonResponse
     {
-        $negocio = $this->negocioDe($request);
-
-        if (! $negocio) {
-            return $this->sinNegocio();
+        if (! $negocio->esMiembroActivo($request->user())) {
+            return $this->sinAcceso();
         }
 
         $data = $request->validate([
@@ -55,12 +55,15 @@ class CategoriaController extends Controller
     }
 
     /**
-     * Renombrar una categoría mía.
+     * Renombrar una categoría del negocio.
      */
-    public function update(Request $request, int $id): JsonResponse
+    public function update(Request $request, Negocio $negocio, int $id): JsonResponse
     {
-        $negocio = $this->negocioDe($request);
-        $categoria = $negocio?->categorias()->find($id);
+        if (! $negocio->esMiembroActivo($request->user())) {
+            return $this->sinAcceso();
+        }
+
+        $categoria = $negocio->categorias()->find($id);
 
         if (! $categoria) {
             return $this->noEncontrada();
@@ -81,12 +84,16 @@ class CategoriaController extends Controller
     }
 
     /**
-     * Borrar una categoría mía. Los productos NO se borran: quedan sin
+     * Borrar una categoría. Los productos NO se borran: quedan sin
      * categoría (categoria_id pasa a null, por el nullOnDelete de la migración).
      */
-    public function destroy(Request $request, int $id): JsonResponse
+    public function destroy(Request $request, Negocio $negocio, int $id): JsonResponse
     {
-        $categoria = $this->negocioDe($request)?->categorias()->find($id);
+        if (! $negocio->esMiembroActivo($request->user())) {
+            return $this->sinAcceso();
+        }
+
+        $categoria = $negocio->categorias()->find($id);
 
         if (! $categoria) {
             return $this->noEncontrada();
@@ -99,14 +106,9 @@ class CategoriaController extends Controller
 
     // ---------- Helpers privados ----------
 
-    private function negocioDe(Request $request): ?Negocio
+    private function sinAcceso(): JsonResponse
     {
-        return $request->user()->negocio;
-    }
-
-    private function sinNegocio(): JsonResponse
-    {
-        return response()->json(['message' => 'Primero debes crear tu negocio.'], 409);
+        return response()->json(['message' => 'No tienes acceso a este negocio.'], 403);
     }
 
     private function noEncontrada(): JsonResponse

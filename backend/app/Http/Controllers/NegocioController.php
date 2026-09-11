@@ -3,41 +3,48 @@
 namespace App\Http\Controllers;
 
 use App\Http\Resources\NegocioResource;
+use App\Models\Negocio;
 use App\Models\TipoNegocio;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
+/**
+ * Negocios del usuario autenticado (modelo unificado): cualquier persona
+ * puede crear uno o VARIOS negocios y además ser trabajadora de otros.
+ * El acceso se decide por la MEMBRESÍA (negocio_user), no por un rol global.
+ */
 class NegocioController extends Controller
 {
     /**
-     * Ver MI negocio (el del comerciante autenticado).
+     * Mis negocios: todos aquellos donde soy miembro activo, con mi rol en
+     * cada uno. Incluye mi código público (para que me inviten a trabajar).
      */
-    public function show(Request $request): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $negocio = $request->user()->negocio;
+        $user = $request->user();
 
-        if (! $negocio) {
-            return response()->json([
-                'message' => 'Todavía no has creado tu negocio.',
-            ], 404);
-        }
+        $negocios = $user->negociosActivos()
+            ->with('tiposNegocio')
+            ->orderBy('nombre')
+            ->get()
+            ->map(fn (Negocio $n) => (new NegocioResource($n))->resolve() + [
+                'rol' => $n->pivot->rol,
+            ]);
 
-        return response()->json(['negocio' => new NegocioResource($negocio->load('tiposNegocio'))]);
+        return response()->json([
+            'negocios' => $negocios,
+            'codigo_publico' => $user->codigo_publico,
+        ]);
     }
 
     /**
-     * Crear MI negocio. Un comerciante solo puede tener uno.
+     * Crear un negocio nuevo. Sin límite: una persona puede tener varios.
+     * El creador queda como miembro 'propietario' (hook del modelo).
      */
     public function store(Request $request): JsonResponse
     {
-        if ($request->user()->negocio) {
-            return response()->json([
-                'message' => 'Ya tienes un negocio. Usa actualizar para modificarlo.',
-            ], 409);
-        }
-
         $data = $request->validate([
             'nombre' => ['required', 'string', 'max:255'],
             'descripcion' => ['nullable', 'string'],
@@ -61,20 +68,33 @@ class NegocioController extends Controller
 
         $this->guardarImagen($request, $negocio);
 
-        return response()->json(['negocio' => new NegocioResource($negocio->load('tiposNegocio'))], 201);
+        return response()->json([
+            'negocio' => $this->conRol($negocio, Negocio::ROL_PROPIETARIO),
+        ], 201);
     }
 
     /**
-     * Actualizar MI negocio.
+     * Ver UN negocio mío (soy miembro activo: propietario o trabajador).
      */
-    public function update(Request $request): JsonResponse
+    public function show(Request $request, Negocio $negocio): JsonResponse
     {
-        $negocio = $request->user()->negocio;
+        if (! $negocio->esMiembroActivo($request->user())) {
+            return $this->sinAcceso();
+        }
 
-        if (! $negocio) {
-            return response()->json([
-                'message' => 'Todavía no has creado tu negocio.',
-            ], 404);
+        $rol = $negocio->miembros()->whereKey($request->user()->id)->first()?->pivot->rol;
+
+        return response()->json(['negocio' => $this->conRol($negocio, $rol)]);
+    }
+
+    /**
+     * Actualizar un negocio. Solo el PROPIETARIO puede editar los datos del
+     * negocio (los trabajadores gestionan catálogo y pedidos, no esto).
+     */
+    public function update(Request $request, Negocio $negocio): JsonResponse
+    {
+        if (! $negocio->esPropietario($request->user())) {
+            return $this->sinAcceso('Solo el propietario puede editar el negocio.');
         }
 
         $data = $request->validate([
@@ -103,7 +123,20 @@ class NegocioController extends Controller
 
         $this->guardarImagen($request, $negocio);
 
-        return response()->json(['negocio' => new NegocioResource($negocio->load('tiposNegocio'))]);
+        return response()->json([
+            'negocio' => $this->conRol($negocio, Negocio::ROL_PROPIETARIO),
+        ]);
+    }
+
+    /** Resource del negocio + el rol del usuario en él (para la app). */
+    private function conRol(Negocio $negocio, ?string $rol): array
+    {
+        return (new NegocioResource($negocio->load('tiposNegocio')))->resolve() + ['rol' => $rol];
+    }
+
+    private function sinAcceso(string $mensaje = 'No tienes acceso a este negocio.'): JsonResponse
+    {
+        return response()->json(['message' => $mensaje], 403);
     }
 
     /**
@@ -133,7 +166,7 @@ class NegocioController extends Controller
     /**
      * @param array<int, string> $categorias
      */
-    private function sincronizarCategorias(\App\Models\Negocio $negocio, array $categorias): void
+    private function sincronizarCategorias(Negocio $negocio, array $categorias): void
     {
         $ids = collect($categorias)->map(function (string $nombre) {
             return TipoNegocio::firstOrCreate(
@@ -150,7 +183,7 @@ class NegocioController extends Controller
      * asigna al negocio, borrando la anterior. `imagen` no está en $fillable:
      * se asigna explícitamente para evitar mass-assignment de rutas arbitrarias.
      */
-    private function guardarImagen(Request $request, \App\Models\Negocio $negocio): void
+    private function guardarImagen(Request $request, Negocio $negocio): void
     {
         if (! $request->hasFile('imagen')) {
             return;

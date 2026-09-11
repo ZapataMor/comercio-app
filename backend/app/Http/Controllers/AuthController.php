@@ -14,54 +14,45 @@ use Illuminate\Validation\ValidationException;
 class AuthController extends Controller
 {
     /**
-     * Roles que un usuario puede elegir al registrarse por su cuenta.
-     *
-     * IMPORTANTE (seguridad): NUNCA incluir 'administrador' ni 'domiciliario'.
-     * Esos roles los asigna un admin manualmente. Si dejaras que el cliente
-     * mande cualquier rol, cualquiera podría registrarse como administrador.
-     */
-    private const ROLES_PUBLICOS = ['usuario', 'comerciante'];
-
-    /**
      * Registro de un nuevo usuario. Devuelve un token Sanctum.
+     *
+     * Modelo UNIFICADO: ya no se elige "cliente" o "comerciante" al crear la
+     * cuenta. Toda persona es cliente por defecto y puede crear sus negocios
+     * después, desde "Mis negocios". Los roles 'administrador' y
+     * 'domiciliario' los asigna un admin manualmente.
      */
     public function register(Request $request): JsonResponse
     {
-        $role = $request->input('role', 'usuario');
-
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
-            'role' => ['sometimes', Rule::in(self::ROLES_PUBLICOS)],
-            'direccion' => [Rule::requiredIf($role === 'usuario'), 'nullable', 'string', 'max:255'],
-            'barrio' => [Rule::requiredIf($role === 'usuario'), 'nullable', 'string', 'max:120'],
-            'telefono' => [Rule::requiredIf($role === 'usuario'), 'nullable', 'string', 'max:30'],
+            'direccion' => ['required', 'string', 'max:255'],
+            'barrio' => ['required', 'string', 'max:120'],
+            'telefono' => ['required', 'string', 'max:30'],
         ]);
 
-        $user = DB::transaction(function () use ($data, $role) {
+        $user = DB::transaction(function () use ($data) {
             $user = User::create([
                 'name' => $data['name'],
                 'email' => $data['email'],
                 'password' => $data['password'], // se hashea solo (cast 'hashed' en el modelo)
-                'direccion' => $role === 'usuario' ? $data['direccion'] : null,
-                'barrio' => $role === 'usuario' ? $data['barrio'] : null,
-                'telefono' => $role === 'usuario' ? $data['telefono'] : null,
+                'direccion' => $data['direccion'],
+                'barrio' => $data['barrio'],
+                'telefono' => $data['telefono'],
             ]);
 
-            $user->assignRole($role);
+            $user->assignRole('usuario');
 
-            if ($role === 'usuario') {
-                // Si escribió un barrio que no está en el catálogo, queda como
-                // sugerencia pendiente: solo él lo usa hasta que el admin lo apruebe.
-                Barrio::registrarSiEsNuevo($data['barrio'], $user->id);
+            // Si escribió un barrio que no está en el catálogo, queda como
+            // sugerencia pendiente: solo él lo usa hasta que el admin lo apruebe.
+            Barrio::registrarSiEsNuevo($data['barrio'], $user->id);
 
-                $user->clienteDirecciones()->create([
-                    'direccion' => $data['direccion'],
-                    'barrio' => $data['barrio'],
-                    'es_principal' => true,
-                ]);
-            }
+            $user->clienteDirecciones()->create([
+                'direccion' => $data['direccion'],
+                'barrio' => $data['barrio'],
+                'es_principal' => true,
+            ]);
 
             return $user;
         });
@@ -111,6 +102,8 @@ class AuthController extends Controller
     public function actualizarPerfil(Request $request): JsonResponse
     {
         $user = $request->user();
+        // Modelo unificado: todos son clientes; las cuentas viejas de
+        // "comerciante" pueden no tener aún datos de contacto guardados.
         $esCliente = $user->hasRole('usuario');
 
         $data = $request->validate([
@@ -191,6 +184,14 @@ class AuthController extends Controller
             'direccion' => $user->direccion,
             'barrio' => $user->barrio,
             'telefono' => $user->telefono,
+            // Código único para que un negocio lo invite como trabajador.
+            'codigo_publico' => $user->codigo_publico,
+            // Negocios donde es miembro activo, con su rol en cada uno.
+            'negocios' => $user->negociosActivos()->get()->map(fn ($n) => [
+                'id' => $n->id,
+                'nombre' => $n->nombre,
+                'rol' => $n->pivot->rol,
+            ]),
         ];
     }
 }
