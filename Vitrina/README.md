@@ -8,7 +8,7 @@ Vault de **Obsidian** con el conocimiento de **negocio y producto** de comercio-
 2. Empieza por [`00 - Inicio/🏠 Home.md`](<00 - Inicio/🏠 Home.md>).
 
 ## Estructura
-- `00 - Inicio/` — Home (dashboard) y Estado Actual
+- `00 - Inicio/` — Home (dashboard) y Estado Actual (inventario completo de funcionalidades)
 - `01 - Negocio/` — pitch, propuesta de valor, modelo, lógica de negocio, glosario
 - `02 - Actores/` — los 4 roles y su mapa
 - `03 - Historias de Usuario/` — HU-xxx
