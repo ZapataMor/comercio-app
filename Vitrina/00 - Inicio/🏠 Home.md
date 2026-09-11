@@ -2,7 +2,7 @@
 title: 🏠 Home — Vitrina
 tags: [moc, inicio]
 estado: hecho
-actualizado: 2026-06-28
+actualizado: 2026-09-11
 ---
 
 # 🏠 Vitrina — Segundo cerebro de **comercio-api**
@@ -22,7 +22,7 @@ actualizado: 2026-06-28
 - [[_MOC Ideas]] — backlog conceptual y mejoras futuras
 
 ## 📍 Entrada rápida
-- 📊 [[Estado Actual]] — qué está hecho, en curso y pendiente
+- 📊 [[Estado Actual]] — inventario completo de funcionalidades: hecho, en curso y pendiente
 - 🎤 [[Pitch]] — el elevator pitch
 - 📖 [[Glosario]] — el lenguaje del dominio
 - 🔄 [[Lógica de Negocio]] — el ciclo de vida del pedido

@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "932a437b491a402b",
+        "id": "0ed9e429fa97ab7e",
         "type": "tabs",
         "children": [
           {
-            "id": "bdeb0393eab75e78",
+            "id": "d1e90f5e0b5412b3",
             "type": "leaf",
             "state": {
               "type": "markdown",
@@ -41,9 +41,7 @@
               "type": "file-explorer",
               "state": {
                 "sortOrder": "alphabetical",
-                "autoReveal": false,
-                "showSearch": false,
-                "searchQuery": ""
+                "autoReveal": false
               },
               "icon": "lucide-folder-closed",
               "title": "Explorador de archivos"
@@ -182,8 +180,9 @@
       "bases:Crear nueva base": false
     }
   },
-  "active": "bdeb0393eab75e78",
+  "active": "d1e90f5e0b5412b3",
   "lastOpenFiles": [
+    "00 - Inicio/🏠 Home.md",
     "00 - Inicio/Estado Actual.md",
     "08 - Ideas/ADR/ADR-003 Botón llamar o WhatsApp al cliente.md",
     "08 - Ideas/ADR/ADR-002 Notificaciones en tiempo real.md",
@@ -217,7 +216,6 @@
     "05 - Casos de Prueba/CP-005 Tomar pedido.md",
     "01 - Negocio/Pitch.md",
     "05 - Casos de Prueba/CP-004 Comercio marca listo.md",
-    "05 - Casos de Prueba/CP-003 Buscar productos.md",
     "05 - Casos de Prueba/_MOC Casos de Prueba.md.tmp.24444.6d32efc23f4b",
     "05 - Casos de Prueba"
   ]

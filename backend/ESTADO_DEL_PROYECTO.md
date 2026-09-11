@@ -1,7 +1,7 @@
 # 📦 Estado del proyecto — comercio-api
 
 > Documento vivo de seguimiento. Refleja **qué hay hecho** y **qué falta** en la app.
-> Última actualización: **2026-06-29**
+> Última actualización: **2026-09-11**
 
 ---
 
@@ -21,13 +21,16 @@ Leyenda: `- [x]` hecho · `- [ ]` pendiente · 🚧 a medias
 ---
 
 ## 1. Resumen
-API REST en **Laravel 13** (PHP 8.4), autenticación por token con **Sanctum** y roles/permisos con **Spatie**. Base de datos **MySQL** (`comercio_api`). Interfaz web Blade para probar, y app móvil React Native en marcha.
+API REST en **Laravel 13** (PHP 8.4), autenticación por token con **Sanctum** y roles/permisos con **Spatie**. Base de datos **MySQL** (`comercio_api`). Interfaz web Blade para probar, y app móvil React Native (**Vitrina**) con los 4 roles funcionando.
+
+> 🧭 El inventario completo de funcionalidades (de lo mínimo a lo notable, por rol) vive en el vault Obsidian: `Vitrina/00 - Inicio/Estado Actual.md`. Este archivo es el changelog técnico.
 
 ### Estructura del proyecto (monorepo, fuera de OneDrive)
 ```
 C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 ├── backend/                   ← este proyecto Laravel (la API + web Blade)
-└── frontend/                  ← app móvil React Native (ComercioApp)
+├── frontend/                  ← app móvil React Native (ComercioApp, marca "Vitrina")
+└── Vitrina/                   ← vault Obsidian (segundo cerebro: negocio, producto, diseño)
 ```
 > Movido fuera de OneDrive el 2026-06-24 (OneDrive + node_modules/builds da problemas). Respaldo = Git/GitHub. La carpeta vieja en OneDrive quedó vacía (cascarones inofensivos).
 
@@ -45,6 +48,8 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 ## 3. Roles
 - [x] Roles base creados: `administrador`, `comerciante`, `usuario`, `domiciliario` (`RoleSeeder`)
 - [x] Registro público solo permite `usuario` o `comerciante` (los demás los asigna un admin)
+- [x] **Modelo unificado (2026-09-11)**: el registro ya NO pide rol; todo el mundo es `usuario` y puede crear/trabajar en negocios (ver sección 6 → "Negocios y equipos"). 🚧 La app todavía muestra el selector de rol
+- [ ] Decidir el destino del rol global `comerciante` (¿se elimina o queda solo para el panel web?)
 
 ---
 
@@ -53,6 +58,9 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 - [x] `POST /api/login` — login + token (con `throttle:6,1`)
 - [x] `POST /api/logout` — revoca solo el token usado
 - [x] `GET /api/user` — datos del usuario autenticado
+- [x] `PUT /api/perfil` — perfil personal (nombre, email, contraseña con la actual, dirección, barrio, teléfono); sincroniza la dirección principal del cliente
+- [x] El registro exige dirección, barrio y teléfono; crea la dirección principal y sugiere el barrio si es nuevo
+- [x] Login/registro devuelven `codigo_publico` y la lista de `negocios` (con rol) del usuario
 
 ---
 
@@ -65,6 +73,13 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 - [x] `pedidos` (negocio_id, user_id, domiciliario_id, estado, metodo_pago, total, direccion_entrega, telefono_contacto, minutos_recogida)
 - [x] `pedido_items` (pedido_id, producto_id, **copia** de nombre/precio/cantidad al momento del pedido)
 - [x] `device_tokens` (user_id, token único, plataforma, last_used_at) — tokens FCM para notificaciones push (un usuario puede tener varios aparatos)
+- [x] `negocios.imagen` y `productos.imagen` (subida multipart, `storage/public/{negocios,productos}`)
+- [x] `negocios.categoria` (texto legado) + `tipos_negocio` y pivote `negocio_tipo_negocio` — un negocio puede tener varios tipos (Panadería, Droguería…); 30 tipos base sembrados por migración
+- [x] `users.direccion`, `users.barrio`, `users.telefono` — datos de contacto del cliente
+- [x] `cliente_direcciones` (user_id, direccion, barrio, es_principal) — ubicaciones guardadas del cliente
+- [x] `barrios` (nombre único, aprobado, creado_por) — catálogo de barrios de Maicao + sugerencias de clientes
+- [x] `tipos_producto` (nombre, slug, atributo_label, atributo_boton, sugerencias JSON, orden) + `productos.tipo_producto_id` y `productos.atributos` (JSON) — 7 tipos base sembrados por migración
+- [x] `negocio_user` (negocio_id, user_id, rol propietario|trabajador, activo) — membresías; `users.codigo_publico` (ej. `U34F4D`); `invitaciones_trabajo` (negocio_id, user_id, invitado_por, estado) — con backfill de dueños y códigos
 - [x] Relaciones: User→Negocio, Negocio→Productos, Negocio→Categorias, Producto→Categoria, Negocio→Pedidos, Pedido→(cliente, domiciliario, items), User→(pedidos, entregas, carritoItems)
 - [x] **Tipos de venta de producto**: `cantidad` (unidades/porciones/combos/paquetes/docenas), `peso` (precio por kg/libra), `volumen` (por litro), `longitud` (por metro). El precio se entiende "por `unidad_medida`"
 
@@ -84,17 +99,40 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 - [x] Productos con **tipo de venta** (`tipo_venta` + `unidad_medida`) y `precio_formateado` en el JSON (ej. "$8.900 / kg")
 - [x] `CategoriaResource` incluye el **conteo de productos** (`productos`, vía `withCount`) para la lista de categorías de la app
 - [x] Filtro `?sin_categoria=1` en `GET /productos` (lista los productos sin categoría)
+- [x] Subida de **imagen** de negocio y producto (máx 4 MB) al crear/actualizar
+- [x] **Tipos de negocio** (`categoria` / `categorias[]`) al crear/editar el negocio; se crean al vuelo si no existen
+- [x] **Tipos de producto + atributos**: `tipo_producto_id` obligatorio al crear; `atributos[]` (ingredientes, usos, tallas…) limpiados y validados; `GET /api/tipos-producto` devuelve la config del formulario
+- [x] Pedidos recibidos: `GET /comerciante/pedidos` y `PUT /comerciante/pedidos/{id}/listo`
+
+### Negocios y equipos — modelo unificado 🚧 (commit `9430ede`, 2026-09-11)
+> Cualquier usuario puede ser **propietario de varios negocios** y **trabajador de otros**. La autorización se hace contra `negocio_user`, no contra el rol global. Nadie entra a un negocio sin aceptar una invitación; la app no permite buscar personas, solo resolver un código público exacto.
+- [x] Modelos: `Negocio::miembros()/miembrosActivos()/esMiembroActivo()/esPropietario()`, creador = propietario automático; `User::negocios()/negociosActivos()/invitacionesTrabajo()`; `InvitacionTrabajo`
+- [x] `NegocioController` reescrito: `index` (mis negocios + código público), `store` (sin límite), `show`/`update` con `{negocio}` en la ruta; solo el propietario edita
+- [x] `ProductoController`, `CategoriaController`, `ComercioPedidoController` reciben `{negocio}` y validan membresía activa
+- [x] `TrabajadorController`: resolver código → nombre, listar miembros + invitaciones pendientes, invitar por código (solo propietario), cancelar invitación, quitar trabajador (nunca a un propietario), salir del negocio
+- [x] `InvitacionController`: mis invitaciones pendientes, aceptar (crea membresía), rechazar
+- [x] Notificación push `InvitacionTrabajoRecibida`; nuevo pedido avisa a todos los miembros activos; `DashboardController` da panel a quien sea miembro
+- [ ] **`routes/api.php` NO está actualizado**: sigue con `/comerciante/negocio|productos|categorias|pedidos` sin `{negocio}` y bajo `role:comerciante` → esas rutas hoy rompen. Definir `/api/negocios/mios`, `/api/negocios/{negocio}/...`, `/api/negocios/{negocio}/miembros|invitar`, `/api/invitaciones/{id}/aceptar|rechazar`
+- [ ] Adaptar la app: `api.ts`, `NegocioContext` (negocio activo), pantallas Mis negocios / Equipo / Invitaciones, código público en Mi perfil, quitar selector de rol del registro
+- [ ] Tests Pest de membresías e invitaciones (`ComercianteTest` quedó sobre las rutas viejas)
+- [ ] Panel web Blade: sigue en "1 negocio por comerciante" (`User::negocio()`); decidir si se adapta
 
 ### Cliente (`usuario`)
 - [x] Ve su panel en `/api/dashboard`
 - [x] Explorar negocios y ver catálogo (vía web)
 - [x] **Hacer pedidos** (carrito → pago → confirmar) y seguir su estado (vía web)
-- [ ] Versión API de lo anterior (para la app nativa)
+- [x] Versión API de lo anterior (para la app nativa): `GET /api/negocios` (paginado 50, `?buscar`, `?tipo_negocio_id`, abiertos primero), `GET /api/negocios/{id}`, `GET /api/tipos-negocio`, `POST/GET /api/pedidos`, `GET /api/pedidos/{id}`
+- [x] **Búsqueda de productos por relevancia** `GET /api/productos?buscar=` (nombre exacto → empieza por → contiene → descripción/atributos/categoría; negocios abiertos primero; máx 50) con el negocio que los vende
+- [x] **Direcciones guardadas** `GET/POST /api/cliente/direcciones` (principal + otras) para el checkout
+- [x] **Barrios de Maicao**: `GET /api/barrios` público (sembrados por comuna en `BarriosSeeder`); un barrio escrito a mano queda como sugerencia pendiente
+- [x] Al crear un pedido, si el cliente no tenía teléfono se guarda en su perfil
 
 ### Administrador
 - [x] Ve su panel en `/api/dashboard`
 - [x] Gestionar usuarios y asignar roles (vía web `/admin/usuarios`)
 - [x] Ver todos los negocios (vía web `/admin/negocios`)
+- [x] API: `GET /admin/stats`, `GET/POST /admin/usuarios`, `PUT /admin/usuarios/{id}/rol`, `GET /admin/negocios`
+- [x] **Moderación de barrios**: `GET /admin/barrios/pendientes`, `PUT /admin/barrios/{id}/aprobar`, `DELETE /admin/barrios/{id}`
 
 ### Domiciliario
 - [x] Ve su panel en `/api/dashboard`
@@ -156,29 +194,45 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 
 ---
 
-### Notificaciones push (FCM) — 🚧 a medias
-> Estados: **Capa 1 (backend) HECHA**; faltan Capa 2 (conectar Firebase real) y Capa 3 (app móvil). El envío está **blindado**: si Firebase no está configurado, no hace nada; si falla un envío, se registra en log y NUNCA rompe el flujo de pedidos (`App\Support\Push`).
+### Notificaciones push (FCM) — ✅ las 3 capas
+> Estados: **Capa 1 (backend), Capa 2 (Firebase real) y Capa 3 (app móvil) HECHAS**. El envío está **blindado**: si Firebase no está configurado, no hace nada; si falla un envío, se registra en log y NUNCA rompe el flujo de pedidos (`App\Support\Push`).
 - [x] Librería `laravel-notification-channels/fcm` instalada + `config/firebase.php` publicado (requirió habilitar `ext-sodium` en php.ini)
 - [x] Tabla/modelo `device_tokens` + relación `User::deviceTokens()` y `User::routeNotificationForFcm()`
 - [x] Endpoints `POST /api/device-tokens` (registrar, idempotente, reasigna si el aparato cambió de dueño) y `DELETE /api/device-tokens` (baja al cerrar sesión)
 - [x] Notificaciones: `NuevoPedidoParaComercio`, `PedidoDisponibleParaDomiciliario`, `EstadoPedidoActualizado` (mensaje por estado)
 - [x] Disparos enganchados: crear pedido→comercio; marcar listo→domiciliarios + cliente; tomar/recogido/en_camino/entregado→cliente
 - [x] Helper `App\Support\Push` (no-op si no hay credenciales, atrapa fallos) + 10 tests Pest con `Notification::fake()`
-- [ ] **Capa 2**: crear proyecto Firebase, poner la service account en `storage/app/firebase/` y `FIREBASE_CREDENTIALS` en `.env` → envío real
-- [ ] **Capa 3**: app móvil con `@react-native-firebase/messaging`, `google-services.json`, permiso, registrar token al login y manejar notificaciones (foreground/background)
+- [x] **Capa 2**: proyecto Firebase `miproyecto-48045`, service account en `storage/app/firebase/` y `FIREBASE_CREDENTIALS` en `.env` → envío real
+- [x] **Capa 3**: app móvil con `@react-native-firebase/messaging` + `@notifee/react-native`, `google-services.json`, permiso `POST_NOTIFICATIONS` (Android 13+), canal "Pedidos" de alta prioridad, registro del token al iniciar sesión y baja al salir, toast + notificación local en primer plano, y navegación al tocar la notificación según `tipo`/`pedido_id` (`RootNavigation.ts`), incluso con la app cerrada
+- [x] Notificación `InvitacionTrabajoRecibida` (equipos de trabajo)
+- [ ] Notificaciones en tiempo real dentro de la app además del push (ver ADR-002 en el vault)
 
 ## 8. Pendiente grande (siguiente fase)
 - [x] Flujo de **pedidos** (carrito → pedido → estados) en la web — núcleo del comercio
 - [x] Panel de administrador (gestión de usuarios/roles) en la web
 - [x] Asignación de pedidos a domiciliarios (los toman ellos mismos)
-- [ ] Versión **API** del flujo de pedidos (para la app nativa React Native CLI)
+- [x] Versión **API** del flujo de pedidos (para la app nativa React Native CLI)
+- [x] Notificaciones push (FCM): las 3 capas
+- [x] Identidad visual **Vitrina** (logo día/noche, splash animado, paleta Ámbar & Grafito, Sora + Inter, íconos de línea)
+- [x] Perfil personal, barrios de Maicao, direcciones guardadas, tipos de negocio, tipos de producto con atributos, errores de validación por campo
+- 🚧 **Modelo unificado multi-negocio + equipos** (rutas API y app pendientes — ver sección 6)
 - [ ] Ubicación en mapa en tiempo real
-- 🚧 Notificaciones push (FCM): Capa 1 backend hecha (ver sección 6); faltan Firebase real + app
 - [ ] Búsqueda inteligente/semántica (capa 2 y 3)
+- [ ] Botón llamar / WhatsApp al cliente desde el pedido (ADR-003)
 
 ---
 
 ## 📜 Historial de cambios
+- **2026-09-11** — **Modelo unificado de usuarios y negocios (backend, a medias)**. Migración `create_membresias_negocio` (`negocio_user`, `invitaciones_trabajo`, `users.codigo_publico`, backfill). Controladores `Negocio/Producto/Categoria/ComercioPedido` reciben `{negocio}` y autorizan por membresía; nuevos `TrabajadorController` (invitar por código público, miembros, quitar, salir) e `InvitacionController` (aceptar/rechazar); notificación `InvitacionTrabajoRecibida`; registro sin rol. **Pendiente**: `routes/api.php` no se actualizó (las rutas `/comerciante/*` rompen), app móvil sin adaptar, tests. Además: puesta al día de este documento y del vault (`Vitrina/00 - Inicio/Estado Actual.md` pasa a ser el inventario completo de funcionalidades).
+- **2026-07-06** — **Refactor del catálogo del comerciante en la app**: `MisProductosScreen` reemplaza a `MisCategoriasScreen` (las categorías se asignan desde el formulario de producto); modal de producto deslizable con cierre por arrastre; `getProductos` sin filtro por categoría.
+- **2026-07-06** — **Tipos de producto y atributos**: tabla global `tipos_producto` (Comida, Medicamento, Herramienta, Ropa y calzado, Tecnología, Belleza y aseo, Otro) con pregunta, botón y chips sugeridos; `productos.tipo_producto_id` (obligatorio al crear) y `productos.atributos` JSON; componente `ListaAtributos`; los atributos entran en la búsqueda del cliente. Tests.
+- **2026-07-05** — **Marca Vitrina en la app**: componentes `Logo` (día 05:00–17:59 / noche) y `SplashVitrina` animado; íconos adaptativos Android; el teléfono del checkout se guarda en el perfil si no había; la pila de navegación se rearma tras confirmar el pedido.
+- **2026-07-05** — **Barrios de Maicao y teléfono**: modelo `Barrio` + `BarriosSeeder` por comunas; `GET /api/barrios` público; sugerencias de barrio pendientes de aprobación con `AdminBarriosScreen` y endpoints de admin; `users.telefono`; componente `BarrioSelect`; tests.
+- **2026-07-05** — **Direcciones del cliente**: `users.direccion/barrio`, tabla `cliente_direcciones`, `GET/POST /api/cliente/direcciones`; registro y perfil piden dirección/barrio; `ClienteDireccionesTest`.
+- **2026-07-05** — **Tipos de negocio**: tablas `tipos_negocio` + pivote, 30 tipos base, `GET /api/tipos-negocio`, filtro `?tipo_negocio_id` en negocios y productos, chips de filtro en Explorar. Antes: campo `negocios.categoria` (texto) y `categorias[]` en el formulario.
+- **2026-07-05** — **Errores de validación por campo**: tipo `ApiValidationErrors` + `ApiError` en `api.ts`, componente `FieldError` y `formErrors.ts`; aplicado en registro, perfil, negocio, productos.
+- **2026-07-01 → 07-05** — **Identidad Vitrina, perfil y búsqueda de productos**: paleta Ámbar & Grafito, Sora + Inter, animación "paquete al carrito" (`FlyToCart`), barra flotante del cliente (`BarraCliente`), tarjetas de negocio expandibles, scroll infinito en Explorar; `GET /api/productos?buscar=` por relevancia con scroll al producto resaltado en el catálogo. Perfil personal (`PUT /api/perfil`, `PerfilScreen`, `HeaderPerfil`). `ImagenesDemoSeeder`. Tests `CatalogoBusquedaTest`, `CatalogoNegociosTest`, `PerfilTest`.
+- **2026-06-29** — **Push Capas 2 y 3**: Firebase real (`miproyecto-48045`), `@react-native-firebase/messaging` + Notifee, canal "Pedidos", registro/baja de token con la sesión, navegación al tocar la notificación (`RootNavigation.ts`). Tests de notificaciones ampliados (15).
 - **2026-06-29** — **Móvil: íconos de línea, toasts globales y limpieza**.
   - **Íconos de borde fino**: se añadió `react-native-svg` y `src/components/Icon.tsx`, un set propio de íconos *solo borde* (estilo thin/uicons): tienda, etiqueta, bolsa, herramientas, moto, usuario(s), ubicación, teléfono, tarjeta, caja, basura, carrito, efectivo, banco, casa, check, cerrar, imagen, chevron, lista, lupa, reloj. **Se reemplazaron TODOS los emojis** de la app por estos íconos, contextualizados (Home, AdminTablero, Categorías/Productos, detalle de pedido, Explorar, Carrito, Negocio, Checkout, Domiciliario, Login, Register, SelectorImagen). No se usó la fuente Flaticon UICONS porque su paquete npm solo trae woff2/woff (RN no los carga sin convertir a TTF); el SVG logra el mismo estilo de forma fiable.
   - **Toasts en los demás roles**: migrados los `Alert` informativos de cliente/admin/domiciliario (`AdminUsuarios`, `Domiciliario`, `Checkout`) a `useToast`. Se conservan como `Alert` solo las **confirmaciones** (Sí/No: vaciar carrito, borrar producto/categoría).
