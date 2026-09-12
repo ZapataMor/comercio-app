@@ -3,6 +3,10 @@
 Todo lo necesario para levantar **comercio-app** en una máquina nueva.
 Versiones tomadas del propio proyecto (`composer.json`, `package.json`, `android/build.gradle`).
 
+> 💡 Esto es la instalación **desde cero**. Para el arranque del **día a día** (qué comando
+> ejecutar cada vez que enciendes el PC) usa `iniciar-dev.bat` en la raíz, o lee
+> `Vitrina/00 - Inicio/Cómo levantar el proyecto cada día.md`.
+
 ---
 
 ## 1. Qué lleva el proyecto
