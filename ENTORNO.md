@@ -67,11 +67,13 @@ Comprueba que tu PHP trae **todas** las extensiones que pide el backend:
 
 ```powershell
 php --ini                     # te dice qué php.ini se está usando
-php -m | findstr /i "sodium openssl pdo_mysql mbstring fileinfo gd intl curl zip"
+php -m | findstr /i "sodium openssl pdo_mysql pdo_sqlite sqlite3 mbstring fileinfo gd intl curl zip"
 ```
 
-Deben aparecer las nueve. Las que suelen faltar son `sodium` (la necesita
+Deben aparecer las once. Las que suelen faltar son `sodium` (la necesita
 `lcobucci/jwt`, que entra como dependencia del SDK de Firebase) y `intl`.
+`pdo_sqlite` y `sqlite3` no son para la app (esa va con MySQL) sino para los
+tests: `phpunit.xml` los corre con `DB_CONNECTION=sqlite` y `DB_DATABASE=:memory:`.
 Si falta alguna, abre el `php.ini` que te indicó `php --ini`, descomenta la
 línea `extension=...` correspondiente y reinicia la terminal.
 
