@@ -88,6 +88,41 @@ línea `extension=...` correspondiente y reinicia la terminal.
 > where.exe php      # el primero de la lista es el que usa Composer
 > ```
 
+**Receta que funciona (PHP 8.4 con winget), paso a paso en PowerShell:**
+
+```powershell
+winget install --id PHP.PHP.8.4 -e
+
+# 1. Localiza dónde lo dejó winget (no es C:\php)
+$php    = (Get-ChildItem "$env:LOCALAPPDATA\Microsoft\WinGet\Packages" -Recurse -Filter php.exe -ErrorAction SilentlyContinue | Select-Object -First 1).FullName
+$phpDir = Split-Path $php
+& $php -v
+
+# 2. Crea el php.ini (winget no lo crea) y habilita las extensiones del proyecto
+Copy-Item "$phpDir\php.ini-development" "$phpDir\php.ini"
+$ini = "$phpDir\php.ini"
+$c   = Get-Content $ini -Raw
+$c   = $c -replace '(?m)^\s*;?\s*extension_dir\s*=.*$', "extension_dir = `"$phpDir\ext`""
+foreach ($e in 'sodium','openssl','pdo_mysql','pdo_sqlite','sqlite3','mbstring','fileinfo','curl','zip','gd','intl') {
+    $c = $c -replace "(?m)^\s*;\s*extension\s*=\s*$e\s*$", "extension=$e"
+}
+Set-Content $ini $c -Encoding UTF8
+& $php -m | Select-String 'sodium|gd|intl'      # las tres deben aparecer
+
+# 3. Deja ese PHP primero en el PATH (y abre una terminal nueva)
+$u = [Environment]::GetEnvironmentVariable("PATH","User")
+[Environment]::SetEnvironmentVariable("PATH", "$phpDir;$u", "User")
+```
+
+Comprueba en la terminal nueva que `where.exe php` lista el de winget **primero** y que
+`composer -V` ya reporta esa misma ruta; entonces `composer install` pasa sin flags.
+
+> El `extension_dir` va con **ruta absoluta** a propósito: con el valor relativo `"ext"`
+> PHP no encuentra las DLL al ejecutarse desde `backend\`.
+
+> Si actualizas PHP con `winget upgrade`, la carpeta del paquete cambia de nombre y el
+> `PATH` deja de valer: repite el bloque, o copia el PHP a `C:\php` y usa esa ruta fija.
+
 ### 3.2 JDK 17
 
 ```powershell
