@@ -61,6 +61,31 @@ composer -V
 mysql --version
 ```
 
+#### PHP: extensiones obligatorias (ojo con Herd Lite)
+
+Comprueba que tu PHP trae **todas** las extensiones que pide el backend:
+
+```powershell
+php --ini                     # te dice qué php.ini se está usando
+php -m | findstr /i "sodium openssl pdo_mysql mbstring fileinfo gd intl curl zip"
+```
+
+Deben aparecer las nueve. Las que suelen faltar son `sodium` (la necesita
+`lcobucci/jwt`, que entra como dependencia del SDK de Firebase) y `intl`.
+Si falta alguna, abre el `php.ini` que te indicó `php --ini`, descomenta la
+línea `extension=...` correspondiente y reinicia la terminal.
+
+> ⚠️ **Herd Lite / `php.new` en Windows no sirve para este proyecto**: su PHP es
+> un binario *estático* compilado sin `sodium`, así que no se puede habilitar por
+> `php.ini` (no hay carpeta `ext/` ni DLL que cargar). Usa **Laravel Herd**
+> completo (gratis, sí trae `sodium`) o el PHP oficial de
+> [windows.php.net](https://windows.php.net/download/) (x64 Non Thread Safe),
+> y asegúrate de que ese `php.exe` va **primero** en el `PATH`:
+>
+> ```powershell
+> where.exe php      # el primero de la lista es el que usa Composer
+> ```
+
 ### 3.2 JDK 17
 
 ```powershell
@@ -298,6 +323,8 @@ adb devices        # tu emulador o móvil aparece
 | Metro se queda con caché vieja                       | `npm start -- --reset-cache`                                                               |
 | Las fuentes salen genéricas                          | Faltó `npx react-native-asset` y recompilar                                                |
 | Laravel: `could not find driver`                     | Habilita `extension=pdo_mysql` (y `mbstring`, `fileinfo`, `gd`, `intl`) en `php.ini`        |
+| `composer install`: *`lcobucci/jwt` requires ext-sodium -> it is missing from your system*  | Tu PHP no trae `sodium`. Si es Herd Lite (`.config\herd-lite`), cámbialo por Herd completo o el PHP de windows.php.net (ver 3.1). Para salir del paso: `composer install --ignore-platform-req=ext-sodium` (funciona porque Firebase firma con RS256, no con Ed25519) |
+| `composer install` dice *`Please run composer update`* por ext-sodium | No es un problema del `composer.lock`: **no ejecutes `composer update`**, falta la extensión en tu PHP |
 | `php artisan pail` no funciona                       | En Windows no hay `pcntl`; lee `backend/storage/logs/laravel.log` directamente              |
 
 ---
