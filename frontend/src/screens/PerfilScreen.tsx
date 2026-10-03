@@ -69,9 +69,11 @@ export default function PerfilScreen({ navigation }: Props) {
         </PressableScale>
       </FadeInView>
 
+      {/* Empuja "Cerrar sesión" a la parte inferior de la vista. */}
+      <View style={styles.espaciador} />
+
       <FadeInView delay={90}>
         <TouchableOpacity style={styles.logout} onPress={salir}>
-          <Icon name="cerrar" size={14} color={c.danger} />
           <Text style={styles.logoutTxt}>Cerrar sesión</Text>
         </TouchableOpacity>
       </FadeInView>
@@ -82,7 +84,9 @@ export default function PerfilScreen({ navigation }: Props) {
 const useStyles = makeStyles((c, shadow) => ({
   container: { flex: 1, backgroundColor: c.bg },
   // Deja aire abajo para la barra flotante del cliente (Carrito/Mis pedidos).
-  content: { padding: 20, paddingBottom: 120 },
+  // flexGrow: el contenido ocupa toda la altura para que el espaciador funcione.
+  content: { flexGrow: 1, padding: 20, paddingBottom: 120 },
+  espaciador: { flex: 1, minHeight: 24 },
   cabecera: { alignItems: 'center', marginBottom: 18 },
   avatar: {
     width: 74, height: 74, borderRadius: 37, backgroundColor: c.accent,
@@ -103,9 +107,12 @@ const useStyles = makeStyles((c, shadow) => ({
   itemTexto: { flex: 1 },
   itemTitulo: { fontSize: 16, fontFamily: font.bold, color: c.textStrong },
   itemSub: { color: c.muted, fontSize: 13, marginTop: 2, fontFamily: font.regular },
+  // Recuadro rojo. El texto usa `surface` (claro de día, oscuro de noche) porque
+  // `danger` también cambia de tono por modo y así conserva el contraste.
+  // alignSelf: 'center' → el recuadro se ajusta al ancho del texto.
   logout: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    marginTop: 16, paddingVertical: 8,
+    alignSelf: 'center', backgroundColor: c.danger, borderRadius: radius.md,
+    paddingVertical: 9, paddingHorizontal: 18, ...shadow.soft,
   },
-  logoutTxt: { color: c.danger, fontFamily: font.bold },
+  logoutTxt: { color: c.surface, fontFamily: font.bold, fontSize: 14 },
 }));
