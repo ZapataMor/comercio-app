@@ -6,7 +6,6 @@ import {
   Image,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -25,7 +24,7 @@ import { useAuth } from '../AuthContext';
 import { CardSkeletons, Desplegable, FadeInView, PressableScale } from '../components/anim';
 import Icon from '../components/Icon';
 import { RootStackParamList } from '../navTypes';
-import { c, font, radius, shadow } from '../theme';
+import { font, makeStyles, radius, useTheme } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Explorar'>;
 
@@ -38,6 +37,8 @@ function categoriasNegocio(item: { categorias?: string[]; categoria?: string | n
 }
 
 export default function ExplorarScreen({ navigation }: Props) {
+  const { c } = useTheme();
+  const styles = useStyles();
   const { auth } = useAuth();
   const [negocios, setNegocios] = useState<NegocioLista[]>([]);
   const [productos, setProductos] = useState<ProductoConNegocio[]>([]);
@@ -219,7 +220,7 @@ export default function ExplorarScreen({ navigation }: Props) {
       }
       renderItem={({ item, index }) =>
         mostrandoProductos ? (
-          renderProducto(item as ProductoConNegocio, navigation, index)
+          <TarjetaProducto item={item as ProductoConNegocio} navigation={navigation} index={index} />
         ) : (
           <CardNegocio
             item={item as NegocioLista}
@@ -235,11 +236,17 @@ export default function ExplorarScreen({ navigation }: Props) {
 }
 
 /** Tarjeta de producto (resultado de búsqueda): imagen, info y negocio. */
-function renderProducto(
-  item: ProductoConNegocio,
-  navigation: Props['navigation'],
-  index: number,
-) {
+function TarjetaProducto({
+  item,
+  navigation,
+  index,
+}: {
+  item: ProductoConNegocio;
+  navigation: Props['navigation'];
+  index: number;
+}) {
+  const { c } = useTheme();
+  const styles = useStyles();
   const img = imagenUrl(item.imagen);
   return (
     <FadeInView delay={Math.min(index, 8) * 45}>
@@ -302,6 +309,8 @@ const CardNegocio = React.memo(function CardNegocio({
   expandida: boolean;
   onToggle: (id: number) => void;
 }) {
+  const { c } = useTheme();
+  const styles = useStyles();
   const img = imagenUrl(item.imagen);
   return (
     <FadeInView delay={Math.min(index, 8) * 45}>
@@ -367,7 +376,7 @@ const CardNegocio = React.memo(function CardNegocio({
   );
 });
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c, shadow) => ({
   container: { flex: 1, backgroundColor: c.bg },
   filaAccion: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   buscadorBox: {
@@ -447,4 +456,4 @@ const styles = StyleSheet.create({
   },
   vacio: { textAlign: 'center', color: c.muted, marginTop: 40, fontFamily: font.regular },
   error: { color: c.danger, backgroundColor: c.dangerSoft, padding: 12, borderRadius: radius.sm, marginBottom: 12, fontFamily: font.medium },
-});
+}));

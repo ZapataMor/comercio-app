@@ -16,7 +16,7 @@ import {
   StyleProp,
   ViewStyle,
 } from 'react-native';
-import { c, radius } from '../theme';
+import { radius, useTheme } from '../theme';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -147,6 +147,7 @@ type SkeletonProps = {
 
 /** Bloque "fantasma" que late suavemente mientras carga el contenido. */
 export function Skeleton({ width = '100%', height = 14, r = radius.sm, style }: SkeletonProps) {
+  const { c } = useTheme();
   const a = useRef(new Animated.Value(0.5)).current;
   useEffect(() => {
     const loop = Animated.loop(
@@ -167,6 +168,7 @@ export function Skeleton({ width = '100%', height = 14, r = radius.sm, style }: 
 
 /** Lista de tarjetas "fantasma" para pantallas que cargan (Explorar, etc.). */
 export function CardSkeletons({ count = 4 }: { count?: number }) {
+  const { c } = useTheme();
   return (
     <>
       {Array.from({ length: count }).map((_, i) => (

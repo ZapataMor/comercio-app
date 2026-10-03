@@ -1,12 +1,13 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { ComercioPedido, getPedidosComercio, marcarPedidoListo } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import Icon from '../components/Icon';
+import { useNegocio } from '../NegocioContext';
 import { RootStackParamList } from '../navTypes';
-import { c, estadoColor, font, radius, shadow } from '../theme';
+import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ComercioPedidoDetalle'>;
@@ -16,20 +17,25 @@ function cop(n: number) {
 }
 
 export default function ComercioPedidoDetalleScreen({ route, navigation }: Props) {
+  const { c, estadoColor } = useTheme();
+  const styles = useStyles();
   const { auth } = useAuth();
   const token = auth!.token;
   const toast = useToast();
+  const { negocio } = useNegocio();
+  // Desde un push el pedido puede ser de un negocio que no es el activo.
+  const negocioId = route.params.negocioId ?? negocio?.id ?? null;
   const [pedido, setPedido] = useState<ComercioPedido | null>(route.params.pedido ?? null);
   const [cargando, setCargando] = useState(!route.params.pedido);
   const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
-    if (pedido || !route.params.pedidoId) {
+    if (pedido || !route.params.pedidoId || !negocioId) {
       setCargando(false);
       return;
     }
 
-    getPedidosComercio(token)
+    getPedidosComercio(token, negocioId)
       .then(pedidos => {
         const encontrado = pedidos.find(p => p.id === route.params.pedidoId);
         if (encontrado) {
@@ -40,15 +46,15 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
       })
       .catch(e => toast.error('No se pudo cargar', e instanceof Error ? e.message : 'Error'))
       .finally(() => setCargando(false));
-  }, [pedido, route.params.pedidoId, toast, token]);
+  }, [pedido, route.params.pedidoId, negocioId, toast, token]);
 
   async function onListo() {
-    if (!pedido) {
+    if (!pedido || !negocioId) {
       return;
     }
     setEnviando(true);
     try {
-      await marcarPedidoListo(token, pedido.id);
+      await marcarPedidoListo(token, negocioId, pedido.id);
       toast.exito('Pedido listo', 'Los domiciliarios ya pueden recogerlo.');
       navigation.goBack();
     } catch (e) {
@@ -157,7 +163,7 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c, shadow) => ({
   container: { flex: 1, backgroundColor: c.bg },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg, padding: 20 },
   card: { backgroundColor: c.surface, borderRadius: radius.lg, padding: 18, ...shadow.soft },
@@ -183,4 +189,4 @@ const styles = StyleSheet.create({
   btn: { backgroundColor: c.brand, borderRadius: radius.md, paddingVertical: 16, alignItems: 'center', marginTop: 16, ...shadow.soft },
   btnTxt: { color: c.onBrand, fontFamily: font.bold, fontSize: 16 },
   nota: { textAlign: 'center', color: c.muted, marginTop: 16, fontSize: 14, fontFamily: font.regular },
-});
+}));

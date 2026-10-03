@@ -7,11 +7,17 @@ export type RootStackParamList = {
   Home: undefined;
   // Perfil PERSONAL del usuario logueado (cualquier rol).
   Perfil: undefined;
-  // Comerciante
-  MiTienda: undefined;
-  // Catálogo del comerciante: lista de productos + "Añadir producto".
+  // Negocios (cualquier usuario puede tener o trabajar en varios).
+  // Lista de mis negocios + invitaciones recibidas + crear otro.
+  MisNegocios: undefined;
+  // Datos del negocio activo; `nuevo` abre directo el formulario de creación.
+  MiTienda: { nuevo?: boolean } | undefined;
+  // Catálogo del negocio activo: lista de productos + "Añadir producto".
   MisProductos: undefined;
-  ComercioPedidoDetalle: { pedido?: ComercioPedido; pedidoId?: number };
+  // Miembros e invitaciones del negocio activo.
+  Equipo: undefined;
+  // `negocioId`: desde un push, el pedido puede ser de otro negocio que no es el activo.
+  ComercioPedidoDetalle: { pedido?: ComercioPedido; pedidoId?: number; negocioId?: number };
   // Cliente
   Explorar: undefined;
   // `productoId` opcional: al entrar desde una búsqueda de producto, el catálogo

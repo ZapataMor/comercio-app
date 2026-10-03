@@ -200,7 +200,7 @@ test('marcar un pedido listo notifica a los domiciliarios y al cliente', functio
     $pedido = pedidoEnEstado($negocio, $cliente, 'pendiente');
 
     Sanctum::actingAs($negocio->user);
-    $this->putJson("/api/comerciante/pedidos/{$pedido->id}/listo")->assertOk();
+    $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}/listo")->assertOk();
 
     Notification::assertSentTo($domiciliario, PedidoDisponibleParaDomiciliario::class);
     Notification::assertSentTo($cliente, EstadoPedidoActualizado::class);

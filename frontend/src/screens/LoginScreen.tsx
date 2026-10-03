@@ -34,7 +34,7 @@ import FieldError from '../components/FieldError';
 import { marca, ModoVitrina, useModoVitrina } from '../components/Logo';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
-import { c, font, radius } from '../theme';
+import { font, paletas, radius } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
@@ -52,6 +52,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 //   · Noche (18:00–04:59): luna plateada y estrellas, paleta nocturna del kit
 //     de marca (índigo, arena, luna y terracota).
 // ─────────────────────────────────────────────────────────────
+const c = paletas.dia; // la escena de día parte de la paleta diurna de la app
 const ORO = c.accent; // #E8A019
 const GRAFITO = c.brand; // #262019
 const TINTA = c.textStrong; // #1F1B16
@@ -101,6 +102,8 @@ const PALETA: Record<ModoVitrina, {
   destello: string;
   destelloOp: number;
   hint: string;
+  errorFondo: string;
+  errorTexto: string;
 }> = {
   dia: {
     fondo: c.bg, // #FAF8F4
@@ -150,6 +153,8 @@ const PALETA: Record<ModoVitrina, {
     destello: ORO,
     destelloOp: 0.38,
     hint: 'rgba(38,32,25,0.35)',
+    errorFondo: paletas.dia.dangerSoft,
+    errorTexto: paletas.dia.danger,
   },
   noche: {
     fondo: marca.indigo, // #1A1F3D
@@ -199,6 +204,8 @@ const PALETA: Record<ModoVitrina, {
     destello: marca.terracota,
     destelloOp: 0.3,
     hint: 'rgba(247,235,216,0.35)',
+    errorFondo: paletas.noche.dangerSoft,
+    errorTexto: paletas.noche.danger,
   },
 };
 type Paleta = (typeof PALETA)[ModoVitrina];
@@ -689,7 +696,7 @@ export default function LoginScreen({ navigation }: Props) {
                 <CenefaKanaasu p={p} progresoA={anim.cenefaA} progresoB={anim.cenefaB} />
               </View>
 
-              {error ? <Text style={styles.error}>{error}</Text> : null}
+              {error ? <Text style={[styles.error, e.error]}>{error}</Text> : null}
 
               <Animated.View style={bloque(1)}>
                 <Text style={[styles.label, e.label]}>CORREO</Text>
@@ -879,8 +886,6 @@ const styles = StyleSheet.create({
   botonCargando: { height: 19 },
   destello: { position: 'absolute', top: -8, bottom: -8, left: 0, width: 70 },
   error: {
-    backgroundColor: c.dangerSoft,
-    color: c.danger,
     fontFamily: font.medium,
     padding: 10,
     borderRadius: radius.sm,
@@ -912,6 +917,7 @@ function crearEstilos(p: Paleta) {
     boton: { backgroundColor: p.boton, boxShadow: p.botonSombra },
     botonTexto: { color: p.botonTexto },
     hint: { color: p.hint },
+    error: { backgroundColor: p.errorFondo, color: p.errorTexto },
   });
 }
 

@@ -17,9 +17,9 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { c, font, radius } from './theme';
+import { Colores, font, makeStyles, radius, useTheme } from './theme';
 
 type Tipo = 'exito' | 'error' | 'info';
 
@@ -78,6 +78,7 @@ export const useToast = () => useContext(ToastContext);
 // ---------------------------------------------------------------------------
 
 function Overlay({ items, quitar }: { items: ToastItem[]; quitar: (id: number) => void }) {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   if (items.length === 0) {
     return null;
@@ -91,13 +92,17 @@ function Overlay({ items, quitar }: { items: ToastItem[]; quitar: (id: number) =
   );
 }
 
-const ESTILOS: Record<Tipo, { color: string; icono: string }> = {
-  exito: { color: c.success, icono: '✓' },
-  error: { color: c.danger, icono: '!' },
-  info: { color: c.brand, icono: 'i' },
-};
+function estilosToast(c: Colores): Record<Tipo, { color: string; icono: string }> {
+  return {
+    exito: { color: c.success, icono: '✓' },
+    error: { color: c.danger, icono: '!' },
+    info: { color: c.brand, icono: 'i' },
+  };
+}
 
 function Tarjeta({ item, onClose }: { item: ToastItem; onClose: (id: number) => void }) {
+  const { c } = useTheme();
+  const styles = useStyles();
   const anim = useRef(new Animated.Value(0)).current; // 0 oculto, 1 visible
 
   useEffect(() => {
@@ -110,7 +115,7 @@ function Tarjeta({ item, onClose }: { item: ToastItem; onClose: (id: number) => 
     return () => clearTimeout(t);
   }, [anim, item.id, onClose]);
 
-  const estilo = ESTILOS[item.tipo];
+  const estilo = estilosToast(c)[item.tipo];
   const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [-14, 0] });
 
   return (
@@ -133,7 +138,7 @@ function Tarjeta({ item, onClose }: { item: ToastItem; onClose: (id: number) => 
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c, shadow) => ({
   overlay: {
     position: 'absolute',
     right: 12,
@@ -152,10 +157,8 @@ const styles = StyleSheet.create({
     maxWidth: 360,
     minWidth: 220,
     overflow: 'hidden',
-    shadowColor: '#7A5A2A',
-    shadowOpacity: 0.22,
+    ...shadow.card,
     shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
     elevation: 6,
   },
   barra: { width: 5, alignSelf: 'stretch' },
@@ -167,8 +170,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  icono: { color: '#fff', fontWeight: '900', fontSize: 14 },
+  icono: { color: c.onBrand, fontWeight: '900', fontSize: 14 },
   texto: { flex: 1 },
   titulo: { color: c.textStrong, fontFamily: font.bold, fontSize: 14 },
   mensaje: { color: c.muted, fontSize: 12, marginTop: 2, fontFamily: font.regular },
-});
+}));

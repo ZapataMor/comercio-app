@@ -6,33 +6,30 @@ import {
   Platform,
   ScrollView,
   StatusBar,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { register, RolPublico } from '../api';
+import { register } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import BarrioSelect from '../components/BarrioSelect';
 import FieldError from '../components/FieldError';
-import Icon, { IconName } from '../components/Icon';
 import { VitrinaMark } from '../components/Logo';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
-import { c, font, radius, shadow } from '../theme';
+import { font, makeStyles, radius, useTheme } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 
-// Solo se permiten estos dos roles al registrarse desde la app.
-// 'administrador' y 'domiciliario' NO se ofrecen (los crea un admin).
-const OPCIONES: { rol: RolPublico; titulo: string; sub: string; icon: IconName }[] = [
-  { rol: 'usuario', titulo: 'Cliente', sub: 'Quiero comprar y pedir domicilios', icon: 'bolsa' },
-  { rol: 'comerciante', titulo: 'Comerciante', sub: 'Quiero vender en mi negocio', icon: 'tienda' },
-];
+// Modelo unificado: no se elige rol al registrarse. Toda cuenta nace como
+// cliente y luego puede crear sus negocios (o unirse a otros) desde
+// "Mis negocios". 'administrador' y 'domiciliario' los asigna un admin.
 
 export default function RegisterScreen({ navigation }: Props) {
+  const { c } = useTheme();
+  const styles = useStyles();
   const { entrar: guardarSesion } = useAuth();
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
@@ -41,7 +38,6 @@ export default function RegisterScreen({ navigation }: Props) {
   const [direccion, setDireccion] = useState('');
   const [barrio, setBarrio] = useState('');
   const [telefono, setTelefono] = useState('');
-  const [rol, setRol] = useState<RolPublico>('usuario');
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errores, setErrores] = useState<FieldErrors>({});
@@ -62,9 +58,9 @@ export default function RegisterScreen({ navigation }: Props) {
     if (!nombre.trim()) nuevosErrores.name = 'El campo nombre es obligatorio.';
     if (!email.trim()) nuevosErrores.email = 'El campo correo es obligatorio.';
     if (!password) nuevosErrores.password = 'El campo contrasena es obligatorio.';
-    if (rol === 'usuario' && !direccion.trim()) nuevosErrores.direccion = 'El campo direccion es obligatorio.';
-    if (rol === 'usuario' && !barrio.trim()) nuevosErrores.barrio = 'El campo barrio es obligatorio.';
-    if (rol === 'usuario' && !telefono.trim()) nuevosErrores.telefono = 'El campo telefono es obligatorio.';
+    if (!direccion.trim()) nuevosErrores.direccion = 'El campo direccion es obligatorio.';
+    if (!barrio.trim()) nuevosErrores.barrio = 'El campo barrio es obligatorio.';
+    if (!telefono.trim()) nuevosErrores.telefono = 'El campo telefono es obligatorio.';
     if (Object.keys(nuevosErrores).length > 0) {
       setErrores(nuevosErrores);
       return;
@@ -84,10 +80,9 @@ export default function RegisterScreen({ navigation }: Props) {
         name: nombre.trim(),
         email: email.trim(),
         password,
-        role: rol,
-        direccion: rol === 'usuario' ? direccion.trim() : undefined,
-        barrio: rol === 'usuario' ? barrio.trim() : undefined,
-        telefono: rol === 'usuario' ? telefono.trim() : undefined,
+        direccion: direccion.trim(),
+        barrio: barrio.trim(),
+        telefono: telefono.trim(),
       });
       guardarSesion(token, user);
     } catch (e) {
@@ -177,73 +172,47 @@ export default function RegisterScreen({ navigation }: Props) {
           />
           <FieldError mensaje={errores.confirmar} />
 
-          <Text style={styles.label}>¿Cómo quieres usar la app?</Text>
-          <View style={styles.opciones}>
-            {OPCIONES.map(o => (
-              <TouchableOpacity
-                key={o.rol}
-                style={[styles.opcion, rol === o.rol && styles.opcionOn]}
-                onPress={() => setRol(o.rol)}
-                disabled={cargando}>
-                <Icon
-                  name={o.icon}
-                  size={24}
-                  color={rol === o.rol ? c.onAccent : c.muted}
-                  style={styles.opcionEmoji}
-                />
-                <Text style={[styles.opcionTitulo, rol === o.rol && styles.opcionTituloOn]}>
-                  {o.titulo}
-                </Text>
-                <Text style={[styles.opcionSub, rol === o.rol && styles.opcionSubOn]}>
-                  {o.sub}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <Text style={styles.label}>Direccion</Text>
+          <TextInput
+            style={styles.input}
+            value={direccion}
+            onChangeText={valor => {
+              setDireccion(valor);
+              limpiarError('direccion');
+            }}
+            placeholder="Calle, numero, referencia"
+            placeholderTextColor={c.mutedSoft}
+            editable={!cargando}
+          />
+          <FieldError mensaje={errores.direccion} />
 
-          {rol === 'usuario' ? (
-            <>
-              <Text style={styles.label}>Direccion</Text>
-              <TextInput
-                style={styles.input}
-                value={direccion}
-                onChangeText={valor => {
-                  setDireccion(valor);
-                  limpiarError('direccion');
-                }}
-                placeholder="Calle, numero, referencia"
-                placeholderTextColor={c.mutedSoft}
-                editable={!cargando}
-              />
-              <FieldError mensaje={errores.direccion} />
+          <Text style={styles.label}>Barrio</Text>
+          <BarrioSelect
+            valor={barrio}
+            onSeleccionar={nombre => {
+              setBarrio(nombre);
+              limpiarError('barrio');
+            }}
+            disabled={cargando}
+          />
+          <FieldError mensaje={errores.barrio} />
 
-              <Text style={styles.label}>Barrio</Text>
-              <BarrioSelect
-                valor={barrio}
-                onSeleccionar={nombre => {
-                  setBarrio(nombre);
-                  limpiarError('barrio');
-                }}
-                disabled={cargando}
-              />
-              <FieldError mensaje={errores.barrio} />
+          <Text style={styles.label}>Telefono</Text>
+          <TextInput
+            style={styles.input}
+            value={telefono}
+            onChangeText={valor => {
+              setTelefono(valor);
+              limpiarError('telefono');
+            }}
+            keyboardType="phone-pad"
+            placeholder="300 123 4567"
+            placeholderTextColor={c.mutedSoft}
+            editable={!cargando}
+          />
+          <FieldError mensaje={errores.telefono} />
 
-              <Text style={styles.label}>Telefono</Text>
-              <TextInput
-                style={styles.input}
-                value={telefono}
-                onChangeText={valor => {
-                  setTelefono(valor);
-                  limpiarError('telefono');
-                }}
-                keyboardType="phone-pad"
-                placeholder="300 123 4567"
-                placeholderTextColor={c.mutedSoft}
-                editable={!cargando}
-              />
-              <FieldError mensaje={errores.telefono} />
-            </>
-          ) : null}
+          <Text style={styles.nota}>¿Tienes un negocio? Créalo después desde "Mis negocios".</Text>
 
           <PressableScale
             style={[styles.boton, cargando && styles.botonDisabled]}
@@ -265,7 +234,7 @@ export default function RegisterScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c, shadow) => ({
   container: { flex: 1, backgroundColor: c.bg },
   scroll: { flexGrow: 1, justifyContent: 'center', padding: 20 },
   card: {
@@ -289,21 +258,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     color: c.textStrong,
   },
-  opciones: { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  opcion: {
-    flex: 1,
-    borderWidth: 1.5,
-    borderColor: c.border,
-    borderRadius: radius.md,
-    padding: 14,
-    backgroundColor: c.surface2,
-  },
-  opcionOn: { borderColor: c.accent, backgroundColor: c.accentSoft },
-  opcionEmoji: { fontSize: 24 },
-  opcionTitulo: { fontSize: 15, fontFamily: font.bold, color: c.text, marginTop: 6 },
-  opcionTituloOn: { color: c.onAccent },
-  opcionSub: { fontSize: 12, color: c.muted, marginTop: 2, fontFamily: font.regular },
-  opcionSubOn: { color: c.onAccent },
+  nota: { fontSize: 12, color: c.muted, fontFamily: font.regular, textAlign: 'center', marginBottom: 16 },
   boton: {
     backgroundColor: c.brand,
     borderRadius: radius.md,
@@ -323,4 +278,4 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   hint: { textAlign: 'center', color: c.goldText, fontSize: 14, marginTop: 18, fontFamily: font.semibold },
-});
+}));

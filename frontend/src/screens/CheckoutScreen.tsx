@@ -4,7 +4,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -24,7 +23,7 @@ import FieldError from '../components/FieldError';
 import Icon from '../components/Icon';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
-import { c, font, radius, shadow } from '../theme';
+import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Checkout'>;
@@ -39,6 +38,8 @@ function textoUbicacion(ubicacion: Pick<ClienteDireccion, 'direccion' | 'barrio'
 }
 
 export default function CheckoutScreen({ navigation }: Props) {
+  const { c } = useTheme();
+  const styles = useStyles();
   const { auth, actualizarUsuario } = useAuth();
   const cart = useCart();
   const toast = useToast();
@@ -372,7 +373,7 @@ export default function CheckoutScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c, shadow) => ({
   container: { flex: 1, backgroundColor: c.bg },
   resumen: { backgroundColor: c.surface, borderRadius: radius.md, padding: 16, marginBottom: 16, ...shadow.soft },
   resumenTitulo: { fontFamily: font.bold, color: c.text, marginBottom: 8 },
@@ -402,4 +403,4 @@ const styles = StyleSheet.create({
   pagoTxtOn: { color: c.onAccent },
   btn: { backgroundColor: c.accent, borderRadius: radius.md, paddingVertical: 16, alignItems: 'center', ...shadow.gold },
   btnTxt: { color: c.onAccent, fontFamily: font.bold, fontSize: 16 },
-});
+}));

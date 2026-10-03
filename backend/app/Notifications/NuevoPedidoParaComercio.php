@@ -40,6 +40,9 @@ class NuevoPedidoParaComercio extends Notification
             ->data([
             'tipo' => 'nuevo_pedido',
             'pedido_id' => (string) $this->pedido->id,
+            // Una persona puede ser miembro de varios negocios: la app abre
+            // el pedido dentro del negocio correcto.
+            'negocio_id' => (string) $this->pedido->negocio_id,
             'estado' => 'pendiente',
         ]);
     }

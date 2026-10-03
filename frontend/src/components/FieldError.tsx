@@ -1,13 +1,14 @@
 import React from 'react';
-import { StyleSheet, Text } from 'react-native';
-import { c, font } from '../theme';
+import { Text } from 'react-native';
+import { font, makeStyles } from '../theme';
 
 export default function FieldError({ mensaje }: { mensaje?: string | null }) {
+  const styles = useStyles();
   if (!mensaje) return null;
   return <Text style={styles.text}>{mensaje}</Text>;
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(c => ({
   text: {
     color: c.danger,
     fontFamily: font.medium,
@@ -15,4 +16,4 @@ const styles = StyleSheet.create({
     marginTop: -10,
     marginBottom: 12,
   },
-});
+}));

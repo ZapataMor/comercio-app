@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, Text, View } from 'react-native';
 import { AdminNegocio, getAdminNegocios } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView } from '../components/anim';
-import { c, font, radius, shadow } from '../theme';
+import { font, makeStyles, radius, useTheme } from '../theme';
 
 export default function AdminNegociosScreen() {
+  const { c } = useTheme();
+  const styles = useStyles();
   const { auth } = useAuth();
   const [negocios, setNegocios] = useState<AdminNegocio[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -64,7 +66,7 @@ export default function AdminNegociosScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c, shadow) => ({
   container: { flex: 1, backgroundColor: c.bg },
   titulo: { fontSize: 22, fontFamily: font.display, color: c.textStrong, marginBottom: 12 },
   card: {
@@ -78,4 +80,4 @@ const styles = StyleSheet.create({
   abierto: { backgroundColor: c.successSoft, color: c.success },
   cerrado: { backgroundColor: c.surface2, color: c.muted },
   error: { color: c.danger, backgroundColor: c.dangerSoft, padding: 12, borderRadius: radius.sm, margin: 16, fontFamily: font.medium },
-});
+}));

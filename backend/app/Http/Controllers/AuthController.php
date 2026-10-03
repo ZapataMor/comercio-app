@@ -96,7 +96,7 @@ class AuthController extends Controller
      * Actualiza el perfil PERSONAL del usuario autenticado (cualquier rol).
      *
      * Es el perfil de la persona (nombre, email, contraseña), NO el del
-     * negocio: eso vive en /comerciante/negocio. Para cambiar la contraseña
+     * negocio: eso vive en /negocios/{negocio}. Para cambiar la contraseña
      * se exige la contraseña actual.
      */
     public function actualizarPerfil(Request $request): JsonResponse

@@ -1,7 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useCallback, useLayoutEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import { ScrollView, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { ComercioPedido, getPedidosComercio } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
@@ -9,7 +9,7 @@ import HeaderPerfil from '../components/HeaderPerfil';
 import Icon from '../components/Icon';
 import { useNegocio } from '../NegocioContext';
 import { RootStackParamList } from '../navTypes';
-import { c, font, radius, shadow } from '../theme';
+import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
@@ -20,12 +20,23 @@ function cop(n: number) {
 
 /** Switch Abierto/Cerrado que va en la parte derecha de la topbar. */
 function HeaderEstadoNegocio() {
-  const { negocio, setAbierto } = useNegocio();
+  const { c } = useTheme();
+  const styles = useStyles();
+  const { negocio, setAbierto, esPropietario } = useNegocio();
   const toast = useToast();
   const [cambiando, setCambiando] = useState(false);
 
   if (!negocio) {
     return null;
+  }
+
+  // Solo el propietario abre/cierra el negocio; el trabajador solo ve el estado.
+  if (!esPropietario) {
+    return (
+      <Text style={[styles.headerSwitchTxt, { color: negocio.activo ? c.onHeaderOk : c.onHeaderOff }]}>
+        {negocio.activo ? 'Abierto' : 'Cerrado'}
+      </Text>
+    );
   }
 
   async function toggle(v: boolean) {
@@ -45,21 +56,23 @@ function HeaderEstadoNegocio() {
 
   return (
     <View style={styles.headerSwitch}>
-      <Text style={[styles.headerSwitchTxt, { color: negocio.activo ? c.successSoft : c.dangerSoft }]}>
+      <Text style={[styles.headerSwitchTxt, { color: negocio.activo ? c.onHeaderOk : c.onHeaderOff }]}>
         {negocio.activo ? 'Abierto' : 'Cerrado'}
       </Text>
       <Switch
         value={negocio.activo}
         onValueChange={toggle}
         disabled={cambiando}
-        trackColor={{ true: c.success, false: '#6B6358' }}
-        thumbColor={c.onBrand}
+        trackColor={{ true: c.success, false: c.headerTrack }}
+        thumbColor={c.onHeader}
       />
     </View>
   );
 }
 
 export default function HomeScreen({ navigation }: Props) {
+  const { c } = useTheme();
+  const styles = useStyles();
   const { auth, salir } = useAuth();
   const user = auth!.user;
   const token = auth!.token;
@@ -68,15 +81,17 @@ export default function HomeScreen({ navigation }: Props) {
   const esAdmin = user.roles.includes('administrador');
   const esDomiciliario = user.roles.includes('domiciliario');
 
-  const { negocio } = useNegocio();
+  const { negocio, negocios, esPropietario } = useNegocio();
+  const negocioId = negocio?.id ?? null;
+  // Panel de negocio: quien es miembro de algún negocio (modelo unificado).
+  // Las cuentas con el rol viejo 'comerciante' lo ven aunque aún no tengan uno,
+  // para poder crearlo.
+  const tienePanel = negocios.length > 0 || esComerciante;
   const [pedidos, setPedidos] = useState<ComercioPedido[]>([]);
 
-  // Topbar: el comerciante ve el switch Abierto/Cerrado junto a "Mi perfil".
-  // (Para el resto de roles aplica el headerRight global con solo "Mi perfil".)
+  // Topbar: con negocio, el switch Abierto/Cerrado va junto a "Mi perfil".
+  // (Sin negocio aplica el headerRight global con solo "Mi perfil".)
   useLayoutEffect(() => {
-    if (!esComerciante) {
-      return;
-    }
     navigation.setOptions({
       headerRight: () => (
         <View style={styles.headerDerecha}>
@@ -85,29 +100,33 @@ export default function HomeScreen({ navigation }: Props) {
         </View>
       ),
     });
-  }, [navigation, esComerciante]);
+  }, [navigation, styles]);
 
   const cargarPedidos = useCallback(() => {
-    if (!esComerciante) {
+    if (!negocioId) {
+      setPedidos([]);
       return;
     }
 
-    getPedidosComercio(token)
+    getPedidosComercio(token, negocioId)
       .then(setPedidos)
       .catch(() => {});
-  }, [esComerciante, token]);
+  }, [negocioId, token]);
 
-  // Pedidos en espera: se recargan al entrar y luego cada pocos segundos.
+  // Al cambiar de negocio no se muestran los pedidos del anterior.
+  useEffect(() => setPedidos([]), [negocioId]);
+
+  // Pedidos en espera del negocio activo: se recargan al entrar y luego cada pocos segundos.
   useFocusEffect(
     useCallback(() => {
-      if (!esComerciante) {
+      if (!negocioId) {
         return;
       }
 
       cargarPedidos();
       const timer = setInterval(cargarPedidos, 5000);
       return () => clearInterval(timer);
-    }, [cargarPedidos, esComerciante]),
+    }, [cargarPedidos, negocioId]),
   );
 
   const enEspera = pedidos.filter(p => p.estado === 'pendiente');
@@ -126,7 +145,7 @@ export default function HomeScreen({ navigation }: Props) {
         </View>
       </FadeInView>
 
-      {esComerciante && (
+      {tienePanel && (
         <>
           <FadeInView delay={60}>
             <PressableScale style={styles.item} onPress={() => navigation.navigate('MiTienda')}>
@@ -134,59 +153,98 @@ export default function HomeScreen({ navigation }: Props) {
               <View style={styles.itemTexto}>
                 <Text style={styles.itemTitulo}>Mi negocio</Text>
                 <Text style={styles.itemSub}>
-                  {negocio ? `${negocio.nombre} · ${negocio.activo ? 'Abierto' : 'Cerrado'}` : 'Crea tu negocio'}
+                  {negocio
+                    ? `${negocio.nombre} · ${negocio.activo ? 'Abierto' : 'Cerrado'}${esPropietario ? '' : ' · Trabajador'}`
+                    : 'Crea tu negocio'}
                 </Text>
               </View>
               <Icon name="chevron" size={20} color={c.chevron} />
             </PressableScale>
           </FadeInView>
 
-          <FadeInView delay={120}>
-            <PressableScale style={styles.item} onPress={() => navigation.navigate('MisProductos')}>
-              <Icon name="caja" size={26} color={c.accent} style={styles.itemEmoji} />
+          {/* Cambiar de negocio, crear otro y responder invitaciones. */}
+          <FadeInView delay={90}>
+            <PressableScale style={styles.item} onPress={() => navigation.navigate('MisNegocios')}>
+              <Icon name="lista" size={26} color={c.accent} style={styles.itemEmoji} />
               <View style={styles.itemTexto}>
-                <Text style={styles.itemTitulo}>Productos</Text>
-                <Text style={styles.itemSub}>Tu catálogo: añade y edita productos</Text>
+                <Text style={styles.itemTitulo}>Mis negocios</Text>
+                <Text style={styles.itemSub}>
+                  {negocios.length > 1
+                    ? `${negocios.length} negocios · toca para cambiar`
+                    : 'Crea otro negocio o únete a uno'}
+                </Text>
               </View>
               <Icon name="chevron" size={20} color={c.chevron} />
             </PressableScale>
           </FadeInView>
 
-          {/* Pedidos en espera, directamente en el Inicio. */}
-          <Text style={styles.seccion}>
-            Pedidos en espera{enEspera.length > 0 ? ` (${enEspera.length})` : ''}
-          </Text>
-          {enEspera.length === 0 ? (
-            <View style={styles.vacioBox}>
-              <Text style={styles.vacioTxt}>No tienes pedidos en espera.</Text>
-            </View>
-          ) : (
-            enEspera.map((p, i) => (
-              <FadeInView key={p.id} delay={i * 60}>
-                <PressableScale
-                  style={styles.pedidoCard}
-                  onPress={() => navigation.navigate('ComercioPedidoDetalle', { pedido: p })}>
-                  <View style={styles.pedidoHead}>
-                    <Text style={styles.pedidoId}>Pedido #{p.id}</Text>
-                    <Text style={styles.pedidoTotal}>{cop(p.total)}</Text>
+          {negocio && (
+            <>
+              <FadeInView delay={120}>
+                <PressableScale style={styles.item} onPress={() => navigation.navigate('MisProductos')}>
+                  <Icon name="caja" size={26} color={c.accent} style={styles.itemEmoji} />
+                  <View style={styles.itemTexto}>
+                    <Text style={styles.itemTitulo}>Productos</Text>
+                    <Text style={styles.itemSub}>Tu catálogo: añade y edita productos</Text>
                   </View>
-                  <View style={[styles.pedidoCliente, styles.fila]}>
-                    <Icon name="usuario" size={14} color={c.text} />
-                    <Text style={styles.pedidoCliente}>{p.cliente ?? 'Cliente'}</Text>
-                  </View>
-                  <View style={[styles.pedidoItems, styles.fila]}>
-                    <Text style={styles.pedidoItems}>
-                      {p.items.reduce((s, i2) => s + i2.cantidad, 0)} artículo(s) ·
-                    </Text>
-                    <Icon name="ubicacion" size={13} color={c.muted} />
-                    <Text style={[styles.pedidoItems, { flex: 1 }]} numberOfLines={1}>
-                      {p.direccion_entrega}
-                    </Text>
-                  </View>
-                  <Text style={styles.pedidoVer}>Ver y marcar listo ›</Text>
+                  <Icon name="chevron" size={20} color={c.chevron} />
                 </PressableScale>
               </FadeInView>
-            ))
+
+              <FadeInView delay={150}>
+                <PressableScale style={styles.item} onPress={() => navigation.navigate('Equipo')}>
+                  <Icon name="usuarios" size={26} color={c.accent} style={styles.itemEmoji} />
+                  <View style={styles.itemTexto}>
+                    <Text style={styles.itemTitulo}>Equipo</Text>
+                    <Text style={styles.itemSub}>
+                      {esPropietario ? 'Invita trabajadores con su código' : 'Personas que trabajan aquí'}
+                    </Text>
+                  </View>
+                  <Icon name="chevron" size={20} color={c.chevron} />
+                </PressableScale>
+              </FadeInView>
+            </>
+          )}
+
+          {/* Pedidos en espera del negocio activo, directamente en el Inicio. */}
+          {negocio && (
+            <>
+              <Text style={styles.seccion}>
+                Pedidos en espera{enEspera.length > 0 ? ` (${enEspera.length})` : ''}
+              </Text>
+              {enEspera.length === 0 ? (
+                <View style={styles.vacioBox}>
+                  <Text style={styles.vacioTxt}>No tienes pedidos en espera.</Text>
+                </View>
+              ) : (
+                enEspera.map((p, i) => (
+                  <FadeInView key={p.id} delay={i * 60}>
+                    <PressableScale
+                      style={styles.pedidoCard}
+                      onPress={() => navigation.navigate('ComercioPedidoDetalle', { pedido: p })}>
+                      <View style={styles.pedidoHead}>
+                        <Text style={styles.pedidoId}>Pedido #{p.id}</Text>
+                        <Text style={styles.pedidoTotal}>{cop(p.total)}</Text>
+                      </View>
+                      <View style={[styles.pedidoCliente, styles.fila]}>
+                        <Icon name="usuario" size={14} color={c.text} />
+                        <Text style={styles.pedidoCliente}>{p.cliente ?? 'Cliente'}</Text>
+                      </View>
+                      <View style={[styles.pedidoItems, styles.fila]}>
+                        <Text style={styles.pedidoItems}>
+                          {p.items.reduce((s, i2) => s + i2.cantidad, 0)} artículo(s) ·
+                        </Text>
+                        <Icon name="ubicacion" size={13} color={c.muted} />
+                        <Text style={[styles.pedidoItems, { flex: 1 }]} numberOfLines={1}>
+                          {p.direccion_entrega}
+                        </Text>
+                      </View>
+                      <Text style={styles.pedidoVer}>Ver y marcar listo ›</Text>
+                    </PressableScale>
+                  </FadeInView>
+                ))
+              )}
+            </>
           )}
         </>
       )}
@@ -237,7 +295,7 @@ export default function HomeScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c, shadow) => ({
   container: { flex: 1, backgroundColor: c.bg },
   content: { padding: 20 },
   contentCliente: { paddingBottom: 110 },
@@ -276,4 +334,4 @@ const styles = StyleSheet.create({
   pedidoVer: { color: c.goldText, fontFamily: font.bold, fontSize: 13, marginTop: 8 },
   logout: { marginTop: 28, alignItems: 'center' },
   logoutTexto: { color: c.danger, fontFamily: font.bold },
-});
+}));

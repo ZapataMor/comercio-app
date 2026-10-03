@@ -2,12 +2,12 @@
  * Comercio — app móvil (React Native)
  * Navegación con React Navigation + sesión persistente (AsyncStorage).
  */
-import { NavigationContainer } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, NavigationContainer, Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
-import { ActivityIndicator, StatusBar, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StatusBar, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { c, font } from './src/theme';
+import { Colores, font, makeStyles, ThemeProvider, useTheme } from './src/theme';
 import { AuthProvider, useAuth } from './src/AuthContext';
 import { CartProvider } from './src/CartContext';
 import BarraCliente from './src/components/BarraCliente';
@@ -26,7 +26,9 @@ import PerfilScreen from './src/screens/PerfilScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import MiTiendaScreen from './src/screens/MiTiendaScreen';
+import MisNegociosScreen from './src/screens/MisNegociosScreen';
 import MisProductosScreen from './src/screens/MisProductosScreen';
+import EquipoScreen from './src/screens/EquipoScreen';
 import ComercioPedidoDetalleScreen from './src/screens/ComercioPedidoDetalleScreen';
 import ExplorarScreen from './src/screens/ExplorarScreen';
 import NegocioScreen from './src/screens/NegocioScreen';
@@ -45,7 +47,27 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 // Logo de la marca (día/noche según la hora) como título del header.
 const tituloVitrina = () => <VitrinaHeaderLogo />;
 
+/** Tema de React Navigation alineado con el modo (fondos de transición, header). */
+function temaNavegacion(c: Colores, noche: boolean): Theme {
+  const base = noche ? DarkTheme : DefaultTheme;
+  return {
+    ...base,
+    dark: noche,
+    colors: {
+      ...base.colors,
+      primary: c.accent,
+      background: c.bg,
+      card: c.header,
+      text: c.onHeader,
+      border: c.border,
+      notification: c.accent,
+    },
+  };
+}
+
 function Navegacion() {
+  const { c, modo } = useTheme();
+  const styles = useStyles();
   const { auth, cargando } = useAuth();
   const roles = auth?.user.roles ?? [];
   // Ruta actual: la barra flotante del cliente decide con ella qué mostrar.
@@ -67,6 +89,7 @@ function Navegacion() {
       <View style={styles.raiz}>
         <NavigationContainer
           ref={navigationRef}
+          theme={temaNavegacion(c, modo === 'noche')}
           onReady={() => {
             actualizarRuta();
             procesarNotificacionPendiente(auth?.user);
@@ -75,9 +98,9 @@ function Navegacion() {
       <Stack.Navigator
         initialRouteName={inicial}
         screenOptions={{
-          headerStyle: { backgroundColor: c.brand },
-          headerTintColor: c.onBrand,
-          headerTitleStyle: { fontWeight: '700', fontFamily: font.display, color: c.onBrand },
+          headerStyle: { backgroundColor: c.header },
+          headerTintColor: c.onHeader,
+          headerTitleStyle: { fontWeight: '700', fontFamily: font.display, color: c.onHeader },
           headerShadowVisible: false,
           contentStyle: { backgroundColor: c.bg },
           // "Mi perfil" (la persona, no el negocio) visible en todos los roles.
@@ -111,30 +134,30 @@ function Navegacion() {
               </>
             )}
 
-            {roles.some(r => r !== 'usuario') && (
-              <Stack.Screen
-                name="Home"
-                component={HomeScreen}
-                options={{ title: 'Vitrina', headerTitle: tituloVitrina }}
-              />
-            )}
+            {/* Home: menú de los demás roles y panel del negocio activo. El
+                cliente llega aquí desde "Mis negocios" si tiene alguno. */}
+            <Stack.Screen
+              name="Home"
+              component={HomeScreen}
+              options={{ title: 'Vitrina', headerTitle: tituloVitrina }}
+            />
             <Stack.Screen
               name="Perfil"
               component={PerfilScreen}
               options={{ title: 'Mi perfil', headerRight: () => null }}
             />
 
-            {roles.includes('comerciante') && (
-              <>
-                <Stack.Screen name="MiTienda" component={MiTiendaScreen} options={{ title: 'Mi Tienda' }} />
-                <Stack.Screen name="MisProductos" component={MisProductosScreen} options={{ title: 'Productos' }} />
-                <Stack.Screen
-                  name="ComercioPedidoDetalle"
-                  component={ComercioPedidoDetalleScreen}
-                  options={{ title: 'Pedido' }}
-                />
-              </>
-            )}
+            {/* Negocios: cualquier usuario puede crear los suyos o trabajar en
+                otros (el acceso lo decide la membresía, no un rol global). */}
+            <Stack.Screen name="MisNegocios" component={MisNegociosScreen} options={{ title: 'Mis negocios' }} />
+            <Stack.Screen name="MiTienda" component={MiTiendaScreen} options={{ title: 'Mi Tienda' }} />
+            <Stack.Screen name="MisProductos" component={MisProductosScreen} options={{ title: 'Productos' }} />
+            <Stack.Screen name="Equipo" component={EquipoScreen} options={{ title: 'Equipo' }} />
+            <Stack.Screen
+              name="ComercioPedidoDetalle"
+              component={ComercioPedidoDetalleScreen}
+              options={{ title: 'Pedido' }}
+            />
 
             {roles.includes('administrador') && (
               <>
@@ -178,8 +201,19 @@ function PushBridge() {
 }
 
 function App() {
+  // Toda la app toma los colores del modo vigente (día/noche según la hora).
+  return (
+    <ThemeProvider>
+      <AppContenido />
+    </ThemeProvider>
+  );
+}
+
+function AppContenido() {
   // Splash animado de la marca (toldo → V → foco → destello → nombre) al
   // abrir la app; tapa la carga inicial y luego se desvanece.
+  const { c } = useTheme();
+  const styles = useStyles();
   const [splashVisible, setSplashVisible] = React.useState(true);
   const ocultarSplash = React.useCallback(() => setSplashVisible(false), []);
 
@@ -189,7 +223,7 @@ function App() {
         <CartProvider>
           <SafeAreaProvider>
             <ToastProvider>
-              <StatusBar barStyle="light-content" backgroundColor={c.brand} />
+              <StatusBar barStyle="light-content" backgroundColor={c.header} />
               <PushBridge />
               <View style={styles.raiz}>
                 <Navegacion />
@@ -203,9 +237,9 @@ function App() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(c => ({
   raiz: { flex: 1 },
   centro: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: c.bg },
-});
+}));
 
 export default App;

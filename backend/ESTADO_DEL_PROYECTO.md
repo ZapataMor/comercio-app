@@ -102,7 +102,7 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 - [x] Subida de **imagen** de negocio y producto (máx 4 MB) al crear/actualizar
 - [x] **Tipos de negocio** (`categoria` / `categorias[]`) al crear/editar el negocio; se crean al vuelo si no existen
 - [x] **Tipos de producto + atributos**: `tipo_producto_id` obligatorio al crear; `atributos[]` (ingredientes, usos, tallas…) limpiados y validados; `GET /api/tipos-producto` devuelve la config del formulario
-- [x] Pedidos recibidos: `GET /comerciante/pedidos` y `PUT /comerciante/pedidos/{id}/listo`
+- [x] Pedidos recibidos: `GET /negocios/{negocio}/pedidos` y `PUT /negocios/{negocio}/pedidos/{id}/listo` (antes `/comerciante/...`)
 
 ### Negocios y equipos — modelo unificado 🚧 (commit `9430ede`, 2026-09-11)
 > Cualquier usuario puede ser **propietario de varios negocios** y **trabajador de otros**. La autorización se hace contra `negocio_user`, no contra el rol global. Nadie entra a un negocio sin aceptar una invitación; la app no permite buscar personas, solo resolver un código público exacto.
@@ -112,9 +112,9 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 - [x] `TrabajadorController`: resolver código → nombre, listar miembros + invitaciones pendientes, invitar por código (solo propietario), cancelar invitación, quitar trabajador (nunca a un propietario), salir del negocio
 - [x] `InvitacionController`: mis invitaciones pendientes, aceptar (crea membresía), rechazar
 - [x] Notificación push `InvitacionTrabajoRecibida`; nuevo pedido avisa a todos los miembros activos; `DashboardController` da panel a quien sea miembro
-- [ ] **`routes/api.php` NO está actualizado**: sigue con `/comerciante/negocio|productos|categorias|pedidos` sin `{negocio}` y bajo `role:comerciante` → esas rutas hoy rompen. Definir `/api/negocios/mios`, `/api/negocios/{negocio}/...`, `/api/negocios/{negocio}/miembros|invitar`, `/api/invitaciones/{id}/aceptar|rechazar`
-- [ ] Adaptar la app: `api.ts`, `NegocioContext` (negocio activo), pantallas Mis negocios / Equipo / Invitaciones, código público en Mi perfil, quitar selector de rol del registro
-- [ ] Tests Pest de membresías e invitaciones (`ComercianteTest` quedó sobre las rutas viejas)
+- [x] **Rutas API** (sin `role:comerciante`; autoriza la membresía): `GET /negocios/mios`, `GET /negocios/mios/{negocio}`, `POST /negocios`, `PUT /negocios/{negocio}`; `/negocios/{negocio}/productos|categorias|pedidos|miembros`, `POST /negocios/{negocio}/resolver-codigo|invitar|salir`, `DELETE /negocios/{negocio}/invitaciones/{id}|miembros/{userId}`; `GET /invitaciones`, `PUT /invitaciones/{id}/aceptar|rechazar`. Las viejas `/comerciante/*` ya no existen
+- [x] App: `api.ts` con `negocioId`, `NegocioContext` (lista + negocio activo persistido), pantallas `MisNegociosScreen` (cambiar/crear negocio, responder invitaciones, compartir código) y `EquipoScreen` (invitar por código, quitar, cancelar, salir); acceso desde Mi perfil; registro sin selector de rol; push `nuevo_pedido` trae `negocio_id` e `invitacion_trabajo` abre Mis negocios
+- [x] Tests Pest: `ComercianteTest` sobre las rutas nuevas + `MembresiasTest` (código público, invitar, aceptar/rechazar, quitar, salir)
 - [ ] Panel web Blade: sigue en "1 negocio por comerciante" (`User::negocio()`); decidir si se adapta
 
 ### Cliente (`usuario`)
@@ -215,7 +215,7 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 - [x] Notificaciones push (FCM): las 3 capas
 - [x] Identidad visual **Vitrina** (logo día/noche, splash animado, paleta Ámbar & Grafito, Sora + Inter, íconos de línea)
 - [x] Perfil personal, barrios de Maicao, direcciones guardadas, tipos de negocio, tipos de producto con atributos, errores de validación por campo
-- 🚧 **Modelo unificado multi-negocio + equipos** (rutas API y app pendientes — ver sección 6)
+- [x] **Modelo unificado multi-negocio + equipos** (solo falta decidir el panel web — ver sección 6)
 - [ ] Ubicación en mapa en tiempo real
 - [ ] Búsqueda inteligente/semántica (capa 2 y 3)
 - [ ] Botón llamar / WhatsApp al cliente desde el pedido (ADR-003)
@@ -223,6 +223,7 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 ---
 
 ## 📜 Historial de cambios
+- **2026-10-02** — **Modelo unificado multi-negocio: se completa lo pendiente del 11/09**. Síntoma que lo destapó: en la app, "Productos" respondía *"No tienes acceso a este negocio"* a todos (las rutas `/comerciante/*` no traían `{negocio}` y Laravel inyectaba un `Negocio` vacío). Rutas `/api/negocios/...` e `/api/invitaciones/...`; app adaptada (negocio activo, Mis negocios, Equipo, invitaciones, registro sin rol); `NuevoPedidoParaComercio` incluye `negocio_id`; tests Pest (79 en verde).
 - **2026-09-11** — **Modelo unificado de usuarios y negocios (backend, a medias)**. Migración `create_membresias_negocio` (`negocio_user`, `invitaciones_trabajo`, `users.codigo_publico`, backfill). Controladores `Negocio/Producto/Categoria/ComercioPedido` reciben `{negocio}` y autorizan por membresía; nuevos `TrabajadorController` (invitar por código público, miembros, quitar, salir) e `InvitacionController` (aceptar/rechazar); notificación `InvitacionTrabajoRecibida`; registro sin rol. **Pendiente**: `routes/api.php` no se actualizó (las rutas `/comerciante/*` rompen), app móvil sin adaptar, tests. Además: puesta al día de este documento y del vault (`Vitrina/00 - Inicio/Estado Actual.md` pasa a ser el inventario completo de funcionalidades).
 - **2026-07-06** — **Refactor del catálogo del comerciante en la app**: `MisProductosScreen` reemplaza a `MisCategoriasScreen` (las categorías se asignan desde el formulario de producto); modal de producto deslizable con cierre por arrastre; `getProductos` sin filtro por categoría.
 - **2026-07-06** — **Tipos de producto y atributos**: tabla global `tipos_producto` (Comida, Medicamento, Herramienta, Ropa y calzado, Tecnología, Belleza y aseo, Otro) con pregunta, botón y chips sugeridos; `productos.tipo_producto_id` (obligatorio al crear) y `productos.atributos` JSON; componente `ListaAtributos`; los atributos entran en la búsqueda del cliente. Tests.

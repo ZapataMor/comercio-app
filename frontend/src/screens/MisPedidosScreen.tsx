@@ -1,12 +1,12 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, Text, View } from 'react-native';
 import { getMisPedidos, MiPedido } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import { RootStackParamList } from '../navTypes';
-import { c, estadoColor, font, radius, shadow } from '../theme';
+import { font, makeStyles, radius, useTheme } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MisPedidos'>;
 
@@ -15,6 +15,8 @@ function cop(n: number) {
 }
 
 export default function MisPedidosScreen({ navigation }: Props) {
+  const { c, estadoColor } = useTheme();
+  const styles = useStyles();
   const { auth } = useAuth();
   const [pedidos, setPedidos] = useState<MiPedido[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -85,7 +87,7 @@ export default function MisPedidosScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c, shadow) => ({
   container: { flex: 1, backgroundColor: c.bg },
   card: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: c.surface,
@@ -96,4 +98,4 @@ const styles = StyleSheet.create({
   badge: { fontSize: 11, fontFamily: font.bold, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, overflow: 'hidden' },
   total: { fontFamily: font.bold, marginTop: 4, color: c.textStrong },
   vacio: { textAlign: 'center', color: c.muted, marginTop: 40, fontFamily: font.regular },
-});
+}));

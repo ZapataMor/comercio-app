@@ -7,6 +7,7 @@ export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 type PushData = {
   tipo?: string;
   pedido_id?: string;
+  negocio_id?: string;
 };
 
 let pendingData: PushData | null = null;
@@ -20,8 +21,18 @@ function navigateFromData(data: PushData, user: Usuario) {
     return;
   }
 
-  if (data.tipo === 'nuevo_pedido' && roles.includes('comerciante') && Number.isFinite(pedidoId)) {
-    navigationRef.navigate('ComercioPedidoDetalle', { pedidoId });
+  // Llega a todos los miembros del negocio (no depende de un rol global).
+  if (data.tipo === 'nuevo_pedido' && Number.isFinite(pedidoId)) {
+    const negocioId = Number(data.negocio_id);
+    navigationRef.navigate('ComercioPedidoDetalle', {
+      pedidoId,
+      negocioId: Number.isFinite(negocioId) ? negocioId : undefined,
+    });
+    return;
+  }
+
+  if (data.tipo === 'invitacion_trabajo') {
+    navigationRef.navigate('MisNegocios');
     return;
   }
 

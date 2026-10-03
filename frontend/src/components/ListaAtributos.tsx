@@ -11,10 +11,10 @@
  * tipo de producto.
  */
 import React, { useRef, useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Icon from './Icon';
 import { PressableScale } from './anim';
-import { c, font, radius } from '../theme';
+import { font, makeStyles, radius, useTheme } from '../theme';
 
 type Libre = { id: number; texto: string };
 
@@ -39,6 +39,8 @@ export default function ListaAtributos({
   onChange,
   disabled,
 }: Props) {
+  const { c } = useTheme();
+  const styles = useStyles();
   const chips = sugerencias ?? [];
   // Los valores guardados se reparten: los que coinciden con una sugerencia
   // vuelven como chip marcado; el resto, como casillas libres.
@@ -135,7 +137,7 @@ export default function ListaAtributos({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(c => ({
   label: { fontSize: 13, fontFamily: font.semibold, color: c.text, marginBottom: 6 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
   chip: {
@@ -157,4 +159,4 @@ const styles = StyleSheet.create({
     borderRadius: radius.md, paddingVertical: 11, alignItems: 'center', marginBottom: 14,
   },
   agregarTxt: { color: c.goldText, fontFamily: font.bold, fontSize: 14 },
-});
+}));

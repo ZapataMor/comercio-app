@@ -10,8 +10,8 @@
  */
 import { errorCodes, isErrorWithCode, pick, types } from '@react-native-documents/picker';
 import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { c, font, radius } from '../theme';
+import { Image, Text, TouchableOpacity, View } from 'react-native';
+import { font, makeStyles, radius, useTheme } from '../theme';
 import Icon from './Icon';
 
 type Props = {
@@ -24,6 +24,8 @@ type Props = {
 };
 
 export default function SelectorImagen({ uri, onSelect, label = 'Imagen', disabled }: Props) {
+  const { c } = useTheme();
+  const styles = useStyles();
   async function elegir() {
     try {
       const [archivo] = await pick({ type: [types.images] });
@@ -57,7 +59,7 @@ export default function SelectorImagen({ uri, onSelect, label = 'Imagen', disabl
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(c => ({
   label: { fontSize: 13, fontFamily: font.semibold, color: c.text, marginBottom: 6 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
   preview: {
@@ -72,4 +74,4 @@ const styles = StyleSheet.create({
   },
   botonDisabled: { opacity: 0.6 },
   botonTxt: { color: c.onAccent, fontFamily: font.bold },
-});
+}));

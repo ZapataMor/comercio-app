@@ -13,7 +13,6 @@ import {
   Platform,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Switch,
   Text,
   TextInput,
@@ -31,6 +30,7 @@ import {
   TipoProducto,
 } from '../api';
 import { useAuth } from '../AuthContext';
+import { useNegocio } from '../NegocioContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import { Dropdown } from '../components/Dropdown';
 import FieldError from '../components/FieldError';
@@ -39,7 +39,7 @@ import ListaAtributos from '../components/ListaAtributos';
 import SelectorImagen from '../components/SelectorImagen';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
-import { c, font, radius, shadow } from '../theme';
+import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MisProductos'>;
@@ -70,10 +70,15 @@ function precioCOP(n: number) {
  * "Añadir producto". El tipo de producto (Comida, Medicamento...) se elige en
  * el formulario y define qué atributos se piden.
  */
-export default function MisProductosScreen({}: Props) {
+export default function MisProductosScreen({ navigation }: Props) {
+  const { c } = useTheme();
+  const styles = useStyles();
   const { auth } = useAuth();
   const token = auth!.token;
   const toast = useToast();
+  // Catálogo del negocio ACTIVO (una persona puede gestionar varios).
+  const { negocio, cargando: cargandoNegocio } = useNegocio();
+  const negocioId = negocio?.id ?? null;
 
   const [productos, setProductos] = useState<Producto[]>([]);
   const [tipos, setTipos] = useState<TipoProducto[]>([]);
@@ -158,8 +163,13 @@ export default function MisProductosScreen({}: Props) {
 
   const cargar = useCallback(
     (refresco = false) => {
+      if (!negocioId) {
+        setCargando(false);
+        return;
+      }
       refresco ? setRefrescando(true) : setCargando(true);
-      Promise.all([getProductos(token, { porPagina: 100 }), getTiposProducto(token)])
+      setError(null);
+      Promise.all([getProductos(token, negocioId, { porPagina: 100 }), getTiposProducto(token)])
         .then(([ps, ts]) => {
           setProductos(ps);
           setTipos(ts);
@@ -170,7 +180,7 @@ export default function MisProductosScreen({}: Props) {
           setRefrescando(false);
         });
     },
-    [token],
+    [token, negocioId],
   );
 
   useEffect(() => cargar(), [cargar]);
@@ -209,6 +219,9 @@ export default function MisProductosScreen({}: Props) {
 
   async function guardar() {
     setErrores({});
+    if (!negocioId) {
+      return;
+    }
     if (!tipoId) {
       setErrores({ tipo_producto: 'Selecciona el tipo de producto.' });
       return;
@@ -240,10 +253,10 @@ export default function MisProductosScreen({}: Props) {
         disponible,
       };
       if (editando) {
-        await actualizarProducto(token, editando.id, body, imagenUri ?? undefined);
+        await actualizarProducto(token, negocioId, editando.id, body, imagenUri ?? undefined);
         toast.exito('Listo', 'Producto actualizado.');
       } else {
-        await crearProducto(token, body, imagenUri ?? undefined);
+        await crearProducto(token, negocioId, body, imagenUri ?? undefined);
         toast.exito('Listo', 'Producto creado.');
       }
       setModal(false);
@@ -268,7 +281,10 @@ export default function MisProductosScreen({}: Props) {
         style: 'destructive',
         onPress: async () => {
           try {
-            await eliminarProducto(token, p.id);
+            if (!negocioId) {
+              return;
+            }
+            await eliminarProducto(token, negocioId, p.id);
             toast.exito('Eliminado', `"${p.nombre}" se quitó del catálogo.`);
             cargar();
           } catch (e) {
@@ -279,6 +295,20 @@ export default function MisProductosScreen({}: Props) {
     ]);
   }
 
+  if (!negocio) {
+    if (cargandoNegocio) {
+      return <ActivityIndicator size="large" color={c.accent} style={{ marginTop: 40 }} />;
+    }
+    return (
+      <View style={styles.sinNegocio}>
+        <Icon name="tienda" size={34} color={c.muted} style={styles.sinNegocioIcono} />
+        <Text style={[styles.vacio, styles.sinNegocioTxt]}>Aún no tienes un negocio para gestionar productos.</Text>
+        <PressableScale style={styles.nuevoBtn} onPress={() => navigation.navigate('MiTienda', { nuevo: true })}>
+          <Text style={styles.nuevoTxt}>Crear mi negocio</Text>
+        </PressableScale>
+      </View>
+    );
+  }
   if (cargando) {
     return <ActivityIndicator size="large" color={c.accent} style={{ marginTop: 40 }} />;
   }
@@ -452,8 +482,8 @@ export default function MisProductosScreen({}: Props) {
                   value={disponible}
                   onValueChange={setDisponible}
                   disabled={guardando}
-                  trackColor={{ true: c.accent, false: '#D8D0C4' }}
-                  thumbColor={c.surface}
+                  trackColor={{ true: c.accent, false: c.switchOff }}
+                  thumbColor={c.switchThumb}
                 />
               </View>
 
@@ -478,8 +508,11 @@ export default function MisProductosScreen({}: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c, shadow) => ({
   container: { flex: 1, backgroundColor: c.bg },
+  sinNegocio: { flex: 1, backgroundColor: c.bg, padding: 24, paddingTop: 60 },
+  sinNegocioIcono: { alignSelf: 'center' },
+  sinNegocioTxt: { marginTop: 14, marginBottom: 20 },
   nuevoBtn: {
     backgroundColor: c.brand, borderRadius: radius.md, paddingVertical: 14, alignItems: 'center', marginBottom: 14, ...shadow.soft,
   },
@@ -531,4 +564,4 @@ const styles = StyleSheet.create({
   boton: { backgroundColor: c.brand, borderRadius: radius.md, paddingVertical: 15, alignItems: 'center', marginTop: 6, ...shadow.soft },
   botonTxt: { color: c.onBrand, fontFamily: font.bold, fontSize: 16 },
   cancelar: { textAlign: 'center', color: c.muted, fontFamily: font.semibold, marginTop: 14, marginBottom: 4 },
-});
+}));

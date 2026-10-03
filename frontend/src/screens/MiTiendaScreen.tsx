@@ -6,7 +6,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  StyleSheet,
   Switch,
   Text,
   TextInput,
@@ -20,7 +19,7 @@ import SelectorImagen from '../components/SelectorImagen';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { useNegocio } from '../NegocioContext';
 import { RootStackParamList } from '../navTypes';
-import { c, font, radius, shadow } from '../theme';
+import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MiTienda'>;
@@ -53,9 +52,14 @@ const CATEGORIAS_NEGOCIO = [
   'Otro',
 ];
 
-export default function MiTiendaScreen({ navigation }: Props) {
-  const { negocio, cargando, guardar } = useNegocio();
+export default function MiTiendaScreen({ navigation, route }: Props) {
+  const { c } = useTheme();
+  const styles = useStyles();
+  const { negocio: negocioActivo, cargando, crear, guardar, esPropietario } = useNegocio();
   const toast = useToast();
+  // `nuevo`: crear OTRO negocio (no editar el activo). Sin negocios, también se crea.
+  const creando = !!route.params?.nuevo || (!cargando && !negocioActivo);
+  const negocio = creando ? null : negocioActivo;
 
   // 'ver' = tarjeta de solo lectura · 'editar' = formulario.
   const [modo, setModo] = useState<'ver' | 'editar'>('ver');
@@ -83,12 +87,12 @@ export default function MiTiendaScreen({ navigation }: Props) {
     });
   }
 
-  // Si el comerciante aún no tiene negocio, se entra directo al formulario.
+  // Al crear un negocio (el primero u otro más) se entra directo al formulario.
   useEffect(() => {
-    if (!cargando && !negocio) {
+    if (creando) {
       setModo('editar');
     }
-  }, [cargando, negocio]);
+  }, [creando]);
 
   function empezarEdicion(n: Negocio | null) {
     setNombre(n?.nombre ?? '');
@@ -125,18 +129,17 @@ export default function MiTiendaScreen({ navigation }: Props) {
     setGuardando(true);
     const eraNuevo = !negocio;
     try {
-      await guardar(
-        {
-          nombre: nombre.trim(),
-          descripcion: descripcion.trim() || null,
-          categoria: categoriasFinales[0],
-          categorias: categoriasFinales,
-          direccion: direccion.trim() || null,
-          telefono: telefono.trim() || null,
-          activo,
-        },
-        imagenUri ?? undefined,
-      );
+      const input = {
+        nombre: nombre.trim(),
+        descripcion: descripcion.trim() || null,
+        categoria: categoriasFinales[0],
+        categorias: categoriasFinales,
+        direccion: direccion.trim() || null,
+        telefono: telefono.trim() || null,
+        activo,
+      };
+      // Crear deja el negocio nuevo como activo.
+      await (eraNuevo ? crear : guardar)(input, imagenUri ?? undefined);
       if (eraNuevo) {
         toast.exito('Negocio creado', 'Ya puedes gestionar tu tienda.');
         navigation.navigate('Home');
@@ -156,7 +159,7 @@ export default function MiTiendaScreen({ navigation }: Props) {
     }
   }
 
-  if (cargando && !negocio) {
+  if (cargando && !negocioActivo && !route.params?.nuevo) {
     return <ActivityIndicator size="large" color={c.accent} style={{ marginTop: 40 }} />;
   }
 
@@ -186,9 +189,15 @@ export default function MiTiendaScreen({ navigation }: Props) {
           <Campo etiqueta="Teléfono" valor={negocio.telefono} />
         </FadeInView>
 
-        <PressableScale style={styles.boton} onPress={() => empezarEdicion(negocio)}>
-          <Text style={styles.botonTexto}>Editar información</Text>
-        </PressableScale>
+        {esPropietario ? (
+          <PressableScale style={styles.boton} onPress={() => empezarEdicion(negocio)}>
+            <Text style={styles.botonTexto}>Editar información</Text>
+          </PressableScale>
+        ) : (
+          <Text style={styles.notaTrabajador}>
+            Eres trabajador de este negocio: solo el propietario puede editar su información.
+          </Text>
+        )}
       </ScrollView>
     );
   }
@@ -202,7 +211,9 @@ export default function MiTiendaScreen({ navigation }: Props) {
         {!negocio && (
           <View style={styles.aviso}>
             <Text style={styles.avisoTxt}>
-              Aún no has creado tu negocio. Complétalo para empezar a vender.
+              {negocioActivo
+                ? 'Vas a crear otro negocio. Quedarás como su propietario.'
+                : 'Aún no has creado tu negocio. Complétalo para empezar a vender.'}
             </Text>
           </View>
         )}
@@ -332,8 +343,8 @@ export default function MiTiendaScreen({ navigation }: Props) {
               value={activo}
               onValueChange={setActivo}
               disabled={guardando}
-              trackColor={{ true: c.accent, false: '#D8D0C4' }}
-              thumbColor={c.surface}
+              trackColor={{ true: c.accent, false: c.switchOff }}
+              thumbColor={c.switchThumb}
             />
           </View>
         </View>
@@ -361,6 +372,7 @@ export default function MiTiendaScreen({ navigation }: Props) {
 
 /** Fila etiqueta + valor para la tarjeta de solo lectura. */
 function Campo({ etiqueta, valor }: { etiqueta: string; valor: string | null }) {
+  const styles = useStyles();
   return (
     <View style={styles.campo}>
       <Text style={styles.campoEtiqueta}>{etiqueta}</Text>
@@ -369,7 +381,7 @@ function Campo({ etiqueta, valor }: { etiqueta: string; valor: string | null }) 
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c, shadow) => ({
   container: { flex: 1, backgroundColor: c.bg },
   content: { padding: 20 },
   aviso: { backgroundColor: c.warningSoft, borderRadius: radius.md, padding: 12, marginBottom: 16 },
@@ -407,4 +419,5 @@ const styles = StyleSheet.create({
   botonDisabled: { opacity: 0.7 },
   botonTexto: { color: c.onBrand, fontFamily: font.bold, fontSize: 16 },
   cancelar: { textAlign: 'center', color: c.muted, fontFamily: font.semibold, marginTop: 14 },
-});
+  notaTrabajador: { textAlign: 'center', color: c.muted, fontFamily: font.regular, fontSize: 13, marginTop: 18 },
+}));

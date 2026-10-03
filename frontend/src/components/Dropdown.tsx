@@ -4,8 +4,8 @@
  * categorías, etc.
  */
 import React, { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { c, font, radius } from '../theme';
+import { Modal, Pressable, Text, TouchableOpacity, View } from 'react-native';
+import { font, makeStyles, radius } from '../theme';
 
 export type OpcionDropdown<T extends string> = { label: string; value: T };
 
@@ -24,6 +24,7 @@ export function Dropdown<T extends string>({
   placeholder = 'Selecciona…',
   disabled,
 }: Props<T>) {
+  const styles = useStyles();
   const [abierto, setAbierto] = useState(false);
   const seleccion = opciones.find(o => o.value === valor) ?? null;
 
@@ -64,7 +65,7 @@ export function Dropdown<T extends string>({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(c => ({
   campo: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -93,4 +94,4 @@ const styles = StyleSheet.create({
   opcionTxt: { fontSize: 16, color: c.text, fontFamily: font.regular },
   opcionTxtOn: { color: c.goldText, fontFamily: font.bold },
   check: { color: c.goldText, fontWeight: '900', fontSize: 16 },
-});
+}));

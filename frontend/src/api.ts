@@ -1,5 +1,8 @@
 import { API_URL } from './config';
 
+/** Rol de una persona DENTRO de un negocio (no es un rol global). */
+export type RolNegocio = 'propietario' | 'trabajador';
+
 export type Usuario = {
   id: number;
   name: string;
@@ -8,6 +11,10 @@ export type Usuario = {
   direccion?: string | null;
   barrio?: string | null;
   telefono?: string | null;
+  /** Código que la persona comparte para que un negocio la invite (ej. "U34F4D"). */
+  codigo_publico?: string | null;
+  /** Negocios donde es miembro activo, con su rol en cada uno. */
+  negocios?: { id: number; nombre: string; rol: RolNegocio }[];
 };
 
 export type LoginResponse = {
@@ -26,6 +33,8 @@ export type Negocio = {
   telefono: string | null;
   activo: boolean;
   imagen?: string | null; // ruta relativa "/storage/negocios/x.jpg"
+  /** Mi rol en este negocio (solo en las rutas de "mis negocios"). */
+  rol?: RolNegocio | null;
 };
 
 export type Categoria = { id: number; nombre: string; productos?: number };
@@ -140,22 +149,19 @@ export async function login(email: string, password: string): Promise<LoginRespo
   return data as LoginResponse;
 }
 
-/** Roles que el público puede elegir al registrarse (NUNCA admin/domiciliario). */
-export type RolPublico = 'usuario' | 'comerciante';
-
 /**
  * Registro de una cuenta nueva contra POST /api/register.
- * Solo permite roles 'usuario' (cliente) o 'comerciante'.
+ * Modelo unificado: no se elige rol. Toda cuenta nace como cliente y luego
+ * puede crear sus negocios (o unirse a otros) desde "Mis negocios".
  * Devuelve usuario + token, o lanza Error con el mensaje del backend.
  */
 export async function register(body: {
   name: string;
   email: string;
   password: string;
-  role: RolPublico;
-  direccion?: string;
-  barrio?: string;
-  telefono?: string;
+  direccion: string;
+  barrio: string;
+  telefono: string;
 }): Promise<LoginResponse> {
   let res: Response;
   try {
@@ -348,30 +354,35 @@ export async function crearClienteDireccion(
   return d.direccion as ClienteDireccion;
 }
 
-/** Mi negocio (o null si el comerciante aún no lo creó → 404). */
-export async function getNegocio(token: string): Promise<Negocio | null> {
-  try {
-    const data = await authGet('/api/comerciante/negocio', token);
-    return data.negocio as Negocio;
-  } catch (e) {
-    if (e instanceof ApiError && e.status === 404) {
-      return null;
-    }
-    throw e;
-  }
+// ---------- Mis negocios (modelo unificado: propietario o trabajador) ----------
+//
+// Toda la gestión va contra /api/negocios/{negocioId}/...: una persona puede
+// tener varios negocios y trabajar en otros. El backend autoriza por la
+// membresía en ESE negocio, no por un rol global.
+
+/** Negocios donde soy miembro activo (con mi rol) + mi código público. */
+export async function getMisNegocios(
+  token: string,
+): Promise<{ negocios: Negocio[]; codigoPublico: string | null }> {
+  const data = await authGet('/api/negocios/mios', token);
+  return {
+    negocios: (data.negocios ?? []) as Negocio[],
+    codigoPublico: data.codigo_publico ?? null,
+  };
 }
 
-/** Mis productos. Sin opciones trae la primera página (15). */
+/** Productos de un negocio mío. Sin opciones trae la primera página (15). */
 export async function getProductos(
   token: string,
+  negocioId: number,
   opts?: { porPagina?: number },
 ): Promise<Producto[]> {
   const qs = opts?.porPagina ? `?por_pagina=${opts.porPagina}` : '';
-  const data = await authGet(`/api/comerciante/productos${qs}`, token);
+  const data = await authGet(`/api/negocios/${negocioId}/productos${qs}`, token);
   return (data.data ?? []) as Producto[];
 }
 
-// ---------- Comerciante: crear / editar su negocio ----------
+// ---------- Crear / editar un negocio ----------
 
 /** Datos editables del negocio. `categoria` es obligatoria al crear. */
 export type NegocioInput = {
@@ -384,27 +395,28 @@ export type NegocioInput = {
   activo?: boolean;
 };
 
-/** Crea mi negocio (cuando aún no existe). Con `imagenUri` sube la foto. */
+/** Crea un negocio nuevo (quedo como propietario). Con `imagenUri` sube la foto. */
 export async function crearNegocio(
   token: string,
   body: NegocioInput,
   imagenUri?: string,
 ): Promise<Negocio> {
   const d = imagenUri
-    ? await authUpload('POST', '/api/comerciante/negocio', token, body, imagenUri)
-    : await authSend('POST', '/api/comerciante/negocio', token, body);
+    ? await authUpload('POST', '/api/negocios', token, body, imagenUri)
+    : await authSend('POST', '/api/negocios', token, body);
   return d.negocio as Negocio;
 }
 
-/** Actualiza mi negocio. Con `imagenUri` reemplaza la foto. */
+/** Actualiza un negocio (solo el propietario). Con `imagenUri` reemplaza la foto. */
 export async function actualizarNegocio(
   token: string,
+  negocioId: number,
   body: NegocioInput,
   imagenUri?: string,
 ): Promise<Negocio> {
   const d = imagenUri
-    ? await authUpload('PUT', '/api/comerciante/negocio', token, body, imagenUri)
-    : await authSend('PUT', '/api/comerciante/negocio', token, body);
+    ? await authUpload('PUT', `/api/negocios/${negocioId}`, token, body, imagenUri)
+    : await authSend('PUT', `/api/negocios/${negocioId}`, token, body);
   return d.negocio as Negocio;
 }
 
@@ -412,12 +424,16 @@ export async function actualizarNegocio(
  * Abrir/cerrar el negocio rápidamente (switch de la topbar).
  * Reutiliza `activo`: cerrado = no visible para los clientes en Explorar.
  */
-export async function cambiarEstadoNegocio(token: string, activo: boolean): Promise<Negocio> {
-  const d = await authSend('PUT', '/api/comerciante/negocio', token, { activo });
+export async function cambiarEstadoNegocio(
+  token: string,
+  negocioId: number,
+  activo: boolean,
+): Promise<Negocio> {
+  const d = await authSend('PUT', `/api/negocios/${negocioId}`, token, { activo });
   return d.negocio as Negocio;
 }
 
-// ---------- Comerciante: CRUD de productos ----------
+// ---------- Catálogo del negocio: CRUD de productos ----------
 
 /** Datos editables de un producto. */
 export type ProductoInput = {
@@ -442,32 +458,36 @@ export async function getTiposProducto(token: string): Promise<TipoProducto[]> {
 
 export async function crearProducto(
   token: string,
+  negocioId: number,
   body: ProductoInput,
   imagenUri?: string,
 ): Promise<Producto> {
+  const path = `/api/negocios/${negocioId}/productos`;
   const d = imagenUri
-    ? await authUpload('POST', '/api/comerciante/productos', token, body, imagenUri)
-    : await authSend('POST', '/api/comerciante/productos', token, body);
+    ? await authUpload('POST', path, token, body, imagenUri)
+    : await authSend('POST', path, token, body);
   return d.producto as Producto;
 }
 
 export async function actualizarProducto(
   token: string,
+  negocioId: number,
   id: number,
   body: ProductoInput,
   imagenUri?: string,
 ): Promise<Producto> {
+  const path = `/api/negocios/${negocioId}/productos/${id}`;
   const d = imagenUri
-    ? await authUpload('PUT', `/api/comerciante/productos/${id}`, token, body, imagenUri)
-    : await authSend('PUT', `/api/comerciante/productos/${id}`, token, body);
+    ? await authUpload('PUT', path, token, body, imagenUri)
+    : await authSend('PUT', path, token, body);
   return d.producto as Producto;
 }
 
-export async function eliminarProducto(token: string, id: number): Promise<void> {
-  await authSend('DELETE', `/api/comerciante/productos/${id}`, token);
+export async function eliminarProducto(token: string, negocioId: number, id: number): Promise<void> {
+  await authSend('DELETE', `/api/negocios/${negocioId}/productos/${id}`, token);
 }
 
-/** Pedidos recibidos por mi negocio (comerciante). */
+/** Pedidos recibidos por un negocio mío. */
 export type ComercioPedido = {
   id: number;
   estado: string;
@@ -481,13 +501,89 @@ export type ComercioPedido = {
   items: { nombre: string; cantidad: number }[];
 };
 
-export async function getPedidosComercio(token: string): Promise<ComercioPedido[]> {
-  const d = await authGet('/api/comerciante/pedidos', token);
+export async function getPedidosComercio(token: string, negocioId: number): Promise<ComercioPedido[]> {
+  const d = await authGet(`/api/negocios/${negocioId}/pedidos`, token);
   return (d.pedidos ?? []) as ComercioPedido[];
 }
 
-export async function marcarPedidoListo(token: string, id: number): Promise<void> {
-  await authSend('PUT', `/api/comerciante/pedidos/${id}/listo`, token);
+export async function marcarPedidoListo(token: string, negocioId: number, id: number): Promise<void> {
+  await authSend('PUT', `/api/negocios/${negocioId}/pedidos/${id}/listo`, token);
+}
+
+// ---------- Equipo del negocio (miembros e invitaciones enviadas) ----------
+
+export type MiembroNegocio = {
+  id: number;
+  name: string;
+  rol: RolNegocio;
+  activo: boolean;
+  es_yo: boolean;
+};
+
+export type InvitacionEnviada = { id: number; nombre: string | null; fecha: string };
+
+export async function getEquipo(
+  token: string,
+  negocioId: number,
+): Promise<{ miembros: MiembroNegocio[]; pendientes: InvitacionEnviada[] }> {
+  const d = await authGet(`/api/negocios/${negocioId}/miembros`, token);
+  return {
+    miembros: (d.miembros ?? []) as MiembroNegocio[],
+    pendientes: (d.invitaciones_pendientes ?? []) as InvitacionEnviada[],
+  };
+}
+
+/** Código público EXACTO → nombre de la persona (para confirmar antes de invitar). */
+export async function resolverCodigo(
+  token: string,
+  negocioId: number,
+  codigo: string,
+): Promise<{ name: string; codigo_publico: string }> {
+  const d = await authSend('POST', `/api/negocios/${negocioId}/resolver-codigo`, token, { codigo });
+  return d.usuario;
+}
+
+/** Invita por código (solo propietario). Devuelve el mensaje del backend. */
+export async function invitarTrabajador(token: string, negocioId: number, codigo: string): Promise<string> {
+  const d = await authSend('POST', `/api/negocios/${negocioId}/invitar`, token, { codigo });
+  return d.message as string;
+}
+
+export async function cancelarInvitacion(token: string, negocioId: number, id: number): Promise<void> {
+  await authSend('DELETE', `/api/negocios/${negocioId}/invitaciones/${id}`, token);
+}
+
+export async function quitarMiembro(token: string, negocioId: number, userId: number): Promise<void> {
+  await authSend('DELETE', `/api/negocios/${negocioId}/miembros/${userId}`, token);
+}
+
+/** Un trabajador renuncia al negocio. */
+export async function salirDelNegocio(token: string, negocioId: number): Promise<void> {
+  await authSend('POST', `/api/negocios/${negocioId}/salir`, token);
+}
+
+// ---------- Invitaciones de trabajo recibidas ----------
+
+export type InvitacionRecibida = {
+  id: number;
+  negocio: string | null;
+  invitado_por: string | null;
+  fecha: string;
+};
+
+export async function getInvitaciones(token: string): Promise<InvitacionRecibida[]> {
+  const d = await authGet('/api/invitaciones', token);
+  return (d.invitaciones ?? []) as InvitacionRecibida[];
+}
+
+/** Acepta: quedo como trabajador. Devuelve el id del negocio al que entré. */
+export async function aceptarInvitacion(token: string, id: number): Promise<number> {
+  const d = await authSend('PUT', `/api/invitaciones/${id}/aceptar`, token);
+  return d.negocio.id as number;
+}
+
+export async function rechazarInvitacion(token: string, id: number): Promise<void> {
+  await authSend('PUT', `/api/invitaciones/${id}/rechazar`, token);
 }
 
 // ---------- Cliente: explorar negocios y ver catálogo ----------

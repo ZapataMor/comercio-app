@@ -276,19 +276,21 @@ La app **no permite buscar personas**. El flujo es: el trabajador comparte su c�
 para confirmar → se crea la invitación **pendiente** → el invitado recibe push → **solo al
 aceptar** entra al negocio. El código nunca sirve para autenticarse.
 
-### 6.3 Lo que falta para cerrar este cambio ⏳
-- [ ] **`routes/api.php` no está actualizado**: sigue exponiendo `/comerciante/negocio`,
-      `/comerciante/productos`… sin `{negocio}` y bajo `role:comerciante`, mientras los
-      controladores ya exigen `Negocio $negocio`. Hoy esas rutas **rompen**. Falta definir
-      `/api/negocios/mios`, `/api/negocios/{negocio}/productos|categorias|pedidos|miembros|invitar…`
-      y `/api/invitaciones/{id}/aceptar|rechazar`, y quitar el middleware de rol.
-- [ ] La **app móvil** sigue en el modelo viejo (`api.ts` llama a `/comerciante/...`,
-      `RegisterScreen` pide rol, `NegocioContext` asume un solo negocio). Faltan pantallas:
-      **Mis negocios**, selector de negocio activo, **Equipo** (miembros + invitar por código),
-      **Invitaciones** recibidas, y mostrar el código público en Mi perfil.
-- [ ] Tests Pest de membresías/invitaciones (los de `ComercianteTest` quedaron sobre las
-      rutas viejas).
+### 6.3 Cierre del cambio (2026-10-02)
+- [x] **Rutas API** sin middleware de rol: `GET /api/negocios/mios`,
+      `GET /api/negocios/mios/{negocio}`, `POST /api/negocios`, `PUT /api/negocios/{negocio}`,
+      `/api/negocios/{negocio}/productos|categorias|pedidos|miembros`,
+      `POST /api/negocios/{negocio}/resolver-codigo|invitar|salir`,
+      `DELETE /api/negocios/{negocio}/invitaciones/{id}|miembros/{userId}`,
+      `GET /api/invitaciones`, `PUT /api/invitaciones/{id}/aceptar|rechazar`.
+      Las `/comerciante/*` se eliminaron (devolvían 403 "No tienes acceso a este negocio" a todos).
+- [x] **App móvil**: `api.ts` con `negocioId`; `NegocioContext` con lista de negocios y
+      **negocio activo** (persistido); pantallas **Mis negocios** (cambiar/crear, responder
+      invitaciones, compartir el código) y **Equipo** (invitar por código, quitar, cancelar,
+      salir); acceso desde Mi perfil; registro **sin** selector de rol.
+- [x] Tests Pest: `ComercianteTest` (rutas nuevas) + `MembresiasTest`.
 - [ ] Decidir qué pasa con el rol global `comerciante` (¿se elimina? ¿queda para el panel web?).
+      Hoy solo sirve para que una cuenta vieja sin negocios vea "Crea tu negocio" en el Inicio.
 - [ ] Panel web Blade: sigue usando `User::negocio()` (1 negocio). Se mantuvo a propósito como
       "legado"; decidir si se adapta o se deja solo para pruebas.
 

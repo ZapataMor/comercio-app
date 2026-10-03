@@ -1,11 +1,11 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Text, TouchableOpacity, View } from 'react-native';
 import { aprobarBarrio, BarrioPendiente, getBarriosPendientes, rechazarBarrio } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView } from '../components/anim';
 import { RootStackParamList } from '../navTypes';
-import { c, font, radius, shadow } from '../theme';
+import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AdminBarrios'>;
@@ -16,6 +16,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'AdminBarrios'>;
  * Rechazar → se descarta la sugerencia (el cliente conserva su texto).
  */
 export default function AdminBarriosScreen(_props: Props) {
+  const { c } = useTheme();
+  const styles = useStyles();
   const { auth } = useAuth();
   const toast = useToast();
   const [barrios, setBarrios] = useState<BarrioPendiente[] | null>(null);
@@ -95,7 +97,7 @@ export default function AdminBarriosScreen(_props: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c, shadow) => ({
   container: { flex: 1, backgroundColor: c.bg },
   ayuda: { color: c.muted, fontFamily: font.regular, fontSize: 13, marginBottom: 14 },
   vacio: { textAlign: 'center', color: c.muted, fontFamily: font.medium, marginTop: 40 },
@@ -126,4 +128,4 @@ const styles = StyleSheet.create({
   },
   btnRechazarTexto: { color: c.danger, fontFamily: font.semibold, fontSize: 13 },
   error: { color: c.danger, backgroundColor: c.dangerSoft, padding: 12, borderRadius: radius.sm, margin: 16, fontFamily: font.medium },
-});
+}));

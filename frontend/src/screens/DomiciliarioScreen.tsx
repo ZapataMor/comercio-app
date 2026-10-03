@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   View,
@@ -19,7 +18,7 @@ import {
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import Icon, { IconName } from '../components/Icon';
-import { c, estadoColor, font, radius, shadow } from '../theme';
+import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 
 function cop(n: number) {
@@ -27,6 +26,8 @@ function cop(n: number) {
 }
 
 export default function DomiciliarioScreen() {
+  const { c, estadoColor } = useTheme();
+  const styles = useStyles();
   const { auth } = useAuth();
   const token = auth!.token;
   const toast = useToast();
@@ -170,15 +171,17 @@ function Boton({
   texto,
   onPress,
   icon,
-  color = c.brand,
+  color,
 }: {
   texto: string;
   onPress: () => void;
   icon?: IconName;
   color?: string;
 }) {
+  const { c } = useTheme();
+  const styles = useStyles();
   return (
-    <PressableScale style={[styles.btn, styles.btnFila, { backgroundColor: color }]} onPress={onPress}>
+    <PressableScale style={[styles.btn, styles.btnFila, { backgroundColor: color ?? c.brand }]} onPress={onPress}>
       {icon && <Icon name={icon} size={16} color={c.onBrand} />}
       <Text style={styles.btnTxt}>{texto}</Text>
     </PressableScale>
@@ -186,6 +189,8 @@ function Boton({
 }
 
 function DisponibleCard({ pedido, onTomar }: { pedido: Pedido; onTomar: (id: number, min: number) => void }) {
+  const { c } = useTheme();
+  const styles = useStyles();
   const [min, setMin] = useState('15');
   return (
     <View style={[styles.card, styles.bordeAmbar]}>
@@ -222,7 +227,7 @@ function DisponibleCard({ pedido, onTomar }: { pedido: Pedido; onTomar: (id: num
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c, shadow) => ({
   container: { flex: 1, backgroundColor: c.bg },
   seccion: { fontSize: 16, fontFamily: font.displaySemi, color: c.textStrong, marginTop: 18, marginBottom: 8 },
   card: {
@@ -256,4 +261,4 @@ const styles = StyleSheet.create({
   },
   histOk: { color: c.success, fontFamily: font.semibold },
   vacio: { color: c.muted, fontSize: 14, fontFamily: font.regular },
-});
+}));

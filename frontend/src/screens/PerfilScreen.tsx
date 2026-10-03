@@ -2,15 +2,14 @@
  * Mi perfil — datos PERSONALES del usuario logueado (cualquier rol).
  *
  * Aquí se gestiona la persona (nombre, email, contraseña), no el negocio:
- * para un comerciante, su tienda se administra en "Mi negocio". También es
- * el lugar de "Cerrar sesión".
+ * los negocios (propios o donde trabaja) se administran en "Mis negocios",
+ * que se abre desde aquí. También es el lugar de "Cerrar sesión".
  */
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -23,16 +22,20 @@ import BarrioSelect from '../components/BarrioSelect';
 import FieldError from '../components/FieldError';
 import Icon from '../components/Icon';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
+import { useNegocio } from '../NegocioContext';
 import { RootStackParamList } from '../navTypes';
-import { c, font, radius, shadow } from '../theme';
+import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Perfil'>;
 
-export default function PerfilScreen(_props: Props) {
+export default function PerfilScreen({ navigation }: Props) {
+  const { c } = useTheme();
+  const styles = useStyles();
   const { auth, actualizarUsuario, salir } = useAuth();
   const toast = useToast();
   const user = auth!.user;
+  const { negocios, codigoPublico } = useNegocio();
 
   const esCliente = user.roles.includes('usuario');
 
@@ -133,6 +136,23 @@ export default function PerfilScreen(_props: Props) {
             <Text key={r} style={styles.rol}>{r}</Text>
           ))}
         </View>
+      </FadeInView>
+
+      {/* Cualquier persona puede tener negocios o trabajar en otros. */}
+      <FadeInView delay={30}>
+        <PressableScale style={styles.negociosCard} onPress={() => navigation.navigate('MisNegocios')}>
+          <Icon name="tienda" size={24} color={c.accent} />
+          <View style={styles.negociosTexto}>
+            <Text style={styles.negociosTitulo}>Mis negocios</Text>
+            <Text style={styles.negociosSub}>
+              {negocios.length > 0
+                ? `${negocios.length} negocio${negocios.length > 1 ? 's' : ''} · invitaciones`
+                : 'Crea tu negocio o únete a uno'}
+              {codigoPublico ? ` · Tu código #${codigoPublico}` : ''}
+            </Text>
+          </View>
+          <Icon name="chevron" size={20} color={c.chevron} />
+        </PressableScale>
       </FadeInView>
 
       <FadeInView delay={60}>
@@ -275,7 +295,7 @@ export default function PerfilScreen(_props: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c, shadow) => ({
   container: { flex: 1, backgroundColor: c.bg },
   // Deja aire abajo para la barra flotante del cliente (Carrito/Mis pedidos).
   content: { padding: 20, paddingBottom: 120 },
@@ -292,6 +312,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, overflow: 'hidden',
   },
   seccion: { fontSize: 16, fontFamily: font.displaySemi, color: c.textStrong, marginTop: 18, marginBottom: 8 },
+  negociosCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: c.surface,
+    borderRadius: radius.lg, padding: 16, marginTop: 18, ...shadow.soft,
+  },
+  negociosTexto: { flex: 1 },
+  negociosTitulo: { fontSize: 16, fontFamily: font.bold, color: c.textStrong },
+  negociosSub: { color: c.muted, fontSize: 13, marginTop: 2, fontFamily: font.regular },
   ayuda: { color: c.muted, fontSize: 12, fontFamily: font.regular, marginTop: -4, marginBottom: 8 },
   tarjeta: { backgroundColor: c.surface, borderRadius: radius.lg, padding: 16, ...shadow.soft },
   label: { fontSize: 13, fontFamily: font.semibold, color: c.text, marginBottom: 6 },
@@ -310,4 +337,4 @@ const styles = StyleSheet.create({
     marginTop: 24, paddingVertical: 8,
   },
   logoutTxt: { color: c.danger, fontFamily: font.bold },
-});
+}));
