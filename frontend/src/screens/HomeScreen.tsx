@@ -1,7 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
-import { ScrollView, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Switch, Text, View } from 'react-native';
 import { ComercioPedido, getPedidosComercio } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
@@ -73,7 +73,7 @@ function HeaderEstadoNegocio() {
 export default function HomeScreen({ navigation }: Props) {
   const { c } = useTheme();
   const styles = useStyles();
-  const { auth, salir } = useAuth();
+  const { auth } = useAuth();
   const user = auth!.user;
   const token = auth!.token;
   const esComerciante = user.roles.includes('comerciante');
@@ -287,10 +287,7 @@ export default function HomeScreen({ navigation }: Props) {
           </PressableScale>
         </FadeInView>
       )}
-
-      <TouchableOpacity style={styles.logout} onPress={salir}>
-        <Text style={styles.logoutTexto}>Cerrar sesión</Text>
-      </TouchableOpacity>
+      {/* "Cerrar sesión" vive solo en Mi perfil (botón de la topbar). */}
     </ScrollView>
   );
 }
@@ -332,6 +329,4 @@ const useStyles = makeStyles((c, shadow) => ({
   pedidoCliente: { color: c.text, fontSize: 14, marginTop: 6, fontFamily: font.medium },
   pedidoItems: { color: c.muted, fontSize: 13, marginTop: 2, fontFamily: font.regular },
   pedidoVer: { color: c.goldText, fontFamily: font.bold, fontSize: 13, marginTop: 8 },
-  logout: { marginTop: 28, alignItems: 'center' },
-  logoutTexto: { color: c.danger, fontFamily: font.bold },
 }));
