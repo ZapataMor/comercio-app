@@ -131,7 +131,7 @@ class DomiciliarioController extends Controller
             'direccion_entrega' => $p->direccion_entrega,
             'telefono_contacto' => $p->telefono_contacto,
             'negocio' => $p->negocio ? ['nombre' => $p->negocio->nombre, 'direccion' => $p->negocio->direccion] : null,
-            'cliente' => $p->relationLoaded('cliente') && $p->cliente ? ['name' => $p->cliente->name] : null,
+            'cliente' => $p->relationLoaded('cliente') && $p->cliente ? ['name' => $p->cliente->nombre_completo] : null,
             'items' => $p->items->map(fn ($i) => ['nombre' => $i->nombre, 'cantidad' => $i->cantidad]),
         ];
     }

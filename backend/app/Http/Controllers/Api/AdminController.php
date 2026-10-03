@@ -44,7 +44,7 @@ class AdminController extends Controller
 
         $usuarios = User::role($rol)->orderBy('name')->get()->map(fn ($u) => [
             'id' => $u->id,
-            'name' => $u->name,
+            'name' => $u->nombre_completo,
             'email' => $u->email,
             'rol' => $u->getRoleNames()->first(),
         ]);
@@ -75,7 +75,7 @@ class AdminController extends Controller
         $user->assignRole($datos['rol']);
 
         return response()->json([
-            'usuario' => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'rol' => $datos['rol']],
+            'usuario' => ['id' => $user->id, 'name' => $user->nombre_completo, 'email' => $user->email, 'rol' => $datos['rol']],
         ], 201);
     }
 
@@ -93,7 +93,7 @@ class AdminController extends Controller
 
         $usuario->syncRoles([$datos['rol']]);
 
-        return response()->json(['message' => "Rol de {$usuario->name} cambiado a {$datos['rol']}."]);
+        return response()->json(['message' => "Rol de {$usuario->nombre_completo} cambiado a {$datos['rol']}."]);
     }
 
     /** Todos los negocios (visión global). */
@@ -106,7 +106,7 @@ class AdminController extends Controller
             ->map(fn ($n) => [
                 'id' => $n->id,
                 'nombre' => $n->nombre,
-                'dueno' => $n->user?->name,
+                'dueno' => $n->user?->nombre_completo,
                 'productos' => $n->productos_count,
                 'activo' => $n->activo,
             ]);

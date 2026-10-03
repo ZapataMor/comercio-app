@@ -31,7 +31,7 @@ export default function PerfilScreen({ navigation }: Props) {
         <View style={styles.avatar}>
           <Text style={styles.avatarTxt}>{user.name.trim().charAt(0).toUpperCase() || '?'}</Text>
         </View>
-        <Text style={styles.nombre}>{user.name}</Text>
+        <Text style={styles.nombre}>{[user.name, user.apellidos].filter(Boolean).join(' ')}</Text>
         <Text style={styles.email}>{user.email}</Text>
         <View style={styles.rolesRow}>
           {user.roles.map(r => (

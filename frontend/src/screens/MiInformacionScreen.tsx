@@ -46,6 +46,7 @@ export default function MiInformacionScreen(_props: Props) {
   const [modo, setModo] = useState<'ver' | 'editar'>('ver');
 
   const [nombre, setNombre] = useState(user.name);
+  const [apellidos, setApellidos] = useState(user.apellidos ?? '');
   const [email, setEmail] = useState(user.email);
   const [telefono, setTelefono] = useState(user.telefono ?? '');
   const [direccion, setDireccion] = useState(user.direccion ?? '');
@@ -69,6 +70,7 @@ export default function MiInformacionScreen(_props: Props) {
   /** Carga en el formulario los datos guardados de la cuenta. */
   function cargarCampos(u: Usuario) {
     setNombre(u.name);
+    setApellidos(u.apellidos ?? '');
     setEmail(u.email);
     setTelefono(u.telefono ?? '');
     setDireccion(u.direccion ?? '');
@@ -93,6 +95,7 @@ export default function MiInformacionScreen(_props: Props) {
     setErrores({});
     const nuevosErrores: FieldErrors = {};
     if (!nombre.trim()) nuevosErrores.name = 'El campo nombre es obligatorio.';
+    if (!apellidos.trim()) nuevosErrores.apellidos = 'El campo apellidos es obligatorio.';
     if (!email.trim()) nuevosErrores.email = 'El campo correo es obligatorio.';
     if (esCliente) {
       if (!telefono.trim()) nuevosErrores.telefono = 'El campo teléfono es obligatorio.';
@@ -126,6 +129,7 @@ export default function MiInformacionScreen(_props: Props) {
     try {
       const actualizado = await actualizarPerfil(auth!.token, {
         name: nombre.trim(),
+        apellidos: apellidos.trim(),
         email: email.trim(),
         ...(esCliente || telefono.trim() || direccion.trim() || barrio.trim()
           ? {
@@ -159,7 +163,8 @@ export default function MiInformacionScreen(_props: Props) {
         <FadeInView>
           <Text style={styles.seccion}>Datos personales</Text>
           <View style={styles.tarjeta}>
-            <Dato icono="usuario" etiqueta="Nombre" valor={user.name} />
+            <Dato icono="usuario" etiqueta="Nombre(s)" valor={user.name} />
+            <Dato icono="usuarios" etiqueta="Apellidos" valor={user.apellidos} />
             <Dato icono="lista" etiqueta="Correo" valor={user.email} />
             <Dato icono="telefono" etiqueta="Teléfono" valor={user.telefono} ultimo />
           </View>
@@ -208,7 +213,7 @@ export default function MiInformacionScreen(_props: Props) {
         <FadeInView>
           <Text style={styles.seccion}>Datos personales</Text>
           <View style={styles.tarjeta}>
-            <Text style={styles.label}>Nombre</Text>
+            <Text style={styles.label}>Nombre(s)</Text>
             <TextInput
               style={styles.input}
               value={nombre}
@@ -216,11 +221,26 @@ export default function MiInformacionScreen(_props: Props) {
                 setNombre(valor);
                 limpiarError('name');
               }}
-              placeholder="Tu nombre"
+              placeholder="Ej: Ana María"
               placeholderTextColor={c.mutedSoft}
+              autoCapitalize="words"
               editable={!guardando}
             />
             <FieldError mensaje={errores.name} />
+            <Text style={styles.label}>Apellidos</Text>
+            <TextInput
+              style={styles.input}
+              value={apellidos}
+              onChangeText={valor => {
+                setApellidos(valor);
+                limpiarError('apellidos');
+              }}
+              placeholder="Ej: Pérez Gómez"
+              placeholderTextColor={c.mutedSoft}
+              autoCapitalize="words"
+              editable={!guardando}
+            />
+            <FieldError mensaje={errores.apellidos} />
             <Text style={styles.label}>Correo</Text>
             <TextInput
               style={styles.input}

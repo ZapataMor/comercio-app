@@ -37,8 +37,8 @@ class ComercioPedidoController extends Controller
                 'metodo_pago' => $p->metodo_pago,
                 'direccion_entrega' => $p->direccion_entrega,
                 'telefono_contacto' => $p->telefono_contacto,
-                'cliente' => $p->cliente?->name,
-                'domiciliario' => $p->domiciliario?->name,
+                'cliente' => $p->cliente?->nombre_completo,
+                'domiciliario' => $p->domiciliario?->nombre_completo,
                 'items' => $p->items->map(fn ($i) => ['nombre' => $i->nombre, 'cantidad' => $i->cantidad]),
             ]);
 

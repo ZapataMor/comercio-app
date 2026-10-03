@@ -20,13 +20,13 @@ class InvitacionController extends Controller
     {
         $invitaciones = $request->user()->invitacionesTrabajo()
             ->where('estado', InvitacionTrabajo::PENDIENTE)
-            ->with(['negocio:id,nombre', 'invitadoPor:id,name'])
+            ->with(['negocio:id,nombre', 'invitadoPor:id,name,apellidos'])
             ->latest()
             ->get()
             ->map(fn ($i) => [
                 'id' => $i->id,
                 'negocio' => $i->negocio?->nombre,
-                'invitado_por' => $i->invitadoPor?->name,
+                'invitado_por' => $i->invitadoPor?->nombre_completo,
                 'fecha' => $i->created_at->format('d/m/Y'),
             ]);
 

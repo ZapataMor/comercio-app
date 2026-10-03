@@ -43,7 +43,7 @@ class TrabajadorController extends Controller
         }
 
         return response()->json([
-            'usuario' => ['name' => $usuario->name, 'codigo_publico' => $usuario->codigo_publico],
+            'usuario' => ['name' => $usuario->nombre_completo, 'codigo_publico' => $usuario->codigo_publico],
         ]);
     }
 
@@ -59,7 +59,7 @@ class TrabajadorController extends Controller
             ->get()
             ->map(fn (User $m) => [
                 'id' => $m->id,
-                'name' => $m->name,
+                'name' => $m->nombre_completo,
                 'rol' => $m->pivot->rol,
                 'activo' => (bool) $m->pivot->activo,
                 'es_yo' => $m->id === $request->user()->id,
@@ -68,11 +68,11 @@ class TrabajadorController extends Controller
         // Invitaciones pendientes del negocio (para que el dueño vea a quién invitó).
         $pendientes = $negocio->invitaciones()
             ->where('estado', InvitacionTrabajo::PENDIENTE)
-            ->with('invitado:id,name')
+            ->with('invitado:id,name,apellidos')
             ->get()
             ->map(fn ($i) => [
                 'id' => $i->id,
-                'nombre' => $i->invitado?->name,
+                'nombre' => $i->invitado?->nombre_completo,
                 'fecha' => $i->created_at->format('d/m/Y'),
             ]);
 
@@ -102,7 +102,7 @@ class TrabajadorController extends Controller
         }
 
         if ($negocio->miembros()->whereKey($usuario->id)->exists()) {
-            return response()->json(['message' => "{$usuario->name} ya hace parte del negocio."], 409);
+            return response()->json(['message' => "{$usuario->nombre_completo} ya hace parte del negocio."], 409);
         }
 
         $yaInvitado = $negocio->invitaciones()
@@ -111,7 +111,7 @@ class TrabajadorController extends Controller
             ->exists();
 
         if ($yaInvitado) {
-            return response()->json(['message' => "{$usuario->name} ya tiene una invitación pendiente."], 409);
+            return response()->json(['message' => "{$usuario->nombre_completo} ya tiene una invitación pendiente."], 409);
         }
 
         $invitacion = $negocio->invitaciones()->create([
@@ -124,7 +124,7 @@ class TrabajadorController extends Controller
         Push::enviar($usuario, new InvitacionTrabajoRecibida($invitacion));
 
         return response()->json([
-            'message' => "Invitación enviada a {$usuario->name}. Debe aceptarla desde su app.",
+            'message' => "Invitación enviada a {$usuario->nombre_completo}. Debe aceptarla desde su app.",
         ], 201);
     }
 
@@ -170,7 +170,7 @@ class TrabajadorController extends Controller
         // Se elimina la membresía; su cuenta y su historial de pedidos quedan intactos.
         $negocio->miembros()->detach($userId);
 
-        return response()->json(['message' => "{$miembro->name} ya no hace parte del negocio."]);
+        return response()->json(['message' => "{$miembro->nombre_completo} ya no hace parte del negocio."]);
     }
 
     /** Renunciar: un trabajador se retira del negocio por su cuenta. */

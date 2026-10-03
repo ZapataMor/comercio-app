@@ -27,13 +27,13 @@ class BarrioController extends Controller
     public function pendientes(): JsonResponse
     {
         $barrios = Barrio::where('aprobado', false)
-            ->with('creador:id,name')
+            ->with('creador:id,name,apellidos')
             ->latest()
             ->get()
             ->map(fn ($b) => [
                 'id' => $b->id,
                 'nombre' => $b->nombre,
-                'sugerido_por' => $b->creador?->name,
+                'sugerido_por' => $b->creador?->nombre_completo,
                 'fecha' => $b->created_at?->toDateString(),
             ]);
 

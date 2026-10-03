@@ -44,6 +44,31 @@ test('un usuario actualiza su nombre y email', function () {
     $this->assertDatabaseHas('users', ['id' => $user->id, 'email' => 'nuevo@correo.com']);
 });
 
+test('un usuario actualiza sus apellidos', function () {
+    $user = usuarioPerfil();
+
+    $this->putJson('/api/perfil', [
+        'name' => 'Luis',
+        'apellidos' => 'Zapata Moreno',
+        'email' => $user->email,
+    ] + contactoPerfil())
+        ->assertOk()
+        ->assertJsonPath('user.name', 'Luis')
+        ->assertJsonPath('user.apellidos', 'Zapata Moreno');
+
+    expect($user->fresh()->nombre_completo)->toBe('Luis Zapata Moreno');
+});
+
+test('los demás ven el nombre completo (nombre + apellidos)', function () {
+    $dueno = usuarioPerfil();
+    $negocio = $dueno->negocio()->create(['nombre' => 'La Espiga']);
+    $otro = User::factory()->create(['name' => 'Ana', 'apellidos' => 'Pérez']);
+
+    $this->postJson("/api/negocios/{$negocio->id}/resolver-codigo", ['codigo' => $otro->codigo_publico])
+        ->assertOk()
+        ->assertJsonPath('usuario.name', 'Ana Pérez');
+});
+
 test('un cliente actualiza su dirección, barrio y teléfono', function () {
     $user = usuarioPerfil();
 

@@ -5,7 +5,9 @@ export type RolNegocio = 'propietario' | 'trabajador';
 
 export type Usuario = {
   id: number;
+  /** Nombre(s). Los apellidos van aparte. */
   name: string;
+  apellidos?: string | null;
   email: string;
   roles: string[];
   direccion?: string | null;
@@ -157,6 +159,7 @@ export async function login(email: string, password: string): Promise<LoginRespo
  */
 export async function register(body: {
   name: string;
+  apellidos: string;
   email: string;
   password: string;
   direccion: string;
@@ -312,6 +315,7 @@ async function authUpload(
 /** Datos editables del perfil de la PERSONA (no del negocio). */
 export type PerfilInput = {
   name: string;
+  apellidos?: string | null;
   email: string;
   /** Si viene, se exige también `password_actual`. */
   password?: string;

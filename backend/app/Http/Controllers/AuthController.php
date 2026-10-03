@@ -24,7 +24,9 @@ class AuthController extends Controller
     public function register(Request $request): JsonResponse
     {
         $data = $request->validate([
+            // Nombre(s) y apellidos se piden por separado.
             'name' => ['required', 'string', 'max:255'],
+            'apellidos' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'direccion' => ['required', 'string', 'max:255'],
@@ -35,6 +37,7 @@ class AuthController extends Controller
         $user = DB::transaction(function () use ($data) {
             $user = User::create([
                 'name' => $data['name'],
+                'apellidos' => $data['apellidos'],
                 'email' => $data['email'],
                 'password' => $data['password'], // se hashea solo (cast 'hashed' en el modelo)
                 'direccion' => $data['direccion'],
@@ -108,6 +111,8 @@ class AuthController extends Controller
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            // Opcional aquí: las cuentas creadas antes (o por un admin) pueden no tenerlos.
+            'apellidos' => ['sometimes', 'nullable', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'password' => ['sometimes', 'nullable', 'string', 'min:8', 'confirmed'],
             'password_actual' => ['required_with:password', 'string'],
@@ -127,6 +132,9 @@ class AuthController extends Controller
         }
 
         $user->name = $data['name'];
+        if (array_key_exists('apellidos', $data)) {
+            $user->apellidos = $data['apellidos'];
+        }
         $user->email = $data['email'];
         if (array_key_exists('direccion', $data)) {
             $user->direccion = $data['direccion'];
@@ -179,6 +187,7 @@ class AuthController extends Controller
         return [
             'id' => $user->id,
             'name' => $user->name,
+            'apellidos' => $user->apellidos,
             'email' => $user->email,
             'roles' => $user->getRoleNames(),
             'direccion' => $user->direccion,

@@ -32,6 +32,7 @@ export default function RegisterScreen({ navigation }: Props) {
   const styles = useStyles();
   const { entrar: guardarSesion } = useAuth();
   const [nombre, setNombre] = useState('');
+  const [apellidos, setApellidos] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmar, setConfirmar] = useState('');
@@ -56,6 +57,7 @@ export default function RegisterScreen({ navigation }: Props) {
 
     const nuevosErrores: FieldErrors = {};
     if (!nombre.trim()) nuevosErrores.name = 'El campo nombre es obligatorio.';
+    if (!apellidos.trim()) nuevosErrores.apellidos = 'El campo apellidos es obligatorio.';
     if (!email.trim()) nuevosErrores.email = 'El campo correo es obligatorio.';
     if (!password) nuevosErrores.password = 'El campo contrasena es obligatorio.';
     if (!direccion.trim()) nuevosErrores.direccion = 'El campo direccion es obligatorio.';
@@ -78,6 +80,7 @@ export default function RegisterScreen({ navigation }: Props) {
     try {
       const { token, user } = await register({
         name: nombre.trim(),
+        apellidos: apellidos.trim(),
         email: email.trim(),
         password,
         direccion: direccion.trim(),
@@ -112,7 +115,7 @@ export default function RegisterScreen({ navigation }: Props) {
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          <Text style={styles.label}>Nombre</Text>
+          <Text style={styles.label}>Nombre(s)</Text>
           <TextInput
             style={styles.input}
             value={nombre}
@@ -120,11 +123,31 @@ export default function RegisterScreen({ navigation }: Props) {
               setNombre(valor);
               limpiarError('name');
             }}
-            placeholder="Tu nombre"
+            placeholder="Ej: Ana María"
             placeholderTextColor={c.mutedSoft}
+            autoCapitalize="words"
+            textContentType="givenName"
+            autoComplete="name-given"
             editable={!cargando}
           />
           <FieldError mensaje={errores.name} />
+
+          <Text style={styles.label}>Apellidos</Text>
+          <TextInput
+            style={styles.input}
+            value={apellidos}
+            onChangeText={valor => {
+              setApellidos(valor);
+              limpiarError('apellidos');
+            }}
+            placeholder="Ej: Pérez Gómez"
+            placeholderTextColor={c.mutedSoft}
+            autoCapitalize="words"
+            textContentType="familyName"
+            autoComplete="name-family"
+            editable={!cargando}
+          />
+          <FieldError mensaje={errores.apellidos} />
 
           <Text style={styles.label}>Correo</Text>
           <TextInput

@@ -13,21 +13,52 @@ beforeEach(function () {
 test('el cliente debe registrar direccion, barrio y telefono', function () {
     $this->postJson('/api/register', [
         'name' => 'Cliente',
+        'apellidos' => 'Pérez',
         'email' => 'cliente@correo.com',
         'password' => 'password123',
         'password_confirmation' => 'password123',
-        'role' => 'usuario',
     ])->assertStatus(422)
         ->assertJsonValidationErrors(['direccion', 'barrio', 'telefono']);
 });
 
-test('la direccion del registro queda como ubicacion principal', function () {
+test('el registro exige los apellidos en su propio campo', function () {
     $this->postJson('/api/register', [
         'name' => 'Cliente',
         'email' => 'cliente@correo.com',
         'password' => 'password123',
         'password_confirmation' => 'password123',
-        'role' => 'usuario',
+        'direccion' => 'Calle 10 # 20-30',
+        'barrio' => 'Centro',
+        'telefono' => '3001234567',
+    ])->assertStatus(422)
+        ->assertJsonValidationErrors(['apellidos']);
+});
+
+test('el registro guarda nombre y apellidos por separado', function () {
+    $this->postJson('/api/register', [
+        'name' => 'Ana María',
+        'apellidos' => 'Pérez Gómez',
+        'email' => 'ana@correo.com',
+        'password' => 'password123',
+        'password_confirmation' => 'password123',
+        'direccion' => 'Calle 10 # 20-30',
+        'barrio' => 'Centro',
+        'telefono' => '3001234567',
+    ])->assertCreated()
+        ->assertJsonPath('user.name', 'Ana María')
+        ->assertJsonPath('user.apellidos', 'Pérez Gómez');
+
+    $user = User::where('email', 'ana@correo.com')->firstOrFail();
+    expect($user->nombre_completo)->toBe('Ana María Pérez Gómez');
+});
+
+test('la direccion del registro queda como ubicacion principal', function () {
+    $this->postJson('/api/register', [
+        'name' => 'Cliente',
+        'apellidos' => 'Pérez',
+        'email' => 'cliente@correo.com',
+        'password' => 'password123',
+        'password_confirmation' => 'password123',
         'direccion' => 'Calle 10 # 20-30',
         'barrio' => 'Centro',
         'telefono' => '3001234567',

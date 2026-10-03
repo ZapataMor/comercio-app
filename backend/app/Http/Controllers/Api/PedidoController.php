@@ -136,7 +136,7 @@ class PedidoController extends Controller
             'direccion_entrega' => $pedido->direccion_entrega,
             'minutos_recogida' => $pedido->minutos_recogida,
             'negocio' => $pedido->negocio?->nombre,
-            'domiciliario' => $pedido->domiciliario?->name,
+            'domiciliario' => $pedido->domiciliario?->nombre_completo,
             'items' => $pedido->items->map(fn ($i) => [
                 'nombre' => $i->nombre,
                 'cantidad' => $i->cantidad,
