@@ -1,128 +1,29 @@
 /**
- * Mi perfil — datos PERSONALES del usuario logueado (cualquier rol).
+ * Mi perfil — menú de la cuenta del usuario logueado (cualquier rol).
  *
- * Aquí se gestiona la persona (nombre, email, contraseña), no el negocio:
- * los negocios (propios o donde trabaja) se administran en "Mis negocios",
- * que se abre desde aquí. También es el lugar de "Cerrar sesión".
+ * Desde aquí se abre:
+ *  - "Mi información": ver y modificar los datos personales de la cuenta,
+ *  - "Mis negocios": los negocios propios o donde trabaja.
+ * También es el lugar de "Cerrar sesión".
  */
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useState } from 'react';
-import {
-  ActivityIndicator,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { actualizarPerfil } from '../api';
+import React from 'react';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
-import BarrioSelect from '../components/BarrioSelect';
-import FieldError from '../components/FieldError';
 import Icon from '../components/Icon';
-import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { useNegocio } from '../NegocioContext';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
-import { useToast } from '../Toast';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Perfil'>;
 
 export default function PerfilScreen({ navigation }: Props) {
   const { c } = useTheme();
   const styles = useStyles();
-  const { auth, actualizarUsuario, salir } = useAuth();
-  const toast = useToast();
+  const { auth, salir } = useAuth();
   const user = auth!.user;
   const { negocios, codigoPublico } = useNegocio();
-
-  const esCliente = user.roles.includes('usuario');
-
-  const [nombre, setNombre] = useState(user.name);
-  const [email, setEmail] = useState(user.email);
-  const [telefono, setTelefono] = useState(user.telefono ?? '');
-  const [direccion, setDireccion] = useState(user.direccion ?? '');
-  const [barrio, setBarrio] = useState(user.barrio ?? '');
-  const [passActual, setPassActual] = useState('');
-  const [passNueva, setPassNueva] = useState('');
-  const [passConfirma, setPassConfirma] = useState('');
-  const [guardando, setGuardando] = useState(false);
-  const [errores, setErrores] = useState<FieldErrors>({});
-
-  const cambiaPass = passActual.length > 0 || passNueva.length > 0 || passConfirma.length > 0;
-
-  function limpiarError(campo: string) {
-    setErrores(prev => {
-      const next = { ...prev };
-      delete next[campo];
-      return next;
-    });
-  }
-
-  async function guardar() {
-    setErrores({});
-    const nuevosErrores: FieldErrors = {};
-    if (!nombre.trim()) nuevosErrores.name = 'El campo nombre es obligatorio.';
-    if (!email.trim()) nuevosErrores.email = 'El campo correo es obligatorio.';
-    if (esCliente) {
-      if (!telefono.trim()) nuevosErrores.telefono = 'El campo teléfono es obligatorio.';
-      if (!direccion.trim()) nuevosErrores.direccion = 'El campo dirección es obligatorio.';
-      if (!barrio.trim()) nuevosErrores.barrio = 'El campo barrio es obligatorio.';
-    }
-    if (Object.keys(nuevosErrores).length > 0) {
-      setErrores(nuevosErrores);
-      return;
-    }
-    if (cambiaPass) {
-      const passErrores: FieldErrors = {};
-      if (!passActual) passErrores.password_actual = 'El campo contrasena actual es obligatorio.';
-      if (!passNueva) passErrores.password = 'El campo nueva contrasena es obligatorio.';
-      if (!passConfirma) passErrores.confirmar = 'Confirma la nueva contrasena.';
-      if (Object.keys(passErrores).length > 0) {
-        setErrores(passErrores);
-        return;
-      }
-      if (passNueva !== passConfirma) {
-        setErrores({ confirmar: 'La nueva contrasena y su confirmacion deben ser iguales.' });
-        return;
-      }
-      if (passNueva.length < 8) {
-        setErrores({ password: 'La nueva contrasena debe tener al menos 8 caracteres.' });
-        return;
-      }
-    }
-
-    setGuardando(true);
-    try {
-      const actualizado = await actualizarPerfil(auth!.token, {
-        name: nombre.trim(),
-        email: email.trim(),
-        ...(esCliente || telefono.trim() || direccion.trim() || barrio.trim()
-          ? {
-              telefono: telefono.trim(),
-              direccion: direccion.trim(),
-              barrio: barrio.trim(),
-            }
-          : {}),
-        ...(cambiaPass ? { password: passNueva, password_actual: passActual } : {}),
-      });
-      actualizarUsuario(actualizado);
-      setPassActual('');
-      setPassNueva('');
-      setPassConfirma('');
-      toast.exito('Perfil actualizado', 'Tus datos personales quedaron guardados.');
-    } catch (e) {
-      const campos = fieldErrorsFromError(e, { password_confirmation: 'confirmar' });
-      if (Object.keys(campos).length > 0) {
-        setErrores(campos);
-      } else {
-        toast.error('No se pudo guardar', messageFromError(e, 'Error'));
-      }
-    } finally {
-      setGuardando(false);
-    }
-  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -131,6 +32,7 @@ export default function PerfilScreen({ navigation }: Props) {
           <Text style={styles.avatarTxt}>{user.name.trim().charAt(0).toUpperCase() || '?'}</Text>
         </View>
         <Text style={styles.nombre}>{user.name}</Text>
+        <Text style={styles.email}>{user.email}</Text>
         <View style={styles.rolesRow}>
           {user.roles.map(r => (
             <Text key={r} style={styles.rol}>{r}</Text>
@@ -138,13 +40,25 @@ export default function PerfilScreen({ navigation }: Props) {
         </View>
       </FadeInView>
 
-      {/* Cualquier persona puede tener negocios o trabajar en otros. */}
+      {/* Datos personales de la cuenta: ver y modificar. */}
       <FadeInView delay={30}>
-        <PressableScale style={styles.negociosCard} onPress={() => navigation.navigate('MisNegocios')}>
+        <PressableScale style={styles.item} onPress={() => navigation.navigate('MiInformacion')}>
+          <Icon name="usuario" size={24} color={c.accent} />
+          <View style={styles.itemTexto}>
+            <Text style={styles.itemTitulo}>Mi información</Text>
+            <Text style={styles.itemSub}>Nombre, correo, teléfono, dirección y contraseña</Text>
+          </View>
+          <Icon name="chevron" size={20} color={c.chevron} />
+        </PressableScale>
+      </FadeInView>
+
+      {/* Cualquier persona puede tener negocios o trabajar en otros. */}
+      <FadeInView delay={60}>
+        <PressableScale style={styles.item} onPress={() => navigation.navigate('MisNegocios')}>
           <Icon name="tienda" size={24} color={c.accent} />
-          <View style={styles.negociosTexto}>
-            <Text style={styles.negociosTitulo}>Mis negocios</Text>
-            <Text style={styles.negociosSub}>
+          <View style={styles.itemTexto}>
+            <Text style={styles.itemTitulo}>Mis negocios</Text>
+            <Text style={styles.itemSub}>
               {negocios.length > 0
                 ? `${negocios.length} negocio${negocios.length > 1 ? 's' : ''} · invitaciones`
                 : 'Crea tu negocio o únete a uno'}
@@ -155,137 +69,7 @@ export default function PerfilScreen({ navigation }: Props) {
         </PressableScale>
       </FadeInView>
 
-      <FadeInView delay={60}>
-        <Text style={styles.seccion}>Datos personales</Text>
-        <View style={styles.tarjeta}>
-          <Text style={styles.label}>Nombre</Text>
-          <TextInput
-            style={styles.input}
-            value={nombre}
-            onChangeText={valor => {
-              setNombre(valor);
-              limpiarError('name');
-            }}
-            placeholder="Tu nombre"
-            placeholderTextColor={c.mutedSoft}
-          />
-          <FieldError mensaje={errores.name} />
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={valor => {
-              setEmail(valor);
-              limpiarError('email');
-            }}
-            placeholder="tu@correo.com"
-            placeholderTextColor={c.mutedSoft}
-            autoCapitalize="none"
-            keyboardType="email-address"
-          />
-          <FieldError mensaje={errores.email} />
-          <Text style={styles.label}>Teléfono</Text>
-          <TextInput
-            style={styles.input}
-            value={telefono}
-            onChangeText={valor => {
-              setTelefono(valor);
-              limpiarError('telefono');
-            }}
-            placeholder="Tu número de contacto"
-            placeholderTextColor={c.mutedSoft}
-            keyboardType="phone-pad"
-          />
-          <FieldError mensaje={errores.telefono} />
-        </View>
-      </FadeInView>
-
       <FadeInView delay={90}>
-        <Text style={styles.seccion}>Mi dirección</Text>
-        {esCliente ? (
-          <Text style={styles.ayuda}>Se usa como tu ubicación principal para los pedidos.</Text>
-        ) : null}
-        <View style={styles.tarjeta}>
-          <Text style={styles.label}>Dirección</Text>
-          <TextInput
-            style={styles.input}
-            value={direccion}
-            onChangeText={valor => {
-              setDireccion(valor);
-              limpiarError('direccion');
-            }}
-            placeholder="Calle, número, referencias"
-            placeholderTextColor={c.mutedSoft}
-          />
-          <FieldError mensaje={errores.direccion} />
-          <Text style={styles.label}>Barrio</Text>
-          <BarrioSelect
-            valor={barrio}
-            onSeleccionar={valor => {
-              setBarrio(valor);
-              limpiarError('barrio');
-            }}
-            placeholder="Tu barrio"
-          />
-          <FieldError mensaje={errores.barrio} />
-        </View>
-      </FadeInView>
-
-      <FadeInView delay={120}>
-        <Text style={styles.seccion}>Cambiar contraseña</Text>
-        <Text style={styles.ayuda}>Opcional: déjalo vacío para no cambiarla.</Text>
-        <View style={styles.tarjeta}>
-          <Text style={styles.label}>Contraseña actual</Text>
-          <TextInput
-            style={styles.input}
-            value={passActual}
-            onChangeText={valor => {
-              setPassActual(valor);
-              limpiarError('password_actual');
-            }}
-            placeholder="••••••••"
-            placeholderTextColor={c.mutedSoft}
-            secureTextEntry
-          />
-          <FieldError mensaje={errores.password_actual} />
-          <Text style={styles.label}>Nueva contraseña</Text>
-          <TextInput
-            style={styles.input}
-            value={passNueva}
-            onChangeText={valor => {
-              setPassNueva(valor);
-              limpiarError('password');
-            }}
-            placeholder="Mínimo 8 caracteres"
-            placeholderTextColor={c.mutedSoft}
-            secureTextEntry
-          />
-          <FieldError mensaje={errores.password} />
-          <Text style={styles.label}>Confirmar nueva contraseña</Text>
-          <TextInput
-            style={[styles.input, styles.inputUltimo]}
-            value={passConfirma}
-            onChangeText={valor => {
-              setPassConfirma(valor);
-              limpiarError('confirmar');
-            }}
-            placeholder="Repite la nueva contraseña"
-            placeholderTextColor={c.mutedSoft}
-            secureTextEntry
-          />
-          <FieldError mensaje={errores.confirmar} />
-        </View>
-      </FadeInView>
-
-      <FadeInView delay={180}>
-        <PressableScale style={styles.btn} onPress={guardar} disabled={guardando}>
-          {guardando ? (
-            <ActivityIndicator color={c.onAccent} />
-          ) : (
-            <Text style={styles.btnTxt}>Guardar cambios</Text>
-          )}
-        </PressableScale>
-
         <TouchableOpacity style={styles.logout} onPress={salir}>
           <Icon name="cerrar" size={14} color={c.danger} />
           <Text style={styles.logoutTxt}>Cerrar sesión</Text>
@@ -299,42 +83,29 @@ const useStyles = makeStyles((c, shadow) => ({
   container: { flex: 1, backgroundColor: c.bg },
   // Deja aire abajo para la barra flotante del cliente (Carrito/Mis pedidos).
   content: { padding: 20, paddingBottom: 120 },
-  cabecera: { alignItems: 'center', marginBottom: 8 },
+  cabecera: { alignItems: 'center', marginBottom: 18 },
   avatar: {
     width: 74, height: 74, borderRadius: 37, backgroundColor: c.accent,
     alignItems: 'center', justifyContent: 'center', marginTop: 6, ...shadow.gold,
   },
   avatarTxt: { color: c.onAccent, fontFamily: font.displayExtra, fontSize: 30 },
   nombre: { fontSize: 20, fontFamily: font.display, color: c.textStrong, marginTop: 10 },
+  email: { fontSize: 13, fontFamily: font.regular, color: c.muted, marginTop: 2 },
   rolesRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
   rol: {
     backgroundColor: c.accentSoft, color: c.goldText, fontFamily: font.bold, fontSize: 12,
     paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, overflow: 'hidden',
   },
-  seccion: { fontSize: 16, fontFamily: font.displaySemi, color: c.textStrong, marginTop: 18, marginBottom: 8 },
-  negociosCard: {
+  item: {
     flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: c.surface,
-    borderRadius: radius.lg, padding: 16, marginTop: 18, ...shadow.soft,
+    borderRadius: radius.lg, padding: 16, marginBottom: 12, ...shadow.soft,
   },
-  negociosTexto: { flex: 1 },
-  negociosTitulo: { fontSize: 16, fontFamily: font.bold, color: c.textStrong },
-  negociosSub: { color: c.muted, fontSize: 13, marginTop: 2, fontFamily: font.regular },
-  ayuda: { color: c.muted, fontSize: 12, fontFamily: font.regular, marginTop: -4, marginBottom: 8 },
-  tarjeta: { backgroundColor: c.surface, borderRadius: radius.lg, padding: 16, ...shadow.soft },
-  label: { fontSize: 13, fontFamily: font.semibold, color: c.text, marginBottom: 6 },
-  input: {
-    backgroundColor: c.bg, borderWidth: 1, borderColor: c.borderStrong, borderRadius: radius.md,
-    paddingHorizontal: 14, paddingVertical: 11, marginBottom: 12, color: c.textStrong, fontFamily: font.regular,
-  },
-  inputUltimo: { marginBottom: 2 },
-  btn: {
-    backgroundColor: c.accent, borderRadius: radius.md, paddingVertical: 15,
-    alignItems: 'center', marginTop: 22, ...shadow.gold,
-  },
-  btnTxt: { color: c.onAccent, fontFamily: font.bold, fontSize: 16 },
+  itemTexto: { flex: 1 },
+  itemTitulo: { fontSize: 16, fontFamily: font.bold, color: c.textStrong },
+  itemSub: { color: c.muted, fontSize: 13, marginTop: 2, fontFamily: font.regular },
   logout: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    marginTop: 24, paddingVertical: 8,
+    marginTop: 16, paddingVertical: 8,
   },
   logoutTxt: { color: c.danger, fontFamily: font.bold },
 }));

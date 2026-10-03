@@ -23,6 +23,7 @@ import { useToast } from './src/Toast';
 import { RootStackParamList } from './src/navTypes';
 import HomeScreen from './src/screens/HomeScreen';
 import PerfilScreen from './src/screens/PerfilScreen';
+import MiInformacionScreen from './src/screens/MiInformacionScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import MiTiendaScreen from './src/screens/MiTiendaScreen';
@@ -145,6 +146,11 @@ function Navegacion() {
               name="Perfil"
               component={PerfilScreen}
               options={{ title: 'Mi perfil', headerRight: () => null }}
+            />
+            <Stack.Screen
+              name="MiInformacion"
+              component={MiInformacionScreen}
+              options={{ title: 'Mi información', headerRight: () => null }}
             />
 
             {/* Negocios: cualquier usuario puede crear los suyos o trabajar en

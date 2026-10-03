@@ -7,6 +7,8 @@ export type RootStackParamList = {
   Home: undefined;
   // Perfil PERSONAL del usuario logueado (cualquier rol).
   Perfil: undefined;
+  // Datos personales de la cuenta: ver y modificar (se abre desde Mi perfil).
+  MiInformacion: undefined;
   // Negocios (cualquier usuario puede tener o trabajar en varios).
   // Lista de mis negocios + invitaciones recibidas + crear otro.
   MisNegocios: undefined;
