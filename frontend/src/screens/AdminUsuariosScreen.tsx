@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   FlatList,
   RefreshControl,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -14,10 +13,12 @@ import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import FieldError from '../components/FieldError';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
-import { c, font, radius, shadow } from '../theme';
+import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 
 export default function AdminUsuariosScreen() {
+  const { c } = useTheme();
+  const styles = useStyles();
   const { auth } = useAuth();
   const token = auth!.token;
   const toast = useToast();
@@ -214,7 +215,7 @@ export default function AdminUsuariosScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c, shadow) => ({
   container: { flex: 1, backgroundColor: c.bg },
   formBox: { backgroundColor: c.surface, padding: 16, margin: 16, marginBottom: 8, borderRadius: radius.lg, ...shadow.low },
   formToggle: { color: c.goldText, fontFamily: font.bold },
@@ -237,4 +238,4 @@ const styles = StyleSheet.create({
   chipTxt: { fontSize: 11, color: c.muted, fontFamily: font.semibold },
   chipTxtOn: { color: c.onAccent },
   vacio: { textAlign: 'center', color: c.muted, marginTop: 40, fontFamily: font.regular },
-});
+}));

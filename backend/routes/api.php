@@ -10,6 +10,8 @@ use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\DomiciliarioController as ApiDomiciliarioController;
 use App\Http\Controllers\Api\PedidoController as ApiPedidoController;
 use App\Http\Controllers\Api\ComercioPedidoController;
+use App\Http\Controllers\Api\InvitacionController;
+use App\Http\Controllers\Api\TrabajadorController;
 use App\Http\Controllers\Api\BarrioController;
 use App\Http\Controllers\Api\ClienteDireccionController;
 use App\Http\Controllers\Api\DeviceTokenController;
@@ -51,20 +53,22 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/negocios', [CatalogoController::class, 'index']);
     // Búsqueda de productos (por relevancia) con el negocio que los vende.
     Route::get('/productos', [CatalogoController::class, 'buscarProductos']);
-    Route::get('/negocios/{id}', [CatalogoController::class, 'show']);
 
-    // --- Pedidos del cliente ---
-    Route::get('/cliente/direcciones', [ClienteDireccionController::class, 'index']);
-    Route::post('/cliente/direcciones', [ClienteDireccionController::class, 'store']);
-    Route::post('/pedidos', [ApiPedidoController::class, 'store']);
-    Route::get('/pedidos', [ApiPedidoController::class, 'index']);
-    Route::get('/pedidos/{id}', [ApiPedidoController::class, 'show']);
+    // --- Mis negocios (modelo unificado) ---
+    // Cualquier usuario puede crear negocios y trabajar en otros. No hay
+    // middleware de rol: cada controlador autoriza contra la membresía
+    // (negocio_user) del {negocio} de la ruta.
+    // Va ANTES de /negocios/{id} para que "mios" no se tome como un id.
+    Route::get('/negocios/mios', [NegocioController::class, 'index']);
+    Route::get('/negocios/mios/{negocio}', [NegocioController::class, 'show'])->whereNumber('negocio');
+    Route::post('/negocios', [NegocioController::class, 'store']);
 
-    // --- Zona exclusiva del COMERCIANTE ---
-    Route::middleware('role:comerciante')->prefix('comerciante')->group(function () {
-        Route::get('/negocio', [NegocioController::class, 'show']);
-        Route::post('/negocio', [NegocioController::class, 'store']);
-        Route::put('/negocio', [NegocioController::class, 'update']);
+    // Catálogo público de UN negocio (cliente).
+    Route::get('/negocios/{id}', [CatalogoController::class, 'show'])->whereNumber('id');
+
+    Route::prefix('negocios/{negocio}')->whereNumber('negocio')->group(function () {
+        // Datos del negocio: solo el propietario los edita.
+        Route::put('/', [NegocioController::class, 'update']);
 
         // Catálogo de productos del negocio.
         Route::get('/productos', [ProductoController::class, 'index']);
@@ -82,7 +86,27 @@ Route::middleware('auth:sanctum')->group(function () {
         // Pedidos recibidos por el negocio.
         Route::get('/pedidos', [ComercioPedidoController::class, 'index']);
         Route::put('/pedidos/{id}/listo', [ComercioPedidoController::class, 'marcarListo']);
+
+        // Equipo: miembros e invitaciones por código público.
+        Route::get('/miembros', [TrabajadorController::class, 'miembros']);
+        Route::post('/resolver-codigo', [TrabajadorController::class, 'resolverCodigo']);
+        Route::post('/invitar', [TrabajadorController::class, 'invitar']);
+        Route::delete('/invitaciones/{id}', [TrabajadorController::class, 'cancelarInvitacion']);
+        Route::delete('/miembros/{userId}', [TrabajadorController::class, 'quitarMiembro']);
+        Route::post('/salir', [TrabajadorController::class, 'salir']);
     });
+
+    // --- Invitaciones de trabajo recibidas (lado del invitado) ---
+    Route::get('/invitaciones', [InvitacionController::class, 'index']);
+    Route::put('/invitaciones/{id}/aceptar', [InvitacionController::class, 'aceptar']);
+    Route::put('/invitaciones/{id}/rechazar', [InvitacionController::class, 'rechazar']);
+
+    // --- Pedidos del cliente ---
+    Route::get('/cliente/direcciones', [ClienteDireccionController::class, 'index']);
+    Route::post('/cliente/direcciones', [ClienteDireccionController::class, 'store']);
+    Route::post('/pedidos', [ApiPedidoController::class, 'store']);
+    Route::get('/pedidos', [ApiPedidoController::class, 'index']);
+    Route::get('/pedidos/{id}', [ApiPedidoController::class, 'show']);
 
     // --- Zona del ADMINISTRADOR ---
     Route::middleware('role:administrador')->prefix('admin')->group(function () {

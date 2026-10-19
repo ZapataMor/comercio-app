@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Barrio, getBarrios } from '../api';
 import Icon from './Icon';
-import { c, font, radius, shadow } from '../theme';
+import { font, makeStyles, radius, useTheme } from '../theme';
 
 /** Quita tildes y baja a minúsculas para comparar/buscar sin acentos. */
 function normalizar(texto: string): string {
@@ -35,6 +35,8 @@ type Props = {
  * administrador lo apruebe (mientras tanto solo lo ve ese usuario).
  */
 export default function BarrioSelect({ valor, onSeleccionar, disabled, placeholder = 'Elige tu barrio' }: Props) {
+  const { c } = useTheme();
+  const styles = useStyles();
   const [abierto, setAbierto] = useState(false);
   const [barrios, setBarrios] = useState<Barrio[] | null>(null);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
@@ -139,7 +141,7 @@ export default function BarrioSelect({ valor, onSeleccionar, disabled, placehold
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c, shadow) => ({
   campo: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -154,7 +156,7 @@ const styles = StyleSheet.create({
   },
   campoTexto: { fontSize: 16, fontFamily: font.regular, color: c.textStrong, flex: 1 },
   campoPlaceholder: { fontSize: 16, fontFamily: font.regular, color: c.mutedSoft, flex: 1 },
-  fondo: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  fondo: { flex: 1, backgroundColor: c.scrim, justifyContent: 'flex-end' },
   hoja: {
     backgroundColor: c.surface,
     borderTopLeftRadius: radius.xl,
@@ -206,4 +208,4 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 13,
   },
-});
+}));

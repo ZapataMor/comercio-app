@@ -23,37 +23,66 @@ function actuarComo(string $rol): User
     return $user;
 }
 
-/** Crea un comerciante autenticado que YA tiene su negocio. */
+/**
+ * Crea un usuario autenticado que YA tiene su negocio (queda como
+ * propietario por el hook del modelo). Rol global 'usuario': en el modelo
+ * unificado cualquier persona puede tener negocios.
+ */
 function comercianteConNegocio(): array
 {
-    $user = actuarComo('comerciante');
+    $user = actuarComo('usuario');
     $negocio = $user->negocio()->create(['nombre' => 'Tienda Test']);
 
     return [$user, $negocio];
+}
+
+/** URL de la zona de gestión de un negocio. */
+function urlNegocio(Negocio $negocio, string $resto = ''): string
+{
+    return "/api/negocios/{$negocio->id}{$resto}";
 }
 
 // ---------------------------------------------------------------------------
 // Seguridad / acceso
 // ---------------------------------------------------------------------------
 
-test('sin token no se puede entrar a la zona comerciante', function () {
-    $this->getJson('/api/comerciante/negocio')->assertStatus(401);
+test('sin token no se puede entrar a mis negocios', function () {
+    $this->getJson('/api/negocios/mios')->assertStatus(401);
 });
 
-test('un usuario cliente no puede entrar a la zona comerciante', function () {
+test('quien no es miembro no puede gestionar un negocio', function () {
+    $dueno = User::factory()->create();
+    $negocio = $dueno->negocio()->create(['nombre' => 'Ajeno']);
+
     actuarComo('usuario');
 
-    $this->getJson('/api/comerciante/negocio')->assertStatus(403);
+    $this->getJson(urlNegocio($negocio, '/productos'))->assertStatus(403);
+    $this->getJson(urlNegocio($negocio, '/categorias'))->assertStatus(403);
+    $this->getJson(urlNegocio($negocio, '/pedidos'))->assertStatus(403);
+    $this->getJson("/api/negocios/mios/{$negocio->id}")->assertStatus(403);
+});
+
+test('un negocio inexistente devuelve 404', function () {
+    actuarComo('usuario');
+
+    $this->getJson('/api/negocios/999999/productos')->assertStatus(404);
+});
+
+test('un miembro suspendido pierde el acceso', function () {
+    [$user, $negocio] = comercianteConNegocio();
+    $negocio->miembros()->updateExistingPivot($user->id, ['activo' => false]);
+
+    $this->getJson(urlNegocio($negocio, '/productos'))->assertStatus(403);
 });
 
 // ---------------------------------------------------------------------------
 // Negocio
 // ---------------------------------------------------------------------------
 
-test('un comerciante crea su negocio', function () {
-    actuarComo('comerciante');
+test('cualquier usuario crea un negocio y queda como propietario', function () {
+    $user = actuarComo('usuario');
 
-    $this->postJson('/api/comerciante/negocio', [
+    $this->postJson('/api/negocios', [
         'nombre' => 'Donde Pepe',
         'categorias' => ['Restaurante', 'Comidas rápidas'],
     ])
@@ -62,43 +91,78 @@ test('un comerciante crea su negocio', function () {
         ->assertJsonPath('negocio.categoria', 'Restaurante')
         ->assertJsonPath('negocio.categorias.0', 'Restaurante')
         ->assertJsonPath('negocio.categorias.1', 'Comidas rápidas')
-        ->assertJsonPath('negocio.activo', true);
+        ->assertJsonPath('negocio.activo', true)
+        ->assertJsonPath('negocio.rol', Negocio::ROL_PROPIETARIO);
 
     $this->assertDatabaseHas('negocios', ['nombre' => 'Donde Pepe', 'categoria' => 'Restaurante']);
     $this->assertDatabaseHas('tipos_negocio', ['nombre' => 'Comidas rápidas']);
+
+    $negocio = Negocio::where('nombre', 'Donde Pepe')->firstOrFail();
+    expect($negocio->esPropietario($user))->toBeTrue();
 });
 
 test('crear un negocio exige la categoría (tipo de negocio)', function () {
-    actuarComo('comerciante');
+    actuarComo('usuario');
 
-    $this->postJson('/api/comerciante/negocio', ['nombre' => 'Sin Tipo'])
+    $this->postJson('/api/negocios', ['nombre' => 'Sin Tipo'])
         ->assertStatus(422)
         ->assertJsonValidationErrors('categoria');
 });
 
-test('un comerciante no puede tener dos negocios', function () {
+test('una persona puede tener varios negocios', function () {
     comercianteConNegocio();
 
-    $this->postJson('/api/comerciante/negocio', ['nombre' => 'Otro', 'categorias' => ['Farmacia']])
-        ->assertStatus(409);
+    $this->postJson('/api/negocios', ['nombre' => 'Otro', 'categorias' => ['Farmacia']])
+        ->assertStatus(201);
+
+    $this->getJson('/api/negocios/mios')
+        ->assertOk()
+        ->assertJsonCount(2, 'negocios')
+        ->assertJsonPath('negocios.0.rol', Negocio::ROL_PROPIETARIO);
+});
+
+test('mis negocios incluye mi código público', function () {
+    $user = actuarComo('usuario');
+
+    $this->getJson('/api/negocios/mios')
+        ->assertOk()
+        ->assertJsonPath('codigo_publico', $user->codigo_publico)
+        ->assertJsonCount(0, 'negocios');
+});
+
+test('el propietario ve y edita su negocio', function () {
+    [, $negocio] = comercianteConNegocio();
+
+    $this->getJson("/api/negocios/mios/{$negocio->id}")
+        ->assertOk()
+        ->assertJsonPath('negocio.nombre', 'Tienda Test')
+        ->assertJsonPath('negocio.rol', Negocio::ROL_PROPIETARIO);
+
+    $this->putJson(urlNegocio($negocio), ['activo' => false])
+        ->assertOk()
+        ->assertJsonPath('negocio.activo', false);
+});
+
+test('un trabajador no puede editar los datos del negocio', function () {
+    $dueno = User::factory()->create();
+    $negocio = $dueno->negocio()->create(['nombre' => 'Con Equipo']);
+    $trabajador = actuarComo('usuario');
+    $negocio->miembros()->attach($trabajador->id, ['rol' => Negocio::ROL_TRABAJADOR, 'activo' => true]);
+
+    $this->putJson(urlNegocio($negocio), ['nombre' => 'Hackeado'])->assertStatus(403);
+    // ...pero sí gestiona el catálogo.
+    $this->getJson(urlNegocio($negocio, '/productos'))->assertOk();
 });
 
 // ---------------------------------------------------------------------------
 // Productos
 // ---------------------------------------------------------------------------
 
-test('crear producto sin tener negocio devuelve 409', function () {
-    actuarComo('comerciante');
-
-    $this->postJson('/api/comerciante/productos', ['nombre' => 'X', 'precio' => 100])
-        ->assertStatus(409);
-});
-
-test('un comerciante crea un producto en su negocio', function () {
-    comercianteConNegocio();
+test('un propietario crea un producto en su negocio', function () {
+    [, $negocio] = comercianteConNegocio();
     $comida = TipoProducto::where('slug', 'comida')->firstOrFail();
 
-    $this->postJson('/api/comerciante/productos', [
+    $this->postJson(urlNegocio($negocio, '/productos'), [
         'nombre' => 'Empanada',
         'precio' => 2500,
         'tipo_producto_id' => $comida->id,
@@ -113,18 +177,18 @@ test('un comerciante crea un producto en su negocio', function () {
 });
 
 test('crear un producto exige el tipo de producto', function () {
-    comercianteConNegocio();
+    [, $negocio] = comercianteConNegocio();
 
-    $this->postJson('/api/comerciante/productos', ['nombre' => 'X', 'precio' => 100])
+    $this->postJson(urlNegocio($negocio, '/productos'), ['nombre' => 'X', 'precio' => 100])
         ->assertStatus(422)
         ->assertJsonValidationErrorFor('tipo_producto_id');
 });
 
 test('el precio debe ser un entero sin puntos ni comas', function () {
-    comercianteConNegocio();
+    [, $negocio] = comercianteConNegocio();
     $comida = TipoProducto::where('slug', 'comida')->firstOrFail();
 
-    $this->postJson('/api/comerciante/productos', [
+    $this->postJson(urlNegocio($negocio, '/productos'), [
         'nombre' => 'X',
         'precio' => '12.500',
         'tipo_producto_id' => $comida->id,
@@ -151,58 +215,60 @@ test('los tipos de producto vienen con su configuración de atributos', function
 });
 
 test('el precio no puede ser negativo', function () {
-    comercianteConNegocio();
+    [, $negocio] = comercianteConNegocio();
 
-    $this->postJson('/api/comerciante/productos', ['nombre' => 'X', 'precio' => -5])
+    $this->postJson(urlNegocio($negocio, '/productos'), ['nombre' => 'X', 'precio' => -5])
         ->assertStatus(422)
         ->assertJsonValidationErrorFor('precio');
 });
 
 test('el listado de productos viene paginado', function () {
-    [$user, $negocio] = comercianteConNegocio();
+    [, $negocio] = comercianteConNegocio();
     $negocio->productos()->createMany(
         collect(range(1, 20))->map(fn ($i) => ['nombre' => "Prod $i", 'precio' => 1000])->all()
     );
 
-    $this->getJson('/api/comerciante/productos')
+    $this->getJson(urlNegocio($negocio, '/productos'))
         ->assertOk()
         ->assertJsonCount(15, 'data')          // 15 por página por defecto
         ->assertJsonPath('meta.total', 20);
 });
 
 test('se puede buscar productos por nombre', function () {
-    [$user, $negocio] = comercianteConNegocio();
+    [, $negocio] = comercianteConNegocio();
     $negocio->productos()->create(['nombre' => 'Jugo de corozo', 'precio' => 3000]);
     $negocio->productos()->create(['nombre' => 'Empanada', 'precio' => 2500]);
 
-    $this->getJson('/api/comerciante/productos?buscar=corozo')
+    $this->getJson(urlNegocio($negocio, '/productos?buscar=corozo'))
         ->assertOk()
         ->assertJsonCount(1, 'data')
         ->assertJsonPath('data.0.nombre', 'Jugo de corozo');
 });
 
-test('un comerciante no puede ver el producto de otro comerciante', function () {
-    // Comerciante A con su producto.
+test('no se puede tocar el producto de otro negocio', function () {
+    // Negocio A con su producto.
     $otro = User::factory()->create();
-    $otro->assignRole('comerciante');
     $negocioOtro = $otro->negocio()->create(['nombre' => 'Tienda Ajena']);
     $productoAjeno = $negocioOtro->productos()->create(['nombre' => 'Secreto', 'precio' => 9999]);
 
-    // Comerciante B autenticado.
-    comercianteConNegocio();
+    // Propietario de B autenticado.
+    [, $negocio] = comercianteConNegocio();
 
-    $this->getJson("/api/comerciante/productos/{$productoAjeno->id}")->assertStatus(404);
-    $this->deleteJson("/api/comerciante/productos/{$productoAjeno->id}")->assertStatus(404);
+    // Por su propio negocio: el producto no está ahí.
+    $this->getJson(urlNegocio($negocio, "/productos/{$productoAjeno->id}"))->assertStatus(404);
+    $this->deleteJson(urlNegocio($negocio, "/productos/{$productoAjeno->id}"))->assertStatus(404);
+    // Por el negocio ajeno: no es miembro.
+    $this->getJson(urlNegocio($negocioOtro, "/productos/{$productoAjeno->id}"))->assertStatus(403);
 });
 
 test('borrar un producto es borrado suave (soft delete)', function () {
-    [$user, $negocio] = comercianteConNegocio();
+    [, $negocio] = comercianteConNegocio();
     $producto = $negocio->productos()->create(['nombre' => 'Temporal', 'precio' => 1000]);
 
-    $this->deleteJson("/api/comerciante/productos/{$producto->id}")->assertOk();
+    $this->deleteJson(urlNegocio($negocio, "/productos/{$producto->id}"))->assertOk();
 
     // Ya no aparece en el listado...
-    $this->getJson('/api/comerciante/productos')->assertJsonCount(0, 'data');
+    $this->getJson(urlNegocio($negocio, '/productos'))->assertJsonCount(0, 'data');
     // ...pero sigue en la BD con deleted_at (recuperable, no rompe historial).
     $this->assertSoftDeleted('productos', ['id' => $producto->id]);
 });
@@ -211,33 +277,32 @@ test('borrar un producto es borrado suave (soft delete)', function () {
 // Categorías
 // ---------------------------------------------------------------------------
 
-test('un comerciante crea una categoría', function () {
-    comercianteConNegocio();
+test('un propietario crea una categoría', function () {
+    [, $negocio] = comercianteConNegocio();
 
-    $this->postJson('/api/comerciante/categorias', ['nombre' => 'Bebidas'])
+    $this->postJson(urlNegocio($negocio, '/categorias'), ['nombre' => 'Bebidas'])
         ->assertStatus(201)
         ->assertJsonPath('categoria.nombre', 'Bebidas');
 });
 
 test('no se permite una categoría duplicada en el mismo negocio', function () {
-    [$user, $negocio] = comercianteConNegocio();
+    [, $negocio] = comercianteConNegocio();
     $negocio->categorias()->create(['nombre' => 'Bebidas']);
 
-    $this->postJson('/api/comerciante/categorias', ['nombre' => 'Bebidas'])
+    $this->postJson(urlNegocio($negocio, '/categorias'), ['nombre' => 'Bebidas'])
         ->assertStatus(422)
         ->assertJsonValidationErrorFor('nombre');
 });
 
 test('no se puede asignar a un producto la categoría de otro negocio', function () {
-    // Categoría de otro comerciante.
+    // Categoría de otro negocio.
     $otro = User::factory()->create();
-    $otro->assignRole('comerciante');
     $negocioOtro = $otro->negocio()->create(['nombre' => 'Ajena']);
     $catAjena = $negocioOtro->categorias()->create(['nombre' => 'Ajena']);
 
-    comercianteConNegocio();
+    [, $negocio] = comercianteConNegocio();
 
-    $this->postJson('/api/comerciante/productos', [
+    $this->postJson(urlNegocio($negocio, '/productos'), [
         'nombre' => 'Producto',
         'precio' => 1000,
         'categoria_id' => $catAjena->id,
@@ -247,7 +312,7 @@ test('no se puede asignar a un producto la categoría de otro negocio', function
 });
 
 test('al borrar una categoría sus productos quedan sin categoría', function () {
-    [$user, $negocio] = comercianteConNegocio();
+    [, $negocio] = comercianteConNegocio();
     $categoria = $negocio->categorias()->create(['nombre' => 'Bebidas']);
     $producto = $negocio->productos()->create([
         'nombre' => 'Jugo',
@@ -255,7 +320,7 @@ test('al borrar una categoría sus productos quedan sin categoría', function ()
         'categoria_id' => $categoria->id,
     ]);
 
-    $this->deleteJson("/api/comerciante/categorias/{$categoria->id}")->assertOk();
+    $this->deleteJson(urlNegocio($negocio, "/categorias/{$categoria->id}"))->assertOk();
 
     // El producto sigue existiendo, pero sin categoría.
     $this->assertDatabaseHas('productos', [
@@ -265,24 +330,24 @@ test('al borrar una categoría sus productos quedan sin categoría', function ()
 });
 
 test('el listado de categorías incluye el conteo de productos', function () {
-    [$user, $negocio] = comercianteConNegocio();
+    [, $negocio] = comercianteConNegocio();
     $cat = $negocio->categorias()->create(['nombre' => 'Comida']);
     $negocio->productos()->create(['nombre' => 'Arroz con pollo', 'precio' => 12000, 'categoria_id' => $cat->id]);
     $negocio->productos()->create(['nombre' => 'Sancocho', 'precio' => 15000, 'categoria_id' => $cat->id]);
 
-    $this->getJson('/api/comerciante/categorias')
+    $this->getJson(urlNegocio($negocio, '/categorias'))
         ->assertOk()
         ->assertJsonPath('data.0.nombre', 'Comida')
         ->assertJsonPath('data.0.productos', 2);
 });
 
 test('se pueden listar solo los productos sin categoría', function () {
-    [$user, $negocio] = comercianteConNegocio();
+    [, $negocio] = comercianteConNegocio();
     $cat = $negocio->categorias()->create(['nombre' => 'Comida']);
     $negocio->productos()->create(['nombre' => 'Con categoría', 'precio' => 1000, 'categoria_id' => $cat->id]);
     $negocio->productos()->create(['nombre' => 'Suelto', 'precio' => 1000]);
 
-    $this->getJson('/api/comerciante/productos?sin_categoria=1')
+    $this->getJson(urlNegocio($negocio, '/productos?sin_categoria=1'))
         ->assertOk()
         ->assertJsonCount(1, 'data')
         ->assertJsonPath('data.0.nombre', 'Suelto');

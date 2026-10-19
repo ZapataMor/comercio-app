@@ -1,16 +1,17 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { AdminStats, getAdminStats } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import Icon from '../components/Icon';
 import { RootStackParamList } from '../navTypes';
-import { c, font, radius, shadow } from '../theme';
+import { font, makeStyles, radius, useTheme } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AdminTablero'>;
 
 function Tarjeta({ valor, etiqueta, color }: { valor: number; etiqueta: string; color: string }) {
+  const styles = useStyles();
   return (
     <View style={styles.tarjeta}>
       <Text style={[styles.valor, { color }]}>{valor}</Text>
@@ -20,6 +21,8 @@ function Tarjeta({ valor, etiqueta, color }: { valor: number; etiqueta: string; 
 }
 
 export default function AdminTableroScreen({ navigation }: Props) {
+  const { c } = useTheme();
+  const styles = useStyles();
   const { auth } = useAuth();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -74,7 +77,7 @@ export default function AdminTableroScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c, shadow) => ({
   container: { flex: 1, backgroundColor: c.bg },
   titulo: { fontSize: 22, fontFamily: font.display, color: c.textStrong, marginBottom: 16 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 8 },
@@ -90,4 +93,4 @@ const styles = StyleSheet.create({
   itemEmoji: { marginRight: 12 },
   itemTitulo: { flex: 1, fontSize: 16, fontFamily: font.semibold, color: c.textStrong },
   error: { color: c.danger, backgroundColor: c.dangerSoft, padding: 12, borderRadius: radius.sm, marginTop: 16, fontFamily: font.medium },
-});
+}));

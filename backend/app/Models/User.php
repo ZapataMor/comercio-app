@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -12,7 +13,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
-#[Fillable(['name', 'email', 'password', 'direccion', 'barrio', 'telefono'])]
+#[Fillable(['name', 'apellidos', 'email', 'password', 'direccion', 'barrio', 'telefono'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -44,6 +45,15 @@ class User extends Authenticatable
                 $user->codigo_publico = self::generarCodigoPublico();
             }
         });
+    }
+
+    /**
+     * Nombre(s) + apellidos, para mostrar a otras personas (pedidos, equipo,
+     * invitaciones, admin). `name` guarda solo el/los nombre(s).
+     */
+    protected function nombreCompleto(): Attribute
+    {
+        return Attribute::get(fn () => trim($this->name.' '.($this->apellidos ?? '')));
     }
 
     /** Código de 6 caracteres sin ambiguos (sin 0/O ni 1/I/L), único. */

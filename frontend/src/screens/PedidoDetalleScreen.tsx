@@ -1,13 +1,13 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, ScrollView, Text, View } from 'react-native';
 import { getPedido, SeguimientoPedido } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView } from '../components/anim';
 import Icon from '../components/Icon';
 import { RootStackParamList } from '../navTypes';
-import { c, font, radius, shadow } from '../theme';
+import { font, makeStyles, radius, useTheme } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PedidoDetalle'>;
 
@@ -26,6 +26,8 @@ function cop(n: number) {
 
 /** Un paso de la línea de tiempo; el paso "actual" late suavemente. */
 function Paso({ texto, hecho, actual }: { texto: string; hecho: boolean; actual: boolean }) {
+  const { c } = useTheme();
+  const styles = useStyles();
   const pulse = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     if (!actual) return;
@@ -63,6 +65,8 @@ function Paso({ texto, hecho, actual }: { texto: string; hecho: boolean; actual:
 }
 
 export default function PedidoDetalleScreen({ route }: Props) {
+  const { c } = useTheme();
+  const styles = useStyles();
   const { auth } = useAuth();
   const { id } = route.params;
   const [pedido, setPedido] = useState<SeguimientoPedido | null>(null);
@@ -151,7 +155,7 @@ export default function PedidoDetalleScreen({ route }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c, shadow) => ({
   container: { flex: 1, backgroundColor: c.bg },
   titulo: { fontSize: 22, fontFamily: font.display, color: c.textStrong },
   sub: { color: c.muted, marginTop: 2, marginBottom: 16, fontFamily: font.medium },
@@ -175,4 +179,4 @@ const styles = StyleSheet.create({
   totalLabel: { fontFamily: font.bold, color: c.textStrong },
   info: { color: c.muted, fontSize: 13, marginTop: 10, fontFamily: font.regular },
   error: { color: c.danger, backgroundColor: c.dangerSoft, padding: 12, borderRadius: radius.sm, margin: 16, fontFamily: font.medium },
-});
+}));

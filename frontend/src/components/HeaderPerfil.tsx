@@ -1,36 +1,37 @@
 /**
  * Botón "Mi perfil" de la topbar (parte superior derecha), visible para
- * TODOS los roles. Abre la pantalla del perfil PERSONAL del usuario
- * (la persona, no el negocio).
+ * TODOS los roles. Solo muestra el ícono de la persona; abre la pantalla del
+ * perfil PERSONAL del usuario (la persona, no el negocio).
  */
 import React from 'react';
-import { StyleSheet, Text } from 'react-native';
 import { navigationRef } from '../RootNavigation';
-import { c, font, radius } from '../theme';
+import { radius, makeStyles, useTheme } from '../theme';
 import { PressableScale } from './anim';
 import Icon from './Icon';
 
 export default function HeaderPerfil() {
+  const { c } = useTheme();
+  const styles = useStyles();
   return (
     <PressableScale
       style={styles.boton}
-      hitSlop={6}
+      hitSlop={8}
+      // Sin texto visible: el lector de pantalla anuncia "Mi perfil".
+      accessibilityRole="button"
+      accessibilityLabel="Mi perfil"
       onPress={() => navigationRef.isReady() && navigationRef.navigate('Perfil')}>
-      <Icon name="usuario" size={14} color={c.onBrand} strokeWidth={2} />
-      <Text style={styles.txt}>Mi perfil</Text>
+      <Icon name="usuario" size={18} color={c.onHeader} strokeWidth={2} />
     </PressableScale>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(() => ({
   boton: {
-    flexDirection: 'row',
+    width: 34,
+    height: 34,
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    justifyContent: 'center',
     borderRadius: radius.pill,
     backgroundColor: 'rgba(255,255,255,0.14)',
   },
-  txt: { color: c.onBrand, fontFamily: font.semibold, fontSize: 12 },
-});
+}));

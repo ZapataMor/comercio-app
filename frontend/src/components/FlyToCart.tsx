@@ -23,7 +23,7 @@ import React, {
   useState,
 } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
-import { c, shadow } from '../theme';
+import { makeStyles, useTheme } from '../theme';
 import Icon from './Icon';
 
 export type Punto = { x: number; y: number };
@@ -148,6 +148,8 @@ function arco(a: Punto, b: Punto, pasos: number) {
 
 function Paquete({ vuelo, onFin }: { vuelo: Vuelo; onFin: (id: number) => void }) {
   // pop: nacimiento (0 → 1 con "overshoot"); p: progreso del vuelo (0 → 1).
+  const { c } = useTheme();
+  const styles = useStyles();
   const pop = useRef(new Animated.Value(0)).current;
   const p = useRef(new Animated.Value(0)).current;
 
@@ -205,7 +207,7 @@ function Paquete({ vuelo, onFin }: { vuelo: Vuelo; onFin: (id: number) => void }
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c, shadow) => ({
   paquete: {
     position: 'absolute',
     // Centrado sobre el punto (0,0): el translate lo lleva a su sitio.
@@ -219,4 +221,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     ...shadow.gold,
   },
-});
+}));

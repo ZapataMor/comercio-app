@@ -6,7 +6,6 @@ import {
   FlatList,
   GestureResponderEvent,
   Image,
-  StyleSheet,
   Text,
   View,
 } from 'react-native';
@@ -17,7 +16,7 @@ import { FadeInView, PressableScale } from '../components/anim';
 import { useFlyToCart } from '../components/FlyToCart';
 import Icon from '../components/Icon';
 import { RootStackParamList } from '../navTypes';
-import { c, font, radius, shadow } from '../theme';
+import { font, makeStyles, radius, useTheme } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Negocio'>;
 
@@ -47,6 +46,8 @@ function construirCatalogo(productos: Producto[]): CatalogoFila[] {
 }
 
 export default function NegocioScreen({ route }: Props) {
+  const { c } = useTheme();
+  const styles = useStyles();
   const { auth } = useAuth();
   const cart = useCart();
   const { volar } = useFlyToCart();
@@ -228,7 +229,7 @@ export default function NegocioScreen({ route }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c, shadow) => ({
   container: { flex: 1, backgroundColor: c.bg },
   cabecera: { marginBottom: 6 },
   hero: {
@@ -314,4 +315,4 @@ const styles = StyleSheet.create({
   addTxtOff: { color: c.mutedSoft },
   vacio: { textAlign: 'center', color: c.muted, marginTop: 40, fontFamily: font.regular },
   error: { color: c.danger, backgroundColor: c.dangerSoft, padding: 12, borderRadius: radius.sm, margin: 16, fontFamily: font.medium },
-});
+}));

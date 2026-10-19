@@ -1,11 +1,11 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useCart } from '../CartContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import Icon from '../components/Icon';
 import { RootStackParamList } from '../navTypes';
-import { c, font, radius, shadow } from '../theme';
+import { font, makeStyles, radius, useTheme } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Carrito'>;
 
@@ -14,6 +14,8 @@ function cop(n: number) {
 }
 
 export default function CarritoScreen({ navigation }: Props) {
+  const { c } = useTheme();
+  const styles = useStyles();
   const { items, negocioNombre, total, cambiar, quitar, vaciar } = useCart();
 
   if (items.length === 0) {
@@ -77,7 +79,7 @@ export default function CarritoScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c, shadow) => ({
   container: { flex: 1, backgroundColor: c.bg },
   tienda: { fontFamily: font.bold, color: c.text, marginBottom: 12 },
   fila: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -101,4 +103,4 @@ const styles = StyleSheet.create({
   vacioBox: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: c.bg },
   vacio: { color: c.muted, marginTop: 8, fontFamily: font.regular },
   link: { color: c.goldText, marginTop: 12, fontFamily: font.semibold },
-});
+}));

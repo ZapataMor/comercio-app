@@ -10,12 +10,12 @@
  *    registra su posición y rebota cuando un paquete aterriza.
  */
 import React, { useCallback, useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../AuthContext';
 import { useCart } from '../CartContext';
 import { navigationRef } from '../RootNavigation';
-import { c, font, radius, shadow } from '../theme';
+import { font, makeStyles, radius, useTheme } from '../theme';
 import { PressableScale } from './anim';
 import { useFlyToCart } from './FlyToCart';
 import Icon from './Icon';
@@ -42,6 +42,8 @@ export default function BarraCliente({ ruta }: Props) {
 }
 
 function Barra({ ruta }: { ruta: string }) {
+  const { c } = useTheme();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const cart = useCart();
   const { registrarDestino, registrarAterrizaje } = useFlyToCart();
@@ -154,7 +156,7 @@ function Entrada({ children, style }: { children: React.ReactNode; style?: objec
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c, shadow) => ({
   zona: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   fila: {
     flexDirection: 'row',
@@ -191,4 +193,4 @@ const styles = StyleSheet.create({
     borderColor: c.bg,
   },
   badgeTxt: { color: c.onBrand, fontFamily: font.extra, fontSize: 11 },
-});
+}));
