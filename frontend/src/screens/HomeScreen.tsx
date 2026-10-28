@@ -7,6 +7,7 @@ import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import HeaderPerfil from '../components/HeaderPerfil';
 import Icon from '../components/Icon';
+import { NivelBadge } from '../components/Reputacion';
 import { useNegocio } from '../NegocioContext';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
@@ -76,17 +77,15 @@ export default function HomeScreen({ navigation }: Props) {
   const { auth } = useAuth();
   const user = auth!.user;
   const token = auth!.token;
-  const esComerciante = user.roles.includes('comerciante');
   const esCliente = user.roles.includes('usuario');
   const esAdmin = user.roles.includes('administrador');
   const esDomiciliario = user.roles.includes('domiciliario');
 
   const { negocio, negocios, esPropietario } = useNegocio();
   const negocioId = negocio?.id ?? null;
-  // Panel de negocio: quien es miembro de algún negocio (modelo unificado).
-  // Las cuentas con el rol viejo 'comerciante' lo ven aunque aún no tengan uno,
-  // para poder crearlo.
-  const tienePanel = negocios.length > 0 || esComerciante;
+  // Panel de negocio: quien es miembro de algún negocio (no hay rol global
+  // de "comerciante"; los negocios se crean desde Mis negocios).
+  const tienePanel = negocios.length > 0;
   const [pedidos, setPedidos] = useState<ComercioPedido[]>([]);
 
   // Topbar: con negocio, el switch Abierto/Cerrado va junto a "Mi perfil".
@@ -130,6 +129,8 @@ export default function HomeScreen({ navigation }: Props) {
   );
 
   const enEspera = pedidos.filter(p => p.estado === 'pendiente');
+  // Efectivo: falta decir si el domiciliario entregó el dinero.
+  const porConfirmar = pedidos.filter(p => p.puede_confirmar_dinero);
 
   return (
     <ScrollView
@@ -157,6 +158,11 @@ export default function HomeScreen({ navigation }: Props) {
                     ? `${negocio.nombre} · ${negocio.activo ? 'Abierto' : 'Cerrado'}${esPropietario ? '' : ' · Trabajador'}`
                     : 'Crea tu negocio'}
                 </Text>
+                {!!negocio?.reputacion && (
+                  <View style={styles.itemBadge}>
+                    <NivelBadge reputacion={negocio.reputacion} />
+                  </View>
+                )}
               </View>
               <Icon name="chevron" size={20} color={c.chevron} />
             </PressableScale>
@@ -186,6 +192,17 @@ export default function HomeScreen({ navigation }: Props) {
                   <View style={styles.itemTexto}>
                     <Text style={styles.itemTitulo}>Productos</Text>
                     <Text style={styles.itemSub}>Tu catálogo: añade y edita productos</Text>
+                  </View>
+                  <Icon name="chevron" size={20} color={c.chevron} />
+                </PressableScale>
+              </FadeInView>
+
+              <FadeInView delay={135}>
+                <PressableScale style={styles.item} onPress={() => navigation.navigate('PedidosNegocio')}>
+                  <Icon name="lista" size={26} color={c.accent} style={styles.itemEmoji} />
+                  <View style={styles.itemTexto}>
+                    <Text style={styles.itemTitulo}>Pedidos y ventas</Text>
+                    <Text style={styles.itemSub}>En curso, entregados, cancelados y lo vendido hoy</Text>
                   </View>
                   <Icon name="chevron" size={20} color={c.chevron} />
                 </PressableScale>
@@ -243,6 +260,29 @@ export default function HomeScreen({ navigation }: Props) {
                     </PressableScale>
                   </FadeInView>
                 ))
+              )}
+
+              {porConfirmar.length > 0 && (
+                <>
+                  <Text style={styles.seccion}>Dinero por confirmar ({porConfirmar.length})</Text>
+                  {porConfirmar.map((p, i) => (
+                    <FadeInView key={p.id} delay={i * 60}>
+                      <PressableScale
+                        style={[styles.pedidoCard, styles.pedidoCardDinero]}
+                        onPress={() => navigation.navigate('ComercioPedidoDetalle', { pedido: p })}>
+                        <View style={styles.pedidoHead}>
+                          <Text style={styles.pedidoId}>Pedido #{p.id}</Text>
+                          <Text style={styles.pedidoTotal}>{cop(p.total)}</Text>
+                        </View>
+                        <View style={[styles.pedidoCliente, styles.fila]}>
+                          <Icon name="moto" size={14} color={c.text} />
+                          <Text style={styles.pedidoCliente}>{p.domiciliario ?? 'Domiciliario'}</Text>
+                        </View>
+                        <Text style={styles.pedidoVer}>¿Te entregó el dinero? ›</Text>
+                      </PressableScale>
+                    </FadeInView>
+                  ))}
+                </>
               )}
             </>
           )}
@@ -329,4 +369,6 @@ const useStyles = makeStyles((c, shadow) => ({
   pedidoCliente: { color: c.text, fontSize: 14, marginTop: 6, fontFamily: font.medium },
   pedidoItems: { color: c.muted, fontSize: 13, marginTop: 2, fontFamily: font.regular },
   pedidoVer: { color: c.goldText, fontFamily: font.bold, fontSize: 13, marginTop: 8 },
+  pedidoCardDinero: { borderLeftColor: c.success },
+  itemBadge: { marginTop: 6 },
 }));

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Resources\NegocioResource;
 use App\Models\Negocio;
 use App\Models\TipoNegocio;
+use App\Support\Reputacion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -55,6 +56,8 @@ class NegocioController extends Controller
             'direccion' => ['nullable', 'string', 'max:255'],
             'telefono' => ['nullable', 'string', 'max:30'],
             'activo' => ['sometimes', 'boolean'],
+            // Tiempo promedio que promete para tener listo un pedido (minutos).
+            'tiempo_preparacion' => ['sometimes', 'integer', 'min:5', 'max:180'],
             'imagen' => ['sometimes', 'image', 'max:4096'], // máx 4 MB
         ]);
 
@@ -88,6 +91,23 @@ class NegocioController extends Controller
     }
 
     /**
+     * Nivel de confiabilidad del negocio y por qué (últimos eventos), para
+     * que el equipo sepa qué mejorar. Cualquier miembro activo lo ve.
+     */
+    public function reputacion(Request $request, Negocio $negocio): JsonResponse
+    {
+        if (! $negocio->esMiembroActivo($request->user())) {
+            return $this->sinAcceso();
+        }
+
+        return response()->json([
+            'reputacion' => Reputacion::resumen(Reputacion::NEGOCIO, $negocio),
+            'tiempo_preparacion' => $negocio->tiempo_preparacion,
+            'eventos' => Reputacion::historial(Reputacion::NEGOCIO, $negocio),
+        ]);
+    }
+
+    /**
      * Actualizar un negocio. Solo el PROPIETARIO puede editar los datos del
      * negocio (los trabajadores gestionan catálogo y pedidos, no esto).
      */
@@ -106,6 +126,8 @@ class NegocioController extends Controller
             'direccion' => ['nullable', 'string', 'max:255'],
             'telefono' => ['nullable', 'string', 'max:30'],
             'activo' => ['sometimes', 'boolean'],
+            // Tiempo promedio que promete para tener listo un pedido (minutos).
+            'tiempo_preparacion' => ['sometimes', 'integer', 'min:5', 'max:180'],
             'imagen' => ['sometimes', 'image', 'max:4096'],
         ]);
 

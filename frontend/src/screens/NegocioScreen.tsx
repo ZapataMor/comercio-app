@@ -15,6 +15,7 @@ import { useCart } from '../CartContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import { useFlyToCart } from '../components/FlyToCart';
 import Icon from '../components/Icon';
+import { NivelBadge } from '../components/Reputacion';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
 
@@ -165,6 +166,16 @@ export default function NegocioScreen({ route }: Props) {
                 <Text style={negocio.activo ? styles.heroEstadoAbierto : styles.heroEstadoCerrado}>
                   {negocio.activo ? 'Abierto' : 'Cerrado'}
                 </Text>
+                {/* Nivel de confiabilidad y tiempo que promete en preparar. */}
+                <View style={styles.heroDato}>
+                  <NivelBadge reputacion={negocio.reputacion} />
+                  {!!negocio.tiempo_preparacion && (
+                    <>
+                      <Icon name="reloj" size={13} color="rgba(255,255,255,0.78)" />
+                      <Text style={styles.heroDatoTxt}>~{negocio.tiempo_preparacion} min</Text>
+                    </>
+                  )}
+                </View>
                 {!!negocio.direccion && (
                   <View style={styles.heroDato}>
                     <Icon name="ubicacion" size={13} color="rgba(255,255,255,0.78)" />

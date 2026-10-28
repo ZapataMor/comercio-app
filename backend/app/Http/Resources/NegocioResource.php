@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Support\Reputacion;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -31,6 +32,8 @@ class NegocioResource extends JsonResource
             // Ruta relativa servida por el symlink storage (ej "/storage/negocios/x.jpg")
             // o null. La app le antepone la API_URL para formar la URL completa.
             'imagen' => $this->imagen ? '/storage/'.$this->imagen : null,
+            'tiempo_preparacion' => $this->tiempo_preparacion,
+            'reputacion' => Reputacion::resumen(Reputacion::NEGOCIO, $this->resource),
         ];
     }
 }

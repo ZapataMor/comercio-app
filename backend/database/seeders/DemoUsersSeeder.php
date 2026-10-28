@@ -8,7 +8,7 @@ use Illuminate\Database\Seeder;
 class DemoUsersSeeder extends Seeder
 {
     /**
-     * Crea un usuario de prueba por cada rol, todos con la MISMA contraseña
+     * Crea usuarios de prueba (uno por rol + un dueño de negocio), todos con la MISMA contraseña
      * conocida ("password123") para poder probar el login y ver la "vista"
      * de cada tipo de usuario.
      *
@@ -18,7 +18,8 @@ class DemoUsersSeeder extends Seeder
     {
         $usuarios = [
             ['administrador', 'Admin Demo', 'admin@demo.co'],
-            ['comerciante', 'Comerciante Demo', 'comerciante@demo.co'],
+            // Cliente que además administra "El Rincón Paisa" (ver CatalogoDemoSeeder).
+            ['usuario', 'Comerciante Demo', 'comerciante@demo.co'],
             ['domiciliario', 'Domiciliario Demo', 'domiciliario@demo.co'],
             ['usuario', 'Cliente Demo', 'cliente@demo.co'],
         ];

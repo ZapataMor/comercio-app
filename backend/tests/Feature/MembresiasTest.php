@@ -9,7 +9,7 @@ use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
 
 beforeEach(function () {
-    foreach (['administrador', 'comerciante', 'usuario', 'domiciliario'] as $rol) {
+    foreach (['administrador', 'usuario', 'domiciliario'] as $rol) {
         Role::findOrCreate($rol, 'web');
     }
     Notification::fake();

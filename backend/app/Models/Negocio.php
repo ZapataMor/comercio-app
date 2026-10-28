@@ -14,6 +14,7 @@ class Negocio extends Model
     /** Valores por defecto a nivel de modelo (coinciden con la migración). */
     protected $attributes = [
         'activo' => true,
+        'tiempo_preparacion' => 20,
     ];
 
     protected $fillable = [
@@ -23,12 +24,19 @@ class Negocio extends Model
         'direccion',
         'telefono',
         'activo',
+        // Minutos que promete tardar en tener listo un pedido. La reputación
+        // (reputacion, vetado_at...) NO es asignable: la maneja Support\Reputacion.
+        'tiempo_preparacion',
     ];
 
     protected function casts(): array
     {
         return [
             'activo' => 'boolean',
+            'tiempo_preparacion' => 'integer',
+            'reputacion' => 'integer',
+            'reputacion_pedidos' => 'integer',
+            'vetado_at' => 'datetime',
         ];
     }
 
@@ -117,6 +125,12 @@ class Negocio extends Model
     public function tiposNegocio(): BelongsToMany
     {
         return $this->belongsToMany(TipoNegocio::class, 'negocio_tipo_negocio');
+    }
+
+    /** ¿Vetado por baja reputación? No aparece ni recibe pedidos. */
+    public function estaVetado(): bool
+    {
+        return $this->vetado_at !== null;
     }
 
     /** Pedidos recibidos por este negocio. */

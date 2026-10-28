@@ -1,10 +1,20 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
-import { ComercioPedido, getPedidosComercio, marcarPedidoListo } from '../api';
+import { ActivityIndicator, Alert, ScrollView, Text, View } from 'react-native';
+import {
+  cancelarPedidoNegocio,
+  ComercioPedido,
+  confirmarDinero,
+  DineroEstado,
+  getPedidoNegocio,
+  marcarPedidoListo,
+} from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
+import BotonesContacto from '../components/BotonesContacto';
 import Icon from '../components/Icon';
+import MotivoCancelacion from '../components/MotivoCancelacion';
+import { NivelBadge } from '../components/Reputacion';
 import { useNegocio } from '../NegocioContext';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
@@ -35,18 +45,31 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
       return;
     }
 
-    getPedidosComercio(token, negocioId)
-      .then(pedidos => {
-        const encontrado = pedidos.find(p => p.id === route.params.pedidoId);
-        if (encontrado) {
-          setPedido(encontrado);
-        } else {
-          toast.error('Pedido no encontrado', 'Actualiza la lista de pedidos.');
-        }
-      })
+    getPedidoNegocio(token, negocioId, route.params.pedidoId)
+      .then(setPedido)
       .catch(e => toast.error('No se pudo cargar', e instanceof Error ? e.message : 'Error'))
       .finally(() => setCargando(false));
   }, [pedido, route.params.pedidoId, negocioId, toast, token]);
+
+  // Rechazar (pendiente) o cancelar (listo y nadie lo tomó), con motivo.
+  const [cancelando, setCancelando] = useState(false);
+  const [enviandoCancelacion, setEnviandoCancelacion] = useState(false);
+
+  async function confirmarCancelacion(motivo: string) {
+    if (!pedido || !negocioId) return;
+    setEnviandoCancelacion(true);
+    try {
+      await cancelarPedidoNegocio(token, negocioId, pedido.id, motivo);
+      setCancelando(false);
+      toast.exito('Pedido cancelado', 'Le avisamos al cliente.');
+      navigation.goBack();
+    } catch (e) {
+      setCancelando(false);
+      toast.error('No se pudo cancelar', e instanceof Error ? e.message : 'Error');
+    } finally {
+      setEnviandoCancelacion(false);
+    }
+  }
 
   async function onListo() {
     if (!pedido || !negocioId) {
@@ -61,6 +84,37 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
       toast.error('No se pudo', e instanceof Error ? e.message : 'Error');
       setEnviando(false);
     }
+  }
+
+  async function enviarDinero(estado: DineroEstado) {
+    if (!pedido || !negocioId) {
+      return;
+    }
+    try {
+      const msg = await confirmarDinero(token, negocioId, pedido.id, estado);
+      setPedido({ ...pedido, dinero_estado: estado, puede_confirmar_dinero: false });
+      toast.exito('Registrado', msg);
+    } catch (e) {
+      toast.error('No se pudo', e instanceof Error ? e.message : 'Error');
+    }
+  }
+
+  function onDinero(estado: DineroEstado) {
+    if (estado === 'recibido') {
+      enviarDinero(estado);
+      return;
+    }
+    // Acusar al domiciliario le baja mucho la confiabilidad: se confirma.
+    Alert.alert(
+      estado === 'no_recibido' ? '¿No te entregó el dinero?' : '¿Te entregó menos dinero?',
+      estado === 'no_recibido'
+        ? 'Es una falta grave: le baja mucho el nivel al domiciliario y, si se repite, queda vetado.'
+        : 'Le bajará el nivel de confiabilidad al domiciliario.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Sí, reportar', style: 'destructive', onPress: () => enviarDinero(estado) },
+      ],
+    );
   }
 
   if (cargando) {
@@ -107,6 +161,13 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
               <Text style={styles.linea}>{pedido.telefono_contacto}</Text>
             </View>
           )}
+          {pedido.estado !== 'cancelado' && pedido.estado !== 'entregado' && (
+            <BotonesContacto
+              telefono={pedido.telefono_contacto}
+              mensaje={`Hola, te escribimos de ${negocio?.nombre ?? 'tu tienda'} por tu pedido #${pedido.id} de Vitrina.`}
+              etiquetaLlamar="Llamar al cliente"
+            />
+          )}
           <View style={styles.filaInfo}>
             <Icon name="tarjeta" size={15} color={c.text} />
             <Text style={styles.linea}>Pago: {pedido.metodo_pago}</Text>
@@ -115,6 +176,27 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
             <View style={styles.filaInfo}>
               <Icon name="moto" size={15} color={c.text} />
               <Text style={styles.linea}>Domiciliario: {pedido.domiciliario}</Text>
+              <NivelBadge reputacion={pedido.domiciliario_reputacion} />
+            </View>
+          )}
+          <BotonesContacto
+            telefono={pedido.domiciliario_telefono}
+            mensaje={`Hola, te escribimos de ${negocio?.nombre ?? 'la tienda'} por el pedido #${pedido.id}.`}
+            etiquetaLlamar="Llamar al domiciliario"
+          />
+          {pedido.estado === 'cancelado' && (
+            <View style={styles.novedad}>
+              <Icon name="cerrar" size={15} color={c.danger} />
+              <Text style={[styles.novedadTxt, { color: c.danger }]}>
+                {pedido.cancelado_por === 'cliente' ? 'El cliente lo canceló' : 'Lo cancelaron ustedes'}
+                {pedido.motivo_cancelacion ? `: ${pedido.motivo_cancelacion}` : '.'}
+              </Text>
+            </View>
+          )}
+          {!!pedido.novedad && pedido.estado !== 'entregado' && (
+            <View style={styles.novedad}>
+              <Icon name="alerta" size={15} color={c.warning} />
+              <Text style={styles.novedadTxt}>Novedad del domiciliario: {pedido.novedad}</Text>
             </View>
           )}
         </View>
@@ -129,11 +211,68 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
           ))}
         </View>
 
+        {pedido.subtotal != null && (
+          <View style={styles.desglose}>
+            <Text style={styles.linea}>Productos (para el negocio): {cop(pedido.subtotal)}</Text>
+            <Text style={styles.linea}>Domicilio: {cop(pedido.costo_domicilio ?? 0)}</Text>
+          </View>
+        )}
         <View style={styles.totalRow}>
-          <Text style={styles.totalLabel}>Total</Text>
+          <Text style={styles.totalLabel}>Total que paga el cliente</Text>
           <Text style={styles.totalValor}>{cop(pedido.total)}</Text>
         </View>
       </FadeInView>
+
+      <MotivoCancelacion
+        visible={cancelando}
+        titulo={pedido.estado === 'pendiente' ? 'Rechazar pedido' : 'Cancelar pedido'}
+        explicacion="El cliente verá el motivo y recibirá un aviso. No se le cobra nada."
+        motivos={pedido.motivos_cancelacion ?? []}
+        textoBoton={pedido.estado === 'pendiente' ? 'Rechazar pedido' : 'Cancelar pedido'}
+        enviando={enviandoCancelacion}
+        onCerrar={() => setCancelando(false)}
+        onConfirmar={confirmarCancelacion}
+      />
+
+      {/* Efectivo: el negocio dice si el domiciliario le entregó el dinero
+          (sube o baja su nivel de confiabilidad). */}
+      {pedido.puede_confirmar_dinero ? (
+        <FadeInView delay={60} style={[styles.card, styles.dineroCard]}>
+          <View style={styles.filaInfo}>
+            <Icon name="efectivo" size={18} color={c.accent} />
+            <Text style={styles.dineroTitulo}>¿{pedido.domiciliario} te entregó los {cop(pedido.total)}?</Text>
+          </View>
+          <Text style={styles.dineroSub}>Respóndelo cuando te pague. Afecta su nivel de confiabilidad.</Text>
+          <View style={styles.dineroFila}>
+            <PressableScale style={[styles.dineroBtn, { backgroundColor: c.success }]} onPress={() => onDinero('recibido')}>
+              <Text style={styles.dineroBtnTxt}>Sí, completo</Text>
+            </PressableScale>
+          </View>
+          <View style={styles.dineroFila}>
+            <PressableScale style={[styles.dineroBtn, styles.dineroBtnBorde]} onPress={() => onDinero('incompleto')}>
+              <Text style={[styles.dineroBtnTxt, { color: c.warning }]}>Incompleto</Text>
+            </PressableScale>
+            <PressableScale style={[styles.dineroBtn, styles.dineroBtnBorde]} onPress={() => onDinero('no_recibido')}>
+              <Text style={[styles.dineroBtnTxt, { color: c.danger }]}>No me lo entregó</Text>
+            </PressableScale>
+          </View>
+        </FadeInView>
+      ) : pedido.dinero_estado ? (
+        <View style={styles.filaNota}>
+          <Icon
+            name={pedido.dinero_estado === 'recibido' ? 'check' : 'alerta'}
+            size={16}
+            color={pedido.dinero_estado === 'recibido' ? c.success : c.danger}
+          />
+          <Text style={[styles.nota, styles.notaInline]}>
+            {pedido.dinero_estado === 'recibido'
+              ? 'Dinero recibido completo'
+              : pedido.dinero_estado === 'incompleto'
+                ? 'Reportaste dinero incompleto'
+                : 'Reportaste que no te entregó el dinero'}
+          </Text>
+        </View>
+      ) : null}
 
       {pedido.estado === 'pendiente' ? (
         <PressableScale style={styles.btn} onPress={onListo} disabled={enviando}>
@@ -153,11 +292,19 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
           <Icon name="check" size={16} color={c.success} />
           <Text style={[styles.nota, styles.notaInline, { color: c.success }]}>Entregado al cliente</Text>
         </View>
-      ) : (
+      ) : pedido.estado === 'cancelado' ? null : (
         <View style={styles.filaNota}>
           <Icon name="moto" size={16} color={c.muted} />
           <Text style={[styles.nota, styles.notaInline]}>{pedido.estado_label}</Text>
         </View>
+      )}
+
+      {pedido.puede_cancelar && (
+        <PressableScale style={styles.btnRechazar} onPress={() => setCancelando(true)}>
+          <Text style={styles.btnRechazarTxt}>
+            {pedido.estado === 'pendiente' ? 'Rechazar pedido' : 'Cancelar (nadie lo ha tomado)'}
+          </Text>
+        </PressableScale>
       )}
     </ScrollView>
   );
@@ -180,6 +327,12 @@ const useStyles = makeStyles((c, shadow) => ({
   itemRow: { flexDirection: 'row', marginTop: 4 },
   itemCant: { fontFamily: font.bold, color: c.goldText, width: 36 },
   itemNombre: { color: c.text, fontSize: 15, flex: 1, fontFamily: font.regular },
+  desglose: { borderTopWidth: 1, borderTopColor: c.border, paddingTop: 10, marginTop: 12, gap: 2 },
+  btnRechazar: {
+    marginTop: 14, borderWidth: 1, borderColor: c.danger, borderRadius: radius.md,
+    paddingVertical: 13, alignItems: 'center',
+  },
+  btnRechazarTxt: { color: c.danger, fontFamily: font.bold, fontSize: 15 },
   totalRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     borderTopWidth: 1, borderTopColor: c.border, paddingTop: 14, marginTop: 14,
@@ -189,4 +342,16 @@ const useStyles = makeStyles((c, shadow) => ({
   btn: { backgroundColor: c.brand, borderRadius: radius.md, paddingVertical: 16, alignItems: 'center', marginTop: 16, ...shadow.soft },
   btnTxt: { color: c.onBrand, fontFamily: font.bold, fontSize: 16 },
   nota: { textAlign: 'center', color: c.muted, marginTop: 16, fontSize: 14, fontFamily: font.regular },
+  novedad: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: c.warningSoft,
+    borderRadius: radius.sm, padding: 10, marginTop: 10,
+  },
+  novedadTxt: { flex: 1, color: c.warning, fontSize: 13, fontFamily: font.medium },
+  dineroCard: { marginTop: 14, borderWidth: 1, borderColor: c.accentSoft },
+  dineroTitulo: { flex: 1, fontFamily: font.bold, color: c.textStrong, fontSize: 15 },
+  dineroSub: { color: c.muted, fontSize: 13, marginTop: 6, fontFamily: font.regular },
+  dineroFila: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  dineroBtn: { flex: 1, borderRadius: radius.sm, paddingVertical: 12, alignItems: 'center' },
+  dineroBtnBorde: { borderWidth: 1, borderColor: c.borderStrong },
+  dineroBtnTxt: { color: c.onBrand, fontFamily: font.bold },
 }));

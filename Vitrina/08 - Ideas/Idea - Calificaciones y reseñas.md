@@ -1,11 +1,16 @@
 ---
 title: Idea - Calificaciones y reseñas
 tags: [idea]
-estado: semilla
+estado: hecho
 impacto: medio
 esfuerzo: medio
-actualizado: 2026-06-28
+actualizado: 2026-10-28
 ---
+
+> ✅ **Hecho el 2026-10-28** como *nivel de confiabilidad* (más que estrellas): puntaje 0–100 para negocios
+> y domiciliarios, alimentado por la calificación del cliente, los tiempos que cada uno promete y la
+> confirmación del dinero en efectivo; con veto automático. Detalle técnico en
+> `backend/ESTADO_DEL_PROYECTO.md` (sección 6) y `backend/app/Support/Reputacion.php`.
 
 # 💡 Calificaciones y reseñas
 

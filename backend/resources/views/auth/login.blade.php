@@ -5,8 +5,8 @@
 @section('contenido')
 <div class="max-w-sm mx-auto mt-10">
     <div class="bg-white rounded-2xl shadow p-6">
-        <h1 class="text-xl font-bold text-center mb-1">🛒 Mi Comercio</h1>
-        <p class="text-center text-slate-500 text-sm mb-6">Entra a tu panel</p>
+        <h1 class="text-xl font-bold text-center mb-1">Vitrina</h1>
+        <p class="text-center text-slate-500 text-sm mb-6">Panel del administrador</p>
 
         @if ($errors->any())
             <div class="mb-4 rounded-lg bg-red-100 text-red-800 px-4 py-2 text-sm">
@@ -20,7 +20,7 @@
                 <label class="block text-sm font-medium mb-1">Correo</label>
                 <input type="email" name="email" value="{{ old('email') }}" required autofocus
                        class="w-full rounded-lg border-slate-300 border px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                       placeholder="comerciante@demo.co">
+                       placeholder="admin@demo.co">
             </div>
             <div>
                 <label class="block text-sm font-medium mb-1">Contraseña</label>
@@ -37,7 +37,7 @@
         </form>
 
         <p class="text-center text-xs text-slate-400 mt-4">
-            Demo: comerciante@demo.co / password123
+            Demo: admin@demo.co / password123
         </p>
     </div>
 </div>

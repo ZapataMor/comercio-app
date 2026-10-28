@@ -31,12 +31,14 @@ import MisNegociosScreen from './src/screens/MisNegociosScreen';
 import MisProductosScreen from './src/screens/MisProductosScreen';
 import EquipoScreen from './src/screens/EquipoScreen';
 import ComercioPedidoDetalleScreen from './src/screens/ComercioPedidoDetalleScreen';
+import PedidosNegocioScreen from './src/screens/PedidosNegocioScreen';
 import ExplorarScreen from './src/screens/ExplorarScreen';
 import NegocioScreen from './src/screens/NegocioScreen';
 import AdminTableroScreen from './src/screens/AdminTableroScreen';
 import AdminUsuariosScreen from './src/screens/AdminUsuariosScreen';
 import AdminNegociosScreen from './src/screens/AdminNegociosScreen';
 import AdminBarriosScreen from './src/screens/AdminBarriosScreen';
+import AdminReputacionScreen from './src/screens/AdminReputacionScreen';
 import DomiciliarioScreen from './src/screens/DomiciliarioScreen';
 import CarritoScreen from './src/screens/CarritoScreen';
 import CheckoutScreen from './src/screens/CheckoutScreen';
@@ -164,6 +166,7 @@ function Navegacion() {
               component={ComercioPedidoDetalleScreen}
               options={{ title: 'Pedido' }}
             />
+            <Stack.Screen name="PedidosNegocio" component={PedidosNegocioScreen} options={{ title: 'Pedidos' }} />
 
             {roles.includes('administrador') && (
               <>
@@ -171,6 +174,11 @@ function Navegacion() {
                 <Stack.Screen name="AdminUsuarios" component={AdminUsuariosScreen} options={{ title: 'Usuarios' }} />
                 <Stack.Screen name="AdminNegocios" component={AdminNegociosScreen} options={{ title: 'Negocios' }} />
                 <Stack.Screen name="AdminBarrios" component={AdminBarriosScreen} options={{ title: 'Barrios sugeridos' }} />
+                <Stack.Screen
+                  name="AdminReputacion"
+                  component={AdminReputacionScreen}
+                  options={{ title: 'Confiabilidad' }}
+                />
               </>
             )}
 

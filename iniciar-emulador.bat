@@ -57,8 +57,11 @@ if not errorlevel 1 (
 )
 
 REM ---- 2. API y 3. Metro ----
-echo   [2/4] API Laravel        -^> puerto 8000
+echo   [2/4] API Laravel        -^> puerto 8000 ^(+ cola y tareas^)
 start "API - Laravel"  /D "%RAIZ%backend"  cmd /k php artisan serve --port=8000
+REM La cola envia los push; schedule:work corre las tareas programadas (horarios).
+start "Cola - Laravel"  /D "%RAIZ%backend"  cmd /k php artisan queue:work --tries=3
+start "Tareas - Laravel"  /D "%RAIZ%backend"  cmd /k php artisan schedule:work
 
 echo   [3/4] Metro React Native -^> puerto 8081
 start "Metro - React Native"  /D "%RAIZ%frontend"  cmd /k npm start
@@ -85,9 +88,9 @@ if errorlevel 1 (
 )
 
 echo.
-echo   Listo. Deja abiertas las ventanas del emulador, la API y Metro.
+echo   Listo. Deja abiertas las ventanas del emulador, la API, la cola, las tareas y Metro.
 echo.
-echo   - Web del PC: http://localhost:8000
+echo   - Panel admin web: http://localhost:8000
 echo   - Recargar la app: pulsa R dos veces en el emulador ^(o r en Metro^).
 echo.
 echo   Solo si tocaste android/ o instalaste una libreria nativa:

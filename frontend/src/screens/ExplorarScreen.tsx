@@ -23,6 +23,7 @@ import {
 import { useAuth } from '../AuthContext';
 import { CardSkeletons, Desplegable, FadeInView, PressableScale } from '../components/anim';
 import Icon from '../components/Icon';
+import { NivelBadge } from '../components/Reputacion';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
 
@@ -346,6 +347,16 @@ const CardNegocio = React.memo(function CardNegocio({
             <Text style={styles.dir}>{item.direccion}</Text>
           </View>
         )}
+        {/* Nivel de confiabilidad y tiempo que promete en preparar. */}
+        <View style={[styles.reputacionFila, styles.filaAccion]}>
+          <NivelBadge reputacion={item.reputacion} />
+          {!!item.tiempo_preparacion && (
+            <>
+              <Icon name="reloj" size={13} color={c.mutedSoft} />
+              <Text style={styles.tiempoTxt}>Prepara en ~{item.tiempo_preparacion} min</Text>
+            </>
+          )}
+        </View>
 
         <Desplegable abierto={expandida}>
           {categoriasNegocio(item).length > 0 && (
@@ -418,6 +429,8 @@ const useStyles = makeStyles((c, shadow) => ({
   desc: { color: c.muted, marginTop: 10, fontFamily: font.regular },
   dir: { color: c.mutedSoft, fontSize: 12, marginTop: 8, fontFamily: font.regular },
   categoriaFila: { marginTop: 7 },
+  reputacionFila: { marginTop: 8 },
+  tiempoTxt: { color: c.mutedSoft, fontSize: 12, fontFamily: font.regular },
   categoriaTxt: { color: c.goldText, fontFamily: font.semibold, fontSize: 13 },
   categoriasChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   categoriaChip: {

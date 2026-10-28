@@ -16,7 +16,7 @@ use Illuminate\Validation\Rule;
  */
 class AdminController extends Controller
 {
-    private const ROLES = ['administrador', 'comerciante', 'usuario', 'domiciliario'];
+    private const ROLES = ['administrador', 'usuario', 'domiciliario'];
 
     /** Tablero con números generales. */
     public function index(): View

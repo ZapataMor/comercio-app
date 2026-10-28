@@ -5,6 +5,7 @@ import { ActivityIndicator, FlatList, RefreshControl, Text, View } from 'react-n
 import { getMisPedidos, MiPedido } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
+import Icon from '../components/Icon';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
 
@@ -78,6 +79,12 @@ export default function MisPedidosScreen({ navigation }: Props) {
                   {item.estado_label}
                 </Text>
                 <Text style={styles.total}>{cop(item.total)}</Text>
+                {item.por_calificar && (
+                  <View style={styles.calificar}>
+                    <Icon name="escudo" size={12} color={c.onAccent} strokeWidth={2} />
+                    <Text style={styles.calificarTxt}>Califica</Text>
+                  </View>
+                )}
               </View>
             </PressableScale>
           </FadeInView>
@@ -97,5 +104,10 @@ const useStyles = makeStyles((c, shadow) => ({
   fecha: { color: c.mutedSoft, fontSize: 12, marginTop: 2, fontFamily: font.regular },
   badge: { fontSize: 11, fontFamily: font.bold, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, overflow: 'hidden' },
   total: { fontFamily: font.bold, marginTop: 4, color: c.textStrong },
+  calificar: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, backgroundColor: c.accent,
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill,
+  },
+  calificarTxt: { color: c.onAccent, fontSize: 11, fontFamily: font.bold },
   vacio: { textAlign: 'center', color: c.muted, marginTop: 40, fontFamily: font.regular },
 }));

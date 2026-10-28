@@ -2,18 +2,18 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
     /**
      * Seed the application's database.
      */
     public function run(): void
     {
+        // Sin WithoutModelEvents: los hooks de los modelos generan el código
+        // público de cada usuario y la membresía del dueño de cada negocio.
+
         // Primero los roles, para poder asignarlos a los usuarios.
         $this->call(RoleSeeder::class);
 

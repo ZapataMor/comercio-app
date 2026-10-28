@@ -15,7 +15,7 @@ Backlog conceptual. No son compromisos: son semillas. Cada una con impacto y esf
 | [[Idea - Seguimiento del domiciliario]] | semilla | alto | alto |
 | [[Idea - Mapa en tiempo real]] | semilla | alto | alto |
 | [[Idea - Busqueda semantica]] | semilla | alto | alto |
-| [[Idea - Calificaciones y reseñas]] | semilla | medio | medio |
+| [[Idea - Calificaciones y reseñas]] | hecho (2026-10-28) | medio | medio |
 | [[Idea - Pagos en linea]] | semilla | alto | alto |
 
 ## Decisiones (ADR)

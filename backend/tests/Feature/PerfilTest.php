@@ -7,7 +7,7 @@ use Spatie\Permission\Models\Role;
 
 // Antes de cada test: crear los 4 roles (la BD se reinicia en cada test).
 beforeEach(function () {
-    foreach (['administrador', 'comerciante', 'usuario', 'domiciliario'] as $rol) {
+    foreach (['administrador', 'usuario', 'domiciliario'] as $rol) {
         Role::findOrCreate($rol, 'web');
     }
 });
@@ -100,19 +100,19 @@ test('a un cliente se le exigen dirección, barrio y teléfono', function () {
         ->assertJsonValidationErrors(['direccion', 'barrio', 'telefono']);
 });
 
-test('un comerciante puede actualizar sin datos de contacto', function () {
-    $user = usuarioPerfil('comerciante');
+test('quien no es cliente (domiciliario) puede actualizar sin datos de contacto', function () {
+    $user = usuarioPerfil('domiciliario');
 
     $this->putJson('/api/perfil', ['name' => 'Solo Nombre', 'email' => $user->email])
         ->assertOk();
 });
 
 test('el perfil conserva los roles del usuario', function () {
-    usuarioPerfil('comerciante');
+    usuarioPerfil('domiciliario');
 
-    $this->putJson('/api/perfil', ['name' => 'Comerciante', 'email' => 'c@c.com'])
+    $this->putJson('/api/perfil', ['name' => 'Domiciliario', 'email' => 'd@d.com'])
         ->assertOk()
-        ->assertJsonPath('user.roles.0', 'comerciante');
+        ->assertJsonPath('user.roles.0', 'domiciliario');
 });
 
 test('no se puede usar el email de otro usuario', function () {

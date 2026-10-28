@@ -30,6 +30,12 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'terminos_aceptados_at' => 'datetime',
+            'suspendido_at' => 'datetime',
+            'eliminado_at' => 'datetime',
+            'reputacion_domiciliario' => 'integer',
+            'reputacion_domiciliario_pedidos' => 'integer',
+            'domiciliario_vetado_at' => 'datetime',
         ];
     }
 
@@ -72,7 +78,8 @@ class User extends Authenticatable
 
     /**
      * El negocio del que este usuario es dueño "original" (negocios.user_id).
-     * Se mantiene para el panel web legado; la app usa negocios() (membresías).
+     * Solo para seeders y tests (crear un negocio con su creador); la
+     * autorización siempre va por negocios() (membresías).
      */
     public function negocio(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
@@ -103,12 +110,6 @@ class User extends Authenticatable
         return $this->hasMany(InvitacionTrabajo::class);
     }
 
-    /** Ítems en el carrito de compras (cuando es cliente). */
-    public function carritoItems(): \Illuminate\Database\Eloquent\Relations\HasMany
-    {
-        return $this->hasMany(CarritoItem::class);
-    }
-
     /** Pedidos que ha hecho como cliente. */
     public function pedidos(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
@@ -119,6 +120,12 @@ class User extends Authenticatable
     public function clienteDirecciones(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(ClienteDireccion::class);
+    }
+
+    /** ¿Vetado como domiciliario por baja reputación? No puede tomar pedidos. */
+    public function domiciliarioVetado(): bool
+    {
+        return $this->domiciliario_vetado_at !== null;
     }
 
     /** Pedidos que lleva como domiciliario. */

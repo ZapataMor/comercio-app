@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Middleware\CuentaActiva;
 use App\Models\Barrio;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -32,6 +33,10 @@ class AuthController extends Controller
             'direccion' => ['required', 'string', 'max:255'],
             'barrio' => ['required', 'string', 'max:120'],
             'telefono' => ['required', 'string', 'max:30'],
+            // Autorización previa del tratamiento de datos (Ley 1581 de 2012).
+            'acepta_terminos' => ['accepted'],
+        ], [
+            'acepta_terminos.accepted' => 'Debes aceptar la política de privacidad para crear la cuenta.',
         ]);
 
         $user = DB::transaction(function () use ($data) {
@@ -44,6 +49,8 @@ class AuthController extends Controller
                 'barrio' => $data['barrio'],
                 'telefono' => $data['telefono'],
             ]);
+            // Prueba de cuándo autorizó el tratamiento de sus datos.
+            $user->forceFill(['terminos_aceptados_at' => now()])->save();
 
             $user->assignRole('usuario');
 
@@ -87,6 +94,12 @@ class AuthController extends Controller
             ]);
         }
 
+        if ($user->suspendido_at !== null) {
+            throw ValidationException::withMessages([
+                'email' => [CuentaActiva::mensajeSuspension($user)],
+            ]);
+        }
+
         $token = $user->createToken('api')->plainTextToken;
 
         return response()->json([
@@ -105,8 +118,8 @@ class AuthController extends Controller
     public function actualizarPerfil(Request $request): JsonResponse
     {
         $user = $request->user();
-        // Modelo unificado: todos son clientes; las cuentas viejas de
-        // "comerciante" pueden no tener aún datos de contacto guardados.
+        // Los clientes necesitan sus datos de contacto para los pedidos; las
+        // cuentas creadas por un admin (domiciliario, admin) pueden no tenerlos.
         $esCliente = $user->hasRole('usuario');
 
         $data = $request->validate([

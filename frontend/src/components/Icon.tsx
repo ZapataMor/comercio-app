@@ -32,7 +32,9 @@ export type IconName =
   | 'chevron'
   | 'lista'
   | 'lupa'
-  | 'reloj';
+  | 'reloj'
+  | 'escudo'
+  | 'alerta';
 
 const GLYPHS: Record<IconName, React.ReactNode> = {
   casa: (
@@ -180,6 +182,20 @@ const GLYPHS: Record<IconName, React.ReactNode> = {
     <>
       <Circle cx="12" cy="12" r="9" />
       <Path d="M12 7.5V12l3 2" />
+    </>
+  ),
+  // Confiabilidad (reputación de negocios y domiciliarios).
+  escudo: (
+    <>
+      <Path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V6L12 3z" />
+      <Path d="M8.8 12.2l2.2 2.2 4.2-4.4" />
+    </>
+  ),
+  alerta: (
+    <>
+      <Path d="M10.3 4.1 2.6 17.5a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 4.1a2 2 0 0 0-3.4 0z" />
+      <Path d="M12 9.5v4" />
+      <Path d="M12 17h.01" />
     </>
   ),
 };

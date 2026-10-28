@@ -32,6 +32,8 @@ import { useAuth } from '../AuthContext';
 import { PressableScale } from '../components/anim';
 import FieldError from '../components/FieldError';
 import { marca, ModoVitrina, useModoVitrina } from '../components/Logo';
+import RecuperarClaveModal from '../components/RecuperarClaveModal';
+import { useToast } from '../Toast';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
 import { font, paletas, radius } from '../theme';
@@ -436,6 +438,9 @@ export default function LoginScreen({ navigation }: Props) {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errores, setErrores] = useState<FieldErrors>({});
+  // "¿Olvidaste tu contraseña?" abierto.
+  const [recuperando, setRecuperando] = useState(false);
+  const toast = useToast();
   // Tamaño de la pantalla. La escena guarda el alto completo: al abrir el
   // teclado la pantalla se encoge y el skyline queda oculto debajo (como en
   // el diseño), en vez de subir.
@@ -771,6 +776,9 @@ export default function LoginScreen({ navigation }: Props) {
               </Animated.View>
 
               <Animated.View style={bloque(3)}>
+                <TouchableOpacity onPress={() => setRecuperando(true)} disabled={cargando}>
+                  <Text style={[styles.olvide, e.textoAcento]}>¿Olvidaste tu contraseña?</Text>
+                </TouchableOpacity>
                 <TouchableOpacity onPress={() => navigation.navigate('Register')} disabled={cargando}>
                   <Text style={[styles.registro, e.textoAcento]}>¿No tienes cuenta? Regístrate</Text>
                 </TouchableOpacity>
@@ -780,6 +788,19 @@ export default function LoginScreen({ navigation }: Props) {
           </View>
         </KeyboardAvoidingView>
       </View>
+      <RecuperarClaveModal
+        visible={recuperando}
+        emailInicial={email}
+        onCerrar={() => setRecuperando(false)}
+        onListo={(correo, mensaje) => {
+          setRecuperando(false);
+          setEmail(correo);
+          setPassword('');
+          setErrores({});
+          setError(null);
+          toast.exito('Contraseña cambiada', mensaje);
+        }}
+      />
     </View>
   );
 }
@@ -892,10 +913,16 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     fontSize: 13,
   },
+  olvide: {
+    textAlign: 'center',
+    fontSize: 13,
+    marginTop: 14,
+    fontFamily: font.medium,
+  },
   registro: {
     textAlign: 'center',
     fontSize: 14,
-    marginTop: 16,
+    marginTop: 12,
     fontFamily: font.semibold,
   },
   hint: {

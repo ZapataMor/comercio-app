@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   ScrollView,
   StatusBar,
@@ -16,7 +17,9 @@ import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import BarrioSelect from '../components/BarrioSelect';
 import FieldError from '../components/FieldError';
+import Icon from '../components/Icon';
 import { VitrinaMark } from '../components/Logo';
+import { WEB_URL } from '../config';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
@@ -39,6 +42,8 @@ export default function RegisterScreen({ navigation }: Props) {
   const [direccion, setDireccion] = useState('');
   const [barrio, setBarrio] = useState('');
   const [telefono, setTelefono] = useState('');
+  // Autorización del tratamiento de datos (Ley 1581): casilla sin marcar por defecto.
+  const [aceptaTerminos, setAceptaTerminos] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errores, setErrores] = useState<FieldErrors>({});
@@ -63,6 +68,9 @@ export default function RegisterScreen({ navigation }: Props) {
     if (!direccion.trim()) nuevosErrores.direccion = 'El campo direccion es obligatorio.';
     if (!barrio.trim()) nuevosErrores.barrio = 'El campo barrio es obligatorio.';
     if (!telefono.trim()) nuevosErrores.telefono = 'El campo telefono es obligatorio.';
+    if (!aceptaTerminos) {
+      nuevosErrores.acepta_terminos = 'Debes aceptar la política de privacidad para crear la cuenta.';
+    }
     if (Object.keys(nuevosErrores).length > 0) {
       setErrores(nuevosErrores);
       return;
@@ -86,6 +94,7 @@ export default function RegisterScreen({ navigation }: Props) {
         direccion: direccion.trim(),
         barrio: barrio.trim(),
         telefono: telefono.trim(),
+        acepta_terminos: aceptaTerminos,
       });
       guardarSesion(token, user);
     } catch (e) {
@@ -235,6 +244,29 @@ export default function RegisterScreen({ navigation }: Props) {
           />
           <FieldError mensaje={errores.telefono} />
 
+          <View style={styles.terminosRow}>
+            <TouchableOpacity
+              style={[styles.casilla, aceptaTerminos && styles.casillaMarcada]}
+              onPress={() => {
+                setAceptaTerminos(v => !v);
+                limpiarError('acepta_terminos');
+              }}
+              disabled={cargando}
+              hitSlop={8}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: aceptaTerminos }}>
+              {aceptaTerminos && <Icon name="check" size={14} color={c.onAccent} />}
+            </TouchableOpacity>
+            <Text style={styles.terminosTxt}>
+              Acepto la{' '}
+              <Text style={styles.enlace} onPress={() => Linking.openURL(`${WEB_URL}/privacidad`)}>
+                política de privacidad
+              </Text>{' '}
+              y autorizo el tratamiento de mis datos para gestionar mis pedidos.
+            </Text>
+          </View>
+          <FieldError mensaje={errores.acepta_terminos} />
+
           <Text style={styles.nota}>¿Tienes un negocio? Créalo después desde "Mis negocios".</Text>
 
           <PressableScale
@@ -282,6 +314,14 @@ const useStyles = makeStyles((c, shadow) => ({
     color: c.textStrong,
   },
   nota: { fontSize: 12, color: c.muted, fontFamily: font.regular, textAlign: 'center', marginBottom: 16 },
+  terminosRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 12 },
+  casilla: {
+    width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: c.borderStrong,
+    alignItems: 'center', justifyContent: 'center', marginTop: 1,
+  },
+  casillaMarcada: { backgroundColor: c.accent, borderColor: c.accent },
+  terminosTxt: { flex: 1, fontSize: 13, color: c.text, fontFamily: font.regular, lineHeight: 19 },
+  enlace: { color: c.goldText, fontFamily: font.semibold, textDecorationLine: 'underline' },
   boton: {
     backgroundColor: c.brand,
     borderRadius: radius.md,

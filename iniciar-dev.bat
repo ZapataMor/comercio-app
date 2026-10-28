@@ -19,20 +19,26 @@ echo   IPs de este PC (la del WiFi es la que va en frontend\src\config.ts):
 for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do echo      %%a
 echo.
 
-echo   [1/3] API Laravel        -^> puerto 8000
+echo   [1/5] API Laravel        -^> puerto 8000
 start "API - Laravel"  /D "%RAIZ%backend"  cmd /k php artisan serve --host=0.0.0.0 --port=8000
 
-echo   [2/3] Telefono por WiFi  -^> %TELEFONO%
+echo   [2/5] Cola de push       -^> queue:work
+start "Cola - Laravel"  /D "%RAIZ%backend"  cmd /k php artisan queue:work --tries=3
+
+echo   [3/5] Tareas programadas -^> schedule:work
+start "Tareas - Laravel"  /D "%RAIZ%backend"  cmd /k php artisan schedule:work
+
+echo   [4/5] Telefono por WiFi  -^> %TELEFONO%
 start "ADB - Telefono"  cmd /k "adb connect %TELEFONO% && adb devices"
 
-echo   [3/3] Metro React Native -^> puerto 8081
+echo   [5/5] Metro React Native -^> puerto 8081
 start "Metro - React Native"  /D "%RAIZ%frontend"  cmd /k npm start
 
 echo.
-echo   Listo. Se abrieron 3 ventanas, dejalas corriendo.
+echo   Listo. Se abrieron 5 ventanas, dejalas corriendo.
 echo.
 echo   - Movil: abre la app desde el icono del telefono.
-echo   - PC:    abre http://localhost:8000 en el navegador.
+echo   - PC:    panel del admin en http://localhost:8000
 echo.
 echo   Solo si tocaste android/ o instalaste una libreria nativa:
 echo       cd frontend  y luego  npm run android

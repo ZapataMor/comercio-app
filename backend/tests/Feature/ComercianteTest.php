@@ -8,7 +8,7 @@ use Spatie\Permission\Models\Role;
 
 // Antes de cada test: crear los 4 roles (la BD se reinicia en cada test).
 beforeEach(function () {
-    foreach (['administrador', 'comerciante', 'usuario', 'domiciliario'] as $rol) {
+    foreach (['administrador', 'usuario', 'domiciliario'] as $rol) {
         Role::findOrCreate($rol, 'web');
     }
 });

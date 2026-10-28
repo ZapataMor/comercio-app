@@ -16,7 +16,7 @@ use Illuminate\Validation\Rule;
  */
 class AdminController extends Controller
 {
-    private const ROLES = ['administrador', 'comerciante', 'usuario', 'domiciliario'];
+    private const ROLES = ['administrador', 'usuario', 'domiciliario'];
 
     /** Números generales para el tablero. */
     public function stats(): JsonResponse
@@ -26,6 +26,9 @@ class AdminController extends Controller
             'negocios' => Negocio::count(),
             'negocios_activos' => Negocio::where('activo', true)->count(),
             'productos' => Producto::count(),
+            // Vetados por baja confiabilidad (revisar en Reputación).
+            'domiciliarios_vetados' => User::whereNotNull('domiciliario_vetado_at')->count(),
+            'negocios_vetados' => Negocio::whereNotNull('vetado_at')->count(),
         ]);
     }
 

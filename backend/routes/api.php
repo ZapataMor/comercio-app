@@ -7,6 +7,7 @@ use App\Http\Controllers\NegocioController;
 use App\Http\Controllers\ProductoController;
 use App\Http\Controllers\Api\CatalogoController;
 use App\Http\Controllers\Api\AdminController;
+use App\Http\Controllers\Api\AdminReputacionController;
 use App\Http\Controllers\Api\DomiciliarioController as ApiDomiciliarioController;
 use App\Http\Controllers\Api\PedidoController as ApiPedidoController;
 use App\Http\Controllers\Api\ComercioPedidoController;
@@ -19,12 +20,17 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // Rutas públicas de autenticación.
-// throttle:6,1 = máximo 6 intentos por minuto por IP (anti fuerza bruta).
-Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:6,1');
-Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:6,1');
+// Límites de intentos con nombre: ver AppServiceProvider::limitesDeIntentos().
+Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:acceso');
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:acceso');
+
+// "Olvidé mi contraseña": se envía un código de 6 dígitos al correo y con él
+// se pone una contraseña nueva.
+Route::post('/password/codigo', [\App\Http\Controllers\Api\RecuperarClaveController::class, 'enviarCodigo'])->middleware('throttle:codigo-clave');
+Route::post('/password/restablecer', [\App\Http\Controllers\Api\RecuperarClaveController::class, 'restablecer'])->middleware('throttle:restablecer-clave');
 
 // Barrios aprobados de Maicao. Pública: el registro la necesita sin token.
-Route::get('/barrios', [BarrioController::class, 'index'])->middleware('throttle:30,1');
+Route::get('/barrios', [BarrioController::class, 'index'])->middleware('throttle:publico');
 
 // Rutas que requieren un token Sanctum válido.
 Route::middleware('auth:sanctum')->group(function () {
@@ -36,6 +42,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Perfil personal del usuario logueado (cualquier rol).
     Route::put('/perfil', [AuthController::class, 'actualizarPerfil']);
+    // Eliminar mi cuenta (anonimiza; exige la contraseña).
+    Route::delete('/cuenta', [\App\Http\Controllers\Api\CuentaController::class, 'destroy']);
 
     // Panel adaptativo: responde distinto según el rol del usuario logueado.
     // El frontend llama siempre aquí y pinta lo que reciba.
@@ -83,9 +91,18 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/categorias/{id}', [CategoriaController::class, 'update']);
         Route::delete('/categorias/{id}', [CategoriaController::class, 'destroy']);
 
-        // Pedidos recibidos por el negocio.
+        // Pedidos recibidos por el negocio (?grupo= para el historial).
         Route::get('/pedidos', [ComercioPedidoController::class, 'index']);
+        Route::get('/pedidos/resumen', [ComercioPedidoController::class, 'resumen']);
+        Route::get('/pedidos/{id}', [ComercioPedidoController::class, 'show'])->whereNumber('id');
         Route::put('/pedidos/{id}/listo', [ComercioPedidoController::class, 'marcarListo']);
+        // Rechazar (pendiente) o cancelar (listo sin domiciliario), con motivo.
+        Route::put('/pedidos/{id}/cancelar', [ComercioPedidoController::class, 'cancelar']);
+        // Efectivo: ¿el domiciliario entregó el dinero? (afecta su confiabilidad).
+        Route::put('/pedidos/{id}/dinero', [ComercioPedidoController::class, 'confirmarDinero']);
+
+        // Nivel de confiabilidad del negocio y sus últimos eventos.
+        Route::get('/reputacion', [NegocioController::class, 'reputacion']);
 
         // Equipo: miembros e invitaciones por código público.
         Route::get('/miembros', [TrabajadorController::class, 'miembros']);
@@ -107,6 +124,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/pedidos', [ApiPedidoController::class, 'store']);
     Route::get('/pedidos', [ApiPedidoController::class, 'index']);
     Route::get('/pedidos/{id}', [ApiPedidoController::class, 'show']);
+    // Cancelar mientras el negocio no lo tenga listo.
+    Route::post('/pedidos/{id}/cancelar', [ApiPedidoController::class, 'cancelar']);
+    // Tarifa de domicilio vigente (para mostrar el total en el checkout).
+    Route::get('/ajustes', [\App\Http\Controllers\Api\AjusteController::class, 'publicos']);
+    // Al terminar: ¿el negocio y el domiciliario cumplieron? (reputación).
+    Route::post('/pedidos/{id}/calificacion', [ApiPedidoController::class, 'calificar']);
 
     // --- Zona del ADMINISTRADOR ---
     Route::middleware('role:administrador')->prefix('admin')->group(function () {
@@ -115,10 +138,22 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/usuarios', [AdminController::class, 'storeUsuario']);
         Route::put('/usuarios/{usuario}/rol', [AdminController::class, 'updateRol']);
         Route::get('/negocios', [AdminController::class, 'negocios']);
+        // Tarifa de domicilio (aplica a los pedidos nuevos).
+        Route::put('/ajustes', [\App\Http\Controllers\Api\AjusteController::class, 'actualizar']);
         // Barrios sugeridos por clientes (aprobar → entra a la lista pública).
         Route::get('/barrios/pendientes', [BarrioController::class, 'pendientes']);
         Route::put('/barrios/{id}/aprobar', [BarrioController::class, 'aprobar']);
         Route::delete('/barrios/{id}', [BarrioController::class, 'rechazar']);
+        // Confiabilidad de domiciliarios y negocios: vetados, en riesgo, eventos.
+        Route::get('/reputacion', [AdminReputacionController::class, 'index']);
+        Route::get('/reputacion/{tipo}/{id}', [AdminReputacionController::class, 'show'])
+            ->whereIn('tipo', ['negocio', 'domiciliario'])->whereNumber('id');
+        Route::put('/reputacion/eventos/{id}/anular', [AdminReputacionController::class, 'anular']);
+        Route::put('/reputacion/{tipo}/{id}/levantar-veto', [AdminReputacionController::class, 'levantarVeto'])
+            ->whereIn('tipo', ['negocio', 'domiciliario'])->whereNumber('id');
+        // Veto manual (sin importar el puntaje); se quita con levantar-veto.
+        Route::put('/reputacion/{tipo}/{id}/suspender', [AdminReputacionController::class, 'suspender'])
+            ->whereIn('tipo', ['negocio', 'domiciliario'])->whereNumber('id');
     });
 
     // --- Zona del DOMICILIARIO (pedidos) ---
@@ -126,6 +161,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/disponibles', [ApiDomiciliarioController::class, 'disponibles']);
         Route::get('/entregas', [ApiDomiciliarioController::class, 'entregas']);
         Route::get('/historial', [ApiDomiciliarioController::class, 'historial']);
+        Route::get('/reputacion', [ApiDomiciliarioController::class, 'reputacion']);
+        // Justificar una demora (lluvia, tráfico...) de una entrega en curso.
+        Route::put('/pedidos/{id}/novedad', [ApiDomiciliarioController::class, 'novedad']);
         Route::put('/pedidos/{id}/tomar', [ApiDomiciliarioController::class, 'tomar']);
         Route::put('/pedidos/{id}/recogido', [ApiDomiciliarioController::class, 'recogido']);
         Route::put('/pedidos/{id}/en-camino', [ApiDomiciliarioController::class, 'enCamino']);

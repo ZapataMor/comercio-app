@@ -34,10 +34,21 @@ class AuthWebController extends Controller
                 ->withErrors(['email' => 'Las credenciales no son correctas.']);
         }
 
+        // La web es solo para administradores: los demás usan la app.
+        if (! Auth::user()->hasRole('administrador')) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return back()
+                ->withInput($request->only('email'))
+                ->withErrors(['email' => 'El panel web es solo para administradores. Usa la app Vitrina.']);
+        }
+
         // Evita "session fixation": nueva sesión tras autenticar.
         $request->session()->regenerate();
 
-        return redirect()->intended(route('home'));
+        return redirect()->intended(route('admin.panel'));
     }
 
     /** Cierra la sesión web. */

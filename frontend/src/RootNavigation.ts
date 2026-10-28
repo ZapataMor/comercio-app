@@ -31,6 +31,16 @@ function navigateFromData(data: PushData, user: Usuario) {
     return;
   }
 
+  // El cliente canceló un pedido de uno de mis negocios.
+  if (data.tipo === 'pedido_cancelado' && Number.isFinite(pedidoId)) {
+    const negocioId = Number(data.negocio_id);
+    navigationRef.navigate('ComercioPedidoDetalle', {
+      pedidoId,
+      negocioId: Number.isFinite(negocioId) ? negocioId : undefined,
+    });
+    return;
+  }
+
   if (data.tipo === 'invitacion_trabajo') {
     navigationRef.navigate('MisNegocios');
     return;

@@ -20,6 +20,8 @@ export type RootStackParamList = {
   Equipo: undefined;
   // `negocioId`: desde un push, el pedido puede ser de otro negocio que no es el activo.
   ComercioPedidoDetalle: { pedido?: ComercioPedido; pedidoId?: number; negocioId?: number };
+  // Historial de pedidos del negocio activo (pestañas) y ventas de hoy.
+  PedidosNegocio: undefined;
   // Cliente
   Explorar: undefined;
   // `productoId` opcional: al entrar desde una búsqueda de producto, el catálogo
@@ -35,6 +37,8 @@ export type RootStackParamList = {
   AdminNegocios: undefined;
   // Barrios sugeridos por clientes, pendientes de aprobación.
   AdminBarrios: undefined;
+  // Confiabilidad de domiciliarios y negocios (vetados, en riesgo, eventos).
+  AdminReputacion: undefined;
   // Domiciliario
   Domiciliario: undefined;
 };

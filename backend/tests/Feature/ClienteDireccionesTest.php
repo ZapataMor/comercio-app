@@ -5,7 +5,7 @@ use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
 
 beforeEach(function () {
-    foreach (['administrador', 'comerciante', 'usuario', 'domiciliario'] as $rol) {
+    foreach (['administrador', 'usuario', 'domiciliario'] as $rol) {
         Role::findOrCreate($rol, 'web');
     }
 });
@@ -30,6 +30,7 @@ test('el registro exige los apellidos en su propio campo', function () {
         'direccion' => 'Calle 10 # 20-30',
         'barrio' => 'Centro',
         'telefono' => '3001234567',
+        'acepta_terminos' => true,
     ])->assertStatus(422)
         ->assertJsonValidationErrors(['apellidos']);
 });
@@ -44,6 +45,7 @@ test('el registro guarda nombre y apellidos por separado', function () {
         'direccion' => 'Calle 10 # 20-30',
         'barrio' => 'Centro',
         'telefono' => '3001234567',
+        'acepta_terminos' => true,
     ])->assertCreated()
         ->assertJsonPath('user.name', 'Ana María')
         ->assertJsonPath('user.apellidos', 'Pérez Gómez');
@@ -62,6 +64,7 @@ test('la direccion del registro queda como ubicacion principal', function () {
         'direccion' => 'Calle 10 # 20-30',
         'barrio' => 'Centro',
         'telefono' => '3001234567',
+        'acepta_terminos' => true,
     ])->assertCreated()
         ->assertJsonPath('user.direccion', 'Calle 10 # 20-30')
         ->assertJsonPath('user.barrio', 'Centro')

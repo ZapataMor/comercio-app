@@ -1,5 +1,6 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -12,9 +13,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { imagenUrl, Negocio } from '../api';
+import { getReputacionNegocio, imagenUrl, Negocio, ReputacionDetalle } from '../api';
+import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import FieldError from '../components/FieldError';
+import { TarjetaReputacion } from '../components/Reputacion';
 import SelectorImagen from '../components/SelectorImagen';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { useNegocio } from '../NegocioContext';
@@ -75,9 +78,27 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
   const [direccion, setDireccion] = useState('');
   const [telefono, setTelefono] = useState('');
   const [activo, setActivo] = useState(true);
+  // Tiempo promedio de preparación (minutos) que el negocio promete.
+  const [tiempo, setTiempo] = useState('20');
   // URI local de una imagen recién elegida (sin subir aún). null = sin cambios.
   const [imagenUri, setImagenUri] = useState<string | null>(null);
   const [errores, setErrores] = useState<FieldErrors>({});
+  const { auth } = useAuth();
+  const [reputacion, setReputacion] = useState<ReputacionDetalle | null>(null);
+
+  // Nivel de confiabilidad del negocio y sus últimos movimientos.
+  const negocioId = negocio?.id;
+  useFocusEffect(
+    useCallback(() => {
+      if (!negocioId || !auth) {
+        setReputacion(null);
+        return;
+      }
+      getReputacionNegocio(auth.token, negocioId)
+        .then(setReputacion)
+        .catch(() => setReputacion(null));
+    }, [auth, negocioId]),
+  );
 
   function limpiarError(campo: string) {
     setErrores(prev => {
@@ -106,6 +127,7 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
     setDireccion(n?.direccion ?? '');
     setTelefono(n?.telefono ?? '');
     setActivo(n?.activo ?? true);
+    setTiempo(String(n?.tiempo_preparacion ?? 20));
     setImagenUri(null);
     setErrores({});
     setModo('editar');
@@ -126,6 +148,11 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
       setErrores({ categorias: 'Selecciona al menos una categoria para el negocio.' });
       return;
     }
+    const minutos = parseInt(tiempo, 10);
+    if (!(minutos >= 5 && minutos <= 180)) {
+      setErrores({ tiempo_preparacion: 'Pon un tiempo entre 5 y 180 minutos.' });
+      return;
+    }
     setGuardando(true);
     const eraNuevo = !negocio;
     try {
@@ -137,6 +164,7 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
         direccion: direccion.trim() || null,
         telefono: telefono.trim() || null,
         activo,
+        tiempo_preparacion: minutos,
       };
       // Crear deja el negocio nuevo como activo.
       await (eraNuevo ? crear : guardar)(input, imagenUri ?? undefined);
@@ -187,6 +215,10 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
           <Campo etiqueta="Descripción" valor={negocio.descripcion} />
           <Campo etiqueta="Dirección" valor={negocio.direccion} />
           <Campo etiqueta="Teléfono" valor={negocio.telefono} />
+          <Campo
+            etiqueta="Tiempo promedio de preparación"
+            valor={`${negocio.tiempo_preparacion ?? 20} minutos`}
+          />
         </FadeInView>
 
         {esPropietario ? (
@@ -197,6 +229,20 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
           <Text style={styles.notaTrabajador}>
             Eres trabajador de este negocio: solo el propietario puede editar su información.
           </Text>
+        )}
+
+        {!!reputacion && (
+          <View style={styles.reputacion}>
+            <TarjetaReputacion
+              reputacion={reputacion.reputacion}
+              eventos={reputacion.eventos}
+              explicacion={
+                'Sube cuando tienes los pedidos listos dentro de tu tiempo de preparación y cuando el cliente ' +
+                'queda conforme. Baja si te pasas de ese tiempo o si el cliente reporta productos equivocados, ' +
+                'incompletos o en mal estado. Con menos de 30 puntos el negocio deja de aparecer en Vitrina.'
+              }
+            />
+          </View>
         )}
       </ScrollView>
     );
@@ -332,6 +378,26 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
           />
           <FieldError mensaje={errores.telefono} />
 
+          <Text style={styles.label}>Tiempo promedio de preparación (minutos)</Text>
+          <TextInput
+            style={styles.input}
+            value={tiempo}
+            onChangeText={valor => {
+              setTiempo(valor.replace(/[^0-9]/g, ''));
+              limpiarError('tiempo_preparacion');
+            }}
+            placeholder="20"
+            placeholderTextColor={c.mutedSoft}
+            keyboardType="number-pad"
+            maxLength={3}
+            editable={!guardando}
+          />
+          <FieldError mensaje={errores.tiempo_preparacion} />
+          <Text style={styles.ayuda}>
+            Lo que tardas en tener listo un pedido. Los clientes lo ven, y si te pasas, baja tu nivel de
+            confiabilidad: pon un tiempo realista.
+          </Text>
+
           <View style={styles.switchRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.label}>Negocio abierto</Text>
@@ -420,4 +486,6 @@ const useStyles = makeStyles((c, shadow) => ({
   botonTexto: { color: c.onBrand, fontFamily: font.bold, fontSize: 16 },
   cancelar: { textAlign: 'center', color: c.muted, fontFamily: font.semibold, marginTop: 14 },
   notaTrabajador: { textAlign: 'center', color: c.muted, fontFamily: font.regular, fontSize: 13, marginTop: 18 },
+  reputacion: { marginTop: 20 },
+  ayuda: { color: c.mutedSoft, fontSize: 12, marginTop: -8, marginBottom: 16, fontFamily: font.regular },
 }));

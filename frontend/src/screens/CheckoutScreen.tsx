@@ -14,6 +14,7 @@ import {
   crearClienteDireccion,
   crearPedido,
   getClienteDirecciones,
+  getTarifaDomicilio,
 } from '../api';
 import { useAuth } from '../AuthContext';
 import { useCart } from '../CartContext';
@@ -55,6 +56,16 @@ export default function CheckoutScreen({ navigation }: Props) {
   const [pago, setPago] = useState('efectivo');
   const [enviando, setEnviando] = useState(false);
   const [errores, setErrores] = useState<FieldErrors>({});
+  // Tarifa vigente del domicilio (la confirma el servidor al crear el pedido).
+  const [domicilio, setDomicilio] = useState<number | null>(null);
+  const totalConDomicilio = cart.total + (domicilio ?? 0);
+
+  useEffect(() => {
+    if (!auth?.token) return;
+    getTarifaDomicilio(auth.token)
+      .then(setDomicilio)
+      .catch(() => setDomicilio(null));
+  }, [auth?.token]);
 
   function limpiarError(campo: string) {
     setErrores(prev => {
@@ -204,9 +215,17 @@ export default function CheckoutScreen({ navigation }: Props) {
             <Text style={styles.lineaTxt}>{cop(i.precio * i.cantidad)}</Text>
           </View>
         ))}
+        <View style={styles.subtotalRow}>
+          <Text style={styles.lineaTxt}>Productos</Text>
+          <Text style={styles.lineaTxt}>{cop(cart.total)}</Text>
+        </View>
+        <View style={styles.linea}>
+          <Text style={styles.lineaTxt}>Domicilio</Text>
+          <Text style={styles.lineaTxt}>{domicilio == null ? '…' : cop(domicilio)}</Text>
+        </View>
         <View style={styles.totalRow}>
-          <Text style={styles.totalLabel}>Total</Text>
-          <Text style={styles.totalValor}>{cop(cart.total)}</Text>
+          <Text style={styles.totalLabel}>Total a pagar</Text>
+          <Text style={styles.totalValor}>{cop(totalConDomicilio)}</Text>
         </View>
       </FadeInView>
 
@@ -366,7 +385,7 @@ export default function CheckoutScreen({ navigation }: Props) {
         {enviando ? (
           <ActivityIndicator color={c.onAccent} />
         ) : (
-          <Text style={styles.btnTxt}>Confirmar pedido - {cop(cart.total)}</Text>
+          <Text style={styles.btnTxt}>Confirmar pedido - {cop(totalConDomicilio)}</Text>
         )}
       </PressableScale>
     </ScrollView>
@@ -380,6 +399,7 @@ const useStyles = makeStyles((c, shadow) => ({
   fila: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   linea: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3, gap: 12 },
   lineaTxt: { color: c.text, fontFamily: font.regular, flexShrink: 1 },
+  subtotalRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, paddingBottom: 3, borderTopWidth: 1, borderTopColor: c.border },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: c.border },
   totalLabel: { fontFamily: font.bold, color: c.textStrong },
   totalValor: { fontFamily: font.extra, color: c.textStrong },

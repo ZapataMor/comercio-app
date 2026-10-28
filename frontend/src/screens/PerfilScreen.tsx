@@ -4,17 +4,34 @@
  * Desde aquí se abre:
  *  - "Mi información": ver y modificar los datos personales de la cuenta,
  *  - "Mis negocios": los negocios propios o donde trabaja.
- * También es el lugar de "Cerrar sesión".
+ *  - La política de privacidad (página pública del servidor).
+ * También es el lugar de "Cerrar sesión" y "Eliminar mi cuenta".
  */
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Linking,
+  Modal,
+  Platform,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { eliminarCuenta } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
+import FieldError from '../components/FieldError';
 import Icon from '../components/Icon';
+import { WEB_URL } from '../config';
+import { messageFromError } from '../formErrors';
 import { useNegocio } from '../NegocioContext';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
+import { useToast } from '../Toast';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Perfil'>;
 
@@ -22,8 +39,40 @@ export default function PerfilScreen({ navigation }: Props) {
   const { c } = useTheme();
   const styles = useStyles();
   const { auth, salir } = useAuth();
+  const toast = useToast();
   const user = auth!.user;
   const { negocios, codigoPublico } = useNegocio();
+
+  // "Eliminar mi cuenta": se confirma escribiendo la contraseña.
+  const [eliminando, setEliminando] = useState(false);
+  const [clave, setClave] = useState('');
+  const [errorClave, setErrorClave] = useState<string | undefined>();
+  const [enviando, setEnviando] = useState(false);
+
+  function cerrarEliminar() {
+    if (enviando) return;
+    setEliminando(false);
+    setClave('');
+    setErrorClave(undefined);
+  }
+
+  async function confirmarEliminar() {
+    if (!clave) {
+      setErrorClave('Escribe tu contraseña para confirmar.');
+      return;
+    }
+    setEnviando(true);
+    try {
+      await eliminarCuenta(auth!.token, clave);
+      setEliminando(false);
+      toast.exito('Cuenta eliminada', 'Gracias por haber usado Vitrina.');
+      salir();
+    } catch (e) {
+      setErrorClave(messageFromError(e, 'No se pudo eliminar la cuenta.'));
+    } finally {
+      setEnviando(false);
+    }
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -69,6 +118,17 @@ export default function PerfilScreen({ navigation }: Props) {
         </PressableScale>
       </FadeInView>
 
+      <FadeInView delay={75}>
+        <PressableScale style={styles.item} onPress={() => Linking.openURL(`${WEB_URL}/privacidad`)}>
+          <Icon name="escudo" size={24} color={c.accent} />
+          <View style={styles.itemTexto}>
+            <Text style={styles.itemTitulo}>Privacidad</Text>
+            <Text style={styles.itemSub}>Cómo usamos y protegemos tus datos</Text>
+          </View>
+          <Icon name="chevron" size={20} color={c.chevron} />
+        </PressableScale>
+      </FadeInView>
+
       {/* Empuja "Cerrar sesión" a la parte inferior de la vista. */}
       <View style={styles.espaciador} />
 
@@ -76,7 +136,52 @@ export default function PerfilScreen({ navigation }: Props) {
         <TouchableOpacity style={styles.logout} onPress={salir}>
           <Text style={styles.logoutTxt}>Cerrar sesión</Text>
         </TouchableOpacity>
+        <TouchableOpacity onPress={() => setEliminando(true)} hitSlop={8}>
+          <Text style={styles.eliminarTxt}>Eliminar mi cuenta</Text>
+        </TouchableOpacity>
       </FadeInView>
+
+      <Modal visible={eliminando} transparent animationType="fade" onRequestClose={cerrarEliminar}>
+        <KeyboardAvoidingView
+          style={styles.modalFondo}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={styles.modalCaja}>
+            <Text style={styles.modalTitulo}>Eliminar mi cuenta</Text>
+            <Text style={styles.modalTexto}>
+              Se borran tu nombre, correo, teléfono, direcciones y sesiones. Los pedidos ya hechos se
+              conservan sin tus datos. Si eres el único dueño de un negocio, se cierra y deja de verse.
+              No se puede deshacer.
+            </Text>
+            <TextInput
+              style={styles.input}
+              value={clave}
+              onChangeText={v => {
+                setClave(v);
+                setErrorClave(undefined);
+              }}
+              secureTextEntry
+              placeholder="Tu contraseña"
+              placeholderTextColor={c.mutedSoft}
+              editable={!enviando}
+              autoFocus
+            />
+            <FieldError mensaje={errorClave} />
+            <TouchableOpacity
+              style={[styles.botonPeligro, enviando && styles.botonDeshabilitado]}
+              onPress={confirmarEliminar}
+              disabled={enviando}>
+              {enviando ? (
+                <ActivityIndicator color={c.surface} />
+              ) : (
+                <Text style={styles.botonPeligroTxt}>Eliminar definitivamente</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={cerrarEliminar} disabled={enviando}>
+              <Text style={styles.cancelar}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </ScrollView>
   );
 }
@@ -115,4 +220,19 @@ const useStyles = makeStyles((c, shadow) => ({
     paddingVertical: 9, paddingHorizontal: 18, ...shadow.soft,
   },
   logoutTxt: { color: c.surface, fontFamily: font.bold, fontSize: 14 },
+  eliminarTxt: { textAlign: 'center', color: c.danger, fontFamily: font.semibold, fontSize: 13, marginTop: 16 },
+  modalFondo: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 24 },
+  modalCaja: { backgroundColor: c.surface, borderRadius: radius.xl, padding: 22, ...shadow.card },
+  modalTitulo: { fontSize: 18, fontFamily: font.display, color: c.textStrong, marginBottom: 8 },
+  modalTexto: { fontSize: 13, fontFamily: font.regular, color: c.text, lineHeight: 19, marginBottom: 14 },
+  input: {
+    borderWidth: 1, borderColor: c.borderStrong, borderRadius: radius.md, paddingHorizontal: 14,
+    paddingVertical: 12, fontSize: 16, fontFamily: font.regular, color: c.textStrong, marginBottom: 6,
+  },
+  botonPeligro: {
+    backgroundColor: c.danger, borderRadius: radius.md, paddingVertical: 14, alignItems: 'center', marginTop: 8,
+  },
+  botonDeshabilitado: { opacity: 0.7 },
+  botonPeligroTxt: { color: c.surface, fontFamily: font.bold, fontSize: 15 },
+  cancelar: { textAlign: 'center', color: c.muted, fontFamily: font.semibold, marginTop: 14 },
 }));

@@ -68,9 +68,10 @@ export default function CarritoScreen({ navigation }: Props) {
 
       <View style={styles.footer}>
         <View style={styles.totalRow}>
-          <Text style={styles.totalLabel}>Total</Text>
+          <Text style={styles.totalLabel}>Productos</Text>
           <Text style={styles.totalValor}>{cop(total)}</Text>
         </View>
+        <Text style={styles.notaDomicilio}>El domicilio se suma en el siguiente paso.</Text>
         <PressableScale style={styles.btn} onPress={() => navigation.navigate('Checkout')}>
           <Text style={styles.btnTxt}>Continuar al pago →</Text>
         </PressableScale>
@@ -95,7 +96,8 @@ const useStyles = makeStyles((c, shadow) => ({
   qty: { minWidth: 18, textAlign: 'center', fontFamily: font.bold, color: c.textStrong },
   vaciar: { color: c.danger, textAlign: 'center', fontFamily: font.semibold },
   footer: { padding: 16, backgroundColor: c.surface, borderTopWidth: 1, borderTopColor: c.border },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  notaDomicilio: { color: c.muted, fontSize: 12, fontFamily: font.regular, marginBottom: 12 },
   totalLabel: { color: c.muted, fontSize: 16, fontFamily: font.medium },
   totalValor: { fontSize: 22, fontFamily: font.extra, color: c.textStrong },
   btn: { backgroundColor: c.accent, borderRadius: radius.md, paddingVertical: 15, alignItems: 'center', ...shadow.gold },

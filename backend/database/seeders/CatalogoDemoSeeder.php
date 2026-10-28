@@ -2,12 +2,12 @@
 
 namespace Database\Seeders;
 
+use App\Models\Negocio;
 use App\Models\User;
 use App\Models\TipoNegocio;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Spatie\Permission\Models\Role;
 
 /**
  * Llena la app con un catálogo realista de demostración:
@@ -17,24 +17,33 @@ use Spatie\Permission\Models\Role;
  *       cantidad (unidades/porciones/combos/paquetes),
  *       peso (por kg / libra), volumen (por litro), longitud (por metro).
  *
- * Cada negocio pertenece a un usuario comerciante (contraseña 'password123').
+ * Cada negocio pertenece a un usuario propio (`{slug}@demo.co`, contraseña
+ * 'password123') que lo administra como propietario (membresía). Además,
+ * `comerciante@demo.co` queda como propietario de "El Rincón Paisa".
  * Pensado para desarrollo. Se puede correr varias veces sin duplicar.
  */
 class CatalogoDemoSeeder extends Seeder
 {
     public function run(): void
     {
-        Role::findOrCreate('comerciante', 'web');
-
         DB::transaction(function () {
             foreach ($this->tiendas() as [$nombreTienda, $tipo]) {
                 $this->crearTienda($nombreTienda, $tipo);
+            }
+
+            // La cuenta demo "de negocio" administra una tienda con catálogo.
+            $demo = User::where('email', 'comerciante@demo.co')->first();
+            $tienda = Negocio::where('nombre', 'El Rincón Paisa')->first();
+            if ($demo && $tienda) {
+                $tienda->miembros()->syncWithoutDetaching([
+                    $demo->id => ['rol' => Negocio::ROL_PROPIETARIO, 'activo' => true],
+                ]);
             }
         });
     }
 
     /**
-     * Crea (o reutiliza) el comerciante, su negocio, categorías y productos.
+     * Crea (o reutiliza) el dueño, su negocio, categorías y productos.
      */
     private function crearTienda(string $nombre, string $tipo): void
     {
@@ -44,7 +53,7 @@ class CatalogoDemoSeeder extends Seeder
             ['email' => "{$slug}@demo.co"],
             ['name' => $nombre, 'password' => 'password123'],
         );
-        $dueno->syncRoles(['comerciante']);
+        $dueno->syncRoles(['usuario']);
 
         $negocio = $dueno->negocio()->firstOrCreate([
             'nombre' => $nombre,
@@ -54,6 +63,11 @@ class CatalogoDemoSeeder extends Seeder
             'direccion' => 'Calle '.rand(1, 90).' # '.rand(1, 50).'-'.rand(1, 99),
             'telefono' => '3'.rand(0, 1).rand(10_000_000, 99_999_999),
             'activo' => true,
+        ]);
+
+        // El dueño administra su negocio por la membresía (idempotente).
+        $negocio->miembros()->syncWithoutDetaching([
+            $dueno->id => ['rol' => Negocio::ROL_PROPIETARIO, 'activo' => true],
         ]);
 
         $this->sincronizarCategoriasNegocio($negocio, $tipo);

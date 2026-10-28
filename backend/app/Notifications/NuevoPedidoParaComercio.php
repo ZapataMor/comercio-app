@@ -4,6 +4,8 @@ namespace App\Notifications;
 
 use App\Models\Pedido;
 use App\Notifications\Concerns\UsaCanalPedidosFcm;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 use NotificationChannels\Fcm\FcmChannel;
 use NotificationChannels\Fcm\FcmMessage;
@@ -12,9 +14,10 @@ use NotificationChannels\Fcm\Resources\Notification as FcmNotification;
 /**
  * Avisa al COMERCIO que acaba de entrar un pedido nuevo (estado "pendiente").
  */
-class NuevoPedidoParaComercio extends Notification
+class NuevoPedidoParaComercio extends Notification implements ShouldQueue
 {
-    use UsaCanalPedidosFcm;
+    // En cola: el push sale del worker y no hace esperar al pedido.
+    use Queueable, UsaCanalPedidosFcm;
 
     public function __construct(public Pedido $pedido)
     {

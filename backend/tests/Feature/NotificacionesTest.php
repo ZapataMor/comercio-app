@@ -12,7 +12,7 @@ use Spatie\Permission\Models\Role;
 
 // Antes de cada test: crear los 4 roles (la BD se reinicia en cada test).
 beforeEach(function () {
-    foreach (['administrador', 'comerciante', 'usuario', 'domiciliario'] as $rol) {
+    foreach (['administrador', 'usuario', 'domiciliario'] as $rol) {
         Role::findOrCreate($rol, 'web');
     }
 });
@@ -26,10 +26,10 @@ function usuarioCon(string $rol): User
     return $user;
 }
 
-/** Crea un negocio abierto con su comerciante dueño. */
+/** Crea un negocio abierto con su dueño (propietario por membresía). */
 function negocioAbierto(): Negocio
 {
-    return usuarioCon('comerciante')->negocio()->create([
+    return usuarioCon('usuario')->negocio()->create([
         'nombre' => 'Negocio Test',
         'activo' => true,
     ]);
@@ -166,31 +166,6 @@ test('crear un pedido notifica al comercio', function () {
     Notification::assertSentTo($negocio->user, NuevoPedidoParaComercio::class);
 });
 
-test('crear un pedido desde la web notifica al comercio', function () {
-    Notification::fake();
-
-    $negocio = negocioAbierto();
-    $producto = $negocio->productos()->create([
-        'nombre' => 'Arroz', 'precio' => 3000, 'disponible' => true,
-    ]);
-
-    $cliente = usuarioCon('usuario');
-    $cliente->carritoItems()->create([
-        'producto_id' => $producto->id,
-        'cantidad' => 1,
-    ]);
-
-    $this->actingAs($cliente)
-        ->post('/carrito/confirmar', [
-            'metodo_pago' => 'efectivo',
-            'direccion_entrega' => 'Calle 20',
-            'telefono_contacto' => '3156126318',
-        ])
-        ->assertRedirect();
-
-    Notification::assertSentTo($negocio->user, NuevoPedidoParaComercio::class);
-});
-
 test('marcar un pedido listo notifica a los domiciliarios y al cliente', function () {
     Notification::fake();
 
@@ -201,22 +176,6 @@ test('marcar un pedido listo notifica a los domiciliarios y al cliente', functio
 
     Sanctum::actingAs($negocio->user);
     $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}/listo")->assertOk();
-
-    Notification::assertSentTo($domiciliario, PedidoDisponibleParaDomiciliario::class);
-    Notification::assertSentTo($cliente, EstadoPedidoActualizado::class);
-});
-
-test('marcar un pedido listo desde la web notifica a los domiciliarios y al cliente', function () {
-    Notification::fake();
-
-    $negocio = negocioAbierto();
-    $cliente = usuarioCon('usuario');
-    $domiciliario = usuarioCon('domiciliario');
-    $pedido = pedidoEnEstado($negocio, $cliente, 'pendiente');
-
-    $this->actingAs($negocio->user)
-        ->put("/panel/pedidos/{$pedido->id}/listo")
-        ->assertRedirect();
 
     Notification::assertSentTo($domiciliario, PedidoDisponibleParaDomiciliario::class);
     Notification::assertSentTo($cliente, EstadoPedidoActualizado::class);
@@ -237,21 +196,6 @@ test('tomar un pedido notifica al cliente', function () {
     Notification::assertSentTo($cliente, EstadoPedidoActualizado::class);
 });
 
-test('tomar un pedido desde la web notifica al cliente', function () {
-    Notification::fake();
-
-    $negocio = negocioAbierto();
-    $cliente = usuarioCon('usuario');
-    $domiciliario = usuarioCon('domiciliario');
-    $pedido = pedidoEnEstado($negocio, $cliente, 'listo');
-
-    $this->actingAs($domiciliario)
-        ->put("/domiciliario/pedidos/{$pedido->id}/tomar", ['minutos_recogida' => 15])
-        ->assertRedirect();
-
-    Notification::assertSentTo($cliente, EstadoPedidoActualizado::class);
-});
-
 test('avanzar el pedido a entregado notifica al cliente', function () {
     Notification::fake();
 
@@ -268,18 +212,11 @@ test('avanzar el pedido a entregado notifica al cliente', function () {
         fn (EstadoPedidoActualizado $n) => $n->pedido->estado === 'entregado');
 });
 
-test('avanzar el pedido a entregado desde la web notifica al cliente', function () {
-    Notification::fake();
 
-    $negocio = negocioAbierto();
-    $cliente = usuarioCon('usuario');
-    $domiciliario = usuarioCon('domiciliario');
-    $pedido = pedidoEnEstado($negocio, $cliente, 'en_camino', $domiciliario);
+test('los push salen en cola para no frenar el pedido', function () {
+    $pedido = pedidoEnEstado(negocioAbierto(), usuarioCon('usuario'), 'pendiente');
 
-    $this->actingAs($domiciliario)
-        ->put("/domiciliario/pedidos/{$pedido->id}/entregado")
-        ->assertRedirect();
-
-    Notification::assertSentTo($cliente, EstadoPedidoActualizado::class,
-        fn (EstadoPedidoActualizado $n) => $n->pedido->estado === 'entregado');
+    expect(new NuevoPedidoParaComercio($pedido))->toBeInstanceOf(Illuminate\Contracts\Queue\ShouldQueue::class)
+        ->and(new PedidoDisponibleParaDomiciliario($pedido))->toBeInstanceOf(Illuminate\Contracts\Queue\ShouldQueue::class)
+        ->and(new EstadoPedidoActualizado($pedido))->toBeInstanceOf(Illuminate\Contracts\Queue\ShouldQueue::class);
 });

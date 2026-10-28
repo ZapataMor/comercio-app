@@ -24,6 +24,37 @@ export type LoginResponse = {
   token: string;
 };
 
+/**
+ * Nivel de confiabilidad (0–100) de un negocio o un domiciliario. Sube cuando
+ * cumple (a tiempo, completo, entrega el dinero) y baja cuando falla; por
+ * debajo de 30, o con dos faltas graves, queda vetado.
+ */
+export type NivelReputacion = 'nuevo' | 'excelente' | 'confiable' | 'regular' | 'riesgo' | 'vetado';
+
+export type Reputacion = {
+  puntaje: number;
+  nivel: NivelReputacion;
+  nivel_label: string;
+  /** Pedidos que ya cuentan para el puntaje. */
+  pedidos: number;
+  vetado: boolean;
+  motivo_veto: string | null;
+};
+
+/** Algo que subió o bajó el puntaje (con su pedido y motivo). */
+export type EventoReputacion = {
+  id: number;
+  motivo: string;
+  descripcion: string;
+  puntos: number;
+  grave: boolean;
+  origen: 'sistema' | 'cliente' | 'negocio' | 'admin';
+  comentario: string | null;
+  pedido_id: number | null;
+  anulado: boolean;
+  fecha: string;
+};
+
 export type Negocio = {
   id: number;
   nombre: string;
@@ -35,6 +66,9 @@ export type Negocio = {
   telefono: string | null;
   activo: boolean;
   imagen?: string | null; // ruta relativa "/storage/negocios/x.jpg"
+  /** Minutos que el negocio promete tardar en tener listo un pedido. */
+  tiempo_preparacion?: number;
+  reputacion?: Reputacion;
   /** Mi rol en este negocio (solo en las rutas de "mis negocios"). */
   rol?: RolNegocio | null;
 };
@@ -85,6 +119,8 @@ export type NegocioLista = {
   imagen?: string | null;
   productos: number;
   abierto: boolean;
+  tiempo_preparacion?: number;
+  reputacion?: Reputacion;
 };
 
 /**
@@ -177,6 +213,8 @@ export async function register(body: {
   direccion: string;
   barrio: string;
   telefono: string;
+  // Autorización del tratamiento de datos (Ley 1581); el backend la exige.
+  acepta_terminos: boolean;
 }): Promise<LoginResponse> {
   let res: Response;
   try {
@@ -202,6 +240,43 @@ export async function register(body: {
   }
 
   return data as LoginResponse;
+}
+
+// ---------- Recuperar contraseña (sin sesión) ----------
+
+/** POST público (sin token) con cuerpo JSON. Devuelve el `message` del backend. */
+async function publicPost(path: string, body: any, porDefecto: string): Promise<string> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    throw new Error('No se pudo conectar con el servidor.');
+  }
+  const data = await res.json().catch(() => ({} as any));
+  if (!res.ok) {
+    const errors = validationErrors(data);
+    const mensaje = res.status === 429 ? 'Demasiados intentos. Espera un minuto.' : data?.message;
+    throw new ApiError(firstValidationMessage(errors) ?? mensaje ?? porDefecto, res.status, errors);
+  }
+  return data?.message ?? '';
+}
+
+/** Envía al correo un código de 6 dígitos (la respuesta no dice si el correo existe). */
+export function pedirCodigoClave(email: string): Promise<string> {
+  return publicPost('/api/password/codigo', { email }, 'No se pudo enviar el código.');
+}
+
+/** Pone una contraseña nueva con el código recibido por correo. */
+export function restablecerClave(email: string, codigo: string, password: string): Promise<string> {
+  return publicPost(
+    '/api/password/restablecer',
+    { email, codigo, password, password_confirmation: password },
+    'No se pudo cambiar la contraseña.',
+  );
 }
 
 // ---------- Barrios (Maicao) ----------
@@ -351,6 +426,14 @@ export async function actualizarPerfil(token: string, body: PerfilInput): Promis
   return d.user as Usuario;
 }
 
+/**
+ * Elimina la cuenta (anonimiza los datos; exige la contraseña). Puede fallar
+ * con 409 si hay pedidos o entregas en curso.
+ */
+export async function eliminarCuenta(token: string, password: string): Promise<void> {
+  await authSend('DELETE', '/api/cuenta', token, { password });
+}
+
 // ---------- Cliente: ubicaciones ----------
 
 export type ClienteDireccion = {
@@ -412,6 +495,7 @@ export type NegocioInput = {
   direccion?: string | null;
   telefono?: string | null;
   activo?: boolean;
+  tiempo_preparacion?: number;
 };
 
 /** Crea un negocio nuevo (quedo como propietario). Con `imagenUri` sube la foto. */
@@ -511,14 +595,34 @@ export type ComercioPedido = {
   id: number;
   estado: string;
   estado_label: string;
+  fecha?: string;
+  /** Lo del negocio (productos); el domicilio es aparte. */
+  subtotal?: number;
+  costo_domicilio?: number;
   total: number;
   metodo_pago: string;
   direccion_entrega: string;
   telefono_contacto: string | null;
   cliente: string | null;
   domiciliario: string | null;
+  /** Solo mientras el domiciliario lleva el pedido. */
+  domiciliario_telefono?: string | null;
+  domiciliario_reputacion?: Reputacion | null;
+  cancelado_por?: 'cliente' | 'negocio' | null;
+  motivo_cancelacion?: string | null;
+  /** Se puede rechazar (pendiente) o cancelar (listo sin domiciliario). */
+  puede_cancelar?: boolean;
+  motivos_cancelacion?: string[];
+  minutos_preparacion?: number | null;
+  /** Justificación del domiciliario si se está demorando. */
+  novedad?: string | null;
+  /** Solo efectivo: lo que el negocio dijo del dinero. */
+  dinero_estado?: DineroEstado | null;
+  puede_confirmar_dinero?: boolean;
   items: { nombre: string; cantidad: number }[];
 };
+
+export type DineroEstado = 'recibido' | 'incompleto' | 'no_recibido';
 
 export async function getPedidosComercio(token: string, negocioId: number): Promise<ComercioPedido[]> {
   const d = await authGet(`/api/negocios/${negocioId}/pedidos`, token);
@@ -527,6 +631,71 @@ export async function getPedidosComercio(token: string, negocioId: number): Prom
 
 export async function marcarPedidoListo(token: string, negocioId: number, id: number): Promise<void> {
   await authSend('PUT', `/api/negocios/${negocioId}/pedidos/${id}/listo`, token);
+}
+
+/** Pestañas del historial de pedidos del negocio. */
+export type GrupoPedidos = 'en_espera' | 'en_curso' | 'entregados' | 'cancelados';
+
+export type PedidosNegocioPagina = {
+  pedidos: ComercioPedido[];
+  pagina: number;
+  ultima_pagina: number;
+  total: number;
+};
+
+/** Historial paginado (20 por página) de un grupo de pedidos del negocio. */
+export function getPedidosNegocio(
+  token: string,
+  negocioId: number,
+  grupo: GrupoPedidos,
+  pagina = 1,
+): Promise<PedidosNegocioPagina> {
+  return authGet(`/api/negocios/${negocioId}/pedidos?grupo=${grupo}&page=${pagina}`, token);
+}
+
+/** Un pedido del negocio (p. ej. al abrirlo desde una notificación). */
+export function getPedidoNegocio(token: string, negocioId: number, id: number): Promise<ComercioPedido> {
+  return authGet(`/api/negocios/${negocioId}/pedidos/${id}`, token);
+}
+
+/** Resumen de hoy: pedidos, entregados, cancelados y ventas (sin domicilios). */
+export type ResumenNegocio = {
+  pedidos: number;
+  en_curso: number;
+  entregados: number;
+  cancelados: number;
+  ventas: number;
+};
+
+export function getResumenNegocio(token: string, negocioId: number): Promise<ResumenNegocio> {
+  return authGet(`/api/negocios/${negocioId}/pedidos/resumen`, token);
+}
+
+/** Rechazar (pendiente) o cancelar (listo sin domiciliario) un pedido. */
+export async function cancelarPedidoNegocio(token: string, negocioId: number, id: number, motivo?: string): Promise<void> {
+  await authSend('PUT', `/api/negocios/${negocioId}/pedidos/${id}/cancelar`, token, { motivo: motivo || null });
+}
+
+/** Pedido en efectivo: ¿el domiciliario le entregó el dinero al negocio? */
+export async function confirmarDinero(
+  token: string,
+  negocioId: number,
+  id: number,
+  estado: DineroEstado,
+): Promise<string> {
+  const d = await authSend('PUT', `/api/negocios/${negocioId}/pedidos/${id}/dinero`, token, { estado });
+  return d.message as string;
+}
+
+export type ReputacionDetalle = {
+  reputacion: Reputacion;
+  eventos: EventoReputacion[];
+  tiempo_preparacion?: number;
+};
+
+/** Nivel de confiabilidad de un negocio mío y sus últimos eventos. */
+export function getReputacionNegocio(token: string, negocioId: number): Promise<ReputacionDetalle> {
+  return authGet(`/api/negocios/${negocioId}/reputacion`, token);
 }
 
 // ---------- Equipo del negocio (miembros e invitaciones enviadas) ----------
@@ -685,6 +854,8 @@ export type AdminStats = {
   negocios: number;
   negocios_activos: number;
   productos: number;
+  domiciliarios_vetados?: number;
+  negocios_vetados?: number;
 };
 
 export type AdminUsuario = { id: number; name: string; email: string; rol: string };
@@ -751,6 +922,56 @@ export async function rechazarBarrio(token: string, id: number): Promise<void> {
   await authSend('DELETE', `/api/admin/barrios/${id}`, token);
 }
 
+export type TipoReputacion = 'domiciliario' | 'negocio';
+
+/** Domiciliario o negocio en la lista de reputación del admin. */
+export type SujetoReputacion = {
+  id: number;
+  nombre: string;
+  /** Email del domiciliario o dueño del negocio. */
+  detalle: string | null;
+  reputacion: Reputacion;
+};
+
+export type AdminReputacionResp = {
+  tipo: TipoReputacion;
+  sujetos: SujetoReputacion[];
+  vetados: number;
+  en_riesgo: number;
+};
+
+/** Vetados primero, luego del peor al mejor puntaje. */
+export function getAdminReputacion(token: string, tipo: TipoReputacion): Promise<AdminReputacionResp> {
+  return authGet(`/api/admin/reputacion?tipo=${tipo}`, token);
+}
+
+export function getAdminReputacionDetalle(token: string, tipo: TipoReputacion, id: number): Promise<ReputacionDetalle> {
+  return authGet(`/api/admin/reputacion/${tipo}/${id}`, token);
+}
+
+/** Anula un evento injusto (el puntaje se recalcula y puede levantar el veto). */
+export async function anularEventoReputacion(token: string, eventoId: number): Promise<Reputacion> {
+  const d = await authSend('PUT', `/api/admin/reputacion/eventos/${eventoId}/anular`, token);
+  return d.reputacion as Reputacion;
+}
+
+/** Veto manual del admin (aunque el puntaje esté bien), con su motivo. */
+export async function suspenderSujeto(
+  token: string,
+  tipo: TipoReputacion,
+  id: number,
+  motivo: string,
+): Promise<Reputacion> {
+  const d = await authSend('PUT', `/api/admin/reputacion/${tipo}/${id}/suspender`, token, { motivo });
+  return d.reputacion as Reputacion;
+}
+
+/** Segunda oportunidad: quita el veto y deja el puntaje en "En riesgo". */
+export async function levantarVeto(token: string, tipo: TipoReputacion, id: number): Promise<Reputacion> {
+  const d = await authSend('PUT', `/api/admin/reputacion/${tipo}/${id}/levantar-veto`, token);
+  return d.reputacion as Reputacion;
+}
+
 // ---------- Push notifications ----------
 
 export async function registrarDeviceToken(token: string, fcmToken: string): Promise<void> {
@@ -772,19 +993,37 @@ export type Pedido = {
   id: number;
   estado: string;
   estado_label: string;
+  subtotal: number;
+  costo_domicilio: number;
   total: number;
+  /** Lo que se le cobra al cliente al entregar (0 si pagó por transferencia). */
+  cobrar: number;
   metodo_pago: string;
   minutos_recogida: number | null;
   direccion_entrega: string;
+  /** Solo cuando el pedido es mío y lo estoy llevando. */
   telefono_contacto: string | null;
-  negocio: { nombre: string; direccion: string | null } | null;
+  /** Justificación que reporté para una demora. */
+  novedad?: string | null;
+  negocio: { nombre: string; direccion: string | null; telefono?: string | null } | null;
   cliente: { name: string } | null;
   items: PedidoItem[];
 };
 
-export async function getDisponibles(token: string): Promise<Pedido[]> {
+/** `vetado`: mi cuenta está suspendida y no puedo tomar pedidos nuevos. */
+export async function getDisponibles(token: string): Promise<{ pedidos: Pedido[]; vetado: boolean }> {
   const d = await authGet('/api/domiciliario/disponibles', token);
-  return (d.pedidos ?? []) as Pedido[];
+  return { pedidos: (d.pedidos ?? []) as Pedido[], vetado: !!d.vetado };
+}
+
+/** Mi nivel de confiabilidad como domiciliario y sus últimos eventos. */
+export function getMiReputacion(token: string): Promise<ReputacionDetalle> {
+  return authGet('/api/domiciliario/reputacion', token);
+}
+
+/** Justificar una demora (lluvia, tráfico...) de una entrega en curso. */
+export async function reportarNovedad(token: string, id: number, novedad: string): Promise<void> {
+  await authSend('PUT', `/api/domiciliario/pedidos/${id}/novedad`, token, { novedad });
 }
 
 export async function getMisEntregas(token: string): Promise<Pedido[]> {
@@ -815,6 +1054,28 @@ export type MiPedido = {
   total: number;
   negocio: string | null;
   fecha: string;
+  cancelado_por?: 'cliente' | 'negocio' | null;
+  /** Entregado y aún sin calificar (dentro del plazo). */
+  por_calificar?: boolean;
+};
+
+/** Problema que el cliente puede reportar al calificar. */
+export type OpcionProblema = { clave: string; label: string };
+
+export type CalificacionPedido = {
+  negocio_ok: boolean;
+  negocio_problemas: string[];
+  domiciliario_ok: boolean | null;
+  domiciliario_problemas: string[];
+  comentario: string | null;
+};
+
+export type NuevaCalificacion = {
+  negocio_ok: boolean;
+  negocio_problemas?: string[];
+  domiciliario_ok?: boolean;
+  domiciliario_problemas?: string[];
+  comentario?: string;
 };
 
 export type SeguimientoPedido = {
@@ -823,13 +1084,32 @@ export type SeguimientoPedido = {
   estado_label: string;
   estados: string[];
   estado_index: number;
+  /** Productos + domicilio = total. */
+  subtotal: number;
+  costo_domicilio: number;
   total: number;
   metodo_pago: string;
   direccion_entrega: string;
   minutos_recogida: number | null;
+  fecha?: string;
   negocio: string | null;
+  negocio_telefono?: string | null;
+  negocio_reputacion?: Reputacion | null;
   domiciliario: string | null;
+  /** Solo mientras el domiciliario lleva el pedido. */
+  domiciliario_telefono?: string | null;
+  cancelado_por?: 'cliente' | 'negocio' | null;
+  motivo_cancelacion?: string | null;
+  /** El negocio aún no lo tiene listo: el cliente puede cancelarlo. */
+  puede_cancelar?: boolean;
+  motivos_cancelacion?: string[];
+  domiciliario_reputacion?: Reputacion | null;
+  /** Justificación del domiciliario si se está demorando. */
+  novedad?: string | null;
   items: { nombre: string; cantidad: number; precio: number }[];
+  puede_calificar?: boolean;
+  opciones_problemas?: { negocio: OpcionProblema[]; domiciliario: OpcionProblema[] } | null;
+  calificacion?: CalificacionPedido | null;
 };
 
 export type NuevoPedido = {
@@ -852,4 +1132,29 @@ export async function getMisPedidos(token: string): Promise<MiPedido[]> {
 
 export async function getPedido(token: string, id: number): Promise<SeguimientoPedido> {
   return authGet(`/api/pedidos/${id}`, token);
+}
+
+/** El cliente cancela su pedido (solo mientras el negocio no lo tenga listo). */
+export async function cancelarMiPedido(token: string, id: number, motivo?: string): Promise<void> {
+  await authSend('POST', `/api/pedidos/${id}/cancelar`, token, { motivo: motivo || null });
+}
+
+// ---------- Ajustes de la plataforma ----------
+
+/** Tarifa de domicilio vigente (COP), para mostrar el total en el checkout. */
+export async function getTarifaDomicilio(token: string): Promise<number> {
+  const d = await authGet('/api/ajustes', token);
+  return Number(d.tarifa_domicilio ?? 0);
+}
+
+/** Admin: cambiar la tarifa de domicilio (aplica a los pedidos nuevos). */
+export async function actualizarTarifaDomicilio(token: string, tarifa: number): Promise<number> {
+  const d = await authSend('PUT', '/api/admin/ajustes', token, { tarifa_domicilio: tarifa });
+  return Number(d.tarifa_domicilio ?? tarifa);
+}
+
+/** Calificar un pedido entregado: ¿el negocio y el domiciliario cumplieron? */
+export async function calificarPedido(token: string, id: number, body: NuevaCalificacion): Promise<string> {
+  const d = await authSend('POST', `/api/pedidos/${id}/calificacion`, token, body);
+  return d.message as string;
 }

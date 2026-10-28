@@ -4,6 +4,8 @@ namespace App\Notifications;
 
 use App\Models\Pedido;
 use App\Notifications\Concerns\UsaCanalPedidosFcm;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 use NotificationChannels\Fcm\FcmChannel;
 use NotificationChannels\Fcm\FcmMessage;
@@ -13,9 +15,10 @@ use NotificationChannels\Fcm\Resources\Notification as FcmNotification;
  * Avisa al CLIENTE que su pedido cambió de estado.
  * El texto se adapta al estado actual del pedido.
  */
-class EstadoPedidoActualizado extends Notification
+class EstadoPedidoActualizado extends Notification implements ShouldQueue
 {
-    use UsaCanalPedidosFcm;
+    // En cola: el push sale del worker y no hace esperar al pedido.
+    use Queueable, UsaCanalPedidosFcm;
 
     /**
      * Título y cuerpo del aviso según el estado del pedido.

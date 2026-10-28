@@ -1,7 +1,7 @@
 # 📦 Estado del proyecto — comercio-api
 
 > Documento vivo de seguimiento. Refleja **qué hay hecho** y **qué falta** en la app.
-> Última actualización: **2026-09-11**
+> Última actualización: **2026-10-28**
 
 ---
 
@@ -46,16 +46,21 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 ---
 
 ## 3. Roles
-- [x] Roles base creados: `administrador`, `comerciante`, `usuario`, `domiciliario` (`RoleSeeder`)
-- [x] Registro público solo permite `usuario` o `comerciante` (los demás los asigna un admin)
-- [x] **Modelo unificado (2026-09-11)**: el registro ya NO pide rol; todo el mundo es `usuario` y puede crear/trabajar en negocios (ver sección 6 → "Negocios y equipos"). 🚧 La app todavía muestra el selector de rol
-- [ ] Decidir el destino del rol global `comerciante` (¿se elimina o queda solo para el panel web?)
+- [x] Roles base: `administrador`, `usuario`, `domiciliario` (`RoleSeeder`)
+- [x] Registro público solo crea `usuario`; `administrador` y `domiciliario` los asigna un admin
+- [x] **Modelo unificado (2026-09-11)**: el registro ya NO pide rol; todo el mundo es `usuario` y puede crear/trabajar en negocios (ver sección 6 → "Negocios y equipos")
+- [x] **Rol global `comerciante` eliminado (2026-10-28)**, decisión del usuario: migración `eliminar_rol_comerciante` pasa a quien lo tenía a `usuario` y borra el rol; seeders sin el rol (los dueños demo administran su negocio por la membresía; `comerciante@demo.co` es propietario de "El Rincón Paisa")
 
 ---
 
 ## 4. Autenticación
-- [x] `POST /api/register` — registro + token (con `throttle:6,1`)
-- [x] `POST /api/login` — login + token (con `throttle:6,1`)
+- [x] `POST /api/register` — registro + token (límite `throttle:acceso`)
+- [x] `POST /api/login` — login + token (límite `throttle:acceso`)
+- [x] **Límites de intentos con nombre** (`AppServiceProvider::limitesDeIntentos`): `acceso`, `codigo-clave`, `restablecer-clave`, `eliminar-cuenta`, `publico`, por correo + IP. Antes `throttle:6,1` compartía UN contador por IP entre todas las rutas públicas (2 logins fallidos bloqueaban "olvidé mi contraseña"; en producción, muchos teléfonos comparten la IP del operador)
+- [x] **Recuperar contraseña** con código de 6 dígitos por correo: `POST /api/password/codigo` y `POST /api/password/restablecer` (`RecuperarClaveController`; código cifrado en `password_reset_tokens`, vence en 15 min, se anula tras 5 fallos, cierra las demás sesiones; nunca revela si el correo existe). App: "¿Olvidaste tu contraseña?" en el Login (`RecuperarClaveModal`)
+- [x] **Autorización de datos** (Ley 1581): el registro exige `acepta_terminos` y guarda `users.terminos_aceptados_at`; casilla con enlace a la política en `RegisterScreen`
+- [x] **Eliminar cuenta**: `DELETE /api/cuenta` (exige contraseña) y página pública `/eliminar-cuenta` (Play Store). `App\Support\EliminarCuenta` anonimiza la fila (los pedidos del historial se conservan sin datos de contacto), borra sesiones, aparatos, direcciones, membresías e invitaciones; archiva los negocios donde era el único propietario. No deja si hay pedidos o entregas en curso. App: "Eliminar mi cuenta" en Mi perfil
+- [x] **Cuenta suspendida** (`users.suspendido_at` + motivo): no puede iniciar sesión y el middleware `CuentaActiva` (grupo `api`) borra su token y responde 401 (la app cierra sesión sola). 🚧 Falta el botón del admin (P2)
 - [x] `POST /api/logout` — revoca solo el token usado
 - [x] `GET /api/user` — datos del usuario autenticado
 - [x] `PUT /api/perfil` — perfil personal (nombre, email, contraseña con la actual, dirección, barrio, teléfono); sincroniza la dirección principal del cliente
@@ -69,8 +74,11 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 - [x] `negocios` (user_id, nombre, descripcion, direccion, telefono, activo) — 1 por comerciante
 - [x] `productos` (negocio_id, categoria_id, nombre, descripcion, precio, **tipo_venta**, **unidad_medida**, disponible) — con **SoftDeletes**
 - [x] `categorias` (negocio_id, nombre)
-- [x] `carrito_items` (user_id, producto_id, cantidad) — carrito del cliente (1 negocio a la vez)
+- [x] `carrito_items` (user_id, producto_id, cantidad) — carrito de la web de clientes. **Tabla eliminada el 2026-10-28** junto con esa web (el carrito de la app vive en el teléfono)
 - [x] `pedidos` (negocio_id, user_id, domiciliario_id, estado, metodo_pago, total, direccion_entrega, telefono_contacto, minutos_recogida)
+- [x] `pedidos.subtotal` + `pedidos.costo_domicilio` (= `total`), y cancelación: `cancelado_por` (cliente|negocio), `motivo_cancelacion`, `cancelado_at`; estado `cancelado` (fuera de `Pedido::ESTADOS`, que es el stepper)
+- [x] `ajustes` (clave → valor) con `tarifa_domicilio` (4000 por defecto); modelo `Ajuste` con caché
+- [x] `users.terminos_aceptados_at`, `suspendido_at`, `motivo_suspension`, `eliminado_at`; `negocios.archivado_at` (no sale en el catálogo ni recibe pedidos)
 - [x] `pedido_items` (pedido_id, producto_id, **copia** de nombre/precio/cantidad al momento del pedido)
 - [x] `device_tokens` (user_id, token único, plataforma, last_used_at) — tokens FCM para notificaciones push (un usuario puede tener varios aparatos)
 - [x] `negocios.imagen` y `productos.imagen` (subida multipart, `storage/public/{negocios,productos}`)
@@ -80,7 +88,7 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 - [x] `barrios` (nombre único, aprobado, creado_por) — catálogo de barrios de Maicao + sugerencias de clientes
 - [x] `tipos_producto` (nombre, slug, atributo_label, atributo_boton, sugerencias JSON, orden) + `productos.tipo_producto_id` y `productos.atributos` (JSON) — 7 tipos base sembrados por migración
 - [x] `negocio_user` (negocio_id, user_id, rol propietario|trabajador, activo) — membresías; `users.codigo_publico` (ej. `U34F4D`); `invitaciones_trabajo` (negocio_id, user_id, invitado_por, estado) — con backfill de dueños y códigos
-- [x] Relaciones: User→Negocio, Negocio→Productos, Negocio→Categorias, Producto→Categoria, Negocio→Pedidos, Pedido→(cliente, domiciliario, items), User→(pedidos, entregas, carritoItems)
+- [x] Relaciones: User→Negocio, Negocio→Productos, Negocio→Categorias, Producto→Categoria, Negocio→Pedidos, Pedido→(cliente, domiciliario, items), User→(pedidos, entregas)
 - [x] **Tipos de venta de producto**: `cantidad` (unidades/porciones/combos/paquetes/docenas), `peso` (precio por kg/libra), `volumen` (por litro), `longitud` (por metro). El precio se entiende "por `unidad_medida`"
 
 ---
@@ -103,6 +111,9 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 - [x] **Tipos de negocio** (`categoria` / `categorias[]`) al crear/editar el negocio; se crean al vuelo si no existen
 - [x] **Tipos de producto + atributos**: `tipo_producto_id` obligatorio al crear; `atributos[]` (ingredientes, usos, tallas…) limpiados y validados; `GET /api/tipos-producto` devuelve la config del formulario
 - [x] Pedidos recibidos: `GET /negocios/{negocio}/pedidos` y `PUT /negocios/{negocio}/pedidos/{id}/listo` (antes `/comerciante/...`)
+- [x] **Historial de pedidos** `GET /negocios/{n}/pedidos?grupo=en_espera|en_curso|entregados|cancelados` (20 por página) + `GET /negocios/{n}/pedidos/{id}` + **resumen de hoy** `GET /negocios/{n}/pedidos/resumen` (pedidos, en curso, entregados, cancelados y ventas = subtotal entregado). Sin `grupo` devuelve los en curso + entregados de 7 días (lo que usa el Inicio). App: tarjeta "Pedidos y ventas" → `PedidosNegocioScreen`
+- [x] **Rechazar / cancelar pedido** `PUT /negocios/{n}/pedidos/{id}/cancelar` con motivo: pendiente (rechazar) o listo sin domiciliario (nadie lo tomó). Push `PedidoCancelado` al cliente. App: botón y motivos sugeridos en el detalle del pedido (`MotivoCancelacion`)
+- [x] **Contacto**: llamar/WhatsApp al cliente y, mientras lo lleva, al domiciliario (`BotonesContacto`, ADR-003). Desglose productos/domicilio en el detalle
 
 ### Negocios y equipos — modelo unificado 🚧 (commit `9430ede`, 2026-09-11)
 > Cualquier usuario puede ser **propietario de varios negocios** y **trabajador de otros**. La autorización se hace contra `negocio_user`, no contra el rol global. Nadie entra a un negocio sin aceptar una invitación; la app no permite buscar personas, solo resolver un código público exacto.
@@ -115,7 +126,7 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 - [x] **Rutas API** (sin `role:comerciante`; autoriza la membresía): `GET /negocios/mios`, `GET /negocios/mios/{negocio}`, `POST /negocios`, `PUT /negocios/{negocio}`; `/negocios/{negocio}/productos|categorias|pedidos|miembros`, `POST /negocios/{negocio}/resolver-codigo|invitar|salir`, `DELETE /negocios/{negocio}/invitaciones/{id}|miembros/{userId}`; `GET /invitaciones`, `PUT /invitaciones/{id}/aceptar|rechazar`. Las viejas `/comerciante/*` ya no existen
 - [x] App: `api.ts` con `negocioId`, `NegocioContext` (lista + negocio activo persistido), pantallas `MisNegociosScreen` (cambiar/crear negocio, responder invitaciones, compartir código) y `EquipoScreen` (invitar por código, quitar, cancelar, salir); acceso desde Mi perfil; registro sin selector de rol; push `nuevo_pedido` trae `negocio_id` e `invitacion_trabajo` abre Mis negocios
 - [x] Tests Pest: `ComercianteTest` sobre las rutas nuevas + `MembresiasTest` (código público, invitar, aceptar/rechazar, quitar, salir)
-- [ ] Panel web Blade: sigue en "1 negocio por comerciante" (`User::negocio()`); decidir si se adapta
+- [x] Panel web Blade del comerciante: **eliminado el 2026-10-28** (decisión del usuario: un solo frontend, la app). `User::negocio()` queda solo para seeders y tests
 
 ### Cliente (`usuario`)
 - [x] Ve su panel en `/api/dashboard`
@@ -126,6 +137,10 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 - [x] **Direcciones guardadas** `GET/POST /api/cliente/direcciones` (principal + otras) para el checkout
 - [x] **Barrios de Maicao**: `GET /api/barrios` público (sembrados por comuna en `BarriosSeeder`); un barrio escrito a mano queda como sugerencia pendiente
 - [x] Al crear un pedido, si el cliente no tenía teléfono se guarda en su perfil
+- [x] **Costo de domicilio**: el pedido copia la tarifa vigente (`Ajuste::tarifaDomicilio()`): `subtotal` + `costo_domicilio` = `total`. `GET /api/ajustes` para el checkout. App: Carrito avisa que el domicilio va aparte; Checkout y seguimiento muestran el desglose
+- [x] **Cancelar mi pedido** `POST /api/pedidos/{id}/cancelar` (con motivo opcional) mientras esté `pendiente`; push `PedidoCancelado` a todo el equipo del negocio. El seguimiento muestra "Pedido cancelado" (quién y por qué) en vez de la línea de tiempo
+- [x] **Contacto**: el seguimiento trae `negocio_telefono` (siempre) y `domiciliario_telefono` (solo mientras lo lleva) con botones Llamar / WhatsApp
+- [x] Negocios **archivados** fuera del catálogo, de la búsqueda y sin poder recibir pedidos
 
 ### Administrador
 - [x] Ve su panel en `/api/dashboard`
@@ -133,16 +148,47 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 - [x] Ver todos los negocios (vía web `/admin/negocios`)
 - [x] API: `GET /admin/stats`, `GET/POST /admin/usuarios`, `PUT /admin/usuarios/{id}/rol`, `GET /admin/negocios`
 - [x] **Moderación de barrios**: `GET /admin/barrios/pendientes`, `PUT /admin/barrios/{id}/aprobar`, `DELETE /admin/barrios/{id}`
+- [x] **Tarifa de domicilio** `PUT /api/admin/ajustes` (aplica a pedidos nuevos). App: editor en el Tablero
+- [x] La **web** queda SOLO para el admin: el login web rechaza a quien no es administrador
 
 ### Domiciliario
 - [x] Ve su panel en `/api/dashboard`
-- [x] Vista web del panel (`/domiciliario`) con datos reales: pedidos disponibles, mis entregas, historial
+- [x] Vista web del panel (`/domiciliario`) con datos reales: pedidos disponibles, mis entregas, historial (web eliminada el 2026-10-28; todo vive en la app)
 - [x] Tomar pedido (con minutos de recogida) y actualizar estado (Recogido → En camino → Entregado)
+- [x] Ve el domicilio y **cuánto cobrar** (`cobrar`: total si es efectivo, 0 si transferencia); el teléfono del negocio, y el del cliente solo cuando el pedido es suyo (antes salía en "disponibles"). Botones Llamar / WhatsApp: al negocio antes de recoger, al cliente después. Un pedido cancelado deja de estar disponible (409 al tomarlo)
+
+### Nivel de confiabilidad (reputación) de negocios y domiciliarios — 2026-10-28
+> Puntaje 0–100 (arranca en 80) que sube cuando cumplen y baja cuando fallan. Se recalcula siempre desde un historial de eventos (`reputacion_eventos`), así un admin puede anular uno injusto. Lógica en `App\Support\Reputacion`, umbrales en `config/reputacion.php`.
+- [x] Migración `create_reputacion_tables`: `reputacion_eventos`, `calificaciones`; en `negocios` `tiempo_preparacion` (min, def. 20), `reputacion`, `reputacion_pedidos`, `vetado_at`, `motivo_veto`; en `users` lo mismo con prefijo `domiciliario`/`reputacion_domiciliario`; en `pedidos` `minutos_preparacion` (copia del tiempo prometido), marcas `listo_at`/`tomado_at`/`recogido_at`/`en_camino_at`/`entregado_at`, `novedad` y `dinero_estado`
+- [x] **Medición automática de tiempos**: al marcar listo, el negocio +1 si cumplió su tiempo de preparación o −3 si se pasó; al recoger, el domiciliario −3 si se pasó de los minutos que prometió al tomarlo (margen: máx(5 min, 20 %))
+- [x] **Calificación del cliente** al terminar (`POST /api/pedidos/{id}/calificacion`, una vez, 72 h): "Todo bien" (+2) o problemas — negocio: producto equivocado −8, incompleto −8, mala calidad −5, mala atención −3; domiciliario: llegó tarde −5, manipulado −15, cobró de más −15, mal trato −5, **nunca llegó −35 (grave)**
+- [x] **Dinero en efectivo**: el negocio confirma (`PUT /api/negocios/{n}/pedidos/{id}/dinero`): recibido +2, incompleto −15, **no entregado −35 (grave)**; solo hasta 72 h después de recoger
+- [x] **Novedad del domiciliario** (`PUT /api/domiciliario/pedidos/{id}/novedad`): justifica una demora; las demoras justificadas quedan anotadas con 0 puntos. El cliente y el negocio la ven
+- [x] **Veto**: puntaje < 30 o 2 faltas graves en 30 días. Domiciliario vetado: no ve ni toma pedidos (sí termina los que lleva). Negocio vetado: desaparece de Explorar/búsqueda y no recibe pedidos (`vetar_negocios` en config). Niveles: Nuevo (< 5 pedidos), Excelente ≥ 90, Confiable ≥ 70, Regular, En riesgo < 50, Vetado
+- [x] **Admin** (`/api/admin/reputacion…`): lista (vetados primero), historial con anulados, anular evento, levantar veto (segunda oportunidad: queda en 50 y las graves viejas no cuentan) y **suspender a mano** (evento `suspension_admin`, solo se quita levantando el veto). `stats` incluye vetados
+- [x] App: `NivelBadge`/`TarjetaReputacion` (`components/Reputacion.tsx`), `CalificarPedido` en el seguimiento, badge "Califica" en Mis pedidos, nivel y "Prepara en ~N min" en Explorar y en el catálogo, tiempo de preparación en Mi Tienda + tarjeta de reputación del negocio, "Dinero por confirmar" en el Inicio del negocio y en el detalle del pedido, nivel + "Reportar novedad" + aviso de veto en Mis entregas, pantalla `AdminReputacionScreen` (Confiabilidad) y tarjetas de vetados en el tablero
+- [x] Tests Pest `ReputacionTest` (24) + verificado en el emulador de punta a punta con los usuarios demo
+- [ ] Push al domiciliario/negocio cuando queda vetado o en riesgo (hoy solo lo ve en la app)
+- [ ] Reclamo cuando el pedido se queda "en camino" y nunca se marca entregado (hoy el cliente solo califica pedidos entregados)
+- [ ] Ordenar Explorar por confiabilidad (hoy solo se muestra el nivel)
 
 ### General
 - [x] `GET /api/dashboard` — panel adaptativo que responde distinto según el rol
 
+### Producción (preparación para el piloto) — 2026-10-28
+> Guía paso a paso en `DESPLIEGUE.md` (raíz del repo).
+- [x] App: `API_URL` según el build (`__DEV__` → desarrollo, release → `API_URL_PRODUCCION`, HTTPS). 🚧 Falta poner el dominio real (hoy `api.vitrina.example`)
+- [x] Firma de la versión final: `android/app/build.gradle` lee `android/keystore.properties` (no va a git; plantilla `keystore.properties.example`); sin él firma con debug
+- [x] Push **en cola** (`ShouldQueue` en las notificaciones FCM); `iniciar-dev.bat` e `iniciar-emulador.bat` levantan `queue:work` y `schedule:work`
+- [x] Páginas públicas `/privacidad` (Ley 1581, datos del responsable en `config/vitrina.php` / `VITRINA_*`) y `/eliminar-cuenta`
+- [x] Zona horaria `America/Bogota` (`APP_TIMEZONE`): antes las horas de los pedidos salían en UTC (+5 h)
+- [ ] Elegir hosting y dominio, montar el servidor, SMTP real y llenar `VITRINA_*` (ver `DESPLIEGUE.md`)
+- [ ] Decidir el `applicationId` definitivo antes de la primera subida a Play Store (hoy `com.comercioapp`; cambiarlo exige re-registrar la app en Firebase)
+- [ ] iOS (después de Android, decisión del usuario): `GoogleService-Info.plist`, firma y prueba en iPhone
+
 ### Interfaz WEB (Blade) — panel del comerciante (sesión con cookies)
+> ⚠️ **Eliminada el 2026-10-28** (decisión del usuario: no mantener dos frontends). Se conserva la lista como historial; solo queda la web del administrador.
+>
 > Front web temporal para ver/probar todo en el navegador mientras se desarrolla el frontend nativo (React Native CLI vendrá después y consume la misma API). Login web por **sesión** (independiente de los tokens de la API). Estilo con Tailwind por CDN.
 - [x] Login/Logout web (`/login`, `/logout`) — `Web\AuthWebController`, vista `auth/login`
 - [x] Panel `/panel` protegido por sesión + `role:comerciante` — `Web\PanelController`, vista `panel/index`
@@ -154,6 +200,7 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 - [ ] Paginación visual del listado de productos en la web
 
 ### Interfaz WEB (Blade) — cliente (rol `usuario`)
+> ⚠️ **Eliminada el 2026-10-28** (todo vive en la app).
 - [x] `/explorar` — lista de negocios abiertos con nº de productos disponibles (`Web\ClienteController`, vista `cliente/explorar`)
 - [x] `/explorar/{id}` — catálogo de un negocio (productos disponibles agrupados por categoría) — vista `cliente/negocio`
 - [x] **Barra de búsqueda** `/buscar?q=` — busca productos por nombre, descripción, **categoría** y nombre del negocio; multi-palabra; insensible a mayúsculas/tildes (colación MySQL). Solo productos disponibles de negocios activos
@@ -161,6 +208,8 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 - [ ] **Búsqueda inteligente/semántica** (tolerante a errores de ortografía y por intención, ej: "pastillas para el dolor" → analgésicos). Capa futura sobre la búsqueda actual (full-text / trigramas / embeddings IA)
 
 ### Interfaz WEB (Blade) — FLUJO DE PEDIDOS (atraviesa los 4 roles)
+> ⚠️ **Eliminada el 2026-10-28** (todo vive en la app).
+>
 > Estados: `pendiente → listo → tomado → recogido → en_camino → entregado`. La "notificación" por ahora es que el pedido aparece en la vista de cada rol (push real con FCM = futuro). Menú del layout adaptado por rol (carrito con contador, "Mis pedidos", "Pedidos", "Entregas").
 - [x] **Cliente — carrito**: agregar/actualizar/quitar/vaciar; regla "un carrito = un negocio" — `Web\CarritoController`, vista `cliente/carrito`
 - [x] **Cliente — checkout**: dirección + teléfono + **forma de pago (efectivo/transferencia)** antes de confirmar — vista `cliente/checkout`
@@ -170,8 +219,8 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 - [x] **Domiciliario**: ver disponibles, **tomar** (con minutos), marcar Recogido/En camino/Entregado, historial — vista `domiciliario/index`
 - [x] Verificado end-to-end: cliente pide → comercio listo → domiciliario toma/recoge/entrega → cliente ve "Entregado"
 - [ ] Compartir **ubicación en mapa** del cliente (por ahora solo dirección escrita)
-- [ ] **Notificaciones push** en tiempo real (FCM) — hoy se ve al refrescar la vista
-- [ ] Tests Pest del ciclo de pedidos
+- [x] **Notificaciones push** en tiempo real (FCM) — hechas en la app (ver "Notificaciones push")
+- [x] Tests Pest del ciclo de pedidos — `PedidosCicloTest` (domicilio, cancelaciones, historial, ciclo completo)
 
 ### Interfaz WEB (Blade) — administrador (rol `administrador`)
 - [x] `/admin` — tablero con totales (usuarios, negocios, abiertos, productos) — `Web\AdminController`, vista `admin/index`
@@ -179,6 +228,7 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 - [x] `/admin/negocios` — visión global de todos los negocios (dueño, productos, abierto/cerrado) — vista `admin/negocios`
 
 ### Interfaz WEB (Blade) — domiciliario (rol `domiciliario`)
+> ⚠️ **Eliminada el 2026-10-28** (todo vive en la app).
 - [x] `/domiciliario` — panel con **datos reales**: pedidos disponibles (tomar con minutos), mis entregas en curso (Recogido→En camino→Entregado) e historial — `Web\DomiciliarioController`, vista `domiciliario/index`
 
 ---
@@ -188,7 +238,7 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
   `admin@demo.co`, `comerciante@demo.co`, `domiciliario@demo.co`, `cliente@demo.co`
 - [x] **Catálogo realista sembrado** (`CatalogoDemoSeeder`): 57 negocios de 14 tipos (restaurante, asadero, cafetería, bar, heladería, panadería, papelería, ferretería, ropa, frutería, carnicería, droguería, licorería, minimercado), con sus categorías y ~980 productos de distintos tipos de venta. Cada negocio es de un comerciante propio (`{slug}@demo.co` / `password123`). Idempotente
 - [x] Verificado manualmente: login por rol, dashboard por rol, comerciante crea negocio (201), cliente bloqueado en zona de comerciante (403)
-- [x] Tests automatizados (Pest): 15 tests del flujo de comerciante (negocio, productos, categorías, paginación, búsqueda, soft delete, aislamiento) — `tests/Feature/ComercianteTest.php`. Corren en SQLite en memoria (no tocan MySQL). `RefreshDatabase` activado en `tests/Pest.php`
+- [x] Tests automatizados (Pest): **135 en verde** (2026-10-28) en `tests/Feature` — empezó con 15 tests del flujo de comerciante (negocio, productos, categorías, paginación, búsqueda, soft delete, aislamiento) — `tests/Feature/ComercianteTest.php`. Corren en SQLite en memoria (no tocan MySQL). `RefreshDatabase` activado en `tests/Pest.php`
 - [x] Colección **Postman** con todos los endpoints y guardado automático de token — `postman/comercio-api.postman_collection.json` (importable también en Bruno; Thunder Client ya cobra por importar)
 - [x] Archivo **`api.http`** (extensión REST Client de VS Code, gratis y sin cuenta) con todos los endpoints y captura automática de token
 
@@ -205,6 +255,8 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 - [x] **Capa 2**: proyecto Firebase `miproyecto-48045`, service account en `storage/app/firebase/` y `FIREBASE_CREDENTIALS` en `.env` → envío real
 - [x] **Capa 3**: app móvil con `@react-native-firebase/messaging` + `@notifee/react-native`, `google-services.json`, permiso `POST_NOTIFICATIONS` (Android 13+), canal "Pedidos" de alta prioridad, registro del token al iniciar sesión y baja al salir, toast + notificación local en primer plano, y navegación al tocar la notificación según `tipo`/`pedido_id` (`RootNavigation.ts`), incluso con la app cerrada
 - [x] Notificación `InvitacionTrabajoRecibida` (equipos de trabajo)
+- [x] Notificación `PedidoCancelado` (al cliente si cancela el negocio; al equipo si cancela el cliente; abre el pedido)
+- [x] Todas las notificaciones FCM van **en cola** (`ShouldQueue`): hace falta `php artisan queue:work` corriendo
 - [ ] Notificaciones en tiempo real dentro de la app además del push (ver ADR-002 en el vault)
 
 ## 8. Pendiente grande (siguiente fase)
@@ -218,11 +270,15 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 - [x] **Modelo unificado multi-negocio + equipos** (solo falta decidir el panel web — ver sección 6)
 - [ ] Ubicación en mapa en tiempo real
 - [ ] Búsqueda inteligente/semántica (capa 2 y 3)
-- [ ] Botón llamar / WhatsApp al cliente desde el pedido (ADR-003)
+- [x] Botón llamar / WhatsApp al cliente desde el pedido (ADR-003) — y también al negocio y al domiciliario
+- [x] **P1 de la revisión del 2026-10-28**: cancelar/rechazar pedidos, costo de domicilio, historial y ventas del negocio, contacto, recuperar contraseña, eliminar cuenta + privacidad, push en cola, firma y URL de producción
+- [ ] **P2 de la revisión del 2026-10-28**: carrito persistente, turno del domiciliario, suspender cuentas desde el admin, horario de los negocios, polling más eficiente, paginación
 
 ---
 
 ## 📜 Historial de cambios
+- **2026-10-28** — **P1 de la revisión general (listo para piloto)**. Decisiones del usuario: se elimina el rol global `comerciante` y la web Blade que no es del admin (un solo frontend); iOS va después de Android. Pedidos: estado `cancelado` (el cliente cancela mientras está pendiente; el negocio rechaza pendientes o cancela listos sin domiciliario, con motivo y push `PedidoCancelado`), **costo de domicilio** configurable por el admin (`ajustes`), historial del negocio por pestañas + ventas de hoy (`PedidosNegocioScreen`), botones Llamar/WhatsApp entre las tres partes (ADR-003). Cuentas: recuperar contraseña con código por correo, autorización de datos al registrarse, eliminar cuenta (app + `/eliminar-cuenta`) con anonimización, política de privacidad pública, bloqueo de cuentas suspendidas. Producción: push en cola, `API_URL` por build, firma release con `keystore.properties`, zona horaria de Colombia, límites de intentos con nombre (antes se compartían entre rutas), guía `DESPLIEGUE.md`. Seeders sin `WithoutModelEvents` (los usuarios demo no tenían código público ni los dueños su membresía). Tests: `CuentaTest`, `PedidosCicloTest` → **135 en verde**.
+- **2026-10-28** — **Nivel de confiabilidad de negocios y domiciliarios** (ver sección 6). Puntaje 0–100 desde un historial de eventos: tiempos medidos por la app (preparación del negocio, recogida del domiciliario), calificación del cliente al terminar cada pedido, confirmación del dinero en efectivo por el negocio y novedades que justifican demoras. Veto automático (< 30 o 2 faltas graves en 30 días), suspensión manual, anulación de eventos y segunda oportunidad desde el admin. App: calificación, badges de nivel, tiempo de preparación, dinero por confirmar, novedades y pantalla de admin "Confiabilidad". 24 tests Pest nuevos.
 - **2026-10-02** — **Modelo unificado multi-negocio: se completa lo pendiente del 11/09**. Síntoma que lo destapó: en la app, "Productos" respondía *"No tienes acceso a este negocio"* a todos (las rutas `/comerciante/*` no traían `{negocio}` y Laravel inyectaba un `Negocio` vacío). Rutas `/api/negocios/...` e `/api/invitaciones/...`; app adaptada (negocio activo, Mis negocios, Equipo, invitaciones, registro sin rol); `NuevoPedidoParaComercio` incluye `negocio_id`; tests Pest (79 en verde).
 - **2026-09-11** — **Modelo unificado de usuarios y negocios (backend, a medias)**. Migración `create_membresias_negocio` (`negocio_user`, `invitaciones_trabajo`, `users.codigo_publico`, backfill). Controladores `Negocio/Producto/Categoria/ComercioPedido` reciben `{negocio}` y autorizan por membresía; nuevos `TrabajadorController` (invitar por código público, miembros, quitar, salir) e `InvitacionController` (aceptar/rechazar); notificación `InvitacionTrabajoRecibida`; registro sin rol. **Pendiente**: `routes/api.php` no se actualizó (las rutas `/comerciante/*` rompen), app móvil sin adaptar, tests. Además: puesta al día de este documento y del vault (`Vitrina/00 - Inicio/Estado Actual.md` pasa a ser el inventario completo de funcionalidades).
 - **2026-07-06** — **Refactor del catálogo del comerciante en la app**: `MisProductosScreen` reemplaza a `MisCategoriasScreen` (las categorías se asignan desde el formulario de producto); modal de producto deslizable con cierre por arrastre; `getProductos` sin filtro por categoría.
