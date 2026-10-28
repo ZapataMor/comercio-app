@@ -1,6 +1,7 @@
 /**
  * Notificaciones tipo "toast" con estilo de la app.
- * Aparecen arriba a la derecha, de forma temporal, y se cierran solas.
+ * Aparecen a la derecha, justo debajo de la topbar (para no tapar sus botones),
+ * de forma temporal, y se cierran solas.
  * Reemplazan a los `Alert.alert` genéricos para avisos (no para confirmaciones).
  *
  * Uso:
@@ -17,7 +18,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Animated, Text, View } from 'react-native';
+import { Animated, Platform, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colores, font, makeStyles, radius, useTheme } from './theme';
 
@@ -41,6 +42,10 @@ const ToastContext = createContext<ToastApi>({
 });
 
 const DURACION = 2800; // ms visible antes de cerrarse solo
+
+// Alto de la topbar del native-stack (sin la barra de estado): el toast se
+// coloca debajo para no tapar el switch Abierto/Cerrado ni "Mi perfil".
+const ALTO_TOPBAR = Platform.select({ android: 56, default: 44 });
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);
@@ -84,7 +89,7 @@ function Overlay({ items, quitar }: { items: ToastItem[]; quitar: (id: number) =
     return null;
   }
   return (
-    <View style={[styles.overlay, { top: insets.top + 8 }]} pointerEvents="none">
+    <View style={[styles.overlay, { top: insets.top + ALTO_TOPBAR + 8 }]} pointerEvents="none">
       {items.map(item => (
         <Tarjeta key={item.id} item={item} onClose={quitar} />
       ))}
