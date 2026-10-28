@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
-import { Usuario } from './api';
+import { alRechazarToken, Usuario } from './api';
 import { eliminarPush, escucharRotacionToken, registrarPush } from './pushNotifications';
 
 type Sesion = { token: string; user: Usuario } | null;
@@ -40,6 +40,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       })
       .finally(() => setCargando(false));
+  }, []);
+
+  // Si el backend rechaza el token de la sesión actual (401), se descarta la
+  // sesión y la app vuelve al login. No se llama a eliminarPush: con un token
+  // inválido el backend también lo rechazaría.
+  const tokenActual = useRef<string | null>(null);
+  tokenActual.current = auth?.token ?? null;
+
+  useEffect(() => {
+    alRechazarToken(token => {
+      if (token !== tokenActual.current) {
+        return;
+      }
+      tokenActual.current = null;
+      setAuth(null);
+      AsyncStorage.removeItem(CLAVE);
+    });
+    return () => alRechazarToken(null);
   }, []);
 
   useEffect(() => {

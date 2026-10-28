@@ -122,6 +122,18 @@ export class ApiError extends Error {
 }
 
 /**
+ * Aviso para AuthContext cuando el backend rechaza un token (401): esa sesión
+ * ya no existe en el servidor (token revocado, base re-sembrada, otro backend…).
+ * Recibe el token rechazado para no cerrar una sesión más nueva por una
+ * petición vieja que llegó tarde.
+ */
+let onTokenRechazado: ((token: string) => void) | null = null;
+
+export function alRechazarToken(cb: ((token: string) => void) | null) {
+  onTokenRechazado = cb;
+}
+
+/**
  * Inicia sesión contra POST /api/login del backend Laravel (Sanctum).
  * Devuelve el usuario + token, o lanza un Error con el mensaje del backend.
  */
@@ -228,6 +240,7 @@ async function authGet(path: string, token: string): Promise<any> {
   }
   const data = await res.json().catch(() => ({} as any));
   if (!res.ok) {
+    if (res.status === 401) onTokenRechazado?.(token);
     const errors = validationErrors(data);
     throw new ApiError(firstValidationMessage(errors) ?? data?.message ?? 'Error en la petición.', res.status, errors);
   }
@@ -252,6 +265,7 @@ async function authSend(method: 'POST' | 'PUT' | 'DELETE', path: string, token: 
   }
   const data = await res.json().catch(() => ({} as any));
   if (!res.ok) {
+    if (res.status === 401) onTokenRechazado?.(token);
     // Si hay errores de validación, mostramos el primero (más útil que el genérico).
     const errors = validationErrors(data);
     throw new ApiError(firstValidationMessage(errors) ?? data?.message ?? 'Error en la petición.', res.status, errors);
@@ -304,6 +318,7 @@ async function authUpload(
   }
   const data = await res.json().catch(() => ({} as any));
   if (!res.ok) {
+    if (res.status === 401) onTokenRechazado?.(token);
     const errors = validationErrors(data);
     throw new ApiError(firstValidationMessage(errors) ?? data?.message ?? 'Error en la petición.', res.status, errors);
   }
