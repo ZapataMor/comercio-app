@@ -194,7 +194,12 @@ class ComercioPedidoController extends Controller
         }
 
         // Avisa a los domiciliarios habilitados que hay un pedido para tomar.
-        $domiciliarios = User::role('domiciliario')->whereNull('domiciliario_vetado_at')->get();
+        // Solo a los que están en turno (y no vetados).
+        $domiciliarios = User::role('domiciliario')
+            ->whereNull('domiciliario_vetado_at')
+            ->whereNull('suspendido_at')
+            ->where('en_turno', true)
+            ->get();
         Push::enviar($domiciliarios, new PedidoDisponibleParaDomiciliario($pedido));
 
         // Y avisa al cliente que su pedido ya está listo.
@@ -202,7 +207,12 @@ class ComercioPedidoController extends Controller
             Push::enviar($pedido->cliente, new EstadoPedidoActualizado($pedido));
         }
 
-        return response()->json(['message' => 'Pedido listo. Los domiciliarios ya pueden tomarlo.']);
+        return response()->json([
+            'message' => $domiciliarios->isEmpty()
+                ? 'Pedido listo, pero ahora no hay domiciliarios en turno. Si nadie lo toma, puedes cancelarlo.'
+                : 'Pedido listo. Avisamos a '.$domiciliarios->count().' domiciliario(s) en turno.',
+            'domiciliarios_en_turno' => $domiciliarios->count(),
+        ]);
     }
 
     /**

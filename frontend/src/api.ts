@@ -17,7 +17,12 @@ export type Usuario = {
   codigo_publico?: string | null;
   /** Negocios donde es miembro activo, con su rol en cada uno. */
   negocios?: { id: number; nombre: string; rol: RolNegocio }[];
+  /** Domiciliario: si está en turno (le llegan los avisos de pedidos). */
+  en_turno?: boolean;
 };
+
+/** Una página de una lista paginada del backend. */
+export type Pagina<T> = { items: T[]; pagina: number; ultima_pagina: number };
 
 export type LoginResponse = {
   user: Usuario;
@@ -69,9 +74,17 @@ export type Negocio = {
   /** Minutos que el negocio promete tardar en tener listo un pedido. */
   tiempo_preparacion?: number;
   reputacion?: Reputacion;
+  /** Horario semanal: abre y cierra solo a esas horas. */
+  horario?: HorarioSemana | null;
+  /** "Hoy de 7:00 a. m. a 8:00 p. m." / "Hoy no abre" (null sin horario). */
+  horario_hoy?: string | null;
   /** Mi rol en este negocio (solo en las rutas de "mis negocios"). */
   rol?: RolNegocio | null;
 };
+
+export type DiaSemana = 'lun' | 'mar' | 'mie' | 'jue' | 'vie' | 'sab' | 'dom';
+/** null = ese día no abre. Horas "HH:MM" (24 h); si cierra <= abre, cierra al día siguiente. */
+export type HorarioSemana = Record<DiaSemana, { abre: string; cierra: string } | null>;
 
 export type Categoria = { id: number; nombre: string; productos?: number };
 export type TipoNegocio = { id: number; nombre: string; slug: string };
@@ -119,6 +132,8 @@ export type NegocioLista = {
   imagen?: string | null;
   productos: number;
   abierto: boolean;
+  /** "Hoy de 7:00 a. m. a 8:00 p. m." si el negocio tiene horario. */
+  horario_hoy?: string | null;
   tiempo_preparacion?: number;
   reputacion?: Reputacion;
 };
@@ -496,7 +511,18 @@ export type NegocioInput = {
   telefono?: string | null;
   activo?: boolean;
   tiempo_preparacion?: number;
+  /** null = sin horario (solo el switch Abierto/Cerrado). */
+  horario?: HorarioSemana | null;
 };
+
+/**
+ * El horario viaja como texto JSON: el formulario con foto es multipart y ahí
+ * no caben objetos anidados (el backend lo convierte de vuelta).
+ */
+function cuerpoNegocio(body: NegocioInput): Record<string, any> {
+  const { horario, ...resto } = body;
+  return horario === undefined ? resto : { ...resto, horario: JSON.stringify(horario) };
+}
 
 /** Crea un negocio nuevo (quedo como propietario). Con `imagenUri` sube la foto. */
 export async function crearNegocio(
@@ -504,9 +530,10 @@ export async function crearNegocio(
   body: NegocioInput,
   imagenUri?: string,
 ): Promise<Negocio> {
+  const datos = cuerpoNegocio(body);
   const d = imagenUri
-    ? await authUpload('POST', '/api/negocios', token, body, imagenUri)
-    : await authSend('POST', '/api/negocios', token, body);
+    ? await authUpload('POST', '/api/negocios', token, datos, imagenUri)
+    : await authSend('POST', '/api/negocios', token, datos);
   return d.negocio as Negocio;
 }
 
@@ -517,9 +544,10 @@ export async function actualizarNegocio(
   body: NegocioInput,
   imagenUri?: string,
 ): Promise<Negocio> {
+  const datos = cuerpoNegocio(body);
   const d = imagenUri
-    ? await authUpload('PUT', `/api/negocios/${negocioId}`, token, body, imagenUri)
-    : await authSend('PUT', `/api/negocios/${negocioId}`, token, body);
+    ? await authUpload('PUT', `/api/negocios/${negocioId}`, token, datos, imagenUri)
+    : await authSend('PUT', `/api/negocios/${negocioId}`, token, datos);
   return d.negocio as Negocio;
 }
 
@@ -858,13 +886,23 @@ export type AdminStats = {
   negocios_vetados?: number;
 };
 
-export type AdminUsuario = { id: number; name: string; email: string; rol: string };
+export type AdminUsuario = {
+  id: number;
+  name: string;
+  email: string;
+  rol: string;
+  /** Cuenta bloqueada por un admin (no puede iniciar sesión). */
+  suspendido?: boolean;
+  motivo_suspension?: string | null;
+};
 
 export type AdminUsuariosResp = {
   roles: string[];
   rol_actual: string;
   conteos: Record<string, number>;
   usuarios: AdminUsuario[];
+  pagina: number;
+  ultima_pagina: number;
 };
 
 export type AdminNegocio = {
@@ -873,14 +911,29 @@ export type AdminNegocio = {
   dueno: string | null;
   productos: number;
   activo: boolean;
+  vetado?: boolean;
+  /** Su único dueño eliminó la cuenta: ya no se ve en la app. */
+  archivado?: boolean;
 };
 
 export function getAdminStats(token: string): Promise<AdminStats> {
   return authGet('/api/admin/stats', token);
 }
 
-export function getAdminUsuarios(token: string, rol: string): Promise<AdminUsuariosResp> {
-  return authGet(`/api/admin/usuarios?rol=${rol}`, token);
+/** Usuarios de un rol, 30 por página, con búsqueda por nombre o correo. */
+export function getAdminUsuarios(token: string, rol: string, buscar = '', pagina = 1): Promise<AdminUsuariosResp> {
+  return authGet(`/api/admin/usuarios?rol=${rol}&buscar=${encodeURIComponent(buscar)}&page=${pagina}`, token);
+}
+
+/** Bloquear una cuenta (no puede iniciar sesión; sus sesiones se cierran). */
+export async function suspenderUsuario(token: string, id: number, motivo: string): Promise<string> {
+  const d = await authSend('PUT', `/api/admin/usuarios/${id}/suspender`, token, { motivo });
+  return d.message as string;
+}
+
+export async function reactivarUsuario(token: string, id: number): Promise<string> {
+  const d = await authSend('PUT', `/api/admin/usuarios/${id}/reactivar`, token);
+  return d.message as string;
 }
 
 export async function crearUsuario(
@@ -894,9 +947,10 @@ export async function cambiarRol(token: string, id: number, rol: string): Promis
   await authSend('PUT', `/api/admin/usuarios/${id}/rol`, token, { rol });
 }
 
-export async function getAdminNegocios(token: string): Promise<AdminNegocio[]> {
-  const data = await authGet('/api/admin/negocios', token);
-  return (data.negocios ?? []) as AdminNegocio[];
+/** Todos los negocios, 30 por página, con búsqueda por nombre. */
+export async function getAdminNegocios(token: string, buscar = '', pagina = 1): Promise<Pagina<AdminNegocio>> {
+  const d = await authGet(`/api/admin/negocios?buscar=${encodeURIComponent(buscar)}&page=${pagina}`, token);
+  return { items: (d.negocios ?? []) as AdminNegocio[], pagina: d.pagina ?? 1, ultima_pagina: d.ultima_pagina ?? 1 };
 }
 
 /** Barrio sugerido por un cliente, pendiente de que el admin lo apruebe. */
@@ -1011,9 +1065,17 @@ export type Pedido = {
 };
 
 /** `vetado`: mi cuenta está suspendida y no puedo tomar pedidos nuevos. */
-export async function getDisponibles(token: string): Promise<{ pedidos: Pedido[]; vetado: boolean }> {
+export async function getDisponibles(
+  token: string,
+): Promise<{ pedidos: Pedido[]; vetado: boolean; en_turno: boolean }> {
   const d = await authGet('/api/domiciliario/disponibles', token);
-  return { pedidos: (d.pedidos ?? []) as Pedido[], vetado: !!d.vetado };
+  return { pedidos: (d.pedidos ?? []) as Pedido[], vetado: !!d.vetado, en_turno: !!d.en_turno };
+}
+
+/** Entrar / salir de turno: solo en turno llegan los avisos de pedidos listos. */
+export async function cambiarTurno(token: string, enTurno: boolean): Promise<string> {
+  const d = await authSend('PUT', '/api/domiciliario/turno', token, { en_turno: enTurno });
+  return d.message as string;
 }
 
 /** Mi nivel de confiabilidad como domiciliario y sus últimos eventos. */
@@ -1031,9 +1093,10 @@ export async function getMisEntregas(token: string): Promise<Pedido[]> {
   return (d.pedidos ?? []) as Pedido[];
 }
 
-export async function getHistorialEntregas(token: string): Promise<Pedido[]> {
-  const d = await authGet('/api/domiciliario/historial', token);
-  return (d.pedidos ?? []) as Pedido[];
+/** Mis entregas completadas, 20 por página. */
+export async function getHistorialEntregas(token: string, pagina = 1): Promise<Pagina<Pedido>> {
+  const d = await authGet(`/api/domiciliario/historial?page=${pagina}`, token);
+  return { items: (d.pedidos ?? []) as Pedido[], pagina: d.pagina ?? 1, ultima_pagina: d.ultima_pagina ?? 1 };
 }
 
 export async function tomarPedido(token: string, id: number, minutos: number): Promise<void> {
@@ -1125,9 +1188,10 @@ export async function crearPedido(token: string, body: NuevoPedido): Promise<num
   return d.id as number;
 }
 
-export async function getMisPedidos(token: string): Promise<MiPedido[]> {
-  const d = await authGet('/api/pedidos', token);
-  return (d.pedidos ?? []) as MiPedido[];
+/** Mis pedidos (más recientes primero), 20 por página. */
+export async function getMisPedidos(token: string, pagina = 1): Promise<Pagina<MiPedido>> {
+  const d = await authGet(`/api/pedidos?page=${pagina}`, token);
+  return { items: (d.pedidos ?? []) as MiPedido[], pagina: d.pagina ?? 1, ultima_pagina: d.ultima_pagina ?? 1 };
 }
 
 export async function getPedido(token: string, id: number): Promise<SeguimientoPedido> {

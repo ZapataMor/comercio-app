@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Resources\NegocioResource;
 use App\Models\Negocio;
 use App\Models\TipoNegocio;
+use App\Support\HorarioNegocio;
 use App\Support\Reputacion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -46,6 +47,8 @@ class NegocioController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->horarioDesdeJson($request);
+
         $data = $request->validate([
             'nombre' => ['required', 'string', 'max:255'],
             'descripcion' => ['nullable', 'string'],
@@ -59,7 +62,11 @@ class NegocioController extends Controller
             // Tiempo promedio que promete para tener listo un pedido (minutos).
             'tiempo_preparacion' => ['sometimes', 'integer', 'min:5', 'max:180'],
             'imagen' => ['sometimes', 'image', 'max:4096'], // máx 4 MB
-        ]);
+        ] + HorarioNegocio::reglas());
+
+        if (array_key_exists('horario', $data)) {
+            $data['horario'] = HorarioNegocio::normalizar($data['horario']);
+        }
 
         $categorias = $this->normalizarCategorias($data);
         unset($data['categorias']);
@@ -117,6 +124,8 @@ class NegocioController extends Controller
             return $this->sinAcceso('Solo el propietario puede editar el negocio.');
         }
 
+        $this->horarioDesdeJson($request);
+
         $data = $request->validate([
             'nombre' => ['sometimes', 'required', 'string', 'max:255'],
             'descripcion' => ['nullable', 'string'],
@@ -129,7 +138,16 @@ class NegocioController extends Controller
             // Tiempo promedio que promete para tener listo un pedido (minutos).
             'tiempo_preparacion' => ['sometimes', 'integer', 'min:5', 'max:180'],
             'imagen' => ['sometimes', 'image', 'max:4096'],
-        ]);
+        ] + HorarioNegocio::reglas());
+
+        if (array_key_exists('horario', $data)) {
+            $data['horario'] = HorarioNegocio::normalizar($data['horario']);
+        }
+
+        // Abrir/cerrar a mano se respeta hasta la próxima hora del horario.
+        if (array_key_exists('activo', $data) && (bool) $data['activo'] !== $negocio->activo) {
+            $negocio->activo_cambiado_at = now();
+        }
 
         if (array_key_exists('categorias', $data) || array_key_exists('categoria', $data)) {
             $categorias = $this->normalizarCategorias($data);
@@ -148,6 +166,18 @@ class NegocioController extends Controller
         return response()->json([
             'negocio' => $this->conRol($negocio, Negocio::ROL_PROPIETARIO),
         ]);
+    }
+
+    /**
+     * La app manda el formulario del negocio como multipart (por la imagen),
+     * así que el horario llega como texto JSON: se convierte a arreglo.
+     */
+    private function horarioDesdeJson(Request $request): void
+    {
+        $horario = $request->input('horario');
+        if (is_string($horario)) {
+            $request->merge(['horario' => $horario === '' ? null : json_decode($horario, true)]);
+        }
     }
 
     /** Resource del negocio + el rol del usuario en él (para la app). */

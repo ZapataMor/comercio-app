@@ -19,6 +19,7 @@ import { NegocioProvider } from './src/NegocioContext';
 import { configurarMensajesForeground } from './src/pushNotifications';
 import { navigationRef, procesarNotificacionPendiente } from './src/RootNavigation';
 import { ToastProvider } from './src/Toast';
+import { avisarCambioDesdePush } from './src/usePolling';
 import { useToast } from './src/Toast';
 import { RootStackParamList } from './src/navTypes';
 import HomeScreen from './src/screens/HomeScreen';
@@ -204,6 +205,8 @@ function PushBridge() {
       const titulo = message.notification?.title ?? 'Nueva notificacion';
       const cuerpo = message.notification?.body;
       toast.info(titulo, cuerpo);
+      // Algo cambió: las pantallas en vivo se refrescan ya, sin esperar.
+      avisarCambioDesdePush();
     });
   }, [auth?.user, toast]);
 

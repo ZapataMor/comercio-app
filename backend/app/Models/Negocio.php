@@ -27,6 +27,8 @@ class Negocio extends Model
         // Minutos que promete tardar en tener listo un pedido. La reputación
         // (reputacion, vetado_at...) NO es asignable: la maneja Support\Reputacion.
         'tiempo_preparacion',
+        // Horario semanal (ver App\Support\HorarioNegocio).
+        'horario',
     ];
 
     protected function casts(): array
@@ -37,6 +39,9 @@ class Negocio extends Model
             'reputacion' => 'integer',
             'reputacion_pedidos' => 'integer',
             'vetado_at' => 'datetime',
+            'horario' => 'array',
+            'activo_cambiado_at' => 'datetime',
+            'archivado_at' => 'datetime',
         ];
     }
 

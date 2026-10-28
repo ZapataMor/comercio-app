@@ -341,6 +341,12 @@ const CardNegocio = React.memo(function CardNegocio({
             <Text style={styles.categoriaTxt}>{item.categoria}</Text>
           </View>
         )}
+        {!!item.horario_hoy && (
+          <View style={[styles.categoriaFila, styles.filaAccion]}>
+            <Icon name="reloj" size={13} color={c.muted} />
+            <Text style={styles.categoriaTxt}>{item.horario_hoy}</Text>
+          </View>
+        )}
         {!!item.direccion && (
           <View style={[styles.dir, styles.filaAccion]}>
             <Icon name="ubicacion" size={13} color={c.mutedSoft} />

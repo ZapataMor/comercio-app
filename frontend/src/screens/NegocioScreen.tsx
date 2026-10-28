@@ -176,6 +176,12 @@ export default function NegocioScreen({ route }: Props) {
                     </>
                   )}
                 </View>
+                {!!negocio.horario_hoy && (
+                  <View style={styles.heroDato}>
+                    <Icon name="reloj" size={13} color="rgba(255,255,255,0.78)" />
+                    <Text style={styles.heroDatoTxt} numberOfLines={1}>{negocio.horario_hoy}</Text>
+                  </View>
+                )}
                 {!!negocio.direccion && (
                   <View style={styles.heroDato}>
                     <Icon name="ubicacion" size={13} color="rgba(255,255,255,0.78)" />

@@ -38,7 +38,7 @@ El proyecto no es un solo programa, son tres cosas que se hablan entre sí:
 
 | Pieza | Qué es | Dónde vive |
 |---|---|---|
-| **API (Laravel)** | El servidor: base de datos, login, pedidos. También sirve la web del PC. | `backend/` |
+| **API (Laravel)** | El servidor: base de datos, login, pedidos. También sirve el panel web del admin. | `backend/` |
 | **Metro** | El "servidor de código" de la app móvil. Le envía al teléfono el JavaScript recién guardado. | `frontend/` |
 | **adb** | El puente entre el PC y el teléfono. Sin él, Metro no encuentra el móvil. | Android SDK |
 
@@ -85,7 +85,7 @@ Déjala abierta mientras programas. Si algo se queda raro, pulsa `r` ahí para r
 ### Y ya
 
 - **En el móvil:** abre la app desde su ícono, como cualquier app normal.
-- **En el PC:** abre `http://localhost:8000` en el navegador (es la web Blade de Laravel).
+- **En el PC:** `http://localhost:8000` abre el panel web del **administrador** (`admin@demo.co`). Clientes, negocios y domiciliarios usan solo la app.
 
 ## 🔄 ¿Qué se actualiza solo?
 
@@ -109,7 +109,8 @@ queda. Solo se vuelve a ejecutar en los casos de la última fila.
 | `npm start` | Arranca Metro (igual que `npx react-native start`) |
 | `npm run android` | Compila e **instala** la app en el teléfono (igual que `npx react-native run-android`) |
 | `npm run dev` (en `backend/`) | Recarga en vivo los estilos Tailwind de la web. Solo si tocas CSS |
-| `php artisan queue:listen --tries=1` | Procesa la cola. Solo si estás probando **notificaciones push** |
+| `php artisan queue:work --tries=3` | Procesa la cola: **sin esto no salen los push** (lo abren los `.bat`) |
+| `php artisan schedule:work` | Tareas programadas: abre/cierra los negocios según su horario (lo abren los `.bat`) |
 | `npm start -- --reset-cache` | Metro con la caché limpia. Cuando ves errores que "no tienen sentido" |
 
 ## 🚫 Lo que NO se ejecuta cada día
@@ -149,7 +150,7 @@ o directamente en la cabecera de `iniciar-dev.bat` al arrancar.
 | `cannot connect ... 10061` | El `adb tcpip 5555` no llegó a ejecutarse. Repítelo con el cable puesto |
 | `adb devices` sale vacío | El teléfono se reinició: hay que rehacer el `tcpip` por USB |
 | La web del PC no carga | La API no está levantada (ventana 1) |
-| Las notificaciones push no llegan | Falta `php artisan queue:listen` |
+| Las notificaciones push no llegan | Falta `php artisan queue:work` (ventana "Cola - Laravel"), o el domiciliario está **fuera de turno** |
 
 ## 🔗 Relacionado
 - [[🏠 Home]] · [[Estado Actual]]

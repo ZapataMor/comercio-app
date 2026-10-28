@@ -115,13 +115,16 @@ class PedidoController extends Controller
         return response()->json(['id' => $pedido->id, 'message' => '¡Pedido confirmado!'], 201);
     }
 
-    /** Mis pedidos (más recientes primero). */
+    /** Mis pedidos (más recientes primero), 20 por página (`?page=`). */
     public function index(Request $request): JsonResponse
     {
-        $pedidos = $request->user()->pedidos()
+        $pagina = $request->user()->pedidos()
             ->with(['negocio', 'calificacion'])
             ->latest()
-            ->get()
+            ->latest('id')
+            ->paginate(20);
+
+        $pedidos = $pagina->getCollection()
             ->map(fn ($p) => [
                 'id' => $p->id,
                 'estado' => $p->estado,
@@ -131,9 +134,14 @@ class PedidoController extends Controller
                 'fecha' => $p->created_at->format('d/m/Y H:i'),
                 'cancelado_por' => $p->cancelado_por,
                 'por_calificar' => $p->puedeCalificarse(),
-            ]);
+            ])
+            ->values();
 
-        return response()->json(['pedidos' => $pedidos]);
+        return response()->json([
+            'pedidos' => $pedidos,
+            'pagina' => $pagina->currentPage(),
+            'ultima_pagina' => $pagina->lastPage(),
+        ]);
     }
 
     /** Seguimiento de un pedido propio. */

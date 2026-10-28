@@ -166,19 +166,34 @@ test('crear un pedido notifica al comercio', function () {
     Notification::assertSentTo($negocio->user, NuevoPedidoParaComercio::class);
 });
 
-test('marcar un pedido listo notifica a los domiciliarios y al cliente', function () {
+test('marcar un pedido listo notifica a los domiciliarios en turno y al cliente', function () {
     Notification::fake();
 
     $negocio = negocioAbierto();
     $cliente = usuarioCon('usuario');
-    $domiciliario = usuarioCon('domiciliario');
+    $enTurno = usuarioCon('domiciliario');
+    $enTurno->forceFill(['en_turno' => true])->save();
+    $fueraDeTurno = usuarioCon('domiciliario');
     $pedido = pedidoEnEstado($negocio, $cliente, 'pendiente');
 
     Sanctum::actingAs($negocio->user);
-    $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}/listo")->assertOk();
+    $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}/listo")
+        ->assertOk()
+        ->assertJsonPath('domiciliarios_en_turno', 1);
 
-    Notification::assertSentTo($domiciliario, PedidoDisponibleParaDomiciliario::class);
+    Notification::assertSentTo($enTurno, PedidoDisponibleParaDomiciliario::class);
+    Notification::assertNotSentTo($fueraDeTurno, PedidoDisponibleParaDomiciliario::class);
     Notification::assertSentTo($cliente, EstadoPedidoActualizado::class);
+});
+
+test('el domiciliario entra y sale de turno', function () {
+    $domiciliario = usuarioCon('domiciliario');
+    Sanctum::actingAs($domiciliario);
+
+    $this->getJson('/api/domiciliario/disponibles')->assertJsonPath('en_turno', false);
+    $this->putJson('/api/domiciliario/turno', ['en_turno' => true])->assertOk()->assertJsonPath('en_turno', true);
+    $this->getJson('/api/domiciliario/disponibles')->assertJsonPath('en_turno', true);
+    expect($domiciliario->fresh()->en_turno)->toBeTrue();
 });
 
 test('tomar un pedido notifica al cliente', function () {

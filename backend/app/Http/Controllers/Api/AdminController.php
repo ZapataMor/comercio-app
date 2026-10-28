@@ -32,7 +32,10 @@ class AdminController extends Controller
         ]);
     }
 
-    /** Usuarios filtrados por tipo (rol), con conteos por tipo. */
+    /**
+     * Usuarios filtrados por tipo (rol), con conteos por tipo. 30 por página
+     * (`?page=`) y búsqueda por nombre, apellidos o correo (`?buscar=`).
+     */
     public function usuarios(Request $request): JsonResponse
     {
         $rol = $request->get('rol');
@@ -45,19 +48,62 @@ class AdminController extends Controller
             $conteos[$r] = User::role($r)->count();
         }
 
-        $usuarios = User::role($rol)->orderBy('name')->get()->map(fn ($u) => [
+        $buscar = trim((string) $request->get('buscar', ''));
+        $pagina = User::role($rol)
+            ->when($buscar !== '', fn ($q) => $q->where(fn ($qq) => $qq
+                ->where('name', 'like', "%{$buscar}%")
+                ->orWhere('apellidos', 'like', "%{$buscar}%")
+                ->orWhere('email', 'like', "%{$buscar}%")))
+            ->orderBy('name')
+            ->paginate(30);
+
+        $usuarios = $pagina->getCollection()->map(fn ($u) => [
             'id' => $u->id,
             'name' => $u->nombre_completo,
             'email' => $u->email,
             'rol' => $u->getRoleNames()->first(),
-        ]);
+            'suspendido' => $u->suspendido_at !== null,
+            'motivo_suspension' => $u->motivo_suspension,
+        ])->values();
 
         return response()->json([
             'roles' => self::ROLES,
             'rol_actual' => $rol,
             'conteos' => $conteos,
             'usuarios' => $usuarios,
+            'pagina' => $pagina->currentPage(),
+            'ultima_pagina' => $pagina->lastPage(),
         ]);
+    }
+
+    /**
+     * Suspender una cuenta (cliente abusivo, pedidos falsos…): no puede
+     * iniciar sesión y sus sesiones abiertas se cierran. Para negocios y
+     * domiciliarios por mal servicio está el veto de Reputación.
+     */
+    public function suspender(Request $request, User $usuario): JsonResponse
+    {
+        $datos = $request->validate([
+            'motivo' => ['required', 'string', 'max:255'],
+        ]);
+
+        if ($usuario->id === $request->user()->id) {
+            return response()->json(['message' => 'No puedes suspender tu propia cuenta.'], 422);
+        }
+
+        $usuario->forceFill(['suspendido_at' => now(), 'motivo_suspension' => $datos['motivo']])->save();
+        $usuario->tokens()->delete();
+        $usuario->deviceTokens()->delete();
+
+        return response()->json(['message' => "Cuenta de {$usuario->nombre_completo} suspendida."]);
+    }
+
+    /** Quitar la suspensión: puede volver a iniciar sesión. */
+    public function reactivar(User $usuario): JsonResponse
+    {
+        $usuario->forceFill(['suspendido_at' => null, 'motivo_suspension' => null])->save();
+
+        return response()->json(['message' => "Cuenta de {$usuario->nombre_completo} reactivada."]);
     }
 
     /** Crear un usuario con rol. */
@@ -99,21 +145,30 @@ class AdminController extends Controller
         return response()->json(['message' => "Rol de {$usuario->nombre_completo} cambiado a {$datos['rol']}."]);
     }
 
-    /** Todos los negocios (visión global). */
-    public function negocios(): JsonResponse
+    /** Todos los negocios (visión global): 30 por página y `?buscar=` por nombre. */
+    public function negocios(Request $request): JsonResponse
     {
-        $negocios = Negocio::with('user')
+        $buscar = trim((string) $request->get('buscar', ''));
+        $pagina = Negocio::with('user')
             ->withCount('productos')
+            ->when($buscar !== '', fn ($q) => $q->where('nombre', 'like', "%{$buscar}%"))
             ->orderBy('nombre')
-            ->get()
-            ->map(fn ($n) => [
-                'id' => $n->id,
-                'nombre' => $n->nombre,
-                'dueno' => $n->user?->nombre_completo,
-                'productos' => $n->productos_count,
-                'activo' => $n->activo,
-            ]);
+            ->paginate(30);
 
-        return response()->json(['negocios' => $negocios]);
+        $negocios = $pagina->getCollection()->map(fn ($n) => [
+            'id' => $n->id,
+            'nombre' => $n->nombre,
+            'dueno' => $n->user?->nombre_completo,
+            'productos' => $n->productos_count,
+            'activo' => $n->activo,
+            'vetado' => $n->vetado_at !== null,
+            'archivado' => $n->archivado_at !== null,
+        ])->values();
+
+        return response()->json([
+            'negocios' => $negocios,
+            'pagina' => $pagina->currentPage(),
+            'ultima_pagina' => $pagina->lastPage(),
+        ]);
     }
 }

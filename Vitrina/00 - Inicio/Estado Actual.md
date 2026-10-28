@@ -2,13 +2,13 @@
 title: Estado Actual
 tags: [inicio, estado, producto]
 estado: en-progreso
-actualizado: 2026-09-11
+actualizado: 2026-10-28
 ---
 
 # 📊 Estado Actual
 
 > Snapshot vivo e **inventario completo** de funcionalidades de Vitrina, de lo mínimo a lo
-> notable, derivado del código real (`backend/` y `frontend/`) el **2026-09-11**. Sirve para
+> notable, derivado del código real (`backend/` y `frontend/`) el **2026-10-28**. Sirve para
 > refrescar la memoria tras un tiempo sin desarrollar. El changelog técnico detallado vive en
 > `backend/ESTADO_DEL_PROYECTO.md`.
 
@@ -17,8 +17,11 @@ actualizado: 2026-09-11
 > ⏳ pendiente. Cada sección cierra con la lista de rutas de API y pantallas para ubicarse rápido.
 
 ## 🎯 Foco actual
-Cerrar el **modelo unificado multi-negocio** (sección 6): actualizar `routes/api.php`, adaptar
-la app móvil (Mis negocios, Equipo, Invitaciones, registro sin rol) y cubrirlo con tests.
+**Fase: listo para piloto.** La revisión general del 2026-10-28 cerró P1 (pedidos cancelables,
+costo de domicilio, historial y ventas del negocio, contacto, cuentas y preparación para
+producción) y P2 (carrito persistente, turno del domiciliario, suspensión de cuentas, horario de
+los negocios, refresco eficiente y paginación). Lo que sigue **no es código**: elegir hosting y
+dominio, montar el servidor y publicar en Play Store (`DESPLIEGUE.md`), y luego iOS.
 
 ---
 
@@ -34,13 +37,16 @@ prepara y un domiciliario entrega. Ver [[Pitch]] y [[Propuesta de Valor]].
 | -------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
 | API REST       | Laravel 13 · PHP 8.4 · MySQL (`comercio_api`)                                        | `backend/`                                                          |
 | Auth API       | Sanctum (tokens) · Spatie Permission (roles)                                         | `backend/app/Http/Controllers/AuthController.php`                   |
-| Web de pruebas | Blade + Tailwind CDN, login por sesión                                               | `backend/routes/web.php`, `resources/views`                         |
+| Web (solo admin) | Blade + Tailwind CDN, login por sesión; + páginas públicas `/privacidad` y `/eliminar-cuenta` | `backend/routes/web.php`, `resources/views`                     |
 | App móvil      | React Native 0.86 · TypeScript · React Navigation (native stack)                     | `frontend/`                                                         |
 | Push           | Firebase Cloud Messaging + Notifee (app) · `laravel-notification-channels/fcm` (API) | `frontend/src/pushNotifications.ts`, `backend/app/Support/Push.php` |
-| Tests          | Pest (SQLite en memoria) — 61 tests en 7 archivos                                    | `backend/tests/Feature`                                             |
+| Tests          | Pest (SQLite en memoria) — 145 tests · Jest (app) — 6 tests                          | `backend/tests/Feature`, `frontend/__tests__`                       |
+| Cola y tareas  | `queue:work` (push en cola) y `schedule:work` / cron (horarios)                      | `iniciar-dev.bat`, `routes/console.php`                             |
 | Docs de API    | Postman (`backend/postman/`) y `backend/api.http` (REST Client)                      |                                                                     |
 
-- La app apunta a `http://10.0.2.2:8000` (emulador Android) en `frontend/src/config.ts`.
+- La app apunta a `http://10.0.2.2:8000` (emulador) en desarrollo y a `API_URL_PRODUCCION`
+  (HTTPS) en la versión final, en `frontend/src/config.ts`. Despliegue: `DESPLIEGUE.md`.
+- Zona horaria del backend: `America/Bogota`.
 - Nombre técnico del paquete Android: `com.comercioapp`; marca visible: **Vitrina**.
 - Convención: la API responde JSON en `api/*`, mensajes de validación en **español**
   (`backend/lang/es/`).
@@ -50,7 +56,8 @@ prepara y un domiciliario entrega. Ver [[Pitch]] y [[Propuesta de Valor]].
 ## 2. Cuentas, roles y sesión
 
 ### 2.1 Roles (Spatie) ✅
-`administrador` · `comerciante` · `usuario` (cliente) · `domiciliario`. Ver [[Mapa de Actores]].
+`administrador` · `usuario` (cliente) · `domiciliario`. Ver [[Mapa de Actores]].
+El rol `comerciante` **se eliminó el 2026-10-28**: tener un negocio lo decide la membresía.
 
 - Registro público solo crea `usuario` (ver 2.2). `administrador` y `domiciliario` los asigna un admin.
 - La navegación de la app se decide por rol en `frontend/App.tsx`: el cliente aterriza en
@@ -64,11 +71,8 @@ dirección, barrio y teléfono**. Al crear:
 - guarda la dirección como **ubicación principal** del cliente (`cliente_direcciones`),
 - si el barrio no está en el catálogo lo registra como **sugerencia pendiente** (ver 4.5).
 
-> [!todo] Transición al modelo unificado
-> El backend ya **no acepta elegir rol** al registrarse (todos son clientes; los negocios se
-> crean después). La app (`RegisterScreen`) **todavía muestra el selector Cliente/Comerciante**
-> y envía `role`, que el backend ignora. Hay que quitar ese selector y rediseñar el
-> onboarding a "crea tu negocio desde Mis negocios". Ver 6.
+- exige **aceptar la política de privacidad** (casilla con enlace; Ley 1581) y guarda
+  `terminos_aceptados_at`.
 
 ### 2.3 Login / logout / sesión ✅
 - `POST /api/login` (throttle 6/min) → token Sanctum + payload del usuario (roles, dirección,
@@ -76,12 +80,19 @@ dirección, barrio y teléfono**. Al crear:
 - `POST /api/logout` revoca **solo** el token usado; la app además da de baja el token FCM.
 - Sesión **persistente** en la app (`AuthContext` + AsyncStorage): no vuelve a pedir login.
 - Mensaje genérico en credenciales inválidas (no revela si el email existe).
+- **¿Olvidaste tu contraseña?** ✅ código de 6 dígitos por correo (`/api/password/codigo` y
+  `/restablecer`): vence en 15 min, se anula tras 5 fallos y cierra las otras sesiones.
+- **Cuenta suspendida** ✅ por un admin: no inicia sesión y sus sesiones se cierran solas.
+- Límites de intentos por ruta y por correo (no se mezclan entre login y recuperar contraseña).
 
 ### 2.4 Perfil personal ✅
 `PUT /api/perfil` y pantalla **Mi perfil** (`PerfilScreen`, accesible desde el botón de la
 topbar en todos los roles). Edita nombre, email, contraseña (exige la actual), dirección,
 barrio y teléfono. Para clientes esos tres últimos son obligatorios y se sincronizan con su
-dirección principal. Aquí también está **Cerrar sesión**.
+dirección principal. Aquí también están **Privacidad** (abre `/privacidad`), **Cerrar sesión** y
+**Eliminar mi cuenta** ✅ (pide la contraseña; anonimiza los datos y conserva el historial de
+pedidos sin datos de contacto; archiva los negocios donde era el único dueño; no deja si hay
+pedidos en curso). También se puede desde la web pública `/eliminar-cuenta`.
 
 ### 2.5 Dashboard adaptativo ✅
 `GET /api/dashboard` devuelve título/menú/acciones según el rol (o según si es miembro de
@@ -140,17 +151,29 @@ pantalla de categorías: se asignan desde el formulario de producto (la pantalla
 - El **Inicio** del comerciante lista los **pedidos en espera** y los refresca cada pocos
   segundos; cada uno abre `ComercioPedidoDetalle` (cliente, dirección, teléfono, pago, ítems)
   con el botón **"Marcar listo"**.
-- Marcar listo (`pendiente → listo`) avisa por push a todos los domiciliarios y al cliente.
+- Marcar listo (`pendiente → listo`) avisa por push a los domiciliarios **en turno** y al
+  cliente; la respuesta dice cuántos domiciliarios había en turno.
 - Solo pedidos del propio negocio y solo si están pendientes (409 si no).
+- **Rechazar / cancelar** ✅ con motivo (chips sugeridos): pendiente = rechazar; listo sin
+  domiciliario = cancelar ("nadie lo tomó"). Push `PedidoCancelado` al cliente.
+- **Pedidos y ventas** ✅ (`PedidosNegocioScreen`): pestañas En espera / En curso / Entregados /
+  Cancelados (20 por página) y resumen de **hoy** (pedidos, entregados, cancelados y lo vendido =
+  subtotal entregado, sin domicilios).
+- **Contacto** ✅: Llamar / WhatsApp al cliente y, mientras lo lleva, al domiciliario.
 
-**Rutas (prefijo `/api/comerciante`, `role:comerciante`):** `GET/POST/PUT /negocio`,
+### 3.6 Horario del negocio ✅ (2026-10-28)
+Horario semanal (lun..dom, o "no abre") en Mi Tienda (`EditorHorario`). La tarea
+`negocios:aplicar-horario` (cada minuto) abre y cierra a esas horas; si el dueño usa el switch
+a mano, se respeta hasta la siguiente hora del horario. Soporta horarios que pasan la
+medianoche (18:00 → 02:00). El cliente ve "Hoy de 7:00 a. m. a 8:00 p. m." en Explorar y en la
+tienda.
+
+**Rutas (prefijo `/api/negocios/{negocio}`, autoriza la membresía):** `PUT /`,
 `GET/POST /productos`, `GET/PUT/DELETE /productos/{id}`, `GET/POST /categorias`,
-`PUT/DELETE /categorias/{id}`, `GET /pedidos`, `PUT /pedidos/{id}/listo`.
-Público: `GET /api/tipos-producto`.
-**Pantallas:** `HomeScreen` (Inicio comerciante), `MiTiendaScreen`, `MisProductosScreen`,
-`ComercioPedidoDetalleScreen`.
-
-> [!warning] Ver 6: las rutas de arriba están en transición al modelo multi-negocio.
+`PUT/DELETE /categorias/{id}`, `GET /pedidos[?grupo=]`, `GET /pedidos/resumen`,
+`GET /pedidos/{id}`, `PUT /pedidos/{id}/listo|cancelar|dinero`. Público: `GET /api/tipos-producto`.
+**Pantallas:** `HomeScreen` (Inicio del negocio), `MiTiendaScreen`, `MisProductosScreen`,
+`PedidosNegocioScreen`, `ComercioPedidoDetalleScreen`.
 
 ---
 
@@ -180,8 +203,11 @@ texto cambia la lista de negocios por **tarjetas de producto**; tocar una entra 
 agrupa **por categoría** y muestra el botón **"Pedir"** en cada producto.
 
 ### 4.4 Carrito y checkout ✅
-- Carrito **en memoria** (`CartContext`), regla **un carrito = un negocio**: si agregas de
-  otra tienda, pregunta "vaciar y agregar".
+- Carrito **guardado en el teléfono, uno por cuenta** (`CartContext` + AsyncStorage; sobrevive a
+  cerrar la app), regla **un carrito = un negocio**: si agregas de otra tienda, pregunta
+  "vaciar y agregar".
+- **Costo de domicilio** ✅: tarifa única que fija el admin (4.000 por defecto). El pedido guarda
+  `subtotal` + `costo_domicilio` = `total`; Checkout y seguimiento muestran el desglose.
 - Animación **"paquete al carrito"** (`FlyToCart`): al tocar Pedir, un paquetito vuela en
   parábola hasta el botón flotante, que rebota y cuyo contador late. Ver
   [[Propuesta - Animaciones y microinteracciones]].
@@ -207,7 +233,11 @@ agrupa **por categoría** y muestra el botón **"Pedir"** en cada producto.
 ### 4.6 Seguimiento de pedidos ✅
 `GET /api/pedidos` (mis pedidos) y `GET /api/pedidos/{id}` (detalle con `estados`,
 `estado_index`, ítems, domiciliario, minutos de recogida). `PedidoDetalleScreen` pinta la
-**línea de tiempo** de estados y se refresca al entrar. Ver [[Lógica de Negocio]].
+**línea de tiempo** de estados y se refresca al llegar un push y cada 15 s. Ver [[Lógica de Negocio]].
+- **Cancelar mi pedido** ✅ mientras esté pendiente (con motivo opcional; avisa al negocio). Si
+  se cancela (cualquiera de los dos), se ve "Pedido cancelado" con quién y por qué.
+- **Contacto** ✅: Llamar / WhatsApp al negocio, y al domiciliario mientras lo lleva.
+- Mis pedidos: 20 por página con scroll infinito.
 
 **Rutas:** `/api/negocios`, `/api/negocios/{id}`, `/api/productos`, `/api/tipos-negocio`,
 `/api/barrios`, `/api/cliente/direcciones`, `/api/pedidos`, `/api/pedidos/{id}`.
@@ -224,14 +254,20 @@ agrupa **por categoría** y muestra el botón **"Pedir"** en cada producto.
 - **Tomar** un pedido indicando **minutos de recogida** (`listo → tomado`; update condicional
   anti-choque: si dos lo toman a la vez, solo uno gana).
 - Avanzar: `recogido → en_camino → entregado`. Cada cambio avisa por push al cliente.
-- `DomiciliarioScreen` con las tres listas y pull-to-refresh.
+- `DomiciliarioScreen` con las tres listas y pull-to-refresh; historial de 20 en 20 ("Ver más").
+- **Turno** ✅: switch En turno / Fuera de turno; solo en turno llegan los avisos de pedidos listos.
+- Ve **cuánto cobrar** (efectivo) y el domicilio; Llamar / WhatsApp al negocio antes de recoger
+  y al cliente después (el teléfono del cliente solo aparece cuando el pedido es suyo).
 
 ### 5.2 Administrador ✅
 - `GET /admin/stats` (usuarios, negocios, abiertos, productos) → `AdminTableroScreen`.
 - `GET /admin/usuarios?rol=` (pestañas por tipo con conteo), `POST /admin/usuarios` (crear con
   rol), `PUT /admin/usuarios/{id}/rol` con **salvaguarda**: el admin no puede quitarse su
   propio rol → `AdminUsuariosScreen`.
-- `GET /admin/negocios` (dueño, productos, abierto/cerrado) → `AdminNegociosScreen`.
+- `GET /admin/negocios` (dueño, productos, abierto/cerrado/vetado/archivado) → `AdminNegociosScreen`.
+- Usuarios y negocios con **buscador y 30 por página**.
+- **Suspender / reactivar cuentas** ✅ (`PUT /admin/usuarios/{id}/suspender|reactivar`, con motivo).
+- **Tarifa de domicilio** ✅ editable en el Tablero (`PUT /admin/ajustes`).
 
 ### 5.3 Moderación de barrios ✅
 `GET /admin/barrios/pendientes`, `PUT /admin/barrios/{id}/aprobar` (entra a la lista pública),
@@ -289,10 +325,9 @@ aceptar** entra al negocio. El código nunca sirve para autenticarse.
       invitaciones, compartir el código) y **Equipo** (invitar por código, quitar, cancelar,
       salir); acceso desde Mi perfil; registro **sin** selector de rol.
 - [x] Tests Pest: `ComercianteTest` (rutas nuevas) + `MembresiasTest`.
-- [ ] Decidir qué pasa con el rol global `comerciante` (¿se elimina? ¿queda para el panel web?).
-      Hoy solo sirve para que una cuenta vieja sin negocios vea "Crea tu negocio" en el Inicio.
-- [ ] Panel web Blade: sigue usando `User::negocio()` (1 negocio). Se mantuvo a propósito como
-      "legado"; decidir si se adapta o se deja solo para pruebas.
+- [x] Rol global `comerciante`: **eliminado** (2026-10-28, decisión del usuario).
+- [x] Panel web Blade de comerciante/cliente/domiciliario: **eliminado** (2026-10-28); queda
+      solo la web del admin.
 
 ---
 
@@ -305,8 +340,13 @@ Ver [[Reglas de Notificacion]].
 | Nuevo pedido | todo el equipo del negocio | `ComercioPedidoDetalle` |
 | Pedido listo | todos los domiciliarios + cliente | `Domiciliario` / `PedidoDetalle` |
 | Tomado / recogido / en camino / entregado | cliente | `PedidoDetalle` |
-| Invitación de trabajo | invitado | (pantalla pendiente, ver 6.3) |
+| Invitación de trabajo | invitado | `MisNegocios` |
+| Pedido cancelado por el negocio | cliente | `PedidoDetalle` |
+| Pedido cancelado por el cliente | todo el equipo del negocio | `ComercioPedidoDetalle` |
 
+- Todas las notificaciones van **en cola** (`ShouldQueue`): hace falta `php artisan queue:work`
+  (lo levantan `iniciar-dev.bat` e `iniciar-emulador.bat`). El push "pedido listo" solo llega a
+  domiciliarios **en turno**. Con la app abierta, un push refresca al instante la pantalla.
 - **Capa 1 (backend)**: `App\Support\Push` es **no-op si no hay credenciales** y atrapa fallos
   (un push caído nunca rompe un pedido). Tokens en `device_tokens` (varios aparatos por usuario,
   registro idempotente que reasigna el aparato si cambió de dueño).
@@ -341,18 +381,14 @@ Ver [[_MOC Diseño]] y [[Sistema Visual]].
 
 ---
 
-## 9. Interfaz web (Blade) — solo para gestión/pruebas
+## 9. Interfaz web (Blade) — solo administrador
 
-Login por sesión (independiente de los tokens). Redirección por rol tras login (`/home`).
-- Comerciante `/panel`: negocio, categorías, productos (crear/editar/mostrar-ocultar/borrar),
-  `/panel/pedidos` con "Marcar listo".
-- Cliente: `/explorar`, `/explorar/{id}`, `/buscar?q=` (multi-palabra, insensible a tildes),
-  carrito completo, checkout, `/mis-pedidos`.
-- Admin `/admin`: tablero, usuarios (pestañas por rol, crear, cambiar rol), negocios.
-- Domiciliario `/domiciliario`: disponibles, entregas, historial.
-
-> [!todo] La web quedó sobre el modelo "1 negocio por comerciante". No se ha adaptado al
-> modelo unificado (ver 6.3). Falta paginación visual del catálogo.
+Decisión del 2026-10-28: **un solo frontend (la app)**. La web de comerciante, cliente y
+domiciliario se eliminó. Queda:
+- Admin `/admin` (login por sesión; el login web rechaza a quien no es administrador): tablero,
+  usuarios (pestañas por rol, crear, cambiar rol), negocios.
+- Páginas públicas que exige Play Store: `/privacidad` (política, Ley 1581; datos del
+  responsable en `VITRINA_*`) y `/eliminar-cuenta`.
 
 ---
 
@@ -361,9 +397,9 @@ Login por sesión (independiente de los tokens). Redirección por rol tras login
 - `php artisan migrate:fresh --seed` siembra: roles → barrios de Maicao → usuarios demo →
   catálogo. Imágenes demo aparte: `php artisan db:seed --class=ImagenesDemoSeeder`
   (descarga de Picsum, idempotente).
-- Usuarios demo (contraseña `password123`): `admin@demo.co`, `comerciante@demo.co`,
-  `domiciliario@demo.co`, `cliente@demo.co`. Los ~59 negocios demo tienen su propio dueño
-  `{slug}@demo.co` (lista en `comercios-demo.txt` en la raíz del repo).
+- Usuarios demo (contraseña `password123`): `admin@demo.co`, `comerciante@demo.co` (cliente
+  dueño de "El Rincón Paisa"), `domiciliario@demo.co`, `cliente@demo.co`. Los ~59 negocios demo
+  tienen su propio dueño `{slug}@demo.co` (lista en `comercios-demo.txt` en la raíz del repo).
 - Catálogo demo: 57–59 negocios de 14 tipos, ~364 categorías, ~980 productos con todos los
   tipos de venta.
 - Tests: `cd backend && php artisan test` (Pest, SQLite en memoria). Type-check de la app:
@@ -387,32 +423,42 @@ users ──< negocio_user >── negocios ──< productos ──> tipos_prod
 barrios (aprobado, creado_por)
 ```
 
-Estados del pedido (en orden): `pendiente → listo → tomado → recogido → en_camino → entregado`.
-Formas de pago: `efectivo` · `transferencia`.
+Estados del pedido (en orden): `pendiente → listo → tomado → recogido → en_camino → entregado`,
+más el final alternativo `cancelado` (desde `pendiente`, o desde `listo` sin domiciliario).
+Formas de pago: `efectivo` · `transferencia`. Total = `subtotal` + `costo_domicilio`.
+Otras tablas: `ajustes` (tarifa de domicilio), `users.en_turno`, `users.suspendido_at`,
+`users.eliminado_at`, `negocios.horario`, `negocios.archivado_at`.
 
 ---
 
 ## 12. Pendientes y próximos pasos (consolidado)
 
-**Prioridad 1 — cerrar lo abierto**
-- [ ] Rutas API del modelo multi-negocio + adaptar la app (sección 6.3).
-- [ ] Onboarding sin selector de rol; "Crea tu negocio" desde la app.
-- [ ] Pantallas Equipo / Invitaciones / Mis negocios; código público en Mi perfil.
-- [ ] Mantener esta nota y `backend/ESTADO_DEL_PROYECTO.md` al día con cada cambio.
+**Hecho en la revisión del 2026-10-28** — P1: cancelar/rechazar pedidos, costo de domicilio,
+historial y ventas del negocio, llamar/WhatsApp ([[ADR-003 Botón llamar o WhatsApp al cliente]]),
+recuperar contraseña, eliminar cuenta + privacidad, push en cola, firma y URL de producción.
+P2: carrito persistente, turno del domiciliario, suspensión de cuentas, horario de los negocios,
+refresco eficiente, paginación.
 
-**Prioridad 2 — calidad**
-- [ ] Tests Pest del ciclo completo de pedidos y de membresías.
-- [ ] Botón llamar / WhatsApp al cliente desde el pedido ([[ADR-003 Botón llamar o WhatsApp al cliente]]).
-- [ ] Notificaciones en tiempo real dentro de la app además del push ([[ADR-002 Notificaciones en tiempo real]]).
+**Prioridad 1 — publicar el piloto (fuera del código)**
+- [ ] Elegir hosting y dominio; montar servidor, cola, cron, SMTP y HTTPS (`DESPLIEGUE.md`).
+- [ ] Poner el dominio real en `API_URL_PRODUCCION` y llenar `VITRINA_*` (política de privacidad).
+- [ ] Decidir el `applicationId` definitivo antes de subir a Play Store (hoy `com.comercioapp`).
+- [ ] Crear la llave de subida y la cuenta de Google Play; ficha con privacidad y borrado de cuenta.
+- [ ] Piloto cerrado con 3–5 negocios de Maicao y 2–3 domiciliarios.
+
+**Prioridad 2 — después del piloto**
+- [ ] iOS (decisión: después de Android): `GoogleService-Info.plist`, firma, prueba en iPhone.
+- [ ] Tiempo real dentro de la app ([[ADR-002 Notificaciones en tiempo real]]); hoy push + 15 s.
+- [ ] Tarifa de domicilio por barrio/zona; definir el modelo de ingresos ([[Modelo de Negocio]]).
+- [ ] Reclamo cuando un pedido queda "en camino" y nunca se entrega.
 
 **Prioridad 3 — siguiente fase (ideas)**
 - [ ] Mapa / ubicación en tiempo real ([[Idea - Mapa en tiempo real]], [[Idea - Seguimiento del domiciliario]]).
 - [ ] Búsqueda semántica tolerante a errores ([[Idea - Busqueda semantica]]).
 - [ ] Orden por cercanía ([[Idea - Orden por cercania]]), pagos en línea ([[Idea - Pagos en linea]]),
-      calificaciones ([[Idea - Calificaciones y reseñas]]), login con Google ([[ADR-001 Inicio de sesión con Google]]).
+      login con Google ([[ADR-001 Inicio de sesión con Google]]).
 
 ---
-
 ## 🔗 Relacionado
 - [[🏠 Home]] · [[Lógica de Negocio]] · [[Flujos de Usuario]]
 - [[Wireframes y Pantallas]] · [[Reglas de Notificacion]] · [[Tipos de Venta]] · [[Glosario]]

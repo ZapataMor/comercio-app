@@ -206,6 +206,8 @@ class AuthController extends Controller
             'direccion' => $user->direccion,
             'barrio' => $user->barrio,
             'telefono' => $user->telefono,
+            // Domiciliario: si está en turno (le llegan los avisos de pedidos).
+            'en_turno' => (bool) $user->en_turno,
             // Código único para que un negocio lo invite como trabajador.
             'codigo_publico' => $user->codigo_publico,
             // Negocios donde es miembro activo, con su rol en cada uno.

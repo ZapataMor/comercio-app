@@ -137,6 +137,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/usuarios', [AdminController::class, 'usuarios']);
         Route::post('/usuarios', [AdminController::class, 'storeUsuario']);
         Route::put('/usuarios/{usuario}/rol', [AdminController::class, 'updateRol']);
+        // Bloquear / desbloquear una cuenta (no puede iniciar sesión).
+        Route::put('/usuarios/{usuario}/suspender', [AdminController::class, 'suspender']);
+        Route::put('/usuarios/{usuario}/reactivar', [AdminController::class, 'reactivar']);
         Route::get('/negocios', [AdminController::class, 'negocios']);
         // Tarifa de domicilio (aplica a los pedidos nuevos).
         Route::put('/ajustes', [\App\Http\Controllers\Api\AjusteController::class, 'actualizar']);
@@ -161,6 +164,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/disponibles', [ApiDomiciliarioController::class, 'disponibles']);
         Route::get('/entregas', [ApiDomiciliarioController::class, 'entregas']);
         Route::get('/historial', [ApiDomiciliarioController::class, 'historial']);
+        // Entrar / salir de turno (solo en turno llegan los avisos de pedidos).
+        Route::put('/turno', [ApiDomiciliarioController::class, 'turno']);
         Route::get('/reputacion', [ApiDomiciliarioController::class, 'reputacion']);
         // Justificar una demora (lluvia, tráfico...) de una entrega en curso.
         Route::put('/pedidos/{id}/novedad', [ApiDomiciliarioController::class, 'novedad']);

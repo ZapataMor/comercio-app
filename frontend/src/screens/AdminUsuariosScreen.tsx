@@ -8,10 +8,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { AdminUsuario, cambiarRol, crearUsuario, getAdminUsuarios } from '../api';
+import { AdminUsuario, cambiarRol, crearUsuario, getAdminUsuarios, reactivarUsuario, suspenderUsuario } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import FieldError from '../components/FieldError';
+import Icon from '../components/Icon';
+import MotivoCancelacion from '../components/MotivoCancelacion';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
@@ -47,15 +49,26 @@ export default function AdminUsuariosScreen() {
     });
   }
 
+  // Búsqueda por nombre/correo y paginación (30 por página).
+  const [buscar, setBuscar] = useState('');
+  const [pagina, setPagina] = useState(1);
+  const [hayMas, setHayMas] = useState(false);
+  const [cargandoMas, setCargandoMas] = useState(false);
+  // Suspender cuenta: a quién y si se está enviando.
+  const [aSuspender, setASuspender] = useState<AdminUsuario | null>(null);
+  const [suspendiendo, setSuspendiendo] = useState(false);
+
   const cargar = useCallback(
-    (rol: string, refresco = false) => {
+    (rol: string, refresco = false, texto = '') => {
       refresco ? setRefrescando(true) : setCargando(true);
-      getAdminUsuarios(token, rol)
+      getAdminUsuarios(token, rol, texto, 1)
         .then(r => {
           setRoles(r.roles);
           setConteos(r.conteos);
           setRolActual(r.rol_actual);
           setUsuarios(r.usuarios);
+          setPagina(1);
+          setHayMas(r.pagina < r.ultima_pagina);
         })
         .catch(e => toast.error('Error', e.message))
         .finally(() => {
@@ -63,12 +76,66 @@ export default function AdminUsuariosScreen() {
           setRefrescando(false);
         });
     },
-    [token],
+    [token, toast],
   );
 
   useEffect(() => {
     cargar('administrador');
   }, [cargar]);
+
+  // Busca 350 ms después de dejar de escribir.
+  const primeraVez = React.useRef(true);
+  useEffect(() => {
+    if (primeraVez.current) {
+      primeraVez.current = false;
+      return;
+    }
+    const t = setTimeout(() => cargar(rolActual, false, buscar), 350);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buscar]);
+
+  async function cargarMas() {
+    if (!hayMas || cargandoMas || cargando) return;
+    setCargandoMas(true);
+    try {
+      const r = await getAdminUsuarios(token, rolActual, buscar, pagina + 1);
+      setUsuarios(prev => [...prev, ...r.usuarios.filter(u => !prev.some(v => v.id === u.id))]);
+      setPagina(r.pagina);
+      setHayMas(r.pagina < r.ultima_pagina);
+    } catch {
+      // Se reintenta al volver a llegar al final.
+    } finally {
+      setCargandoMas(false);
+    }
+  }
+
+  async function confirmarSuspension(motivo: string) {
+    if (!aSuspender) return;
+    if (!motivo) {
+      toast.error('Falta el motivo', 'Elige o escribe por qué se suspende la cuenta.');
+      return;
+    }
+    setSuspendiendo(true);
+    try {
+      toast.exito('Cuenta suspendida', await suspenderUsuario(token, aSuspender.id, motivo));
+      setASuspender(null);
+      cargar(rolActual, false, buscar);
+    } catch (e) {
+      toast.error('No se pudo suspender', messageFromError(e, 'Error'));
+    } finally {
+      setSuspendiendo(false);
+    }
+  }
+
+  async function onReactivar(u: AdminUsuario) {
+    try {
+      toast.exito('Cuenta reactivada', await reactivarUsuario(token, u.id));
+      cargar(rolActual, false, buscar);
+    } catch (e) {
+      toast.error('No se pudo reactivar', messageFromError(e, 'Error'));
+    }
+  }
 
   async function onCambiarRol(u: AdminUsuario, nuevo: string) {
     if (u.rol === nuevo) return;
@@ -167,7 +234,7 @@ export default function AdminUsuariosScreen() {
         style={styles.tabs}
         contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}
         renderItem={({ item }) => (
-          <TouchableOpacity onPress={() => cargar(item)}
+          <TouchableOpacity onPress={() => cargar(item, false, buscar)}
             style={[styles.tab, item === rolActual && styles.tabOn]}>
             <Text style={[styles.tabTxt, item === rolActual && styles.tabTxtOn]}>
               {item} {conteos[item] ?? 0}
@@ -175,6 +242,18 @@ export default function AdminUsuariosScreen() {
           </TouchableOpacity>
         )}
       />
+
+      <View style={styles.buscador}>
+        <Icon name="lupa" size={18} color={c.muted} />
+        <TextInput
+          style={styles.buscadorInput}
+          value={buscar}
+          onChangeText={setBuscar}
+          placeholder="Buscar por nombre o correo"
+          placeholderTextColor={c.mutedSoft}
+          autoCapitalize="none"
+        />
+      </View>
 
       {/* Lista */}
       {cargando ? (
@@ -184,20 +263,29 @@ export default function AdminUsuariosScreen() {
           data={usuarios}
           keyExtractor={u => String(u.id)}
           contentContainerStyle={{ padding: 16, paddingTop: 4 }}
+          keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
               refreshing={refrescando}
-              onRefresh={() => cargar(rolActual, true)}
+              onRefresh={() => cargar(rolActual, true, buscar)}
               colors={[c.accent]}
               tintColor={c.accent}
             />
           }
+          onEndReached={cargarMas}
+          onEndReachedThreshold={0.4}
+          ListFooterComponent={cargandoMas ? <ActivityIndicator color={c.accent} style={{ marginVertical: 16 }} /> : null}
           ListEmptyComponent={<Text style={styles.vacio}>No hay usuarios de este tipo.</Text>}
           renderItem={({ item, index }) => (
             <FadeInView delay={Math.min(index, 8) * 40}>
-              <View style={styles.card}>
+              <View style={[styles.card, item.suspendido && styles.cardSuspendida]}>
                 <Text style={styles.nombre}>{item.name}</Text>
                 <Text style={styles.email}>{item.email}</Text>
+                {item.suspendido && (
+                  <Text style={styles.suspendida}>
+                    Suspendida{item.motivo_suspension ? `: ${item.motivo_suspension}` : ''}
+                  </Text>
+                )}
                 <View style={styles.chips}>
                   {roles.map(r => (
                     <TouchableOpacity key={r} onPress={() => onCambiarRol(item, r)}
@@ -206,11 +294,31 @@ export default function AdminUsuariosScreen() {
                     </TouchableOpacity>
                   ))}
                 </View>
+                {item.id !== auth!.user.id && (
+                  <TouchableOpacity
+                    onPress={() => (item.suspendido ? onReactivar(item) : setASuspender(item))}
+                    hitSlop={6}>
+                    <Text style={item.suspendido ? styles.reactivar : styles.suspender}>
+                      {item.suspendido ? 'Reactivar cuenta' : 'Suspender cuenta'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </FadeInView>
           )}
         />
       )}
+
+      <MotivoCancelacion
+        visible={aSuspender !== null}
+        titulo="Suspender cuenta"
+        explicacion={`${aSuspender?.name ?? 'Esta persona'} no podrá iniciar sesión y se cerrarán sus sesiones. Puedes reactivarla después.`}
+        motivos={['Pedidos falsos', 'Mal trato', 'Fraude o estafa', 'Suplantación']}
+        textoBoton="Suspender"
+        enviando={suspendiendo}
+        onCerrar={() => setASuspender(null)}
+        onConfirmar={confirmarSuspension}
+      />
     </View>
   );
 }
@@ -238,4 +346,13 @@ const useStyles = makeStyles((c, shadow) => ({
   chipTxt: { fontSize: 11, color: c.muted, fontFamily: font.semibold },
   chipTxtOn: { color: c.onAccent },
   vacio: { textAlign: 'center', color: c.muted, marginTop: 40, fontFamily: font.regular },
+  buscador: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.surface, borderRadius: radius.md,
+    paddingHorizontal: 12, marginHorizontal: 16, marginTop: 4, marginBottom: 8, ...shadow.low,
+  },
+  buscadorInput: { flex: 1, paddingVertical: 10, fontSize: 15, color: c.textStrong, fontFamily: font.regular },
+  cardSuspendida: { borderLeftWidth: 4, borderLeftColor: c.danger },
+  suspendida: { color: c.danger, fontSize: 12, fontFamily: font.semibold, marginTop: 4 },
+  suspender: { color: c.danger, fontSize: 13, fontFamily: font.semibold, marginTop: 10 },
+  reactivar: { color: c.success, fontSize: 13, fontFamily: font.semibold, marginTop: 10 },
 }));

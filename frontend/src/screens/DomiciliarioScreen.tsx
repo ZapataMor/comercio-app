@@ -3,12 +3,14 @@ import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
+  Switch,
   Text,
   TextInput,
   View,
 } from 'react-native';
 import {
   avanzarPedido,
+  cambiarTurno,
   getDisponibles,
   getHistorialEntregas,
   getMiReputacion,
@@ -25,6 +27,7 @@ import Icon, { IconName } from '../components/Icon';
 import { NivelBadge, TarjetaReputacion } from '../components/Reputacion';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
+import { usePolling } from '../usePolling';
 
 function cop(n: number) {
   return '$' + Math.round(n).toLocaleString('es-CO');
@@ -44,6 +47,12 @@ export default function DomiciliarioScreen() {
   const [vetado, setVetado] = useState(false);
   const [cargando, setCargando] = useState(true);
   const [refrescando, setRefrescando] = useState(false);
+  // En turno = me llegan los avisos de pedidos listos para recoger.
+  const [enTurno, setEnTurno] = useState(false);
+  const [cambiandoTurno, setCambiandoTurno] = useState(false);
+  // Historial paginado (20 por página) con "Ver más".
+  const [paginaHistorial, setPaginaHistorial] = useState(1);
+  const [hayMasHistorial, setHayMasHistorial] = useState(false);
 
   const cargar = useCallback(
     (refresco = false, silencioso = false) => {
@@ -53,12 +62,24 @@ export default function DomiciliarioScreen() {
         setCargando(true);
       }
 
-      Promise.all([getDisponibles(token), getMisEntregas(token), getHistorialEntregas(token), getMiReputacion(token)])
+      // El refresco silencioso (push / cada 15 s) no recarga el historial,
+      // para no perder las páginas que ya se vieron.
+      Promise.all([
+        getDisponibles(token),
+        getMisEntregas(token),
+        silencioso ? Promise.resolve(null) : getHistorialEntregas(token, 1),
+        getMiReputacion(token),
+      ])
         .then(([d, e, h, r]) => {
           setDisponibles(d.pedidos);
           setVetado(d.vetado);
+          setEnTurno(d.en_turno);
           setEntregas(e);
-          setHistorial(h);
+          if (h) {
+            setHistorial(h.items);
+            setPaginaHistorial(1);
+            setHayMasHistorial(h.pagina < h.ultima_pagina);
+          }
           setReputacion(r);
         })
         .catch(err => toast.error('Error', err.message))
@@ -67,14 +88,37 @@ export default function DomiciliarioScreen() {
           setRefrescando(false);
         });
     },
-    [token],
+    [token, toast],
   );
 
   useEffect(() => {
     cargar();
-    const timer = setInterval(() => cargar(false, true), 5000);
-    return () => clearInterval(timer);
   }, [cargar]);
+  usePolling(() => cargar(false, true));
+
+  async function onCambiarTurno(valor: boolean) {
+    setCambiandoTurno(true);
+    setEnTurno(valor);
+    try {
+      toast.info(valor ? 'En turno' : 'Fuera de turno', await cambiarTurno(token, valor));
+    } catch (e) {
+      setEnTurno(!valor);
+      toast.error('No se pudo cambiar', e instanceof Error ? e.message : 'Error');
+    } finally {
+      setCambiandoTurno(false);
+    }
+  }
+
+  async function verMasHistorial() {
+    try {
+      const h = await getHistorialEntregas(token, paginaHistorial + 1);
+      setHistorial(prev => [...prev, ...h.items.filter(x => !prev.some(y => y.id === x.id))]);
+      setPaginaHistorial(h.pagina);
+      setHayMasHistorial(h.pagina < h.ultima_pagina);
+    } catch (e) {
+      toast.error('No se pudo cargar', e instanceof Error ? e.message : 'Error');
+    }
+  }
 
   async function onTomar(id: number, minutos: number) {
     try {
@@ -105,6 +149,27 @@ export default function DomiciliarioScreen() {
       refreshControl={
         <RefreshControl refreshing={refrescando} onRefresh={() => cargar(true)} colors={[c.accent]} tintColor={c.accent} />
       }>
+      {/* Turno: solo en turno llegan los avisos de pedidos listos. */}
+      {!vetado && (
+        <View style={[styles.turno, enTurno ? styles.turnoOn : styles.turnoOff]}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.turnoTitulo}>{enTurno ? 'Estás en turno' : 'Estás fuera de turno'}</Text>
+            <Text style={styles.turnoSub}>
+              {enTurno
+                ? 'Te avisamos cuando haya pedidos listos para recoger.'
+                : 'No te llegan avisos de pedidos nuevos. Actívalo cuando salgas a trabajar.'}
+            </Text>
+          </View>
+          <Switch
+            value={enTurno}
+            onValueChange={onCambiarTurno}
+            disabled={cambiandoTurno}
+            trackColor={{ false: c.borderStrong, true: c.success }}
+            thumbColor={c.surface}
+          />
+        </View>
+      )}
+
       {!!reputacion && (
         <View style={styles.miNivel}>
           <Icon name="escudo" size={16} color={c.accent} />
@@ -208,6 +273,11 @@ export default function DomiciliarioScreen() {
             <Text style={styles.histOk}>Entregado · {cop(p.total)}</Text>
           </View>
         ))
+      )}
+      {hayMasHistorial && (
+        <PressableScale onPress={verMasHistorial}>
+          <Text style={styles.verMas}>Ver más entregas</Text>
+        </PressableScale>
       )}
 
       {!!reputacion && (
@@ -380,6 +450,15 @@ const useStyles = makeStyles((c, shadow) => ({
   },
   linea: { color: c.text, marginTop: 4, fontSize: 14, fontFamily: font.regular },
   lineaSub: { color: c.mutedSoft, marginTop: 4, fontSize: 13, fontFamily: font.regular },
+  turno: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: radius.md, padding: 14,
+    marginBottom: 12, borderWidth: 1,
+  },
+  turnoOn: { backgroundColor: c.surface, borderColor: c.success },
+  turnoOff: { backgroundColor: c.warningSoft, borderColor: c.warning },
+  turnoTitulo: { fontFamily: font.bold, fontSize: 15, color: c.textStrong },
+  turnoSub: { fontFamily: font.regular, fontSize: 12, color: c.text, marginTop: 2 },
+  verMas: { textAlign: 'center', color: c.goldText, fontFamily: font.semibold, marginVertical: 12 },
   tomarRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, marginTop: 12 },
   minLabel: { fontSize: 11, color: c.muted, marginBottom: 4, fontFamily: font.regular },
   minInput: {

@@ -14,6 +14,7 @@ import { messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
+import { usePolling } from '../usePolling';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PedidoDetalle'>;
 
@@ -113,10 +114,10 @@ export default function PedidoDetalleScreen({ route }: Props) {
   useFocusEffect(
     useCallback(() => {
       cargarPedido(true);
-      const timer = setInterval(() => cargarPedido(), 5000);
-      return () => clearInterval(timer);
     }, [cargarPedido]),
   );
+  // Se refresca al llegar un push (cambió el estado) y cada 15 s de respaldo.
+  usePolling(() => cargarPedido());
 
   if (cargando) {
     return <ActivityIndicator size="large" color={c.accent} style={{ marginTop: 40 }} />;

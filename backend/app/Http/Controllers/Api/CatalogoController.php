@@ -8,6 +8,7 @@ use App\Models\Negocio;
 use App\Models\Producto;
 use App\Models\TipoNegocio;
 use App\Models\TipoProducto;
+use App\Support\HorarioNegocio;
 use App\Support\Reputacion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -79,6 +80,7 @@ class CatalogoController extends Controller
             'imagen' => $n->imagen ? '/storage/'.$n->imagen : null,
             'productos' => $n->productos_count,
             'abierto' => (bool) $n->activo,
+            'horario_hoy' => HorarioNegocio::textoHoy($n->horario, now()),
             'tiempo_preparacion' => $n->tiempo_preparacion,
             'reputacion' => Reputacion::resumen(Reputacion::NEGOCIO, $n),
         ]);
@@ -210,6 +212,9 @@ class CatalogoController extends Controller
                 'activo' => (bool) $negocio->activo,
                 'imagen' => $negocio->imagen ? '/storage/'.$negocio->imagen : null,
                 'tiempo_preparacion' => $negocio->tiempo_preparacion,
+                // Horario semanal y el texto de hoy ("Hoy de 7:00 a. m. a 8:00 p. m.").
+                'horario' => HorarioNegocio::normalizar($negocio->horario),
+                'horario_hoy' => HorarioNegocio::textoHoy($negocio->horario, now()),
                 'reputacion' => Reputacion::resumen(Reputacion::NEGOCIO, $negocio),
             ],
             'productos' => ProductoResource::collection($productos),

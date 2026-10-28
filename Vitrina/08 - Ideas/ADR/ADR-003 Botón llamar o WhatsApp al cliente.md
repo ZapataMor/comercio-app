@@ -2,11 +2,11 @@
 title: ADR-003 Botón llamar o WhatsApp al cliente
 tags: [adr]
 id: ADR-003
-estado: propuesto
+estado: aceptado
 decididores: []
 fecha: 2026-06-28
 afecta_a: [app móvil, domiciliario, privacidad]
-actualizado: 2026-06-28
+actualizado: 2026-10-28
 ---
 
 # ADR-003 — Botón para llamar o escribir por WhatsApp al cliente
@@ -16,7 +16,7 @@ actualizado: 2026-06-28
 
 | | |
 |---|---|
-| **Estado** | propuesto |
+| **Estado** | aceptado (implementado el 2026-10-28) |
 | **Fecha** | 2026-06-28 |
 | **Decididores** | (pendiente) |
 
@@ -55,6 +55,14 @@ país de Colombia `+57` por defecto si viene sin él).
   > - ¿Hasta qué estado del pedido se muestra el botón (p. ej. solo `tomado`…`en_camino`)?
   > - Privacidad: evaluar **número enmascarado (proxy)** como evolución futura.
   > - Validar/normalizar `telefono_contacto` en el checkout para garantizar E.164.
+
+## ✅ Implementación (2026-10-28)
+- Componente `BotonesContacto` (Llamar + WhatsApp con `wa.me`, normaliza a +57 los celulares de 10 dígitos).
+- **Domiciliario**: al negocio antes de recoger y al cliente después. El teléfono del cliente ya
+  no aparece en "disponibles": solo cuando el pedido es suyo.
+- **Cliente**: al negocio (siempre) y al domiciliario mientras lleva el pedido.
+- **Negocio**: al cliente y, mientras lo lleva, al domiciliario.
+- Pendiente a futuro: número enmascarado (proxy) si la privacidad lo exige.
 
 ## 🔗 Relacionado
 - [[_MOC ADR]] · [[Domiciliario]] · [[Cliente]] · [[CU-004 Entregar un pedido]]

@@ -19,11 +19,16 @@ use Illuminate\Http\Request;
  */
 class DomiciliarioController extends Controller
 {
-    /** Pedidos listos y sin domiciliario (disponibles para tomar). */
+    /**
+     * Pedidos listos y sin domiciliario (disponibles para tomar). `en_turno`
+     * dice si me llegan los avisos de pedidos nuevos.
+     */
     public function disponibles(Request $request): JsonResponse
     {
-        if ($request->user()->domiciliarioVetado()) {
-            return response()->json(['pedidos' => [], 'vetado' => true]);
+        $yo = $request->user();
+
+        if ($yo->domiciliarioVetado()) {
+            return response()->json(['pedidos' => [], 'vetado' => true, 'en_turno' => (bool) $yo->en_turno]);
         }
 
         $pedidos = Pedido::where('estado', 'listo')
@@ -32,7 +37,28 @@ class DomiciliarioController extends Controller
             ->latest()
             ->get();
 
-        return response()->json(['pedidos' => $pedidos->map(fn ($p) => $this->map($p))]);
+        return response()->json([
+            'pedidos' => $pedidos->map(fn ($p) => $this->map($p)),
+            'en_turno' => (bool) $yo->en_turno,
+        ]);
+    }
+
+    /**
+     * Entrar o salir de turno: solo a quien está en turno le llega el push
+     * de "pedido listo para recoger".
+     */
+    public function turno(Request $request): JsonResponse
+    {
+        $datos = $request->validate(['en_turno' => ['required', 'boolean']]);
+
+        $request->user()->forceFill(['en_turno' => $datos['en_turno']])->save();
+
+        return response()->json([
+            'en_turno' => (bool) $datos['en_turno'],
+            'message' => $datos['en_turno']
+                ? 'Estás en turno: te avisaremos de los pedidos listos.'
+                : 'Saliste de turno: ya no te llegan avisos de pedidos.',
+        ]);
     }
 
     /** Mis entregas activas (tomadas por mí y aún no entregadas). */
@@ -47,16 +73,21 @@ class DomiciliarioController extends Controller
         return response()->json(['pedidos' => $pedidos->map(fn ($p) => $this->map($p))]);
     }
 
-    /** Mis entregas completadas. */
+    /** Mis entregas completadas (20 por página, `?page=`). */
     public function historial(Request $request): JsonResponse
     {
-        $pedidos = Pedido::where('domiciliario_id', $request->user()->id)
+        $pagina = Pedido::where('domiciliario_id', $request->user()->id)
             ->where('estado', 'entregado')
             ->with(['negocio', 'items'])
             ->latest()
-            ->get();
+            ->latest('id')
+            ->paginate(20);
 
-        return response()->json(['pedidos' => $pedidos->map(fn ($p) => $this->map($p))]);
+        return response()->json([
+            'pedidos' => $pagina->getCollection()->map(fn ($p) => $this->map($p))->values(),
+            'pagina' => $pagina->currentPage(),
+            'ultima_pagina' => $pagina->lastPage(),
+        ]);
     }
 
     /** Mi nivel de confiabilidad y por qué (últimos eventos). */

@@ -13,9 +13,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { getReputacionNegocio, imagenUrl, Negocio, ReputacionDetalle } from '../api';
+import { getReputacionNegocio, HorarioSemana, imagenUrl, Negocio, ReputacionDetalle } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
+import EditorHorario, { DIAS, errorHorario } from '../components/EditorHorario';
 import FieldError from '../components/FieldError';
 import { TarjetaReputacion } from '../components/Reputacion';
 import SelectorImagen from '../components/SelectorImagen';
@@ -80,6 +81,8 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
   const [activo, setActivo] = useState(true);
   // Tiempo promedio de preparación (minutos) que el negocio promete.
   const [tiempo, setTiempo] = useState('20');
+  // Horario semanal automático (null = solo abrir/cerrar a mano).
+  const [horario, setHorario] = useState<HorarioSemana | null>(null);
   // URI local de una imagen recién elegida (sin subir aún). null = sin cambios.
   const [imagenUri, setImagenUri] = useState<string | null>(null);
   const [errores, setErrores] = useState<FieldErrors>({});
@@ -128,6 +131,7 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
     setTelefono(n?.telefono ?? '');
     setActivo(n?.activo ?? true);
     setTiempo(String(n?.tiempo_preparacion ?? 20));
+    setHorario(n?.horario ?? null);
     setImagenUri(null);
     setErrores({});
     setModo('editar');
@@ -153,6 +157,11 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
       setErrores({ tiempo_preparacion: 'Pon un tiempo entre 5 y 180 minutos.' });
       return;
     }
+    const errHorario = errorHorario(horario);
+    if (errHorario) {
+      setErrores({ horario: errHorario });
+      return;
+    }
     setGuardando(true);
     const eraNuevo = !negocio;
     try {
@@ -165,6 +174,7 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
         telefono: telefono.trim() || null,
         activo,
         tiempo_preparacion: minutos,
+        horario,
       };
       // Crear deja el negocio nuevo como activo.
       await (eraNuevo ? crear : guardar)(input, imagenUri ?? undefined);
@@ -218,6 +228,17 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
           <Campo
             etiqueta="Tiempo promedio de preparación"
             valor={`${negocio.tiempo_preparacion ?? 20} minutos`}
+          />
+          <Campo
+            etiqueta="Horario"
+            valor={
+              negocio.horario
+                ? DIAS.map(({ clave, nombre }) => {
+                    const f = negocio.horario![clave];
+                    return `${nombre}: ${f ? `${f.abre} a ${f.cierra}` : 'no abre'}`;
+                  }).join('\n')
+                : 'Sin horario automático (abres y cierras a mano)'
+            }
           />
         </FadeInView>
 
@@ -397,6 +418,16 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
             Lo que tardas en tener listo un pedido. Los clientes lo ven, y si te pasas, baja tu nivel de
             confiabilidad: pon un tiempo realista.
           </Text>
+
+          <EditorHorario
+            valor={horario}
+            onCambiar={h => {
+              setHorario(h);
+              limpiarError('horario');
+            }}
+            disabled={guardando}
+          />
+          <FieldError mensaje={errores.horario} />
 
           <View style={styles.switchRow}>
             <View style={{ flex: 1 }}>

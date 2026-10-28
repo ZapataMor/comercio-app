@@ -32,6 +32,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'terminos_aceptados_at' => 'datetime',
             'suspendido_at' => 'datetime',
+            'en_turno' => 'boolean',
             'eliminado_at' => 'datetime',
             'reputacion_domiciliario' => 'integer',
             'reputacion_domiciliario_pedidos' => 'integer',

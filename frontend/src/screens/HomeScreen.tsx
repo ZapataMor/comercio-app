@@ -12,6 +12,7 @@ import { useNegocio } from '../NegocioContext';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
+import { usePolling } from '../usePolling';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -115,18 +116,14 @@ export default function HomeScreen({ navigation }: Props) {
   // Al cambiar de negocio no se muestran los pedidos del anterior.
   useEffect(() => setPedidos([]), [negocioId]);
 
-  // Pedidos en espera del negocio activo: se recargan al entrar y luego cada pocos segundos.
+  // Pedidos en espera del negocio activo: se recargan al entrar, al llegar un
+  // push y cada 15 s mientras la pantalla está visible.
   useFocusEffect(
     useCallback(() => {
-      if (!negocioId) {
-        return;
-      }
-
       cargarPedidos();
-      const timer = setInterval(cargarPedidos, 5000);
-      return () => clearInterval(timer);
-    }, [cargarPedidos, negocioId]),
+    }, [cargarPedidos]),
   );
+  usePolling(cargarPedidos);
 
   const enEspera = pedidos.filter(p => p.estado === 'pendiente');
   // Efectivo: falta decir si el domiciliario entregó el dinero.

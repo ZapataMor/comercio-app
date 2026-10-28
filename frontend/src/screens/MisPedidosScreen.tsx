@@ -8,6 +8,7 @@ import { FadeInView, PressableScale } from '../components/anim';
 import Icon from '../components/Icon';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
+import { usePolling } from '../usePolling';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MisPedidos'>;
 
@@ -22,28 +23,54 @@ export default function MisPedidosScreen({ navigation }: Props) {
   const [pedidos, setPedidos] = useState<MiPedido[]>([]);
   const [cargando, setCargando] = useState(true);
   const [refrescando, setRefrescando] = useState(false);
+  // Paginación (20 por página): se cargan más al llegar al final.
+  const [pagina, setPagina] = useState(1);
+  const [hayMas, setHayMas] = useState(false);
+  const [cargandoMas, setCargandoMas] = useState(false);
 
+  // Refresca la primera página sin perder las que ya se cargaron debajo.
   const cargar = useCallback(
     (mostrarCarga = false) => {
       if (mostrarCarga) {
         setCargando(true);
       }
 
-      return getMisPedidos(auth!.token)
-        .then(setPedidos)
+      return getMisPedidos(auth!.token, 1)
+        .then(p => {
+          setPedidos(prev => {
+            const nuevos = new Set(p.items.map(x => x.id));
+            return [...p.items, ...prev.filter(x => !nuevos.has(x.id) && x.id < (p.items[p.items.length - 1]?.id ?? 0))];
+          });
+          setHayMas(prev => (mostrarCarga ? p.pagina < p.ultima_pagina : prev || p.pagina < p.ultima_pagina));
+          if (mostrarCarga) setPagina(1);
+        })
         .finally(() => setCargando(false));
     },
     [auth],
   );
 
-  // Se recarga cada vez que entras a la pantalla (para ver el avance de estado).
+  async function cargarMas() {
+    if (!hayMas || cargandoMas) return;
+    setCargandoMas(true);
+    try {
+      const p = await getMisPedidos(auth!.token, pagina + 1);
+      setPedidos(prev => [...prev, ...p.items.filter(x => !prev.some(y => y.id === x.id))]);
+      setPagina(p.pagina);
+      setHayMas(p.pagina < p.ultima_pagina);
+    } catch {
+      // Se reintenta al volver a llegar al final.
+    } finally {
+      setCargandoMas(false);
+    }
+  }
+
+  // Al entrar se carga de cero; luego se refresca al llegar un push y cada 15 s.
   useFocusEffect(
     useCallback(() => {
       cargar(true);
-      const timer = setInterval(() => cargar(), 5000);
-      return () => clearInterval(timer);
     }, [cargar]),
   );
+  usePolling(() => cargar());
 
   function refrescar() {
     setRefrescando(true);
@@ -65,6 +92,9 @@ export default function MisPedidosScreen({ navigation }: Props) {
         <RefreshControl refreshing={refrescando} onRefresh={refrescar} colors={[c.accent]} tintColor={c.accent} />
       }
       ListEmptyComponent={<Text style={styles.vacio}>Aún no has hecho pedidos.</Text>}
+      onEndReached={cargarMas}
+      onEndReachedThreshold={0.4}
+      ListFooterComponent={cargandoMas ? <ActivityIndicator color={c.accent} style={{ marginVertical: 16 }} /> : null}
       renderItem={({ item, index }) => {
         const ec = estadoColor(item.estado);
         return (

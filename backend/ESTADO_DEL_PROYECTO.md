@@ -1,7 +1,7 @@
 # 📦 Estado del proyecto — comercio-api
 
 > Documento vivo de seguimiento. Refleja **qué hay hecho** y **qué falta** en la app.
-> Última actualización: **2026-10-28**
+> Última actualización: **2026-10-28** (P1 y P2 de la revisión general)
 
 ---
 
@@ -60,7 +60,7 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 - [x] **Recuperar contraseña** con código de 6 dígitos por correo: `POST /api/password/codigo` y `POST /api/password/restablecer` (`RecuperarClaveController`; código cifrado en `password_reset_tokens`, vence en 15 min, se anula tras 5 fallos, cierra las demás sesiones; nunca revela si el correo existe). App: "¿Olvidaste tu contraseña?" en el Login (`RecuperarClaveModal`)
 - [x] **Autorización de datos** (Ley 1581): el registro exige `acepta_terminos` y guarda `users.terminos_aceptados_at`; casilla con enlace a la política en `RegisterScreen`
 - [x] **Eliminar cuenta**: `DELETE /api/cuenta` (exige contraseña) y página pública `/eliminar-cuenta` (Play Store). `App\Support\EliminarCuenta` anonimiza la fila (los pedidos del historial se conservan sin datos de contacto), borra sesiones, aparatos, direcciones, membresías e invitaciones; archiva los negocios donde era el único propietario. No deja si hay pedidos o entregas en curso. App: "Eliminar mi cuenta" en Mi perfil
-- [x] **Cuenta suspendida** (`users.suspendido_at` + motivo): no puede iniciar sesión y el middleware `CuentaActiva` (grupo `api`) borra su token y responde 401 (la app cierra sesión sola). 🚧 Falta el botón del admin (P2)
+- [x] **Cuenta suspendida** (`users.suspendido_at` + motivo): no puede iniciar sesión y el middleware `CuentaActiva` (grupo `api`) borra su token y responde 401 (la app cierra sesión sola). El admin la suspende/reactiva desde Usuarios (`PUT /api/admin/usuarios/{id}/suspender|reactivar`)
 - [x] `POST /api/logout` — revoca solo el token usado
 - [x] `GET /api/user` — datos del usuario autenticado
 - [x] `PUT /api/perfil` — perfil personal (nombre, email, contraseña con la actual, dirección, barrio, teléfono); sincroniza la dirección principal del cliente
@@ -172,6 +172,15 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 - [ ] Reclamo cuando el pedido se queda "en camino" y nunca se marca entregado (hoy el cliente solo califica pedidos entregados)
 - [ ] Ordenar Explorar por confiabilidad (hoy solo se muestra el nivel)
 
+### Operación del piloto (P2 de la revisión) — 2026-10-28
+- [x] **Carrito persistente** en el teléfono, uno por cuenta (`CartContext` + AsyncStorage): sobrevive a cerrar la app y no se mezcla entre cuentas
+- [x] **Turno del domiciliario** (`users.en_turno`, `PUT /api/domiciliario/turno`): solo a los que están en turno (y no vetados ni suspendidos) les llega el push de "pedido listo". Al marcar listo, el negocio sabe cuántos domiciliarios había en turno. Los domiciliarios existentes quedaron en turno. App: switch En turno / Fuera de turno en Mis entregas
+- [x] **Suspender cuentas** desde el admin (ver Autenticación); lista de usuarios con buscador y 30 por página; la de negocios igual, con etiquetas Vetado/Archivado
+- [x] **Horario de los negocios** (`negocios.horario` JSON lun..dom, `App\Support\HorarioNegocio`): la tarea `negocios:aplicar-horario` (cada minuto con el scheduler) abre y cierra a esas horas; respeta un cambio manual hasta la siguiente hora del horario; soporta horarios que pasan la medianoche. El cliente ve "Hoy de 7:00 a. m. a 8:00 p. m." en Explorar y en la tienda. App: `EditorHorario` en Mi Tienda
+- [x] **Refresco más eficiente** (`usePolling`): cada 15 s (antes 5 s) solo con la pantalla visible y la app en primer plano, y al instante cuando llega un push. Aplicado al Inicio del negocio, Mis pedidos, el seguimiento y Mis entregas
+- [x] **Paginación**: Mis pedidos (20, scroll infinito), historial del domiciliario (20, "Ver más"), usuarios y negocios del admin (30, con buscador)
+- [x] Tests: `P2OperacionTest` (horario, suspensión, paginación), turno en `NotificacionesTest`, `CartPersistencia.test.tsx` (Jest) → **145 Pest + 6 Jest en verde**
+
 ### General
 - [x] `GET /api/dashboard` — panel adaptativo que responde distinto según el rol
 
@@ -238,7 +247,7 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
   `admin@demo.co`, `comerciante@demo.co`, `domiciliario@demo.co`, `cliente@demo.co`
 - [x] **Catálogo realista sembrado** (`CatalogoDemoSeeder`): 57 negocios de 14 tipos (restaurante, asadero, cafetería, bar, heladería, panadería, papelería, ferretería, ropa, frutería, carnicería, droguería, licorería, minimercado), con sus categorías y ~980 productos de distintos tipos de venta. Cada negocio es de un comerciante propio (`{slug}@demo.co` / `password123`). Idempotente
 - [x] Verificado manualmente: login por rol, dashboard por rol, comerciante crea negocio (201), cliente bloqueado en zona de comerciante (403)
-- [x] Tests automatizados (Pest): **135 en verde** (2026-10-28) en `tests/Feature` — empezó con 15 tests del flujo de comerciante (negocio, productos, categorías, paginación, búsqueda, soft delete, aislamiento) — `tests/Feature/ComercianteTest.php`. Corren en SQLite en memoria (no tocan MySQL). `RefreshDatabase` activado en `tests/Pest.php`
+- [x] Tests automatizados (Pest): **145 en verde** (2026-10-28) en `tests/Feature` — empezó con 15 tests del flujo de comerciante (negocio, productos, categorías, paginación, búsqueda, soft delete, aislamiento) — `tests/Feature/ComercianteTest.php`. Corren en SQLite en memoria (no tocan MySQL). `RefreshDatabase` activado en `tests/Pest.php`
 - [x] Colección **Postman** con todos los endpoints y guardado automático de token — `postman/comercio-api.postman_collection.json` (importable también en Bruno; Thunder Client ya cobra por importar)
 - [x] Archivo **`api.http`** (extensión REST Client de VS Code, gratis y sin cuenta) con todos los endpoints y captura automática de token
 
@@ -272,11 +281,14 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 - [ ] Búsqueda inteligente/semántica (capa 2 y 3)
 - [x] Botón llamar / WhatsApp al cliente desde el pedido (ADR-003) — y también al negocio y al domiciliario
 - [x] **P1 de la revisión del 2026-10-28**: cancelar/rechazar pedidos, costo de domicilio, historial y ventas del negocio, contacto, recuperar contraseña, eliminar cuenta + privacidad, push en cola, firma y URL de producción
-- [ ] **P2 de la revisión del 2026-10-28**: carrito persistente, turno del domiciliario, suspender cuentas desde el admin, horario de los negocios, polling más eficiente, paginación
+- [x] **P2 de la revisión del 2026-10-28**: carrito persistente, turno del domiciliario, suspender cuentas desde el admin, horario de los negocios, polling más eficiente, paginación
+- [ ] Tiempo real dentro de la app (WebSockets, ADR-002): hoy push + refresco cada 15 s
+- [ ] Tarifa de domicilio por barrio/zona (hoy es una sola para toda la ciudad)
 
 ---
 
 ## 📜 Historial de cambios
+- **2026-10-28** — **P2 de la revisión general (operación del piloto)**. Carrito persistente por cuenta; turno del domiciliario (solo en turno reciben el push de pedido listo); suspender/reactivar cuentas desde el admin; horario semanal de los negocios con apertura/cierre automático (`negocios:aplicar-horario` cada minuto) que respeta los cambios manuales; refresco con `usePolling` (15 s, solo en primer plano, inmediato con push); paginación en Mis pedidos, historial del domiciliario y listas del admin (con buscador). Tests: `P2OperacionTest` → **145 en verde**.
 - **2026-10-28** — **P1 de la revisión general (listo para piloto)**. Decisiones del usuario: se elimina el rol global `comerciante` y la web Blade que no es del admin (un solo frontend); iOS va después de Android. Pedidos: estado `cancelado` (el cliente cancela mientras está pendiente; el negocio rechaza pendientes o cancela listos sin domiciliario, con motivo y push `PedidoCancelado`), **costo de domicilio** configurable por el admin (`ajustes`), historial del negocio por pestañas + ventas de hoy (`PedidosNegocioScreen`), botones Llamar/WhatsApp entre las tres partes (ADR-003). Cuentas: recuperar contraseña con código por correo, autorización de datos al registrarse, eliminar cuenta (app + `/eliminar-cuenta`) con anonimización, política de privacidad pública, bloqueo de cuentas suspendidas. Producción: push en cola, `API_URL` por build, firma release con `keystore.properties`, zona horaria de Colombia, límites de intentos con nombre (antes se compartían entre rutas), guía `DESPLIEGUE.md`. Seeders sin `WithoutModelEvents` (los usuarios demo no tenían código público ni los dueños su membresía). Tests: `CuentaTest`, `PedidosCicloTest` → **135 en verde**.
 - **2026-10-28** — **Nivel de confiabilidad de negocios y domiciliarios** (ver sección 6). Puntaje 0–100 desde un historial de eventos: tiempos medidos por la app (preparación del negocio, recogida del domiciliario), calificación del cliente al terminar cada pedido, confirmación del dinero en efectivo por el negocio y novedades que justifican demoras. Veto automático (< 30 o 2 faltas graves en 30 días), suspensión manual, anulación de eventos y segunda oportunidad desde el admin. App: calificación, badges de nivel, tiempo de preparación, dinero por confirmar, novedades y pantalla de admin "Confiabilidad". 24 tests Pest nuevos.
 - **2026-10-02** — **Modelo unificado multi-negocio: se completa lo pendiente del 11/09**. Síntoma que lo destapó: en la app, "Productos" respondía *"No tienes acceso a este negocio"* a todos (las rutas `/comerciante/*` no traían `{negocio}` y Laravel inyectaba un `Negocio` vacío). Rutas `/api/negocios/...` e `/api/invitaciones/...`; app adaptada (negocio activo, Mis negocios, Equipo, invitaciones, registro sin rol); `NuevoPedidoParaComercio` incluye `negocio_id`; tests Pest (79 en verde).
