@@ -22,6 +22,16 @@ Si cambias de teléfono o el teléfono cambia de IP, edita la primera línea del
 set "TELEFONO=192.168.1.5:5555"
 ```
 
+### Sin teléfono: `iniciar-emulador.bat`
+
+Para probar la app solo en el PC, con el **emulador de Android**, usa **`iniciar-emulador.bat`**
+(también en la raíz). Enciende el primer emulador creado en Android Studio, levanta la API y
+Metro, espera a que Android arranque y abre la app (si no está instalada, lanza `npm run android`).
+
+Requisitos: haber creado un emulador una vez (*Device Manager → Create Device*) y tener
+`config.ts` con `http://10.0.2.2:8000`. Si tienes varios emuladores, pon el nombre en la línea
+`set "AVD="` del archivo.
+
 ## 🧩 Las tres piezas (y por qué son tres)
 
 El proyecto no es un solo programa, son tres cosas que se hablan entre sí:

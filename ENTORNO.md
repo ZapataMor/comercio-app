@@ -4,7 +4,8 @@ Todo lo necesario para levantar **comercio-app** en una máquina nueva.
 Versiones tomadas del propio proyecto (`composer.json`, `package.json`, `android/build.gradle`).
 
 > 💡 Esto es la instalación **desde cero**. Para el arranque del **día a día** (qué comando
-> ejecutar cada vez que enciendes el PC) usa `iniciar-dev.bat` en la raíz, o lee
+> ejecutar cada vez que enciendes el PC) usa `iniciar-dev.bat` en la raíz (con teléfono) o
+> `iniciar-emulador.bat` (solo PC, con el emulador), o lee
 > `Vitrina/00 - Inicio/Cómo levantar el proyecto cada día.md`.
 
 ---
@@ -64,6 +65,68 @@ php -v      # >= 8.3  (ya lo tienes)
 composer -V
 mysql --version
 ```
+
+#### PHP: extensiones obligatorias (ojo con Herd Lite)
+
+Comprueba que tu PHP trae **todas** las extensiones que pide el backend:
+
+```powershell
+php --ini                     # te dice qué php.ini se está usando
+php -m | findstr /i "sodium openssl pdo_mysql pdo_sqlite sqlite3 mbstring fileinfo gd intl curl zip"
+```
+
+Deben aparecer las once. Las que suelen faltar son `sodium` (la necesita
+`lcobucci/jwt`, que entra como dependencia del SDK de Firebase) y `intl`.
+`pdo_sqlite` y `sqlite3` no son para la app (esa va con MySQL) sino para los
+tests: `phpunit.xml` los corre con `DB_CONNECTION=sqlite` y `DB_DATABASE=:memory:`.
+Si falta alguna, abre el `php.ini` que te indicó `php --ini`, descomenta la
+línea `extension=...` correspondiente y reinicia la terminal.
+
+> ⚠️ **Herd Lite / `php.new` en Windows no sirve para este proyecto**: su PHP es
+> un binario *estático* compilado sin `sodium`, así que no se puede habilitar por
+> `php.ini` (no hay carpeta `ext/` ni DLL que cargar). Usa **Laravel Herd**
+> completo (gratis, sí trae `sodium`) o el PHP oficial de
+> [windows.php.net](https://windows.php.net/download/) (x64 Non Thread Safe),
+> y asegúrate de que ese `php.exe` va **primero** en el `PATH`:
+>
+> ```powershell
+> where.exe php      # el primero de la lista es el que usa Composer
+> ```
+
+**Receta que funciona (PHP 8.4 con winget), paso a paso en PowerShell:**
+
+```powershell
+winget install --id PHP.PHP.8.4 -e
+
+# 1. Localiza dónde lo dejó winget (no es C:\php)
+$php    = (Get-ChildItem "$env:LOCALAPPDATA\Microsoft\WinGet\Packages" -Recurse -Filter php.exe -ErrorAction SilentlyContinue | Select-Object -First 1).FullName
+$phpDir = Split-Path $php
+& $php -v
+
+# 2. Crea el php.ini (winget no lo crea) y habilita las extensiones del proyecto
+Copy-Item "$phpDir\php.ini-development" "$phpDir\php.ini"
+$ini = "$phpDir\php.ini"
+$c   = Get-Content $ini -Raw
+$c   = $c -replace '(?m)^\s*;?\s*extension_dir\s*=.*$', "extension_dir = `"$phpDir\ext`""
+foreach ($e in 'sodium','openssl','pdo_mysql','pdo_sqlite','sqlite3','mbstring','fileinfo','curl','zip','gd','intl') {
+    $c = $c -replace "(?m)^\s*;\s*extension\s*=\s*$e\s*$", "extension=$e"
+}
+Set-Content $ini $c -Encoding UTF8
+& $php -m | Select-String 'sodium|gd|intl'      # las tres deben aparecer
+
+# 3. Deja ese PHP primero en el PATH (y abre una terminal nueva)
+$u = [Environment]::GetEnvironmentVariable("PATH","User")
+[Environment]::SetEnvironmentVariable("PATH", "$phpDir;$u", "User")
+```
+
+Comprueba en la terminal nueva que `where.exe php` lista el de winget **primero** y que
+`composer -V` ya reporta esa misma ruta; entonces `composer install` pasa sin flags.
+
+> El `extension_dir` va con **ruta absoluta** a propósito: con el valor relativo `"ext"`
+> PHP no encuentra las DLL al ejecutarse desde `backend\`.
+
+> Si actualizas PHP con `winget upgrade`, la carpeta del paquete cambia de nombre y el
+> `PATH` deja de valer: repite el bloque, o copia el PHP a `C:\php` y usa esa ruta fija.
 
 ### 3.2 JDK 17
 
@@ -302,6 +365,8 @@ adb devices        # tu emulador o móvil aparece
 | Metro se queda con caché vieja                       | `npm start -- --reset-cache`                                                               |
 | Las fuentes salen genéricas                          | Faltó `npx react-native-asset` y recompilar                                                |
 | Laravel: `could not find driver`                     | Habilita `extension=pdo_mysql` (y `mbstring`, `fileinfo`, `gd`, `intl`) en `php.ini`        |
+| `composer install`: *`lcobucci/jwt` requires ext-sodium -> it is missing from your system*  | Tu PHP no trae `sodium`. Si es Herd Lite (`.config\herd-lite`), cámbialo por Herd completo o el PHP de windows.php.net (ver 3.1). Para salir del paso: `composer install --ignore-platform-req=ext-sodium` (funciona porque Firebase firma con RS256, no con Ed25519) |
+| `composer install` dice *`Please run composer update`* por ext-sodium | No es un problema del `composer.lock`: **no ejecutes `composer update`**, falta la extensión en tu PHP |
 | `php artisan pail` no funciona                       | En Windows no hay `pcntl`; lee `backend/storage/logs/laravel.log` directamente              |
 
 ---
