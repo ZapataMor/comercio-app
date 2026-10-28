@@ -49,11 +49,22 @@ export function errorHorario(h: HorarioSemana | null): string | null {
   return null;
 }
 
-/** "730" → "07:30", "2030" → "20:30" mientras se escribe. */
+/**
+ * Mientras se escribe solo pone los dos puntos ("2030" → "20:30"); no rellena
+ * con ceros, para que borrar con la tecla de retroceso no rehaga la hora.
+ */
 function formatearHora(texto: string): string {
   const d = texto.replace(/\D/g, '').slice(0, 4);
-  if (d.length <= 2) return d;
-  return `${d.slice(0, d.length - 2).padStart(2, '0')}:${d.slice(-2)}`;
+  return d.length <= 2 ? d : `${d.slice(0, 2)}:${d.slice(2)}`;
+}
+
+/** Al salir del campo completa la hora: "8" → "08:00", "730" → "07:30". */
+function completarHora(texto: string): string {
+  const d = texto.replace(/\D/g, '');
+  if (d.length === 0) return texto;
+  if (d.length <= 2) return `${d.padStart(2, '0')}:00`;
+  if (d.length === 3) return `0${d[0]}:${d.slice(1)}`;
+  return `${d.slice(0, 2)}:${d.slice(2, 4)}`;
 }
 
 type Props = {
@@ -83,7 +94,7 @@ export default function EditorHorario({ valor, onCambiar, disabled }: Props) {
   }
 
   return (
-    <View>
+    <View style={styles.contenedor}>
       <View style={styles.fila}>
         <View style={{ flex: 1 }}>
           <Text style={styles.titulo}>Horario automático</Text>
@@ -119,6 +130,7 @@ export default function EditorHorario({ valor, onCambiar, disabled }: Props) {
                     style={styles.hora}
                     value={franja.abre}
                     onChangeText={t => cambiarDia(clave, { ...franja, abre: formatearHora(t) })}
+                    onBlur={() => cambiarDia(clave, { ...franja, abre: completarHora(franja.abre) })}
                     keyboardType="number-pad"
                     maxLength={5}
                     placeholder="07:00"
@@ -130,6 +142,7 @@ export default function EditorHorario({ valor, onCambiar, disabled }: Props) {
                     style={styles.hora}
                     value={franja.cierra}
                     onChangeText={t => cambiarDia(clave, { ...franja, cierra: formatearHora(t) })}
+                    onBlur={() => cambiarDia(clave, { ...franja, cierra: completarHora(franja.cierra) })}
                     keyboardType="number-pad"
                     maxLength={5}
                     placeholder="20:00"
@@ -168,4 +181,6 @@ const useStyles = makeStyles(c => ({
   a: { color: c.muted, fontFamily: font.regular },
   noAbre: { flex: 1, color: c.muted, fontFamily: font.regular, fontSize: 13 },
   copiar: { color: c.goldText, fontFamily: font.semibold, fontSize: 13, marginTop: 12 },
+  // Aire antes del switch "Negocio abierto" que va debajo en el formulario.
+  contenedor: { marginBottom: 18 },
 }));
