@@ -161,26 +161,30 @@ export default function MisProductosScreen({ navigation }: Props) {
     });
   }
 
+  // 'carga' = al entrar o cambiar de negocio (pantalla de carga); 'refresco' =
+  // deslizar hacia abajo; 'silencioso' = tras guardar o eliminar, la lista se
+  // actualiza en su sitio sin taparla.
   const cargar = useCallback(
-    (refresco = false) => {
+    (modo: 'carga' | 'refresco' | 'silencioso' = 'carga') => {
       if (!negocioId) {
         setCargando(false);
         return;
       }
-      refresco ? setRefrescando(true) : setCargando(true);
-      setError(null);
+      if (modo === 'carga') setCargando(true);
+      if (modo === 'refresco') setRefrescando(true);
+      if (modo !== 'silencioso') setError(null);
       Promise.all([getProductos(token, negocioId, { porPagina: 100 }), getTiposProducto(token)])
         .then(([ps, ts]) => {
           setProductos(ps);
           setTipos(ts);
         })
-        .catch(e => setError(e.message))
+        .catch(e => (modo === 'silencioso' ? toast.error('No se pudo actualizar', e.message) : setError(e.message)))
         .finally(() => {
           setCargando(false);
           setRefrescando(false);
         });
     },
-    [token, negocioId],
+    [token, negocioId, toast],
   );
 
   useEffect(() => cargar(), [cargar]);
@@ -260,7 +264,7 @@ export default function MisProductosScreen({ navigation }: Props) {
         toast.exito('Listo', 'Producto creado.');
       }
       setModal(false);
-      cargar();
+      cargar('silencioso');
     } catch (e) {
       const campos = fieldErrorsFromError(e, { tipo_producto_id: 'tipo_producto' });
       if (Object.keys(campos).length > 0) {
@@ -286,7 +290,9 @@ export default function MisProductosScreen({ navigation }: Props) {
             }
             await eliminarProducto(token, negocioId, p.id);
             toast.exito('Eliminado', `"${p.nombre}" se quitó del catálogo.`);
-            cargar();
+            // Sale de la lista al instante; luego se confirma con el servidor.
+            setProductos(prev => prev.filter(x => x.id !== p.id));
+            cargar('silencioso');
           } catch (e) {
             toast.error('No se pudo eliminar', e instanceof Error ? e.message : 'Error');
           }
@@ -326,7 +332,7 @@ export default function MisProductosScreen({ navigation }: Props) {
         keyExtractor={p => String(p.id)}
         contentContainerStyle={{ padding: 16 }}
         refreshControl={
-          <RefreshControl refreshing={refrescando} onRefresh={() => cargar(true)} colors={[c.accent]} tintColor={c.accent} />
+          <RefreshControl refreshing={refrescando} onRefresh={() => cargar('refresco')} colors={[c.accent]} tintColor={c.accent} />
         }
         ListHeaderComponent={
           <PressableScale style={styles.nuevoBtn} onPress={abrirNuevo}>

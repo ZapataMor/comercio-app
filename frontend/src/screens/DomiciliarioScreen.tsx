@@ -60,6 +60,8 @@ export default function DomiciliarioScreen({ navigation }: Props) {
   // Pedido que voy a tomar: abre el modal para elegir los minutos.
   const [porTomar, setPorTomar] = useState<Pedido | null>(null);
   const [tomando, setTomando] = useState(false);
+  // Entrega cuyo estado estoy cambiando: su botón muestra que va en curso.
+  const [avanzando, setAvanzando] = useState<number | null>(null);
   const scroll = useRef<ScrollView>(null);
 
   /** Disponibles y mis entregas en curso; de paso, mi nivel para la topbar. */
@@ -78,12 +80,12 @@ export default function DomiciliarioScreen({ navigation }: Props) {
     setEntregas(e);
   }, []);
 
+  // La pantalla de carga solo sale al entrar: después (acciones, push, cada
+  // 15 s) las listas se actualizan en su sitio, sin taparlas.
   const cargar = useCallback(
-    (refresco = false, silencioso = false) => {
+    (refresco = false) => {
       if (refresco) {
         setRefrescando(true);
-      } else if (!silencioso) {
-        setCargando(true);
       }
 
       traer()
@@ -100,7 +102,22 @@ export default function DomiciliarioScreen({ navigation }: Props) {
   useEffect(() => {
     cargar();
   }, [cargar]);
-  usePolling(() => cargar(false, true));
+  usePolling(() => cargar());
+
+  /**
+   * Trae las listas tras una acción y aplica el cambio con una animación.
+   * Devuelve false si no hubo red (el siguiente refresco lo pone al día).
+   */
+  async function actualizarAnimado(): Promise<boolean> {
+    try {
+      const datos = await traer();
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      aplicar(datos);
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   async function onCambiarTurno(valor: boolean) {
     setCambiandoTurno(true);
@@ -126,21 +143,12 @@ export default function DomiciliarioScreen({ navigation }: Props) {
       toast.error('No se pudo tomar', e instanceof Error ? e.message : 'Error');
       setTomando(false);
       setPorTomar(null);
-      cargar(false, true);
+      cargar();
       return;
     }
 
-    let datos: Listas | null = null;
-    try {
-      datos = await traer();
-    } catch {
-      // Sin red justo ahora: el siguiente refresco lo pone al día.
-    }
     // El que elegí sube a "en curso" (arriba) y los demás disponibles bajan.
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    if (datos) {
-      aplicar(datos);
-    } else {
+    if (!(await actualizarAnimado())) {
       setDisponibles(prev => prev.filter(p => p.id !== pedido.id));
     }
     setTomando(false);
@@ -150,11 +158,17 @@ export default function DomiciliarioScreen({ navigation }: Props) {
   }
 
   async function onAvanzar(id: number, accion: string) {
+    setAvanzando(id);
     try {
       await avanzarPedido(token, id, accion);
-      cargar();
+      await actualizarAnimado();
+      if (accion === 'entregado') {
+        toast.exito('¡Entrega completada!', 'La encuentras en Pedidos entregados.');
+      }
     } catch (e) {
       toast.error('No se pudo actualizar', e instanceof Error ? e.message : 'Error');
+    } finally {
+      setAvanzando(null);
     }
   }
 
@@ -248,15 +262,31 @@ export default function DomiciliarioScreen({ navigation }: Props) {
                         etiquetaLlamar="Llamar al cliente"
                       />
                     )}
-                    <Novedad pedido={p} onReportada={() => cargar(false, true)} />
+                    <Novedad pedido={p} onReportada={() => cargar()} />
                     {p.estado === 'tomado' && (
-                      <Boton icon="caja" texto="Marcar recogido" onPress={() => onAvanzar(p.id, 'recogido')} />
+                      <Boton
+                        icon="caja"
+                        texto="Marcar recogido"
+                        cargando={avanzando === p.id}
+                        onPress={() => onAvanzar(p.id, 'recogido')}
+                      />
                     )}
                     {p.estado === 'recogido' && (
-                      <Boton icon="moto" texto="Salir / En camino" onPress={() => onAvanzar(p.id, 'en-camino')} />
+                      <Boton
+                        icon="moto"
+                        texto="Salir / En camino"
+                        cargando={avanzando === p.id}
+                        onPress={() => onAvanzar(p.id, 'en-camino')}
+                      />
                     )}
                     {p.estado === 'en_camino' && (
-                      <Boton icon="check" texto="Marcar entregado" color={c.success} onPress={() => onAvanzar(p.id, 'entregado')} />
+                      <Boton
+                        icon="check"
+                        texto="Marcar entregado"
+                        color={c.success}
+                        cargando={avanzando === p.id}
+                        onPress={() => onAvanzar(p.id, 'entregado')}
+                      />
                     )}
                   </View>
                 </FadeInView>
@@ -387,18 +417,30 @@ function Boton({
   onPress,
   icon,
   color,
+  cargando,
 }: {
   texto: string;
   onPress: () => void;
   icon?: IconName;
   color?: string;
+  /** Mientras se envía: ruedita dentro del botón (la tarjeta sigue a la vista). */
+  cargando?: boolean;
 }) {
   const { c } = useTheme();
   const styles = useStyles();
   return (
-    <PressableScale style={[styles.btn, styles.btnFila, { backgroundColor: color ?? c.brand }]} onPress={onPress}>
-      {icon && <Icon name={icon} size={16} color={c.onBrand} />}
-      <Text style={styles.btnTxt}>{texto}</Text>
+    <PressableScale
+      style={[styles.btn, styles.btnFila, { backgroundColor: color ?? c.brand }]}
+      onPress={onPress}
+      disabled={cargando}>
+      {cargando ? (
+        <ActivityIndicator color={c.onBrand} />
+      ) : (
+        <>
+          {icon && <Icon name={icon} size={16} color={c.onBrand} />}
+          <Text style={styles.btnTxt}>{texto}</Text>
+        </>
+      )}
     </PressableScale>
   );
 }

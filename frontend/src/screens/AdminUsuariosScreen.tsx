@@ -58,9 +58,13 @@ export default function AdminUsuariosScreen() {
   const [aSuspender, setASuspender] = useState<AdminUsuario | null>(null);
   const [suspendiendo, setSuspendiendo] = useState(false);
 
+  // 'carga' = otra pestaña o búsqueda (ruedita en la lista); 'refresco' =
+  // deslizar hacia abajo; 'silencioso' = tras suspender, reactivar, cambiar
+  // el rol o crear, la lista se actualiza en su sitio sin taparla.
   const cargar = useCallback(
-    (rol: string, refresco = false, texto = '') => {
-      refresco ? setRefrescando(true) : setCargando(true);
+    (rol: string, modo: 'carga' | 'refresco' | 'silencioso' = 'carga', texto = '') => {
+      if (modo === 'carga') setCargando(true);
+      if (modo === 'refresco') setRefrescando(true);
       getAdminUsuarios(token, rol, texto, 1)
         .then(r => {
           setRoles(r.roles);
@@ -90,7 +94,7 @@ export default function AdminUsuariosScreen() {
       primeraVez.current = false;
       return;
     }
-    const t = setTimeout(() => cargar(rolActual, false, buscar), 350);
+    const t = setTimeout(() => cargar(rolActual, 'carga', buscar), 350);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [buscar]);
@@ -120,7 +124,7 @@ export default function AdminUsuariosScreen() {
     try {
       toast.exito('Cuenta suspendida', await suspenderUsuario(token, aSuspender.id, motivo));
       setASuspender(null);
-      cargar(rolActual, false, buscar);
+      cargar(rolActual, 'silencioso', buscar);
     } catch (e) {
       toast.error('No se pudo suspender', messageFromError(e, 'Error'));
     } finally {
@@ -131,7 +135,7 @@ export default function AdminUsuariosScreen() {
   async function onReactivar(u: AdminUsuario) {
     try {
       toast.exito('Cuenta reactivada', await reactivarUsuario(token, u.id));
-      cargar(rolActual, false, buscar);
+      cargar(rolActual, 'silencioso', buscar);
     } catch (e) {
       toast.error('No se pudo reactivar', messageFromError(e, 'Error'));
     }
@@ -141,7 +145,7 @@ export default function AdminUsuariosScreen() {
     if (u.rol === nuevo) return;
     try {
       await cambiarRol(token, u.id, nuevo);
-      cargar(rolActual);
+      cargar(rolActual, 'silencioso', buscar);
     } catch (e) {
       toast.error('No se pudo cambiar', e instanceof Error ? e.message : 'Error');
     }
@@ -167,7 +171,7 @@ export default function AdminUsuariosScreen() {
       setPassword('');
       setErrores({});
       setMostrarForm(false);
-      cargar(formRol);
+      cargar(formRol, 'silencioso');
       toast.exito('Listo', 'Usuario creado.');
     } catch (e) {
       const campos = fieldErrorsFromError(e);
@@ -234,7 +238,7 @@ export default function AdminUsuariosScreen() {
         style={styles.tabs}
         contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}
         renderItem={({ item }) => (
-          <TouchableOpacity onPress={() => cargar(item, false, buscar)}
+          <TouchableOpacity onPress={() => cargar(item, 'carga', buscar)}
             style={[styles.tab, item === rolActual && styles.tabOn]}>
             <Text style={[styles.tabTxt, item === rolActual && styles.tabTxtOn]}>
               {item} {conteos[item] ?? 0}
@@ -267,7 +271,7 @@ export default function AdminUsuariosScreen() {
           refreshControl={
             <RefreshControl
               refreshing={refrescando}
-              onRefresh={() => cargar(rolActual, true, buscar)}
+              onRefresh={() => cargar(rolActual, 'refresco', buscar)}
               colors={[c.accent]}
               tintColor={c.accent}
             />

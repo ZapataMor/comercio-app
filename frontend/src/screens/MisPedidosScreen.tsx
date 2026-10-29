@@ -28,21 +28,19 @@ export default function MisPedidosScreen({ navigation }: Props) {
   const [hayMas, setHayMas] = useState(false);
   const [cargandoMas, setCargandoMas] = useState(false);
 
-  // Refresca la primera página sin perder las que ya se cargaron debajo.
+  // Refresca la primera página sin perder las que ya se cargaron debajo;
+  // `reiniciar` vuelve a contar las páginas desde la primera. La pantalla de
+  // carga solo sale la primera vez: al volver aquí la lista se actualiza en su sitio.
   const cargar = useCallback(
-    (mostrarCarga = false) => {
-      if (mostrarCarga) {
-        setCargando(true);
-      }
-
+    (reiniciar = false) => {
       return getMisPedidos(auth!.token, 1)
         .then(p => {
           setPedidos(prev => {
             const nuevos = new Set(p.items.map(x => x.id));
             return [...p.items, ...prev.filter(x => !nuevos.has(x.id) && x.id < (p.items[p.items.length - 1]?.id ?? 0))];
           });
-          setHayMas(prev => (mostrarCarga ? p.pagina < p.ultima_pagina : prev || p.pagina < p.ultima_pagina));
-          if (mostrarCarga) setPagina(1);
+          setHayMas(prev => (reiniciar ? p.pagina < p.ultima_pagina : prev || p.pagina < p.ultima_pagina));
+          if (reiniciar) setPagina(1);
         })
         .finally(() => setCargando(false));
     },

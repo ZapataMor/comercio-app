@@ -99,21 +99,21 @@ export default function PedidoDetalleScreen({ route }: Props) {
   }
 
   const cargarPedido = useCallback(
-    (mostrarCarga = false) => {
-      if (mostrarCarga) {
-        setCargando(true);
-      }
-
-      return getPedido(auth!.token, id)
+    () =>
+      getPedido(auth!.token, id)
         .then(setPedido)
-        .finally(() => setCargando(false));
-    },
+        .finally(() => setCargando(false)),
     [auth, id],
   );
 
+  // La pantalla de carga solo sale con un pedido nuevo (al entrar o si un
+  // push abre otro); al volver aquí o tras una acción se actualiza en su sitio.
+  useEffect(() => {
+    setCargando(true);
+  }, [id]);
   useFocusEffect(
     useCallback(() => {
-      cargarPedido(true);
+      cargarPedido();
     }, [cargarPedido]),
   );
   // Se refresca al llegar un push (cambió el estado) y cada 15 s de respaldo.
