@@ -2,30 +2,39 @@
  * Botón "Mi perfil" de la topbar (parte superior derecha), visible para
  * TODOS los roles. Solo muestra el ícono de la persona; abre la pantalla del
  * perfil PERSONAL del usuario (la persona, no el negocio).
+ *
+ * Al domiciliario se le muestra al lado su nivel de confiabilidad
+ * (HeaderConfiabilidad).
  */
 import React from 'react';
+import { View } from 'react-native';
 import { navigationRef } from '../RootNavigation';
 import { radius, makeStyles, useTheme } from '../theme';
 import { PressableScale } from './anim';
+import HeaderConfiabilidad from './HeaderConfiabilidad';
 import Icon from './Icon';
 
 export default function HeaderPerfil() {
   const { c } = useTheme();
   const styles = useStyles();
   return (
-    <PressableScale
-      style={styles.boton}
-      hitSlop={8}
-      // Sin texto visible: el lector de pantalla anuncia "Mi perfil".
-      accessibilityRole="button"
-      accessibilityLabel="Mi perfil"
-      onPress={() => navigationRef.isReady() && navigationRef.navigate('Perfil')}>
-      <Icon name="usuario" size={18} color={c.onHeader} strokeWidth={2} />
-    </PressableScale>
+    <View style={styles.fila}>
+      <HeaderConfiabilidad />
+      <PressableScale
+        style={styles.boton}
+        hitSlop={8}
+        // Sin texto visible: el lector de pantalla anuncia "Mi perfil".
+        accessibilityRole="button"
+        accessibilityLabel="Mi perfil"
+        onPress={() => navigationRef.isReady() && navigationRef.navigate('Perfil')}>
+        <Icon name="usuario" size={18} color={c.onHeader} strokeWidth={2} />
+      </PressableScale>
+    </View>
   );
 }
 
 const useStyles = makeStyles(() => ({
+  fila: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   boton: {
     width: 34,
     height: 34,

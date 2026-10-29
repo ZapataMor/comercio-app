@@ -1,6 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  LayoutAnimation,
   RefreshControl,
   ScrollView,
   Switch,
@@ -12,28 +14,35 @@ import {
   avanzarPedido,
   cambiarTurno,
   getDisponibles,
-  getHistorialEntregas,
   getMiReputacion,
   getMisEntregas,
   Pedido,
-  ReputacionDetalle,
   reportarNovedad,
   tomarPedido,
 } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import BotonesContacto from '../components/BotonesContacto';
+import { publicarMiReputacion } from '../components/HeaderConfiabilidad';
 import Icon, { IconName } from '../components/Icon';
-import { NivelBadge, TarjetaReputacion } from '../components/Reputacion';
+import MinutosRecogida from '../components/MinutosRecogida';
+import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 import { usePolling } from '../usePolling';
+
+type Props = NativeStackScreenProps<RootStackParamList, 'Domiciliario'>;
 
 function cop(n: number) {
   return '$' + Math.round(n).toLocaleString('es-CO');
 }
 
-export default function DomiciliarioScreen() {
+/**
+ * Inicio del domiciliario: arriba las entregas que lleva (la última que tomó
+ * primero) y debajo los pedidos disponibles para recoger. Al tomar uno, ese
+ * sube a "en curso" y los demás disponibles quedan debajo.
+ */
+export default function DomiciliarioScreen({ navigation }: Props) {
   const { c, estadoColor } = useTheme();
   const styles = useStyles();
   const { auth } = useAuth();
@@ -41,18 +50,33 @@ export default function DomiciliarioScreen() {
   const toast = useToast();
   const [disponibles, setDisponibles] = useState<Pedido[]>([]);
   const [entregas, setEntregas] = useState<Pedido[]>([]);
-  const [historial, setHistorial] = useState<Pedido[]>([]);
-  // Mi nivel de confiabilidad; vetado = no puedo tomar pedidos nuevos.
-  const [reputacion, setReputacion] = useState<ReputacionDetalle | null>(null);
+  // Vetado = no puedo tomar pedidos nuevos (baja confiabilidad).
   const [vetado, setVetado] = useState(false);
   const [cargando, setCargando] = useState(true);
   const [refrescando, setRefrescando] = useState(false);
   // En turno = me llegan los avisos de pedidos listos para recoger.
   const [enTurno, setEnTurno] = useState(false);
   const [cambiandoTurno, setCambiandoTurno] = useState(false);
-  // Historial paginado (20 por página) con "Ver más".
-  const [paginaHistorial, setPaginaHistorial] = useState(1);
-  const [hayMasHistorial, setHayMasHistorial] = useState(false);
+  // Pedido que voy a tomar: abre el modal para elegir los minutos.
+  const [porTomar, setPorTomar] = useState<Pedido | null>(null);
+  const [tomando, setTomando] = useState(false);
+  const scroll = useRef<ScrollView>(null);
+
+  /** Disponibles y mis entregas en curso; de paso, mi nivel para la topbar. */
+  const traer = useCallback(async () => {
+    getMiReputacion(token)
+      .then(r => publicarMiReputacion(token, r))
+      .catch(() => {});
+    const [d, e] = await Promise.all([getDisponibles(token), getMisEntregas(token)]);
+    return { d, e };
+  }, [token]);
+
+  const aplicar = useCallback(({ d, e }: Listas) => {
+    setDisponibles(d.pedidos);
+    setVetado(d.vetado);
+    setEnTurno(d.en_turno);
+    setEntregas(e);
+  }, []);
 
   const cargar = useCallback(
     (refresco = false, silencioso = false) => {
@@ -62,33 +86,15 @@ export default function DomiciliarioScreen() {
         setCargando(true);
       }
 
-      // El refresco silencioso (push / cada 15 s) no recarga el historial,
-      // para no perder las páginas que ya se vieron.
-      Promise.all([
-        getDisponibles(token),
-        getMisEntregas(token),
-        silencioso ? Promise.resolve(null) : getHistorialEntregas(token, 1),
-        getMiReputacion(token),
-      ])
-        .then(([d, e, h, r]) => {
-          setDisponibles(d.pedidos);
-          setVetado(d.vetado);
-          setEnTurno(d.en_turno);
-          setEntregas(e);
-          if (h) {
-            setHistorial(h.items);
-            setPaginaHistorial(1);
-            setHayMasHistorial(h.pagina < h.ultima_pagina);
-          }
-          setReputacion(r);
-        })
+      traer()
+        .then(aplicar)
         .catch(err => toast.error('Error', err.message))
         .finally(() => {
           setCargando(false);
           setRefrescando(false);
         });
     },
-    [token, toast],
+    [traer, aplicar, toast],
   );
 
   useEffect(() => {
@@ -109,24 +115,38 @@ export default function DomiciliarioScreen() {
     }
   }
 
-  async function verMasHistorial() {
+  async function onTomar(minutos: number) {
+    const pedido = porTomar;
+    if (!pedido) return;
+    setTomando(true);
     try {
-      const h = await getHistorialEntregas(token, paginaHistorial + 1);
-      setHistorial(prev => [...prev, ...h.items.filter(x => !prev.some(y => y.id === x.id))]);
-      setPaginaHistorial(h.pagina);
-      setHayMasHistorial(h.pagina < h.ultima_pagina);
+      await tomarPedido(token, pedido.id, minutos);
     } catch (e) {
-      toast.error('No se pudo cargar', e instanceof Error ? e.message : 'Error');
-    }
-  }
-
-  async function onTomar(id: number, minutos: number) {
-    try {
-      await tomarPedido(token, id, minutos);
-      cargar();
-    } catch (e) {
+      // Puede que otro lo haya tomado: se cierra y se refresca la lista.
       toast.error('No se pudo tomar', e instanceof Error ? e.message : 'Error');
+      setTomando(false);
+      setPorTomar(null);
+      cargar(false, true);
+      return;
     }
+
+    let datos: Listas | null = null;
+    try {
+      datos = await traer();
+    } catch {
+      // Sin red justo ahora: el siguiente refresco lo pone al día.
+    }
+    // El que elegí sube a "en curso" (arriba) y los demás disponibles bajan.
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    if (datos) {
+      aplicar(datos);
+    } else {
+      setDisponibles(prev => prev.filter(p => p.id !== pedido.id));
+    }
+    setTomando(false);
+    setPorTomar(null);
+    scroll.current?.scrollTo({ y: 0, animated: true });
+    toast.exito('Pedido tomado', `Pasa a recogerlo en ${minutos} min.`);
   }
 
   async function onAvanzar(id: number, accion: string) {
@@ -143,160 +163,151 @@ export default function DomiciliarioScreen() {
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ padding: 16 }}
-      refreshControl={
-        <RefreshControl refreshing={refrescando} onRefresh={() => cargar(true)} colors={[c.accent]} tintColor={c.accent} />
-      }>
-      {/* Turno: solo en turno llegan los avisos de pedidos listos. */}
-      {!vetado && (
-        <View style={[styles.turno, enTurno ? styles.turnoOn : styles.turnoOff]}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.turnoTitulo}>{enTurno ? 'Estás en turno' : 'Estás fuera de turno'}</Text>
-            <Text style={styles.turnoSub}>
-              {enTurno
-                ? 'Te avisamos cuando haya pedidos listos para recoger.'
-                : 'No te llegan avisos de pedidos nuevos. Actívalo cuando salgas a trabajar.'}
+    <>
+      <ScrollView
+        ref={scroll}
+        style={styles.container}
+        contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+        refreshControl={
+          <RefreshControl refreshing={refrescando} onRefresh={() => cargar(true)} colors={[c.accent]} tintColor={c.accent} />
+        }>
+        {/* Turno: solo en turno llegan los avisos de pedidos listos. */}
+        {!vetado && (
+          <View style={[styles.turno, enTurno ? styles.turnoOn : styles.turnoOff]}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.turnoTitulo}>{enTurno ? 'Estás en turno' : 'Estás fuera de turno'}</Text>
+              <Text style={styles.turnoSub}>
+                {enTurno
+                  ? 'Te avisamos cuando haya pedidos listos para recoger.'
+                  : 'No te llegan avisos de pedidos nuevos. Actívalo cuando salgas a trabajar.'}
+              </Text>
+            </View>
+            <Switch
+              value={enTurno}
+              onValueChange={onCambiarTurno}
+              disabled={cambiandoTurno}
+              trackColor={{ false: c.borderStrong, true: c.success }}
+              thumbColor={c.surface}
+            />
+          </View>
+        )}
+
+        {/* Lo que ya tomé va arriba: los disponibles quedan debajo. */}
+        {entregas.length > 0 && (
+          <>
+            <Text style={styles.seccion}>Mis entregas en curso</Text>
+            {entregas.map((p, i) => {
+              const ec = estadoColor(p.estado);
+              return (
+                <FadeInView key={p.id} delay={i * 50}>
+                  <View style={[styles.card, styles.bordeAzul]}>
+                    <View style={styles.cardHead}>
+                      <Text style={styles.pedidoId}>Pedido #{p.id}</Text>
+                      <Text style={[styles.badge, { backgroundColor: ec.bg, color: ec.fg }]}>{p.estado_label}</Text>
+                    </View>
+                    {p.estado === 'tomado' && !!p.minutos_recogida && (
+                      <View style={[styles.lineaSub, styles.fila]}>
+                        <Icon name="reloj" size={13} color={c.goldText} />
+                        <Text style={styles.prometido}>Prometiste recogerlo en {p.minutos_recogida} min</Text>
+                      </View>
+                    )}
+                    <View style={[styles.linea, styles.fila]}>
+                      <Icon name="tienda" size={14} color={c.text} />
+                      <Text style={[styles.linea, { flex: 1 }]}>
+                        Recoger: {p.negocio?.nombre} — {p.negocio?.direccion ?? 's/d'}
+                      </Text>
+                    </View>
+                    <View style={[styles.linea, styles.fila]}>
+                      <Icon name="casa" size={14} color={c.text} />
+                      <Text style={[styles.linea, { flex: 1 }]}>
+                        Entregar: {p.cliente?.name} — {p.direccion_entrega}
+                      </Text>
+                    </View>
+                    <View style={[styles.linea, styles.fila]}>
+                      <Icon name="tarjeta" size={14} color={c.text} />
+                      <Text style={styles.linea}>
+                        {p.cobrar > 0
+                          ? `Cobrar al cliente: ${cop(p.cobrar)} en efectivo`
+                          : 'Pagado por transferencia: no cobres nada'}
+                      </Text>
+                    </View>
+                    <Text style={styles.lineaSub}>
+                      Productos {cop(p.subtotal ?? p.total)} · Domicilio {cop(p.costo_domicilio ?? 0)}
+                    </Text>
+                    {/* Antes de recoger se coordina con el negocio; después, con el cliente. */}
+                    {p.estado === 'tomado' ? (
+                      <BotonesContacto
+                        telefono={p.negocio?.telefono}
+                        mensaje={`Hola, soy el domiciliario de Vitrina que va por el pedido #${p.id}.`}
+                        etiquetaLlamar="Llamar al negocio"
+                      />
+                    ) : (
+                      <BotonesContacto
+                        telefono={p.telefono_contacto}
+                        mensaje={`Hola, soy tu domiciliario de Vitrina con el pedido #${p.id}.`}
+                        etiquetaLlamar="Llamar al cliente"
+                      />
+                    )}
+                    <Novedad pedido={p} onReportada={() => cargar(false, true)} />
+                    {p.estado === 'tomado' && (
+                      <Boton icon="caja" texto="Marcar recogido" onPress={() => onAvanzar(p.id, 'recogido')} />
+                    )}
+                    {p.estado === 'recogido' && (
+                      <Boton icon="moto" texto="Salir / En camino" onPress={() => onAvanzar(p.id, 'en-camino')} />
+                    )}
+                    {p.estado === 'en_camino' && (
+                      <Boton icon="check" texto="Marcar entregado" color={c.success} onPress={() => onAvanzar(p.id, 'entregado')} />
+                    )}
+                  </View>
+                </FadeInView>
+              );
+            })}
+          </>
+        )}
+
+        <Text style={styles.seccion}>
+          Pedidos disponibles{!vetado && disponibles.length > 0 ? ` (${disponibles.length})` : ''}
+        </Text>
+        {vetado ? (
+          <View style={styles.vetado}>
+            <Icon name="alerta" size={18} color={c.danger} />
+            <Text style={styles.vetadoTxt}>
+              Tu cuenta de domiciliario está suspendida por baja confiabilidad, así que no puedes tomar pedidos nuevos.
+              Termina las entregas que llevas; un administrador revisará tu caso.
             </Text>
           </View>
-          <Switch
-            value={enTurno}
-            onValueChange={onCambiarTurno}
-            disabled={cambiandoTurno}
-            trackColor={{ false: c.borderStrong, true: c.success }}
-            thumbColor={c.surface}
-          />
-        </View>
-      )}
-
-      {!!reputacion && (
-        <View style={styles.miNivel}>
-          <Icon name="escudo" size={16} color={c.accent} />
-          <Text style={styles.miNivelTxt}>Tu nivel de confiabilidad</Text>
-          <NivelBadge reputacion={reputacion.reputacion} />
-        </View>
-      )}
-
-      <Text style={styles.seccion}>Pedidos disponibles</Text>
-      {vetado ? (
-        <View style={styles.vetado}>
-          <Icon name="alerta" size={18} color={c.danger} />
-          <Text style={styles.vetadoTxt}>
-            Tu cuenta de domiciliario está suspendida por baja confiabilidad, así que no puedes tomar pedidos nuevos.
-            Termina las entregas que llevas; un administrador revisará tu caso.
-          </Text>
-        </View>
-      ) : disponibles.length === 0 ? (
-        <Text style={styles.vacio}>No hay pedidos disponibles ahora.</Text>
-      ) : (
-        disponibles.map((p, i) => (
-          <FadeInView key={p.id} delay={i * 50}>
-            <DisponibleCard pedido={p} onTomar={onTomar} />
-          </FadeInView>
-        ))
-      )}
-
-      <Text style={styles.seccion}>Mis entregas en curso</Text>
-      {entregas.length === 0 ? (
-        <Text style={styles.vacio}>No tienes entregas en curso.</Text>
-      ) : (
-        entregas.map((p, i) => {
-          const ec = estadoColor(p.estado);
-          return (
+        ) : disponibles.length === 0 ? (
+          <Text style={styles.vacio}>No hay pedidos disponibles ahora.</Text>
+        ) : (
+          disponibles.map((p, i) => (
             <FadeInView key={p.id} delay={i * 50}>
-              <View style={[styles.card, styles.bordeAzul]}>
-                <View style={styles.cardHead}>
-                  <Text style={styles.pedidoId}>Pedido #{p.id}</Text>
-                  <Text style={[styles.badge, { backgroundColor: ec.bg, color: ec.fg }]}>{p.estado_label}</Text>
-                </View>
-                <View style={[styles.linea, styles.fila]}>
-                  <Icon name="tienda" size={14} color={c.text} />
-                  <Text style={[styles.linea, { flex: 1 }]}>
-                    Recoger: {p.negocio?.nombre} — {p.negocio?.direccion ?? 's/d'}
-                  </Text>
-                </View>
-                <View style={[styles.linea, styles.fila]}>
-                  <Icon name="casa" size={14} color={c.text} />
-                  <Text style={[styles.linea, { flex: 1 }]}>
-                    Entregar: {p.cliente?.name} — {p.direccion_entrega}
-                  </Text>
-                </View>
-                <View style={[styles.linea, styles.fila]}>
-                  <Icon name="tarjeta" size={14} color={c.text} />
-                  <Text style={styles.linea}>
-                    {p.cobrar > 0
-                      ? `Cobrar al cliente: ${cop(p.cobrar)} en efectivo`
-                      : 'Pagado por transferencia: no cobres nada'}
-                  </Text>
-                </View>
-                <Text style={styles.lineaSub}>
-                  Productos {cop(p.subtotal ?? p.total)} · Domicilio {cop(p.costo_domicilio ?? 0)}
-                </Text>
-                {/* Antes de recoger se coordina con el negocio; después, con el cliente. */}
-                {p.estado === 'tomado' ? (
-                  <BotonesContacto
-                    telefono={p.negocio?.telefono}
-                    mensaje={`Hola, soy el domiciliario de Vitrina que va por el pedido #${p.id}.`}
-                    etiquetaLlamar="Llamar al negocio"
-                  />
-                ) : (
-                  <BotonesContacto
-                    telefono={p.telefono_contacto}
-                    mensaje={`Hola, soy tu domiciliario de Vitrina con el pedido #${p.id}.`}
-                    etiquetaLlamar="Llamar al cliente"
-                  />
-                )}
-                <Novedad pedido={p} onReportada={() => cargar(false, true)} />
-                {p.estado === 'tomado' && (
-                  <Boton icon="caja" texto="Marcar recogido" onPress={() => onAvanzar(p.id, 'recogido')} />
-                )}
-                {p.estado === 'recogido' && (
-                  <Boton icon="moto" texto="Salir / En camino" onPress={() => onAvanzar(p.id, 'en-camino')} />
-                )}
-                {p.estado === 'en_camino' && (
-                  <Boton icon="check" texto="Marcar entregado" color={c.success} onPress={() => onAvanzar(p.id, 'entregado')} />
-                )}
-              </View>
+              <DisponibleCard pedido={p} onTomar={() => setPorTomar(p)} />
             </FadeInView>
-          );
-        })
-      )}
+          ))
+        )}
 
-      <Text style={styles.seccion}>Historial</Text>
-      {historial.length === 0 ? (
-        <Text style={styles.vacio}>Aún no has completado entregas.</Text>
-      ) : (
-        historial.map(p => (
-          <View key={p.id} style={styles.histItem}>
-            <Text style={styles.linea}>Pedido #{p.id} · {p.negocio?.nombre}</Text>
-            <Text style={styles.histOk}>Entregado · {cop(p.total)}</Text>
+        {/* Módulo aparte con las entregas que ya completé. */}
+        <PressableScale style={styles.entregados} onPress={() => navigation.navigate('PedidosEntregados')}>
+          <Icon name="check" size={22} color={c.success} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.entregadosTitulo}>Pedidos entregados</Text>
+            <Text style={styles.entregadosSub}>Revisa las entregas que ya completaste</Text>
           </View>
-        ))
-      )}
-      {hayMasHistorial && (
-        <PressableScale onPress={verMasHistorial}>
-          <Text style={styles.verMas}>Ver más entregas</Text>
+          <Icon name="chevron" size={20} color={c.chevron} />
         </PressableScale>
-      )}
+      </ScrollView>
 
-      {!!reputacion && (
-        <View style={{ marginTop: 18 }}>
-          <TarjetaReputacion
-            reputacion={reputacion.reputacion}
-            eventos={reputacion.eventos}
-            explicacion={
-              'Sube cuando el cliente queda conforme y cuando entregas el dinero completo al negocio. ' +
-              'Baja si recoges después de lo que prometiste, si llegas tarde sin avisar o si hay quejas. ' +
-              'Con menos de 30 puntos, o 2 faltas graves (pedido que no llegó, dinero no entregado) en 30 días, ' +
-              'la cuenta se suspende. ¿Te vas a demorar? Reporta una novedad y la demora no te resta.'
-            }
-          />
-        </View>
-      )}
-    </ScrollView>
+      <MinutosRecogida
+        pedido={porTomar}
+        enviando={tomando}
+        onCerrar={() => setPorTomar(null)}
+        onAceptar={onTomar}
+      />
+    </>
   );
 }
+
+type Listas = { d: Awaited<ReturnType<typeof getDisponibles>>; e: Pedido[] };
 
 /** Motivos rápidos para justificar una demora. */
 const NOVEDADES = ['Lluvia fuerte', 'Tráfico o vía cerrada', 'Problema con la moto', 'El negocio no lo tenía listo', 'No encuentro la dirección'];
@@ -392,10 +403,9 @@ function Boton({
   );
 }
 
-function DisponibleCard({ pedido, onTomar }: { pedido: Pedido; onTomar: (id: number, min: number) => void }) {
+function DisponibleCard({ pedido, onTomar }: { pedido: Pedido; onTomar: () => void }) {
   const { c } = useTheme();
   const styles = useStyles();
-  const [min, setMin] = useState('15');
   return (
     <View style={[styles.card, styles.bordeAmbar]}>
       <View style={styles.cardHead}>
@@ -414,22 +424,11 @@ function DisponibleCard({ pedido, onTomar }: { pedido: Pedido; onTomar: (id: num
         {pedido.items.reduce((s, i) => s + i.cantidad, 0)} producto(s) · Domicilio {cop(pedido.costo_domicilio ?? 0)} ·{' '}
         {pedido.metodo_pago === 'efectivo' ? `cobras ${cop(pedido.cobrar)}` : 'ya pagado'}
       </Text>
-      <View style={styles.tomarRow}>
-        <View>
-          <Text style={styles.minLabel}>Recojo en (min)</Text>
-          <TextInput
-            style={styles.minInput}
-            value={min}
-            onChangeText={setMin}
-            keyboardType="number-pad"
-          />
-        </View>
-        <PressableScale
-          style={styles.tomarBtn}
-          onPress={() => onTomar(pedido.id, parseInt(min, 10) || 15)}>
-          <Text style={styles.tomarTxt}>Tomar pedido</Text>
-        </PressableScale>
-      </View>
+      {/* Abre el modal para elegir en cuántos minutos lo recojo. */}
+      <PressableScale style={[styles.tomarBtn, styles.btnFila]} onPress={onTomar}>
+        <Icon name="moto" size={16} color={c.onAccent} />
+        <Text style={styles.tomarTxt}>Tomar pedido</Text>
+      </PressableScale>
     </View>
   );
 }
@@ -458,30 +457,21 @@ const useStyles = makeStyles((c, shadow) => ({
   turnoOff: { backgroundColor: c.warningSoft, borderColor: c.warning },
   turnoTitulo: { fontFamily: font.bold, fontSize: 15, color: c.textStrong },
   turnoSub: { fontFamily: font.regular, fontSize: 12, color: c.text, marginTop: 2 },
-  verMas: { textAlign: 'center', color: c.goldText, fontFamily: font.semibold, marginVertical: 12 },
-  tomarRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, marginTop: 12 },
   minLabel: { fontSize: 11, color: c.muted, marginBottom: 4, fontFamily: font.regular },
-  minInput: {
-    borderWidth: 1, borderColor: c.borderStrong, borderRadius: radius.sm,
-    paddingHorizontal: 12, paddingVertical: 9, width: 90, textAlign: 'center', color: c.textStrong, fontFamily: font.semibold,
-  },
-  tomarBtn: { flex: 1, backgroundColor: c.accent, borderRadius: radius.sm, paddingVertical: 13, alignItems: 'center', ...shadow.gold },
+  tomarBtn: { backgroundColor: c.accent, borderRadius: radius.sm, paddingVertical: 13, marginTop: 12, ...shadow.gold },
   tomarTxt: { color: c.onAccent, fontFamily: font.bold },
   btn: { borderRadius: radius.sm, paddingVertical: 13, alignItems: 'center', marginTop: 12 },
   btnFila: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
   fila: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   btnTxt: { color: c.onBrand, fontFamily: font.bold },
-  histItem: {
-    flexDirection: 'row', justifyContent: 'space-between', backgroundColor: c.surface,
-    borderRadius: radius.md, padding: 14, marginBottom: 8, ...shadow.low,
-  },
-  histOk: { color: c.success, fontFamily: font.semibold },
+  prometido: { color: c.goldText, fontSize: 13, fontFamily: font.semibold },
   vacio: { color: c.muted, fontSize: 14, fontFamily: font.regular },
-  miNivel: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.surface,
-    borderRadius: radius.md, padding: 12, ...shadow.low,
+  entregados: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.surface,
+    borderRadius: radius.lg, padding: 16, marginTop: 22, ...shadow.soft,
   },
-  miNivelTxt: { flex: 1, color: c.text, fontFamily: font.semibold },
+  entregadosTitulo: { fontSize: 15, fontFamily: font.bold, color: c.textStrong },
+  entregadosSub: { color: c.muted, fontSize: 13, marginTop: 2, fontFamily: font.regular },
   vetado: {
     flexDirection: 'row', gap: 10, alignItems: 'flex-start', backgroundColor: c.dangerSoft,
     borderRadius: radius.md, padding: 14,

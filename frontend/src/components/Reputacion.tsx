@@ -8,7 +8,7 @@
  * debajo de 50 se muestra "En riesgo" y por debajo de 30 queda vetado.
  */
 import React, { useState } from 'react';
-import { Text, View } from 'react-native';
+import { StyleProp, Text, View, ViewStyle } from 'react-native';
 import { EventoReputacion, NivelReputacion, Reputacion } from '../api';
 import { Colores, font, makeStyles, radius, useTheme } from '../theme';
 import { FadeInView, PressableScale } from './anim';
@@ -64,11 +64,14 @@ export function TarjetaReputacion({
   eventos,
   titulo = 'Nivel de confiabilidad',
   explicacion,
+  style,
 }: {
   reputacion: Reputacion;
   eventos?: EventoReputacion[];
   titulo?: string;
   explicacion?: string;
+  /** Ajustes del contenedor (p. ej. sin marco de tarjeta dentro de un modal). */
+  style?: StyleProp<ViewStyle>;
 }) {
   const { c } = useTheme();
   const styles = useStyles();
@@ -79,7 +82,7 @@ export function TarjetaReputacion({
   const visibles = verTodo ? lista : lista.slice(0, EVENTOS_VISIBLES);
 
   return (
-    <FadeInView style={styles.card}>
+    <FadeInView style={[styles.card, style]}>
       <View style={styles.cabecera}>
         <Icon name="escudo" size={18} color={c.accent} />
         <Text style={styles.titulo}>{titulo}</Text>

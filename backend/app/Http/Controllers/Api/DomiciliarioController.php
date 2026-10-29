@@ -61,25 +61,32 @@ class DomiciliarioController extends Controller
         ]);
     }
 
-    /** Mis entregas activas (tomadas por mí y aún no entregadas). */
+    /**
+     * Mis entregas activas (tomadas por mí y aún no entregadas). La última
+     * que tomé va primero.
+     */
     public function entregas(Request $request): JsonResponse
     {
         $pedidos = Pedido::where('domiciliario_id', $request->user()->id)
             ->whereIn('estado', ['tomado', 'recogido', 'en_camino'])
             ->with(['negocio', 'cliente', 'items'])
-            ->latest()
+            ->latest('tomado_at')
+            ->latest('id')
             ->get();
 
         return response()->json(['pedidos' => $pedidos->map(fn ($p) => $this->map($p))]);
     }
 
-    /** Mis entregas completadas (20 por página, `?page=`). */
+    /**
+     * Mis entregas completadas, la más reciente primero (20 por página,
+     * `?page=`). `total` = cuántas he entregado en total.
+     */
     public function historial(Request $request): JsonResponse
     {
         $pagina = Pedido::where('domiciliario_id', $request->user()->id)
             ->where('estado', 'entregado')
-            ->with(['negocio', 'items'])
-            ->latest()
+            ->with(['negocio', 'cliente', 'items'])
+            ->latest('entregado_at')
             ->latest('id')
             ->paginate(20);
 
@@ -87,6 +94,7 @@ class DomiciliarioController extends Controller
             'pedidos' => $pagina->getCollection()->map(fn ($p) => $this->map($p))->values(),
             'pagina' => $pagina->currentPage(),
             'ultima_pagina' => $pagina->lastPage(),
+            'total' => $pagina->total(),
         ]);
     }
 
@@ -101,7 +109,7 @@ class DomiciliarioController extends Controller
         ]);
     }
 
-    /** Tomar un pedido disponible (indicando minutos para recoger). */
+    /** Tomar un pedido disponible (indicando en cuántos minutos, 1 a 20, lo recojo). */
     public function tomar(Request $request, int $id): JsonResponse
     {
         if ($request->user()->domiciliarioVetado()) {
@@ -111,7 +119,7 @@ class DomiciliarioController extends Controller
         }
 
         $datos = $request->validate([
-            'minutos_recogida' => ['required', 'integer', 'min:1', 'max:240'],
+            'minutos_recogida' => ['required', 'integer', 'min:1', 'max:20'],
         ]);
 
         // Update condicional: evita choques si dos lo toman a la vez.
@@ -228,6 +236,7 @@ class DomiciliarioController extends Controller
             // Lo que el domiciliario le cobra al cliente al entregar.
             'cobrar' => $p->metodo_pago === 'efectivo' ? (float) $p->total : 0.0,
             'minutos_recogida' => $p->minutos_recogida,
+            'fecha_entrega' => $p->entregado_at?->format('d/m/Y H:i'),
             'direccion_entrega' => $p->direccion_entrega,
             // El teléfono del cliente solo lo ve quien lleva el pedido.
             'telefono_contacto' => in_array($p->estado, Pedido::EN_RUTA, true) ? $p->telefono_contacto : null,

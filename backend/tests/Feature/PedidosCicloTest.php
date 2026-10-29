@@ -239,10 +239,46 @@ test('ciclo completo: pedir, listo, tomar, recoger, en camino y entregar', funct
     $this->putJson("/api/domiciliario/pedidos/{$id}/en-camino")->assertOk();
     $this->putJson("/api/domiciliario/pedidos/{$id}/entregado")->assertOk();
 
+    // Queda en "Pedidos entregados" del domiciliario, con fecha y cliente.
+    $historial = $this->getJson('/api/domiciliario/historial')
+        ->assertJsonPath('total', 1)
+        ->assertJsonPath('pedidos.0.id', $id)
+        ->assertJsonPath('pedidos.0.cliente.name', $cliente->nombre_completo);
+    expect($historial->json('pedidos.0.fecha_entrega'))->not->toBeNull();
+
     Sanctum::actingAs($cliente);
     $this->getJson("/api/pedidos/{$id}")
         ->assertJsonPath('estado', 'entregado')
         ->assertJsonPath('puede_cancelar', false);
+});
+
+test('el domiciliario promete recoger en 1 a 20 minutos', function () {
+    [, $negocio, $producto] = negocioConProducto();
+    $id = pedirComo(conRol('usuario'), $negocio, $producto)->json('id');
+    Pedido::whereKey($id)->update(['estado' => 'listo']);
+
+    Sanctum::actingAs(conRol('domiciliario'));
+    $this->putJson("/api/domiciliario/pedidos/{$id}/tomar", ['minutos_recogida' => 21])->assertUnprocessable();
+    $this->putJson("/api/domiciliario/pedidos/{$id}/tomar", ['minutos_recogida' => 0])->assertUnprocessable();
+    $this->putJson("/api/domiciliario/pedidos/{$id}/tomar", ['minutos_recogida' => 20])->assertOk();
+});
+
+test('la entrega que acabo de tomar va primero en mis entregas', function () {
+    [, $negocio, $producto] = negocioConProducto();
+    $cliente = conRol('usuario');
+    $viejo = pedirComo($cliente, $negocio, $producto)->json('id');
+    $nuevo = pedirComo($cliente, $negocio, $producto)->json('id');
+    Pedido::whereKey([$viejo, $nuevo])->update(['estado' => 'listo']);
+
+    // Tomo primero el pedido más reciente y luego el más antiguo.
+    Sanctum::actingAs(conRol('domiciliario'));
+    $this->putJson("/api/domiciliario/pedidos/{$nuevo}/tomar", ['minutos_recogida' => 10])->assertOk();
+    $this->travel(1)->minutes();
+    $this->putJson("/api/domiciliario/pedidos/{$viejo}/tomar", ['minutos_recogida' => 10])->assertOk();
+
+    $this->getJson('/api/domiciliario/entregas')
+        ->assertJsonPath('pedidos.0.id', $viejo)
+        ->assertJsonPath('pedidos.1.id', $nuevo);
 });
 
 // ---------------------------------------------------------------------------

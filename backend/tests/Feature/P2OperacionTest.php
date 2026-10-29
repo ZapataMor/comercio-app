@@ -179,5 +179,8 @@ test('mis pedidos y el historial del domiciliario se paginan', function () {
     $this->getJson('/api/pedidos?page=2')->assertJsonCount(5, 'pedidos');
 
     Sanctum::actingAs($domi);
-    $this->getJson('/api/domiciliario/historial')->assertJsonCount(20, 'pedidos')->assertJsonPath('ultima_pagina', 2);
+    $this->getJson('/api/domiciliario/historial')
+        ->assertJsonCount(20, 'pedidos')
+        ->assertJsonPath('ultima_pagina', 2)
+        ->assertJsonPath('total', 25);
 });

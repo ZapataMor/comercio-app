@@ -17,7 +17,7 @@ import { VitrinaHeaderLogo } from './src/components/Logo';
 import SplashVitrina from './src/components/SplashVitrina';
 import { NegocioProvider } from './src/NegocioContext';
 import { configurarMensajesForeground } from './src/pushNotifications';
-import { navigationRef, procesarNotificacionPendiente } from './src/RootNavigation';
+import { navigationRef, procesarNotificacionPendiente, rutaInicio } from './src/RootNavigation';
 import { ToastProvider } from './src/Toast';
 import { avisarCambioDesdePush } from './src/usePolling';
 import { useToast } from './src/Toast';
@@ -41,6 +41,7 @@ import AdminNegociosScreen from './src/screens/AdminNegociosScreen';
 import AdminBarriosScreen from './src/screens/AdminBarriosScreen';
 import AdminReputacionScreen from './src/screens/AdminReputacionScreen';
 import DomiciliarioScreen from './src/screens/DomiciliarioScreen';
+import PedidosEntregadosScreen from './src/screens/PedidosEntregadosScreen';
 import CarritoScreen from './src/screens/CarritoScreen';
 import CheckoutScreen from './src/screens/CheckoutScreen';
 import MisPedidosScreen from './src/screens/MisPedidosScreen';
@@ -86,7 +87,7 @@ function Navegacion() {
     );
   }
 
-  const inicial = !auth ? 'Login' : roles.includes('usuario') ? 'Explorar' : 'Home';
+  const inicial = !auth ? 'Login' : rutaInicio(roles);
 
   return (
     <FlyToCartProvider>
@@ -183,8 +184,20 @@ function Navegacion() {
               </>
             )}
 
+            {/* El domiciliario arranca en sus pedidos: es su "Inicio". */}
             {roles.includes('domiciliario') && (
-              <Stack.Screen name="Domiciliario" component={DomiciliarioScreen} options={{ title: 'Mis entregas' }} />
+              <>
+                <Stack.Screen
+                  name="Domiciliario"
+                  component={DomiciliarioScreen}
+                  options={{ title: 'Mis entregas', headerTitle: tituloVitrina }}
+                />
+                <Stack.Screen
+                  name="PedidosEntregados"
+                  component={PedidosEntregadosScreen}
+                  options={{ title: 'Pedidos entregados' }}
+                />
+              </>
             )}
           </>
         )}

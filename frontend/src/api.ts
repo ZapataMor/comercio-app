@@ -22,7 +22,8 @@ export type Usuario = {
 };
 
 /** Una página de una lista paginada del backend. */
-export type Pagina<T> = { items: T[]; pagina: number; ultima_pagina: number };
+/** `total`: cuántos hay en todas las páginas (solo en las listas que lo envían). */
+export type Pagina<T> = { items: T[]; pagina: number; ultima_pagina: number; total?: number };
 
 export type LoginResponse = {
   user: Usuario;
@@ -1054,6 +1055,8 @@ export type Pedido = {
   cobrar: number;
   metodo_pago: string;
   minutos_recogida: number | null;
+  /** "dd/mm/aaaa hh:mm" en que lo entregué (solo los entregados). */
+  fecha_entrega?: string | null;
   direccion_entrega: string;
   /** Solo cuando el pedido es mío y lo estoy llevando. */
   telefono_contacto: string | null;
@@ -1093,12 +1096,18 @@ export async function getMisEntregas(token: string): Promise<Pedido[]> {
   return (d.pedidos ?? []) as Pedido[];
 }
 
-/** Mis entregas completadas, 20 por página. */
+/** Mis entregas completadas (la más reciente primero), 20 por página. */
 export async function getHistorialEntregas(token: string, pagina = 1): Promise<Pagina<Pedido>> {
   const d = await authGet(`/api/domiciliario/historial?page=${pagina}`, token);
-  return { items: (d.pedidos ?? []) as Pedido[], pagina: d.pagina ?? 1, ultima_pagina: d.ultima_pagina ?? 1 };
+  return {
+    items: (d.pedidos ?? []) as Pedido[],
+    pagina: d.pagina ?? 1,
+    ultima_pagina: d.ultima_pagina ?? 1,
+    total: d.total ?? 0,
+  };
 }
 
+/** Tomar un pedido prometiendo recogerlo en `minutos` (1 a 20). */
 export async function tomarPedido(token: string, id: number, minutos: number): Promise<void> {
   await authSend('PUT', `/api/domiciliario/pedidos/${id}/tomar`, token, { minutos_recogida: minutos });
 }

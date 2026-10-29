@@ -4,6 +4,17 @@ import { Usuario } from './api';
 
 export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
+/**
+ * Pantalla con la que arranca cada quien: el cliente en Explorar, el
+ * domiciliario directo en sus pedidos disponibles (el administrador, aunque
+ * también reparta, en el menú) y los demás en el menú de Inicio.
+ */
+export function rutaInicio(roles: string[]): 'Explorar' | 'Domiciliario' | 'Home' {
+  if (roles.includes('usuario')) return 'Explorar';
+  if (roles.includes('domiciliario') && !roles.includes('administrador')) return 'Domiciliario';
+  return 'Home';
+}
+
 type PushData = {
   tipo?: string;
   pedido_id?: string;
@@ -54,7 +65,7 @@ function navigateFromData(data: PushData, user: Usuario) {
   if (roles.includes('usuario')) {
     navigationRef.navigate('MisPedidos');
   } else {
-    navigationRef.navigate('Home');
+    navigationRef.navigate(rutaInicio(roles));
   }
 }
 
