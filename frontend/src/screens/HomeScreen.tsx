@@ -1,10 +1,11 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { RefreshControl, ScrollView, Switch, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { ComercioPedido, getPedidosComercio } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
+import BotonMantener from '../components/BotonMantener';
 import HeaderPerfil from '../components/HeaderPerfil';
 import Icon from '../components/Icon';
 import PanelDomiciliario, { PanelDomiciliarioRef } from '../components/PanelDomiciliario';
@@ -21,7 +22,11 @@ function cop(n: number) {
   return '$' + Math.round(n).toLocaleString('es-CO');
 }
 
-/** Switch Abierto/Cerrado que va en la parte derecha de la topbar. */
+/**
+ * Abierto/Cerrado del negocio en la parte derecha de la topbar. Se cambia
+ * manteniendo presionada la tienda, como el turno del domiciliario: un toque
+ * sin querer no abre ni cierra el negocio.
+ */
 function HeaderEstadoNegocio() {
   const { c } = useTheme();
   const styles = useStyles();
@@ -36,7 +41,7 @@ function HeaderEstadoNegocio() {
   // Solo el propietario abre/cierra el negocio; el trabajador solo ve el estado.
   if (!esPropietario) {
     return (
-      <Text style={[styles.headerSwitchTxt, { color: negocio.activo ? c.onHeaderOk : c.onHeaderOff }]}>
+      <Text style={[styles.headerEstadoTxt, { color: negocio.activo ? c.onHeaderOk : c.onHeaderOff }]}>
         {negocio.activo ? 'Abierto' : 'Cerrado'}
       </Text>
     );
@@ -58,16 +63,19 @@ function HeaderEstadoNegocio() {
   }
 
   return (
-    <View style={styles.headerSwitch}>
-      <Text style={[styles.headerSwitchTxt, { color: negocio.activo ? c.onHeaderOk : c.onHeaderOff }]}>
+    <View style={styles.headerEstado}>
+      <Text style={[styles.headerEstadoTxt, { color: negocio.activo ? c.onHeaderOk : c.onHeaderOff }]}>
         {negocio.activo ? 'Abierto' : 'Cerrado'}
       </Text>
-      <Switch
-        value={negocio.activo}
-        onValueChange={toggle}
-        disabled={cambiando}
-        trackColor={{ true: c.success, false: c.headerTrack }}
-        thumbColor={c.onHeader}
+      <BotonMantener
+        icon="tienda"
+        encendido={negocio.activo}
+        ocupado={cambiando}
+        accessibilityLabel="Negocio abierto"
+        onCambiar={() => toggle(!negocio.activo)}
+        onToque={() =>
+          toast.info('Mantenlo presionado', negocio.activo ? 'Así cierras el negocio.' : 'Así abres el negocio.')
+        }
       />
     </View>
   );
@@ -367,9 +375,9 @@ const useStyles = makeStyles((c, shadow) => ({
   fila: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   itemTitulo: { fontSize: 16, fontFamily: font.bold, color: c.textStrong },
   itemSub: { color: c.muted, fontSize: 13, marginTop: 2, fontFamily: font.regular },
-  // Topbar switch
-  headerSwitch: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  headerSwitchTxt: { fontFamily: font.bold, fontSize: 13 },
+  // Topbar: Abierto/Cerrado
+  headerEstado: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerEstadoTxt: { fontFamily: font.bold, fontSize: 13 },
   // Pedidos en espera
   seccion: { fontSize: 16, fontFamily: font.displaySemi, color: c.textStrong, marginTop: 14, marginBottom: 10 },
   vacioBox: { backgroundColor: c.surface, borderRadius: radius.md, padding: 18, alignItems: 'center', ...shadow.low },
