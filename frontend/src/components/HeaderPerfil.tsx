@@ -3,8 +3,8 @@
  * TODOS los roles. Solo muestra el ícono de la persona; abre la pantalla del
  * perfil PERSONAL del usuario (la persona, no el negocio).
  *
- * Al domiciliario se le muestra al lado su nivel de confiabilidad
- * (HeaderConfiabilidad).
+ * Al domiciliario se le muestran al lado su nivel de confiabilidad
+ * (HeaderConfiabilidad) y su turno (HeaderTurno).
  */
 import React from 'react';
 import { View } from 'react-native';
@@ -12,6 +12,7 @@ import { navigationRef } from '../RootNavigation';
 import { radius, makeStyles, useTheme } from '../theme';
 import { PressableScale } from './anim';
 import HeaderConfiabilidad from './HeaderConfiabilidad';
+import HeaderTurno from './HeaderTurno';
 import Icon from './Icon';
 
 export default function HeaderPerfil() {
@@ -20,6 +21,7 @@ export default function HeaderPerfil() {
   return (
     <View style={styles.fila}>
       <HeaderConfiabilidad />
+      <HeaderTurno />
       <PressableScale
         style={styles.boton}
         hitSlop={8}

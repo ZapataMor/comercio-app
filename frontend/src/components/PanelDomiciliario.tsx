@@ -9,7 +9,6 @@ import {
 } from 'react-native';
 import {
   avanzarPedido,
-  cambiarTurno,
   getDisponibles,
   getMiReputacion,
   getMisEntregas,
@@ -25,6 +24,7 @@ import { usePolling } from '../usePolling';
 import { FadeInView, PressableScale } from './anim';
 import BotonesContacto from './BotonesContacto';
 import { publicarMiReputacion } from './HeaderConfiabilidad';
+import { publicarTurno, useTurno } from './HeaderTurno';
 import Icon, { IconName } from './Icon';
 import MinutosRecogida from './MinutosRecogida';
 
@@ -58,9 +58,9 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
   // Vetado = no puedo tomar pedidos nuevos (baja confiabilidad).
   const [vetado, setVetado] = useState(false);
   const [cargando, setCargando] = useState(true);
-  // En turno = me llegan los avisos de pedidos listos para recoger.
-  const [enTurno, setEnTurno] = useState(false);
-  const [cambiandoTurno, setCambiandoTurno] = useState(false);
+  // En turno = me llegan los avisos de pedidos listos para recoger. Es el
+  // mismo estado de la moto de la topbar.
+  const turno = useTurno();
   // Pedido que voy a tomar: abre el modal para elegir los minutos.
   const [porTomar, setPorTomar] = useState<Pedido | null>(null);
   const [tomando, setTomando] = useState(false);
@@ -76,12 +76,15 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
     return { d, e };
   }, [token]);
 
-  const aplicar = useCallback(({ d, e }: Listas) => {
-    setDisponibles(d.pedidos);
-    setVetado(d.vetado);
-    setEnTurno(d.en_turno);
-    setEntregas(e);
-  }, []);
+  const aplicar = useCallback(
+    ({ d, e }: Listas) => {
+      setDisponibles(d.pedidos);
+      setVetado(d.vetado);
+      publicarTurno(token, d.en_turno, d.vetado);
+      setEntregas(e);
+    },
+    [token],
+  );
 
   // La pantalla de carga solo sale al entrar: después (acciones, push, cada
   // 15 s) las listas se actualizan en su sitio, sin taparlas.
@@ -112,19 +115,6 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
       return true;
     } catch {
       return false;
-    }
-  }
-
-  async function onCambiarTurno(valor: boolean) {
-    setCambiandoTurno(true);
-    setEnTurno(valor);
-    try {
-      toast.info(valor ? 'En turno' : 'Fuera de turno', await cambiarTurno(token, valor));
-    } catch (e) {
-      setEnTurno(!valor);
-      toast.error('No se pudo cambiar', e instanceof Error ? e.message : 'Error');
-    } finally {
-      setCambiandoTurno(false);
     }
   }
 
@@ -176,19 +166,19 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
     <>
       {/* Turno: solo en turno llegan los avisos de pedidos listos. */}
       {!vetado && (
-        <View style={[styles.turno, enTurno ? styles.turnoOn : styles.turnoOff]}>
+        <View style={[styles.turno, turno.enTurno ? styles.turnoOn : styles.turnoOff]}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.turnoTitulo}>{enTurno ? 'Estás en turno' : 'Estás fuera de turno'}</Text>
+            <Text style={styles.turnoTitulo}>{turno.enTurno ? 'Estás en turno' : 'Estás fuera de turno'}</Text>
             <Text style={styles.turnoSub}>
-              {enTurno
+              {turno.enTurno
                 ? 'Te avisamos cuando haya pedidos listos para recoger.'
                 : 'No te llegan avisos de pedidos nuevos. Actívalo cuando salgas a trabajar.'}
             </Text>
           </View>
           <Switch
-            value={enTurno}
-            onValueChange={onCambiarTurno}
-            disabled={cambiandoTurno}
+            value={turno.enTurno}
+            onValueChange={turno.cambiar}
+            disabled={turno.cambiando}
             trackColor={{ false: c.borderStrong, true: c.success }}
             thumbColor={c.surface}
           />
