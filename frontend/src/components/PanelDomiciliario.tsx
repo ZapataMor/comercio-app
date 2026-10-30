@@ -2,7 +2,6 @@ import React, { Ref, useCallback, useEffect, useImperativeHandle, useState } fro
 import {
   ActivityIndicator,
   LayoutAnimation,
-  Switch,
   Text,
   TextInput,
   View,
@@ -24,7 +23,7 @@ import { usePolling } from '../usePolling';
 import { FadeInView, PressableScale } from './anim';
 import BotonesContacto from './BotonesContacto';
 import { publicarMiReputacion } from './HeaderConfiabilidad';
-import { publicarTurno, useTurno } from './HeaderTurno';
+import { publicarTurno } from './HeaderTurno';
 import Icon, { IconName } from './Icon';
 import MinutosRecogida from './MinutosRecogida';
 
@@ -58,9 +57,6 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
   // Vetado = no puedo tomar pedidos nuevos (baja confiabilidad).
   const [vetado, setVetado] = useState(false);
   const [cargando, setCargando] = useState(true);
-  // En turno = me llegan los avisos de pedidos listos para recoger. Es el
-  // mismo estado de la moto de la topbar.
-  const turno = useTurno();
   // Pedido que voy a tomar: abre el modal para elegir los minutos.
   const [porTomar, setPorTomar] = useState<Pedido | null>(null);
   const [tomando, setTomando] = useState(false);
@@ -80,6 +76,7 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
     ({ d, e }: Listas) => {
       setDisponibles(d.pedidos);
       setVetado(d.vetado);
+      // El turno se cambia con la moto de la topbar: ahí se muestra.
       publicarTurno(token, d.en_turno, d.vetado);
       setEntregas(e);
     },
@@ -164,27 +161,6 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
 
   return (
     <>
-      {/* Turno: solo en turno llegan los avisos de pedidos listos. */}
-      {!vetado && (
-        <View style={[styles.turno, turno.enTurno ? styles.turnoOn : styles.turnoOff]}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.turnoTitulo}>{turno.enTurno ? 'Estás en turno' : 'Estás fuera de turno'}</Text>
-            <Text style={styles.turnoSub}>
-              {turno.enTurno
-                ? 'Te avisamos cuando haya pedidos listos para recoger.'
-                : 'No te llegan avisos de pedidos nuevos. Actívalo cuando salgas a trabajar.'}
-            </Text>
-          </View>
-          <Switch
-            value={turno.enTurno}
-            onValueChange={turno.cambiar}
-            disabled={turno.cambiando}
-            trackColor={{ false: c.borderStrong, true: c.success }}
-            thumbColor={c.surface}
-          />
-        </View>
-      )}
-
       {/* Lo que ya tomé va arriba: los disponibles quedan debajo. */}
       {entregas.length > 0 && (
         <>
@@ -470,14 +446,6 @@ const useStyles = makeStyles((c, shadow) => ({
   },
   linea: { color: c.text, marginTop: 4, fontSize: 14, fontFamily: font.regular },
   lineaSub: { color: c.mutedSoft, marginTop: 4, fontSize: 13, fontFamily: font.regular },
-  turno: {
-    flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: radius.md, padding: 14,
-    marginBottom: 12, borderWidth: 1,
-  },
-  turnoOn: { backgroundColor: c.surface, borderColor: c.success },
-  turnoOff: { backgroundColor: c.warningSoft, borderColor: c.warning },
-  turnoTitulo: { fontFamily: font.bold, fontSize: 15, color: c.textStrong },
-  turnoSub: { fontFamily: font.regular, fontSize: 12, color: c.text, marginTop: 2 },
   minLabel: { fontSize: 11, color: c.muted, marginBottom: 4, fontFamily: font.regular },
   tomarBtn: { backgroundColor: c.accent, borderRadius: radius.sm, paddingVertical: 13, marginTop: 12, ...shadow.gold },
   tomarTxt: { color: c.onAccent, fontFamily: font.bold },

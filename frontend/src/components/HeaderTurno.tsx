@@ -4,11 +4,16 @@
  * moto apagada cuando no. Solo en turno le llegan los avisos de pedidos
  * listos para recoger.
  *
- * Solo aparece para el rol domiciliario (y no si está suspendido). Comparte
- * el estado con la tarjeta de turno del Inicio a través de `useTurno`:
- * cambiarlo en uno cambia el otro.
+ * Para que no cambie sin querer, hay que mantenerla presionada: mientras
+ * tanto se llena un círculo con el color del estado al que va. Un toque solo
+ * explica cómo se usa.
+ *
+ * Solo aparece para el rol domiciliario (y no si está suspendido). El Inicio,
+ * que refresca cada 15 s y con cada push, le avisa el turno del servidor con
+ * `publicarTurno`.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Easing } from 'react-native';
 import { cambiarTurno } from '../api';
 import { useAuth } from '../AuthContext';
 import { makeStyles, radius, useTheme } from '../theme';
@@ -16,9 +21,13 @@ import { useToast } from '../Toast';
 import { PressableScale } from './anim';
 import Icon from './Icon';
 
+/** Cuánto hay que mantener presionada la moto para cambiar el turno. */
+const MANTENER_MS = 600;
+
 type Turno = { enTurno: boolean; vetado: boolean; cambiando: boolean };
 
-// Último turno conocido de la sesión y quienes lo muestran.
+// Último turno conocido de la sesión y quienes lo muestran (cada pantalla
+// tiene su propia topbar).
 let ultimo: { token: string; turno: Turno } | null = null;
 const oyentes = new Set<(t: Turno) => void>();
 
@@ -36,8 +45,8 @@ export function publicarTurno(token: string, enTurno: boolean, vetado: boolean) 
   publicar(token, cambiando ? { vetado } : { enTurno, vetado });
 }
 
-/** Turno del domiciliario y cómo cambiarlo; el mismo en la topbar y el Inicio. */
-export function useTurno() {
+/** Turno del domiciliario y cómo cambiarlo; el mismo en todas las topbars. */
+function useTurno() {
   const { auth } = useAuth();
   const token = auth!.token;
   const toast = useToast();
@@ -80,11 +89,38 @@ export default function HeaderTurno() {
 function BotonTurno() {
   const { c, modo } = useTheme();
   const styles = useStyles();
+  const toast = useToast();
   const { enTurno, vetado, cambiando, cambiar } = useTurno();
+  // 0 → 1 mientras se mantiene presionada (el círculo que se llena).
+  const progreso = useRef(new Animated.Value(0)).current;
 
   // Suspendido no puede tomar pedidos: el turno no le sirve de nada.
   if (vetado) {
     return null;
+  }
+
+  function llenar() {
+    Animated.timing(progreso, {
+      toValue: 1,
+      duration: MANTENER_MS,
+      easing: Easing.linear,
+      useNativeDriver: true,
+    }).start();
+  }
+
+  // Soltó antes de tiempo: el círculo se vacía y no cambia nada.
+  function vaciar() {
+    Animated.timing(progreso, { toValue: 0, duration: 150, useNativeDriver: true }).start();
+  }
+
+  function confirmar() {
+    progreso.stopAnimation();
+    progreso.setValue(0);
+    cambiar(!enTurno);
+  }
+
+  function explicar() {
+    toast.info('Mantenla presionada', enTurno ? 'Así sales de turno.' : 'Así entras en turno.');
   }
 
   return (
@@ -93,9 +129,21 @@ function BotonTurno() {
       hitSlop={8}
       accessibilityRole="switch"
       accessibilityLabel="En turno"
+      accessibilityHint="Mantén presionado para cambiar"
       accessibilityState={{ checked: enTurno, busy: cambiando }}
       disabled={cambiando}
-      onPress={() => cambiar(!enTurno)}>
+      delayLongPress={MANTENER_MS}
+      onPressIn={llenar}
+      onPressOut={vaciar}
+      onPress={explicar}
+      onLongPress={confirmar}>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.relleno,
+          { backgroundColor: enTurno ? c.headerTrack : c.success, transform: [{ scale: progreso }] },
+        ]}
+      />
       <Icon
         name="moto"
         size={18}
@@ -119,5 +167,6 @@ const useStyles = makeStyles(c => ({
     backgroundColor: 'rgba(255,255,255,0.14)',
   },
   botonEnTurno: { backgroundColor: c.success },
+  relleno: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: radius.pill },
   motoApagada: { opacity: 0.45 },
 }));
