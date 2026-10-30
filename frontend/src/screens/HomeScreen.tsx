@@ -1,7 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Animated, Easing, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { ComercioPedido, getPedidosComercio } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
@@ -23,12 +23,85 @@ function cop(n: number) {
 }
 
 /**
+ * Palabra "Abierto"/"Cerrado" de la topbar. Al cambiar, la vieja se
+ * desvanece y la nueva llega con un zoom que se pasa un poco y se acomoda.
+ * Las dos palabras están siempre montadas, una encima de la otra, y solo se
+ * animan su opacidad y su tamaño.
+ */
+function EtiquetaEstado({ abierto }: { abierto: boolean }) {
+  const { c } = useTheme();
+  const styles = useStyles();
+  const opAbierto = useRef(new Animated.Value(abierto ? 1 : 0)).current;
+  const opCerrado = useRef(new Animated.Value(abierto ? 0 : 1)).current;
+  const escAbierto = useRef(new Animated.Value(1)).current;
+  const escCerrado = useRef(new Animated.Value(1)).current;
+  const previo = useRef(abierto);
+
+  useEffect(() => {
+    if (previo.current === abierto) {
+      return;
+    }
+    previo.current = abierto;
+    const [saleOp, entraOp, entraEsc] = abierto
+      ? [opCerrado, opAbierto, escAbierto]
+      : [opAbierto, opCerrado, escCerrado];
+
+    entraOp.setValue(0);
+    entraEsc.setValue(0.6);
+    const anim = Animated.sequence([
+      Animated.timing(saleOp, { toValue: 0, duration: 220, useNativeDriver: true }),
+      Animated.parallel([
+        Animated.timing(entraOp, { toValue: 1, duration: 120, useNativeDriver: true }),
+        Animated.sequence([
+          // Llega rápido, un poco más grande…
+          Animated.timing(entraEsc, {
+            toValue: 1.25,
+            duration: 160,
+            easing: Easing.out(Easing.quad),
+            useNativeDriver: true,
+          }),
+          // …y se acomoda a su tamaño.
+          Animated.spring(entraEsc, { toValue: 1, friction: 4, tension: 160, useNativeDriver: true }),
+        ]),
+      ]),
+    ]);
+    anim.start();
+    // Si cambia otra vez a mitad (p. ej. falló al guardar), sigue desde ahí.
+    return () => anim.stop();
+  }, [abierto, opAbierto, opCerrado, escAbierto, escCerrado]);
+
+  return (
+    // La topbar recorta lo que sale de aquí: el margen a la izquierda deja
+    // sitio para la palabra más larga y para el zoom.
+    <View style={styles.etiqueta} accessible accessibilityLabel={abierto ? 'Abierto' : 'Cerrado'}>
+      {/* Invisible: le da al conjunto el ancho de la palabra actual. */}
+      <Text style={[styles.headerEstadoTxt, styles.oculto]}>{abierto ? 'Abierto' : 'Cerrado'}</Text>
+      <Animated.Text
+        style={[
+          styles.headerEstadoTxt,
+          styles.capa,
+          { color: c.onHeaderOk, opacity: opAbierto, transform: [{ scale: escAbierto }] },
+        ]}>
+        Abierto
+      </Animated.Text>
+      <Animated.Text
+        style={[
+          styles.headerEstadoTxt,
+          styles.capa,
+          { color: c.onHeaderOff, opacity: opCerrado, transform: [{ scale: escCerrado }] },
+        ]}>
+        Cerrado
+      </Animated.Text>
+    </View>
+  );
+}
+
+/**
  * Abierto/Cerrado del negocio en la parte derecha de la topbar. Se cambia
  * manteniendo presionada la tienda, como el turno del domiciliario: un toque
  * sin querer no abre ni cierra el negocio.
  */
 function HeaderEstadoNegocio() {
-  const { c } = useTheme();
   const styles = useStyles();
   const { negocio, setAbierto, esPropietario } = useNegocio();
   const toast = useToast();
@@ -40,11 +113,7 @@ function HeaderEstadoNegocio() {
 
   // Solo el propietario abre/cierra el negocio; el trabajador solo ve el estado.
   if (!esPropietario) {
-    return (
-      <Text style={[styles.headerEstadoTxt, { color: negocio.activo ? c.onHeaderOk : c.onHeaderOff }]}>
-        {negocio.activo ? 'Abierto' : 'Cerrado'}
-      </Text>
-    );
+    return <EtiquetaEstado abierto={negocio.activo} />;
   }
 
   async function toggle(v: boolean) {
@@ -64,9 +133,7 @@ function HeaderEstadoNegocio() {
 
   return (
     <View style={styles.headerEstado}>
-      <Text style={[styles.headerEstadoTxt, { color: negocio.activo ? c.onHeaderOk : c.onHeaderOff }]}>
-        {negocio.activo ? 'Abierto' : 'Cerrado'}
-      </Text>
+      <EtiquetaEstado abierto={negocio.activo} />
       <BotonMantener
         icon="tienda"
         encendido={negocio.activo}
@@ -378,6 +445,12 @@ const useStyles = makeStyles((c, shadow) => ({
   // Topbar: Abierto/Cerrado
   headerEstado: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerEstadoTxt: { fontFamily: font.bold, fontSize: 13 },
+  etiqueta: { paddingLeft: 24 },
+  oculto: { opacity: 0 },
+  // Alineadas a la derecha en una caja más ancha que la palabra actual: la
+  // otra no se parte en dos líneas, y el zoom crece hacia la izquierda sin
+  // montarse sobre el botón.
+  capa: { position: 'absolute', top: 0, right: 0, left: -40, textAlign: 'right', transformOrigin: 'right center' },
   // Pedidos en espera
   seccion: { fontSize: 16, fontFamily: font.displaySemi, color: c.textStrong, marginTop: 14, marginBottom: 10 },
   vacioBox: { backgroundColor: c.surface, borderRadius: radius.md, padding: 18, alignItems: 'center', ...shadow.low },
