@@ -40,7 +40,6 @@ import AdminUsuariosScreen from './src/screens/AdminUsuariosScreen';
 import AdminNegociosScreen from './src/screens/AdminNegociosScreen';
 import AdminBarriosScreen from './src/screens/AdminBarriosScreen';
 import AdminReputacionScreen from './src/screens/AdminReputacionScreen';
-import DomiciliarioScreen from './src/screens/DomiciliarioScreen';
 import PedidosEntregadosScreen from './src/screens/PedidosEntregadosScreen';
 import CarritoScreen from './src/screens/CarritoScreen';
 import CheckoutScreen from './src/screens/CheckoutScreen';
@@ -184,20 +183,14 @@ function Navegacion() {
               </>
             )}
 
-            {/* El domiciliario arranca en sus pedidos: es su "Inicio". */}
+            {/* Las entregas del domiciliario van en su Inicio (Home); aparte
+                solo queda el historial de las que ya completó. */}
             {roles.includes('domiciliario') && (
-              <>
-                <Stack.Screen
-                  name="Domiciliario"
-                  component={DomiciliarioScreen}
-                  options={{ title: 'Mis entregas', headerTitle: tituloVitrina }}
-                />
-                <Stack.Screen
-                  name="PedidosEntregados"
-                  component={PedidosEntregadosScreen}
-                  options={{ title: 'Pedidos entregados' }}
-                />
-              </>
+              <Stack.Screen
+                name="PedidosEntregados"
+                component={PedidosEntregadosScreen}
+                options={{ title: 'Pedidos entregados' }}
+              />
             )}
           </>
         )}

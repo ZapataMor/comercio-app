@@ -1,12 +1,13 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
-import { ScrollView, Switch, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { RefreshControl, ScrollView, Switch, Text, View } from 'react-native';
 import { ComercioPedido, getPedidosComercio } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import HeaderPerfil from '../components/HeaderPerfil';
 import Icon from '../components/Icon';
+import PanelDomiciliario, { PanelDomiciliarioRef } from '../components/PanelDomiciliario';
 import { NivelBadge } from '../components/Reputacion';
 import { useNegocio } from '../NegocioContext';
 import { RootStackParamList } from '../navTypes';
@@ -88,6 +89,11 @@ export default function HomeScreen({ navigation }: Props) {
   // de "comerciante"; los negocios se crean desde Mis negocios).
   const tienePanel = negocios.length > 0;
   const [pedidos, setPedidos] = useState<ComercioPedido[]>([]);
+  // Domiciliario: sus entregas van en el Inicio, debajo del saludo.
+  const scroll = useRef<ScrollView>(null);
+  const panelDomiciliario = useRef<PanelDomiciliarioRef>(null);
+  const panelY = useRef(0);
+  const [refrescando, setRefrescando] = useState(false);
 
   // Topbar: con negocio, el switch Abierto/Cerrado va junto a "Mi perfil".
   // (Sin negocio aplica el headerRight global con solo "Mi perfil".)
@@ -125,15 +131,29 @@ export default function HomeScreen({ navigation }: Props) {
   );
   usePolling(cargarPedidos);
 
+  // Deslizar hacia abajo recarga las entregas (y los pedidos del negocio, si tiene).
+  async function refrescar() {
+    setRefrescando(true);
+    cargarPedidos();
+    await panelDomiciliario.current?.recargar();
+    setRefrescando(false);
+  }
+
   const enEspera = pedidos.filter(p => p.estado === 'pendiente');
   // Efectivo: falta decir si el domiciliario entregó el dinero.
   const porConfirmar = pedidos.filter(p => p.puede_confirmar_dinero);
 
   return (
     <ScrollView
+      ref={scroll}
       style={styles.container}
       // El cliente lleva la barra flotante abajo: dejamos aire para no taparla.
-      contentContainerStyle={[styles.content, esCliente && styles.contentCliente]}>
+      contentContainerStyle={[styles.content, esCliente && styles.contentCliente]}
+      refreshControl={
+        esDomiciliario ? (
+          <RefreshControl refreshing={refrescando} onRefresh={refrescar} colors={[c.accent]} tintColor={c.accent} />
+        ) : undefined
+      }>
       <FadeInView>
         <Text style={styles.saludo}>¡Hola, {user.name}!</Text>
         <View style={styles.rolesRow}>
@@ -312,17 +332,15 @@ export default function HomeScreen({ navigation }: Props) {
         </FadeInView>
       )}
 
+      {/* Turno, entregas en curso y pedidos disponibles, directamente aquí. */}
       {esDomiciliario && (
-        <FadeInView delay={180}>
-          <PressableScale style={styles.item} onPress={() => navigation.navigate('Domiciliario')}>
-            <Icon name="moto" size={26} color={c.accent} style={styles.itemEmoji} />
-            <View style={styles.itemTexto}>
-              <Text style={styles.itemTitulo}>Mis entregas</Text>
-              <Text style={styles.itemSub}>Pedidos para recoger y entregar</Text>
-            </View>
-            <Icon name="chevron" size={20} color={c.chevron} />
-          </PressableScale>
-        </FadeInView>
+        <View onLayout={e => (panelY.current = e.nativeEvent.layout.y)}>
+          <PanelDomiciliario
+            ref={panelDomiciliario}
+            // Al tomar un pedido se sube hasta el panel: queda arriba, en curso.
+            onTomado={() => scroll.current?.scrollTo({ y: panelY.current, animated: true })}
+          />
+        </View>
       )}
       {/* "Cerrar sesión" vive solo en Mi perfil (botón de la topbar). */}
     </ScrollView>

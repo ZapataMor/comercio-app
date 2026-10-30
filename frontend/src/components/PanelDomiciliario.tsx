@@ -1,10 +1,7 @@
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { Ref, useCallback, useEffect, useImperativeHandle, useState } from 'react';
 import {
   ActivityIndicator,
   LayoutAnimation,
-  RefreshControl,
-  ScrollView,
   Switch,
   Text,
   TextInput,
@@ -21,28 +18,36 @@ import {
   tomarPedido,
 } from '../api';
 import { useAuth } from '../AuthContext';
-import { FadeInView, PressableScale } from '../components/anim';
-import BotonesContacto from '../components/BotonesContacto';
-import { publicarMiReputacion } from '../components/HeaderConfiabilidad';
-import Icon, { IconName } from '../components/Icon';
-import MinutosRecogida from '../components/MinutosRecogida';
-import { RootStackParamList } from '../navTypes';
+import { navigationRef } from '../RootNavigation';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 import { usePolling } from '../usePolling';
+import { FadeInView, PressableScale } from './anim';
+import BotonesContacto from './BotonesContacto';
+import { publicarMiReputacion } from './HeaderConfiabilidad';
+import Icon, { IconName } from './Icon';
+import MinutosRecogida from './MinutosRecogida';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Domiciliario'>;
+/** Lo que el Inicio le pide al panel: recargar al deslizar hacia abajo. */
+export type PanelDomiciliarioRef = { recargar: () => Promise<void> };
+
+type Props = {
+  ref?: Ref<PanelDomiciliarioRef>;
+  /** Al tomar un pedido: el Inicio sube hasta el panel para mostrarlo en curso. */
+  onTomado?: () => void;
+};
 
 function cop(n: number) {
   return '$' + Math.round(n).toLocaleString('es-CO');
 }
 
 /**
- * Inicio del domiciliario: arriba las entregas que lleva (la última que tomó
- * primero) y debajo los pedidos disponibles para recoger. Al tomar uno, ese
- * sube a "en curso" y los demás disponibles quedan debajo.
+ * Panel del domiciliario en su Inicio, debajo del saludo: arriba las entregas
+ * que lleva (la última que tomó primero) y debajo los pedidos disponibles para
+ * recoger. Al tomar uno, ese sube a "en curso" y los demás disponibles quedan
+ * debajo.
  */
-export default function DomiciliarioScreen({ navigation }: Props) {
+export default function PanelDomiciliario({ ref, onTomado }: Props) {
   const { c, estadoColor } = useTheme();
   const styles = useStyles();
   const { auth } = useAuth();
@@ -53,7 +58,6 @@ export default function DomiciliarioScreen({ navigation }: Props) {
   // Vetado = no puedo tomar pedidos nuevos (baja confiabilidad).
   const [vetado, setVetado] = useState(false);
   const [cargando, setCargando] = useState(true);
-  const [refrescando, setRefrescando] = useState(false);
   // En turno = me llegan los avisos de pedidos listos para recoger.
   const [enTurno, setEnTurno] = useState(false);
   const [cambiandoTurno, setCambiandoTurno] = useState(false);
@@ -62,7 +66,6 @@ export default function DomiciliarioScreen({ navigation }: Props) {
   const [tomando, setTomando] = useState(false);
   // Entrega cuyo estado estoy cambiando: su botón muestra que va en curso.
   const [avanzando, setAvanzando] = useState<number | null>(null);
-  const scroll = useRef<ScrollView>(null);
 
   /** Disponibles y mis entregas en curso; de paso, mi nivel para la topbar. */
   const traer = useCallback(async () => {
@@ -83,19 +86,11 @@ export default function DomiciliarioScreen({ navigation }: Props) {
   // La pantalla de carga solo sale al entrar: después (acciones, push, cada
   // 15 s) las listas se actualizan en su sitio, sin taparlas.
   const cargar = useCallback(
-    (refresco = false) => {
-      if (refresco) {
-        setRefrescando(true);
-      }
-
+    () =>
       traer()
         .then(aplicar)
         .catch(err => toast.error('Error', err.message))
-        .finally(() => {
-          setCargando(false);
-          setRefrescando(false);
-        });
-    },
+        .finally(() => setCargando(false)),
     [traer, aplicar, toast],
   );
 
@@ -103,6 +98,7 @@ export default function DomiciliarioScreen({ navigation }: Props) {
     cargar();
   }, [cargar]);
   usePolling(() => cargar());
+  useImperativeHandle(ref, () => ({ recargar: cargar }), [cargar]);
 
   /**
    * Trae las listas tras una acción y aplica el cambio con una animación.
@@ -153,7 +149,7 @@ export default function DomiciliarioScreen({ navigation }: Props) {
     }
     setTomando(false);
     setPorTomar(null);
-    scroll.current?.scrollTo({ y: 0, animated: true });
+    onTomado?.();
     toast.exito('Pedido tomado', `Pasa a recogerlo en ${minutos} min.`);
   }
 
@@ -173,159 +169,153 @@ export default function DomiciliarioScreen({ navigation }: Props) {
   }
 
   if (cargando) {
-    return <ActivityIndicator size="large" color={c.accent} style={{ marginTop: 40 }} />;
+    return <ActivityIndicator size="large" color={c.accent} style={{ marginTop: 16 }} />;
   }
 
   return (
     <>
-      <ScrollView
-        ref={scroll}
-        style={styles.container}
-        contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
-        refreshControl={
-          <RefreshControl refreshing={refrescando} onRefresh={() => cargar(true)} colors={[c.accent]} tintColor={c.accent} />
-        }>
-        {/* Turno: solo en turno llegan los avisos de pedidos listos. */}
-        {!vetado && (
-          <View style={[styles.turno, enTurno ? styles.turnoOn : styles.turnoOff]}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.turnoTitulo}>{enTurno ? 'Estás en turno' : 'Estás fuera de turno'}</Text>
-              <Text style={styles.turnoSub}>
-                {enTurno
-                  ? 'Te avisamos cuando haya pedidos listos para recoger.'
-                  : 'No te llegan avisos de pedidos nuevos. Actívalo cuando salgas a trabajar.'}
-              </Text>
-            </View>
-            <Switch
-              value={enTurno}
-              onValueChange={onCambiarTurno}
-              disabled={cambiandoTurno}
-              trackColor={{ false: c.borderStrong, true: c.success }}
-              thumbColor={c.surface}
-            />
-          </View>
-        )}
-
-        {/* Lo que ya tomé va arriba: los disponibles quedan debajo. */}
-        {entregas.length > 0 && (
-          <>
-            <Text style={styles.seccion}>Mis entregas en curso</Text>
-            {entregas.map((p, i) => {
-              const ec = estadoColor(p.estado);
-              return (
-                <FadeInView key={p.id} delay={i * 50}>
-                  <View style={[styles.card, styles.bordeAzul]}>
-                    <View style={styles.cardHead}>
-                      <Text style={styles.pedidoId}>Pedido #{p.id}</Text>
-                      <Text style={[styles.badge, { backgroundColor: ec.bg, color: ec.fg }]}>{p.estado_label}</Text>
-                    </View>
-                    {p.estado === 'tomado' && !!p.minutos_recogida && (
-                      <View style={[styles.lineaSub, styles.fila]}>
-                        <Icon name="reloj" size={13} color={c.goldText} />
-                        <Text style={styles.prometido}>Prometiste recogerlo en {p.minutos_recogida} min</Text>
-                      </View>
-                    )}
-                    <View style={[styles.linea, styles.fila]}>
-                      <Icon name="tienda" size={14} color={c.text} />
-                      <Text style={[styles.linea, { flex: 1 }]}>
-                        Recoger: {p.negocio?.nombre} — {p.negocio?.direccion ?? 's/d'}
-                      </Text>
-                    </View>
-                    <View style={[styles.linea, styles.fila]}>
-                      <Icon name="casa" size={14} color={c.text} />
-                      <Text style={[styles.linea, { flex: 1 }]}>
-                        Entregar: {p.cliente?.name} — {p.direccion_entrega}
-                      </Text>
-                    </View>
-                    <View style={[styles.linea, styles.fila]}>
-                      <Icon name="tarjeta" size={14} color={c.text} />
-                      <Text style={styles.linea}>
-                        {p.cobrar > 0
-                          ? `Cobrar al cliente: ${cop(p.cobrar)} en efectivo`
-                          : 'Pagado por transferencia: no cobres nada'}
-                      </Text>
-                    </View>
-                    <Text style={styles.lineaSub}>
-                      Productos {cop(p.subtotal ?? p.total)} · Domicilio {cop(p.costo_domicilio ?? 0)}
-                    </Text>
-                    {/* Antes de recoger se coordina con el negocio; después, con el cliente. */}
-                    {p.estado === 'tomado' ? (
-                      <BotonesContacto
-                        telefono={p.negocio?.telefono}
-                        mensaje={`Hola, soy el domiciliario de Vitrina que va por el pedido #${p.id}.`}
-                        etiquetaLlamar="Llamar al negocio"
-                      />
-                    ) : (
-                      <BotonesContacto
-                        telefono={p.telefono_contacto}
-                        mensaje={`Hola, soy tu domiciliario de Vitrina con el pedido #${p.id}.`}
-                        etiquetaLlamar="Llamar al cliente"
-                      />
-                    )}
-                    <Novedad pedido={p} onReportada={() => cargar()} />
-                    {p.estado === 'tomado' && (
-                      <Boton
-                        icon="caja"
-                        texto="Marcar recogido"
-                        cargando={avanzando === p.id}
-                        onPress={() => onAvanzar(p.id, 'recogido')}
-                      />
-                    )}
-                    {p.estado === 'recogido' && (
-                      <Boton
-                        icon="moto"
-                        texto="Salir / En camino"
-                        cargando={avanzando === p.id}
-                        onPress={() => onAvanzar(p.id, 'en-camino')}
-                      />
-                    )}
-                    {p.estado === 'en_camino' && (
-                      <Boton
-                        icon="check"
-                        texto="Marcar entregado"
-                        color={c.success}
-                        cargando={avanzando === p.id}
-                        onPress={() => onAvanzar(p.id, 'entregado')}
-                      />
-                    )}
-                  </View>
-                </FadeInView>
-              );
-            })}
-          </>
-        )}
-
-        <Text style={styles.seccion}>
-          Pedidos disponibles{!vetado && disponibles.length > 0 ? ` (${disponibles.length})` : ''}
-        </Text>
-        {vetado ? (
-          <View style={styles.vetado}>
-            <Icon name="alerta" size={18} color={c.danger} />
-            <Text style={styles.vetadoTxt}>
-              Tu cuenta de domiciliario está suspendida por baja confiabilidad, así que no puedes tomar pedidos nuevos.
-              Termina las entregas que llevas; un administrador revisará tu caso.
+      {/* Turno: solo en turno llegan los avisos de pedidos listos. */}
+      {!vetado && (
+        <View style={[styles.turno, enTurno ? styles.turnoOn : styles.turnoOff]}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.turnoTitulo}>{enTurno ? 'Estás en turno' : 'Estás fuera de turno'}</Text>
+            <Text style={styles.turnoSub}>
+              {enTurno
+                ? 'Te avisamos cuando haya pedidos listos para recoger.'
+                : 'No te llegan avisos de pedidos nuevos. Actívalo cuando salgas a trabajar.'}
             </Text>
           </View>
-        ) : disponibles.length === 0 ? (
-          <Text style={styles.vacio}>No hay pedidos disponibles ahora.</Text>
-        ) : (
-          disponibles.map((p, i) => (
-            <FadeInView key={p.id} delay={i * 50}>
-              <DisponibleCard pedido={p} onTomar={() => setPorTomar(p)} />
-            </FadeInView>
-          ))
-        )}
+          <Switch
+            value={enTurno}
+            onValueChange={onCambiarTurno}
+            disabled={cambiandoTurno}
+            trackColor={{ false: c.borderStrong, true: c.success }}
+            thumbColor={c.surface}
+          />
+        </View>
+      )}
 
-        {/* Módulo aparte con las entregas que ya completé. */}
-        <PressableScale style={styles.entregados} onPress={() => navigation.navigate('PedidosEntregados')}>
-          <Icon name="check" size={22} color={c.success} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.entregadosTitulo}>Pedidos entregados</Text>
-            <Text style={styles.entregadosSub}>Revisa las entregas que ya completaste</Text>
-          </View>
-          <Icon name="chevron" size={20} color={c.chevron} />
-        </PressableScale>
-      </ScrollView>
+      {/* Lo que ya tomé va arriba: los disponibles quedan debajo. */}
+      {entregas.length > 0 && (
+        <>
+          <Text style={styles.seccion}>Mis entregas en curso</Text>
+          {entregas.map((p, i) => {
+            const ec = estadoColor(p.estado);
+            return (
+              <FadeInView key={p.id} delay={i * 50}>
+                <View style={[styles.card, styles.bordeAzul]}>
+                  <View style={styles.cardHead}>
+                    <Text style={styles.pedidoId}>Pedido #{p.id}</Text>
+                    <Text style={[styles.badge, { backgroundColor: ec.bg, color: ec.fg }]}>{p.estado_label}</Text>
+                  </View>
+                  {p.estado === 'tomado' && !!p.minutos_recogida && (
+                    <View style={[styles.lineaSub, styles.fila]}>
+                      <Icon name="reloj" size={13} color={c.goldText} />
+                      <Text style={styles.prometido}>Prometiste recogerlo en {p.minutos_recogida} min</Text>
+                    </View>
+                  )}
+                  <View style={[styles.linea, styles.fila]}>
+                    <Icon name="tienda" size={14} color={c.text} />
+                    <Text style={[styles.linea, { flex: 1 }]}>
+                      Recoger: {p.negocio?.nombre} — {p.negocio?.direccion ?? 's/d'}
+                    </Text>
+                  </View>
+                  <View style={[styles.linea, styles.fila]}>
+                    <Icon name="casa" size={14} color={c.text} />
+                    <Text style={[styles.linea, { flex: 1 }]}>
+                      Entregar: {p.cliente?.name} — {p.direccion_entrega}
+                    </Text>
+                  </View>
+                  <View style={[styles.linea, styles.fila]}>
+                    <Icon name="tarjeta" size={14} color={c.text} />
+                    <Text style={styles.linea}>
+                      {p.cobrar > 0
+                        ? `Cobrar al cliente: ${cop(p.cobrar)} en efectivo`
+                        : 'Pagado por transferencia: no cobres nada'}
+                    </Text>
+                  </View>
+                  <Text style={styles.lineaSub}>
+                    Productos {cop(p.subtotal ?? p.total)} · Domicilio {cop(p.costo_domicilio ?? 0)}
+                  </Text>
+                  {/* Antes de recoger se coordina con el negocio; después, con el cliente. */}
+                  {p.estado === 'tomado' ? (
+                    <BotonesContacto
+                      telefono={p.negocio?.telefono}
+                      mensaje={`Hola, soy el domiciliario de Vitrina que va por el pedido #${p.id}.`}
+                      etiquetaLlamar="Llamar al negocio"
+                    />
+                  ) : (
+                    <BotonesContacto
+                      telefono={p.telefono_contacto}
+                      mensaje={`Hola, soy tu domiciliario de Vitrina con el pedido #${p.id}.`}
+                      etiquetaLlamar="Llamar al cliente"
+                    />
+                  )}
+                  <Novedad pedido={p} onReportada={() => cargar()} />
+                  {p.estado === 'tomado' && (
+                    <Boton
+                      icon="caja"
+                      texto="Marcar recogido"
+                      cargando={avanzando === p.id}
+                      onPress={() => onAvanzar(p.id, 'recogido')}
+                    />
+                  )}
+                  {p.estado === 'recogido' && (
+                    <Boton
+                      icon="moto"
+                      texto="Salir / En camino"
+                      cargando={avanzando === p.id}
+                      onPress={() => onAvanzar(p.id, 'en-camino')}
+                    />
+                  )}
+                  {p.estado === 'en_camino' && (
+                    <Boton
+                      icon="check"
+                      texto="Marcar entregado"
+                      color={c.success}
+                      cargando={avanzando === p.id}
+                      onPress={() => onAvanzar(p.id, 'entregado')}
+                    />
+                  )}
+                </View>
+              </FadeInView>
+            );
+          })}
+        </>
+      )}
+
+      <Text style={styles.seccion}>
+        Pedidos disponibles{!vetado && disponibles.length > 0 ? ` (${disponibles.length})` : ''}
+      </Text>
+      {vetado ? (
+        <View style={styles.vetado}>
+          <Icon name="alerta" size={18} color={c.danger} />
+          <Text style={styles.vetadoTxt}>
+            Tu cuenta de domiciliario está suspendida por baja confiabilidad, así que no puedes tomar pedidos nuevos.
+            Termina las entregas que llevas; un administrador revisará tu caso.
+          </Text>
+        </View>
+      ) : disponibles.length === 0 ? (
+        <Text style={styles.vacio}>No hay pedidos disponibles ahora.</Text>
+      ) : (
+        disponibles.map((p, i) => (
+          <FadeInView key={p.id} delay={i * 50}>
+            <DisponibleCard pedido={p} onTomar={() => setPorTomar(p)} />
+          </FadeInView>
+        ))
+      )}
+
+      {/* Módulo aparte con las entregas que ya completé. */}
+      <PressableScale
+        style={styles.entregados}
+        onPress={() => navigationRef.isReady() && navigationRef.navigate('PedidosEntregados')}>
+        <Icon name="check" size={22} color={c.success} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.entregadosTitulo}>Pedidos entregados</Text>
+          <Text style={styles.entregadosSub}>Revisa las entregas que ya completaste</Text>
+        </View>
+        <Icon name="chevron" size={20} color={c.chevron} />
+      </PressableScale>
 
       <MinutosRecogida
         pedido={porTomar}
@@ -476,7 +466,6 @@ function DisponibleCard({ pedido, onTomar }: { pedido: Pedido; onTomar: () => vo
 }
 
 const useStyles = makeStyles((c, shadow) => ({
-  container: { flex: 1, backgroundColor: c.bg },
   seccion: { fontSize: 16, fontFamily: font.displaySemi, color: c.textStrong, marginTop: 18, marginBottom: 8 },
   card: {
     backgroundColor: c.surface, borderRadius: radius.md, padding: 14, marginBottom: 10, ...shadow.low,
