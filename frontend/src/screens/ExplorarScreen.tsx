@@ -21,7 +21,13 @@ import {
   TipoNegocio,
 } from '../api';
 import { useAuth } from '../AuthContext';
-import { CardSkeletons, Desplegable, FadeInView, PressableScale } from '../components/anim';
+import {
+  animarDespliegue,
+  CardSkeletons,
+  Desplegable,
+  FadeInView,
+  PressableScale,
+} from '../components/anim';
 import Icon from '../components/Icon';
 import { NivelBadge } from '../components/Reputacion';
 import { RootStackParamList } from '../navTypes';
@@ -62,6 +68,7 @@ export default function ExplorarScreen({ navigation }: Props) {
   // Estable entre renders para que React.memo de CardNegocio surta efecto:
   // al tocar, solo se redibujan la card que se abre y la que se cierra.
   const alternarCard = useCallback((id: number) => {
+    animarDespliegue();
     setExpandidaId(prev => (prev === id ? null : id));
   }, []);
 
@@ -262,7 +269,7 @@ function TarjetaProducto({
   return (
     <FadeInView delay={Math.min(index, 8) * 45}>
       <PressableScale
-        style={styles.card}
+        style={[styles.card, styles.cardSeparada]}
         onPress={() =>
           navigation.navigate('Negocio', {
             id: item.negocio.id,
@@ -325,79 +332,85 @@ const CardNegocio = React.memo(function CardNegocio({
   const img = imagenUrl(item.imagen);
   return (
     <FadeInView delay={Math.min(index, 8) * 45}>
-      <PressableScale
-        style={[styles.card, !item.abierto && styles.cardCerrada]}
-        onPress={() => onToggle(item.id)}>
-        <Desplegable abierto={expandida}>
-          {img ? (
-            <Image source={{ uri: img }} style={styles.portada} resizeMode="cover" />
-          ) : (
-            <View style={[styles.portada, styles.portadaVacia]}>
-              <Icon name="tienda" size={40} color={c.mutedSoft} />
-            </View>
-          )}
-        </Desplegable>
-
-        <View style={styles.cardHead}>
-          <Text style={styles.nombre}>{item.nombre}</Text>
-          <Text style={item.abierto ? styles.abierto : styles.cerrado}>
-            {item.abierto ? 'Abierto' : 'Cerrado'}
-          </Text>
-        </View>
-
-        {!expandida && !!item.categoria && (
-          <View style={[styles.categoriaFila, styles.filaAccion]}>
-            <Icon name="tienda" size={13} color={c.accent} />
-            <Text style={styles.categoriaTxt}>{item.categoria}</Text>
-          </View>
-        )}
-        {!!item.horario_hoy && (
-          <View style={[styles.categoriaFila, styles.filaAccion]}>
-            <Icon name="reloj" size={13} color={c.muted} />
-            <Text style={styles.categoriaTxt}>{item.horario_hoy}</Text>
-          </View>
-        )}
-        {!!item.direccion && (
-          <View style={[styles.dir, styles.filaAccion]}>
-            <Icon name="ubicacion" size={13} color={c.mutedSoft} />
-            <Text style={styles.dir}>{item.direccion}</Text>
-          </View>
-        )}
-        {/* Nivel de confiabilidad y tiempo que promete en preparar. */}
-        <View style={[styles.reputacionFila, styles.filaAccion]}>
-          <NivelBadge reputacion={item.reputacion} />
-          {!!item.tiempo_preparacion && (
-            <>
-              <Icon name="reloj" size={13} color={c.mutedSoft} />
-              <Text style={styles.tiempoTxt}>Prepara en ~{item.tiempo_preparacion} min</Text>
-            </>
-          )}
-        </View>
-
-        <Desplegable abierto={expandida}>
-          {categoriasNegocio(item).length > 0 && (
-            <View style={styles.categoriasChips}>
-              {categoriasNegocio(item).map(categoria => (
-                <View key={categoria} style={styles.categoriaChip}>
-                  <Text style={styles.categoriaChipTxt}>{categoria}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-          {!!item.descripcion && (
-            <Text style={styles.desc} numberOfLines={3}>{item.descripcion}</Text>
-          )}
-          <TouchableOpacity
-            style={[styles.botonEntrar, !item.abierto && styles.botonEntrarOff]}
-            disabled={!item.abierto || !expandida}
-            onPress={() =>
-              navigation.navigate('Negocio', { id: item.id, nombre: item.nombre })
-            }>
-            <Text style={[styles.botonEntrarTxt, !item.abierto && styles.botonEntrarTxtOff]}>
-              {item.abierto ? 'Entrar a la tienda' : 'Tienda cerrada'}
+      {/* La escala del toque va en este envoltorio sin fondo y la card en la
+          View interna: así el despliegue nunca se corta (ver Desplegable). */}
+      <PressableScale style={styles.cardSeparada} onPress={() => onToggle(item.id)}>
+        <View style={[styles.card, !item.abierto && styles.cardCerrada]}>
+          <Desplegable abierto={expandida}>
+            {img ? (
+              <Image source={{ uri: img }} style={styles.portada} resizeMode="cover" />
+            ) : (
+              <View style={[styles.portada, styles.portadaVacia]}>
+                <Icon name="tienda" size={40} color={c.mutedSoft} />
+              </View>
+            )}
+          </Desplegable>
+  
+          <View style={styles.cardHead}>
+            <Text style={styles.nombre}>{item.nombre}</Text>
+            <Text style={item.abierto ? styles.abierto : styles.cerrado}>
+              {item.abierto ? 'Abierto' : 'Cerrado'}
             </Text>
-          </TouchableOpacity>
-        </Desplegable>
+          </View>
+  
+          {/* Extendida, la categoría pasa a los chips de abajo. Se recoge en vez
+              de desmontarse para que el cambio también sea fluido. */}
+          {!!item.categoria && (
+            <Desplegable abierto={!expandida}>
+              <View style={[styles.categoriaFila, styles.filaAccion]}>
+                <Icon name="tienda" size={13} color={c.accent} />
+                <Text style={styles.categoriaTxt}>{item.categoria}</Text>
+              </View>
+            </Desplegable>
+          )}
+          {!!item.horario_hoy && (
+            <View style={[styles.categoriaFila, styles.filaAccion]}>
+              <Icon name="reloj" size={13} color={c.muted} />
+              <Text style={styles.categoriaTxt}>{item.horario_hoy}</Text>
+            </View>
+          )}
+          {!!item.direccion && (
+            <View style={[styles.dir, styles.filaAccion]}>
+              <Icon name="ubicacion" size={13} color={c.mutedSoft} />
+              <Text style={styles.dir}>{item.direccion}</Text>
+            </View>
+          )}
+          {/* Nivel de confiabilidad y tiempo que promete en preparar. */}
+          <View style={[styles.reputacionFila, styles.filaAccion]}>
+            <NivelBadge reputacion={item.reputacion} />
+            {!!item.tiempo_preparacion && (
+              <>
+                <Icon name="reloj" size={13} color={c.mutedSoft} />
+                <Text style={styles.tiempoTxt}>Prepara en ~{item.tiempo_preparacion} min</Text>
+              </>
+            )}
+          </View>
+  
+          <Desplegable abierto={expandida}>
+            {categoriasNegocio(item).length > 0 && (
+              <View style={styles.categoriasChips}>
+                {categoriasNegocio(item).map(categoria => (
+                  <View key={categoria} style={styles.categoriaChip}>
+                    <Text style={styles.categoriaChipTxt}>{categoria}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+            {!!item.descripcion && (
+              <Text style={styles.desc} numberOfLines={3}>{item.descripcion}</Text>
+            )}
+            <TouchableOpacity
+              style={[styles.botonEntrar, !item.abierto && styles.botonEntrarOff]}
+              disabled={!item.abierto || !expandida}
+              onPress={() =>
+                navigation.navigate('Negocio', { id: item.id, nombre: item.nombre })
+              }>
+              <Text style={[styles.botonEntrarTxt, !item.abierto && styles.botonEntrarTxtOff]}>
+                {item.abierto ? 'Entrar a la tienda' : 'Tienda cerrada'}
+              </Text>
+            </TouchableOpacity>
+          </Desplegable>
+        </View>
       </PressableScale>
     </FadeInView>
   );
@@ -433,8 +446,9 @@ const useStyles = makeStyles((c, shadow) => ({
   filtroChipTxt: { color: c.text, fontFamily: font.semibold, fontSize: 13 },
   filtroChipTxtActivo: { color: c.onBrand },
   card: {
-    backgroundColor: c.surface, borderRadius: radius.lg, padding: 16, marginBottom: 12, ...shadow.soft,
+    backgroundColor: c.surface, borderRadius: radius.lg, padding: 16, ...shadow.soft,
   },
+  cardSeparada: { marginBottom: 12 },
   portada: { width: '100%', height: 140, borderRadius: radius.md, marginBottom: 10, backgroundColor: c.surface2 },
   portadaVacia: { alignItems: 'center', justifyContent: 'center' },
   cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

@@ -7,13 +7,15 @@
  *   <FadeInView delay={index * 50}>…</FadeInView>
  *   <Skeleton width={120} height={16} />
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   Animated,
   Easing,
+  LayoutAnimation,
   Pressable,
   PressableProps,
   StyleProp,
+  View,
   ViewStyle,
 } from 'react-native';
 import { radius, useTheme } from '../theme';
@@ -91,6 +93,29 @@ export function FadeInView({
   );
 }
 
+/** Duración del despliegue de un <Desplegable> (alto + fundido), en ms. */
+const DURACION_DESPLIEGUE = 280;
+
+/**
+ * Anima el alto del próximo cambio de layout. Llámalo justo antes del setState
+ * que abre o cierra un <Desplegable>:
+ *
+ *   animarDespliegue();
+ *   setAbiertoId(id);
+ *
+ * Usa LayoutAnimation: en la Nueva Arquitectura los cuadros intermedios se
+ * calculan en el hilo de UI, así que la sección, su card y las cards de abajo
+ * se mueven fluidas aunque JS esté ocupado. (Animar `height` con Animated iba
+ * por JS y re-medía toda la lista en cada cuadro: de ahí los tirones.)
+ */
+export function animarDespliegue(duration = DURACION_DESPLIEGUE) {
+  LayoutAnimation.configureNext({
+    duration,
+    // Arranca rápido y frena suave: responde al instante sin verse brusco.
+    update: { type: LayoutAnimation.Types.easeOut },
+  });
+}
+
 type DesplegableProps = {
   /** true = extendido, false = recogido. El cambio se anima en ambos sentidos. */
   abierto: boolean;
@@ -101,40 +126,45 @@ type DesplegableProps = {
 /**
  * Sección plegable con transición suave de alto + fundido, en ambos sentidos.
  *
- * El contenido se renderiza siempre (en una capa absoluta que sirve para
- * medir su alto real con onLayout) y el contenedor anima su `height` entre 0
- * y ese alto. `height` no soporta el driver nativo, por eso useNativeDriver
- * va en false.
+ * Recogida queda con alto 0 y recorta su contenido, que sigue montado (la
+ * imagen ya está cargada al abrir). El alto lo anima `animarDespliegue()`, que
+ * quien cambia `abierto` llama justo antes; el fundido va aquí con el driver
+ * nativo. Ninguno de los dos pasa por JS cuadro a cuadro.
+ *
+ * Si la card que lo contiene es un PressableScale, pon el fondo de la card en
+ * una View interna: LayoutAnimation corta en seco la animación de una vista si
+ * React le cambia props a mitad de camino, y PressableScale sincroniza su
+ * escala al terminar el resorte. Con el fondo adentro solo se corta el
+ * envoltorio, que no se ve.
  */
-export function Desplegable({ abierto, children, duration = 200 }: DesplegableProps) {
-  const [alto, setAlto] = useState(0);
+export function Desplegable({ abierto, children, duration = DURACION_DESPLIEGUE }: DesplegableProps) {
   // Arranca ya abierto/cerrado según el estado inicial: así una card extendida
-  // que la FlatList recicla y vuelve a montar no se re-anima desde cero.
+  // que la FlatList vuelve a montar no se re-anima desde cero.
   const anim = useRef(new Animated.Value(abierto ? 1 : 0)).current;
+  const previo = useRef(abierto);
 
   useEffect(() => {
+    // Solo anima cuando cambia: al montar ya está en su sitio.
+    if (previo.current === abierto) return;
+    previo.current = abierto;
     Animated.timing(anim, {
       toValue: abierto ? 1 : 0,
       duration,
-      // Arranca rápido y frena suave: responde al instante sin verse brusco.
       easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
+      useNativeDriver: true,
     }).start();
   }, [abierto, anim, duration]);
 
-  const height = anim.interpolate({ inputRange: [0, 1], outputRange: [0, alto] });
   // El fundido termina de aparecer antes que el alto, para que no se vea vacío.
   const opacity = anim.interpolate({ inputRange: [0, 0.35, 1], outputRange: [0, 0.75, 1] });
   const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] });
 
   return (
-    <Animated.View style={{ height, opacity, overflow: 'hidden' }}>
-      <Animated.View
-        style={{ position: 'absolute', left: 0, top: 0, right: 0, transform: [{ translateY }] }}
-        onLayout={e => setAlto(e.nativeEvent.layout.height)}>
-        {children}
-      </Animated.View>
-    </Animated.View>
+    <View style={{ overflow: 'hidden', height: abierto ? undefined : 0 }}>
+      {/* El fundido va en esta vista interna, que nunca cambia de tamaño: así
+          LayoutAnimation no la toca y no pisa la opacidad del driver nativo. */}
+      <Animated.View style={{ opacity, transform: [{ translateY }] }}>{children}</Animated.View>
+    </View>
   );
 }
 

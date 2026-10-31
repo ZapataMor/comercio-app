@@ -11,7 +11,7 @@ import {
   TipoReputacion,
 } from '../api';
 import { useAuth } from '../AuthContext';
-import { Desplegable, FadeInView, PressableScale } from '../components/anim';
+import { animarDespliegue, Desplegable, FadeInView, PressableScale } from '../components/anim';
 import Icon from '../components/Icon';
 import { FilaEvento, NivelBadge } from '../components/Reputacion';
 import { font, makeStyles, radius, useTheme } from '../theme';
@@ -99,7 +99,10 @@ export default function AdminReputacionScreen() {
                 tipo={tipo}
                 sujeto={item}
                 abierto={abierto === item.id}
-                onToggle={() => setAbierto(a => (a === item.id ? null : item.id))}
+                onToggle={() => {
+                  animarDespliegue();
+                  setAbierto(a => (a === item.id ? null : item.id));
+                }}
                 onCambio={() => cargar()}
               />
             </FadeInView>
@@ -133,7 +136,11 @@ function Sujeto({
 
   const cargarDetalle = useCallback(() => {
     getAdminReputacionDetalle(token, tipo, sujeto.id)
-      .then(setDetalle)
+      .then(d => {
+        // El historial llega con la card ya abierta: que crezca suave, sin salto.
+        animarDespliegue();
+        setDetalle(d);
+      })
       .catch(e => toast.error('No se pudo cargar', e instanceof Error ? e.message : 'Error'));
   }, [token, tipo, sujeto.id, toast]);
 
@@ -188,70 +195,73 @@ function Sujeto({
 
   const r = sujeto.reputacion;
 
+  // Fondo en una View interna para que el despliegue no se corte (ver Desplegable).
   return (
-    <PressableScale style={[styles.card, r.vetado && styles.cardVetada]} onPress={onToggle} scaleTo={0.99}>
-      <View style={styles.cardHead}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.nombre}>{sujeto.nombre}</Text>
-          {!!sujeto.detalle && <Text style={styles.detalle}>{sujeto.detalle}</Text>}
+    <PressableScale style={styles.cardSeparada} onPress={onToggle} scaleTo={0.99}>
+      <View style={[styles.card, r.vetado && styles.cardVetada]}>
+        <View style={styles.cardHead}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.nombre}>{sujeto.nombre}</Text>
+            {!!sujeto.detalle && <Text style={styles.detalle}>{sujeto.detalle}</Text>}
+          </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={[styles.puntaje, r.vetado && { color: c.danger }]}>{r.puntaje}</Text>
+            <NivelBadge reputacion={r} sinPuntaje />
+          </View>
         </View>
-        <View style={{ alignItems: 'flex-end' }}>
-          <Text style={[styles.puntaje, r.vetado && { color: c.danger }]}>{r.puntaje}</Text>
-          <NivelBadge reputacion={r} sinPuntaje />
-        </View>
-      </View>
-      {r.vetado && !!r.motivo_veto && <Text style={styles.motivo}>{r.motivo_veto}</Text>}
+        {r.vetado && !!r.motivo_veto && <Text style={styles.motivo}>{r.motivo_veto}</Text>}
 
-      <Desplegable abierto={abierto}>
-        <View style={styles.cuerpo}>
-          {!detalle ? (
-            <ActivityIndicator color={c.accent} />
-          ) : (
-            <>
-              <Text style={styles.subtitulo}>
-                Historial · {detalle.reputacion.pedidos} pedido(s) evaluado(s)
-              </Text>
-              {detalle.eventos.length === 0 ? (
-                <Text style={styles.detalle}>Sin movimientos todavía.</Text>
-              ) : (
-                detalle.eventos.map(e => (
-                  <FilaEvento
-                    key={e.id}
-                    evento={e}
-                    accion={
-                      !e.anulado && (
-                        <PressableScale onPress={() => onAnular(e.id, e.descripcion)} style={styles.anular}>
-                          <Text style={styles.anularTxt}>Anular</Text>
-                        </PressableScale>
-                      )
-                    }
-                  />
-                ))
-              )}
+        <Desplegable abierto={abierto}>
+          <View style={styles.cuerpo}>
+            {!detalle ? (
+              <ActivityIndicator color={c.accent} />
+            ) : (
+              <>
+                <Text style={styles.subtitulo}>
+                  Historial · {detalle.reputacion.pedidos} pedido(s) evaluado(s)
+                </Text>
+                {detalle.eventos.length === 0 ? (
+                  <Text style={styles.detalle}>Sin movimientos todavía.</Text>
+                ) : (
+                  detalle.eventos.map(e => (
+                    <FilaEvento
+                      key={e.id}
+                      evento={e}
+                      accion={
+                        !e.anulado && (
+                          <PressableScale onPress={() => onAnular(e.id, e.descripcion)} style={styles.anular}>
+                            <Text style={styles.anularTxt}>Anular</Text>
+                          </PressableScale>
+                        )
+                      }
+                    />
+                  ))
+                )}
 
-              {detalle.reputacion.vetado ? (
-                <PressableScale style={styles.btn} onPress={onLevantar}>
-                  <Text style={styles.btnTxt}>Levantar veto (segunda oportunidad)</Text>
-                </PressableScale>
-              ) : (
-                <View style={styles.suspender}>
-                  <TextInput
-                    style={styles.input}
-                    value={motivo}
-                    onChangeText={setMotivo}
-                    placeholder="Motivo para suspender…"
-                    placeholderTextColor={c.mutedSoft}
-                    maxLength={200}
-                  />
-                  <PressableScale style={[styles.btn, styles.btnPeligro]} onPress={onSuspender}>
-                    <Text style={[styles.btnTxt, { color: c.danger }]}>Suspender</Text>
+                {detalle.reputacion.vetado ? (
+                  <PressableScale style={styles.btn} onPress={onLevantar}>
+                    <Text style={styles.btnTxt}>Levantar veto (segunda oportunidad)</Text>
                   </PressableScale>
-                </View>
-              )}
-            </>
-          )}
-        </View>
-      </Desplegable>
+                ) : (
+                  <View style={styles.suspender}>
+                    <TextInput
+                      style={styles.input}
+                      value={motivo}
+                      onChangeText={setMotivo}
+                      placeholder="Motivo para suspender…"
+                      placeholderTextColor={c.mutedSoft}
+                      maxLength={200}
+                    />
+                    <PressableScale style={[styles.btn, styles.btnPeligro]} onPress={onSuspender}>
+                      <Text style={[styles.btnTxt, { color: c.danger }]}>Suspender</Text>
+                    </PressableScale>
+                  </View>
+                )}
+              </>
+            )}
+          </View>
+        </Desplegable>
+      </View>
     </PressableScale>
   );
 }
@@ -265,7 +275,8 @@ const useStyles = makeStyles((c, shadow) => ({
   tabTxtOn: { color: c.onBrand },
   resumen: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 18, paddingVertical: 10 },
   resumenTxt: { color: c.muted, fontSize: 13, fontFamily: font.medium },
-  card: { backgroundColor: c.surface, borderRadius: radius.md, padding: 14, marginBottom: 10, ...shadow.low },
+  card: { backgroundColor: c.surface, borderRadius: radius.md, padding: 14, ...shadow.low },
+  cardSeparada: { marginBottom: 10 },
   cardVetada: { borderLeftWidth: 4, borderLeftColor: c.danger },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   nombre: { fontSize: 15, fontFamily: font.bold, color: c.textStrong },
