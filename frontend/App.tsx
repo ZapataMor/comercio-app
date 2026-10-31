@@ -23,7 +23,6 @@ import { avisarCambioDesdePush } from './src/usePolling';
 import { useToast } from './src/Toast';
 import { RootStackParamList } from './src/navTypes';
 import HomeScreen from './src/screens/HomeScreen';
-import PerfilScreen from './src/screens/PerfilScreen';
 import MiInformacionScreen from './src/screens/MiInformacionScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
@@ -146,11 +145,8 @@ function Navegacion() {
               component={HomeScreen}
               options={{ title: 'Vitrina', headerTitle: tituloVitrina }}
             />
-            <Stack.Screen
-              name="Perfil"
-              component={PerfilScreen}
-              options={{ title: 'Mi perfil', headerRight: () => null }}
-            />
+            {/* Mi información, Mis negocios y Privacidad se abren desde el menú
+                del ícono de usuario (HeaderPerfil), sin pantalla intermedia. */}
             <Stack.Screen
               name="MiInformacion"
               component={MiInformacionScreen}

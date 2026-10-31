@@ -27,7 +27,6 @@ const RUTAS_CLIENTE = new Set([
   'Mapa',
   'Negocio',
   'PedidoDetalle',
-  'Perfil',
 ]);
 
 type Props = { ruta?: string };
