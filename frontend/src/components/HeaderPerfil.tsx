@@ -25,6 +25,7 @@ import { WEB_URL } from '../config';
 import { navigationRef } from '../RootNavigation';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { PressableScale } from './anim';
+import { desenfocarApp } from './Desenfoque';
 import HeaderConfiabilidad from './HeaderConfiabilidad';
 import HeaderTurno from './HeaderTurno';
 import Icon, { IconName } from './Icon';
@@ -87,8 +88,9 @@ export default function HeaderPerfil() {
 
 /**
  * Menú desplegable anclado bajo el botón. La caja entra suave (fundido +
- * escala desde la esquina del ícono) y sus renglones caen en cascada, uno
- * tras otro. Sale con un fundido; tocar fuera o "atrás" lo cierra.
+ * escala desde la esquina del ícono) y se despliega hacia abajo mientras sus
+ * renglones caen en cascada, uno tras otro; detrás, la app se pone borrosa.
+ * Sale con un fundido; tocar fuera o "atrás" lo cierra.
  */
 function MenuPerfil({ ancla, onCerrado }: { ancla: Ancla; onCerrado: () => void }) {
   const { c } = useTheme();
@@ -97,14 +99,32 @@ function MenuPerfil({ ancla, onCerrado }: { ancla: Ancla; onCerrado: () => void 
   const { auth, salir } = useAuth();
   const user = auth?.user;
   const a = useRef(new Animated.Value(0)).current;
+  // Alto real de la lista (medido) y cuánto lleva desplegada la caja.
+  const [alto, setAlto] = useState(0);
+  const despliegue = useRef(new Animated.Value(0)).current;
   // Un valor por renglón (cabecera, módulos y "Cerrar sesión") para la cascada.
   const filas = useRef(Array.from({ length: MODULOS.length + 2 }, () => new Animated.Value(0))).current;
+  const empezado = useRef(false);
   const cerrando = useRef(false);
 
-  useEffect(() => {
+  // Si el menú desaparece de golpe (p. ej. al cerrar sesión), la app no
+  // queda borrosa.
+  useEffect(() => () => desenfocarApp(false), []);
+
+  /** Entrada: arranca cuando ya se conoce el alto, para desplegar sin saltos. */
+  function entrar() {
     const suave = Easing.out(Easing.cubic);
+    desenfocarApp(true);
     Animated.parallel([
-      Animated.timing(a, { toValue: 1, duration: 260, easing: suave, useNativeDriver: true }),
+      // La caja asoma rápido, aún pequeña, y luego se despliega hacia abajo
+      // al ritmo de los renglones. `height` no admite el driver nativo.
+      Animated.timing(a, { toValue: 1, duration: 160, easing: suave, useNativeDriver: true }),
+      Animated.timing(despliegue, {
+        toValue: 1,
+        duration: 500,
+        easing: Easing.inOut(Easing.cubic),
+        useNativeDriver: false,
+      }),
       // Los renglones arrancan cuando la caja ya asoma, cada uno 60 ms después.
       Animated.sequence([
         Animated.delay(80),
@@ -116,11 +136,12 @@ function MenuPerfil({ ancla, onCerrado }: { ancla: Ancla; onCerrado: () => void 
         ),
       ]),
     ]).start();
-  }, [a, filas]);
+  }
 
   function cerrar() {
     if (cerrando.current) return;
     cerrando.current = true;
+    desenfocarApp(false);
     Animated.timing(a, {
       toValue: 0,
       duration: 160,
@@ -140,14 +161,13 @@ function MenuPerfil({ ancla, onCerrado }: { ancla: Ancla; onCerrado: () => void 
   // Borde derecho del menú alineado con el del botón; el pico apunta a su centro.
   const derecha = Math.max(12, width - (ancla.x + ancla.w));
   const pico = Math.max(14, width - (ancla.x + ancla.w / 2) - derecha - 7);
-  const opacidadFondo = a.interpolate({ inputRange: [0, 1], outputRange: [0, 0.55] });
   const translateY = a.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] });
   const scale = a.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] });
+  const altoVisible = despliegue.interpolate({ inputRange: [0, 1], outputRange: [0, alto] });
 
   return (
     <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={cerrar}>
-      <Animated.View style={[StyleSheet.absoluteFill, styles.fondo, { opacity: opacidadFondo }]} />
-      {/* Tocar fuera del menú lo cierra. */}
+      {/* Tocar fuera del menú lo cierra (el fondo no se oscurece: se desenfoca). */}
       <Pressable style={StyleSheet.absoluteFill} onPress={cerrar} accessibilityLabel="Cerrar menú" />
       <Animated.View
         style={[
@@ -162,46 +182,62 @@ function MenuPerfil({ ancla, onCerrado }: { ancla: Ancla; onCerrado: () => void 
         ]}>
         <View style={[styles.pico, { right: pico }]} />
         <View style={styles.caja}>
-          {!!user && (
-            <Cascada v={filas[0]}>
-              <View style={styles.cabecera}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarTxt}>{user.name.trim().charAt(0).toUpperCase() || '?'}</Text>
-                </View>
-                <View style={styles.cabeceraTexto}>
-                  <Text style={styles.nombre} numberOfLines={1}>
-                    {[user.name, user.apellidos].filter(Boolean).join(' ')}
-                  </Text>
-                  <Text style={styles.email} numberOfLines={1}>
-                    {user.email}
-                  </Text>
-                </View>
-              </View>
-            </Cascada>
-          )}
-
-          {MODULOS.map((m, i) => (
-            <Cascada key={m.titulo} v={filas[i + 1]}>
-              <PressableScale style={styles.modulo} accessibilityRole="button" onPress={() => elegir(m.abrir)}>
-                <View style={styles.moduloIcono}>
-                  <Icon name={m.icono} size={18} color={c.accent} strokeWidth={2} />
-                </View>
-                <Text style={styles.moduloTxt}>{m.titulo}</Text>
-              </PressableScale>
-            </Cascada>
-          ))}
-
-          <Cascada v={filas[MODULOS.length + 1]}>
-            <PressableScale
-              style={[styles.modulo, styles.salir]}
-              accessibilityRole="button"
-              onPress={() => elegir(salir)}>
-              <View style={[styles.moduloIcono, styles.salirIcono]}>
-                <Icon name="salir" size={18} color={c.danger} strokeWidth={2} />
-              </View>
-              <Text style={[styles.moduloTxt, styles.salirTxt]}>Cerrar sesión</Text>
-            </PressableScale>
-          </Cascada>
+          {/* La lista se mide en una capa absoluta y la caja crece hasta su alto. */}
+          <Animated.View style={[styles.lista, { height: altoVisible }]}>
+            <View
+              style={styles.listaContenido}
+              onLayout={e => {
+                setAlto(e.nativeEvent.layout.height);
+                if (!empezado.current) {
+                  empezado.current = true;
+                  entrar();
+                }
+              }}>
+              {!!user && (
+                <Cascada v={filas[0]}>
+                  <View style={styles.cabecera}>
+                    <View style={styles.avatar}>
+                      <Text style={styles.avatarTxt}>{user.name.trim().charAt(0).toUpperCase() || '?'}</Text>
+                    </View>
+                    <View style={styles.cabeceraTexto}>
+                      <Text style={styles.nombre} numberOfLines={1}>
+                        {[user.name, user.apellidos].filter(Boolean).join(' ')}
+                      </Text>
+                      <Text style={styles.email} numberOfLines={1}>
+                        {user.email}
+                      </Text>
+                    </View>
+                  </View>
+                </Cascada>
+              )}
+    
+              {MODULOS.map((m, i) => (
+                <Cascada key={m.titulo} v={filas[i + 1]}>
+                  <PressableScale
+                    style={styles.modulo}
+                    accessibilityRole="button"
+                    onPress={() => elegir(m.abrir)}>
+                    <View style={styles.moduloIcono}>
+                      <Icon name={m.icono} size={18} color={c.accent} strokeWidth={2} />
+                    </View>
+                    <Text style={styles.moduloTxt}>{m.titulo}</Text>
+                  </PressableScale>
+                </Cascada>
+              ))}
+    
+              <Cascada v={filas[MODULOS.length + 1]}>
+                <PressableScale
+                  style={[styles.modulo, styles.salir]}
+                  accessibilityRole="button"
+                  onPress={() => elegir(salir)}>
+                  <View style={[styles.moduloIcono, styles.salirIcono]}>
+                    <Icon name="salir" size={18} color={c.danger} strokeWidth={2} />
+                  </View>
+                  <Text style={[styles.moduloTxt, styles.salirTxt]}>Cerrar sesión</Text>
+                </PressableScale>
+              </Cascada>
+            </View>
+          </Animated.View>
         </View>
       </Animated.View>
     </Modal>
@@ -225,7 +261,6 @@ const useStyles = makeStyles((c, shadow) => ({
     backgroundColor: 'rgba(255,255,255,0.14)',
   },
   // Menú desplegable
-  fondo: { backgroundColor: c.scrim },
   // Crece desde la esquina del ícono.
   menu: { position: 'absolute', transformOrigin: 'top right' },
   // Pico que une el menú con el ícono (queda medio oculto tras la caja).
@@ -233,7 +268,9 @@ const useStyles = makeStyles((c, shadow) => ({
     position: 'absolute', top: -6, width: 14, height: 14, borderRadius: 3,
     backgroundColor: c.surface, transform: [{ rotate: '45deg' }],
   },
-  caja: { backgroundColor: c.surface, borderRadius: radius.lg, padding: 10, gap: 8, ...shadow.card },
+  caja: { backgroundColor: c.surface, borderRadius: radius.lg, padding: 10, ...shadow.card },
+  lista: { overflow: 'hidden' },
+  listaContenido: { position: 'absolute', top: 0, left: 0, right: 0, gap: 8 },
   cabecera: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 4, paddingBottom: 2 },
   avatar: {
     width: 36, height: 36, borderRadius: radius.pill, backgroundColor: c.accent,

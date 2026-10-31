@@ -11,6 +11,7 @@ import { Colores, font, makeStyles, ThemeProvider, useTheme } from './src/theme'
 import { AuthProvider, useAuth } from './src/AuthContext';
 import { CartProvider } from './src/CartContext';
 import BarraCliente from './src/components/BarraCliente';
+import { AppDesenfocable } from './src/components/Desenfoque';
 import { FlyToCartProvider } from './src/components/FlyToCart';
 import HeaderPerfil from './src/components/HeaderPerfil';
 import { VitrinaHeaderLogo } from './src/components/Logo';
@@ -90,7 +91,8 @@ function Navegacion() {
 
   return (
     <FlyToCartProvider>
-      <View style={styles.raiz}>
+      {/* Se pone borrosa detrás del menú de "Mi perfil" (HeaderPerfil). */}
+      <AppDesenfocable style={styles.raiz}>
         <NavigationContainer
           ref={navigationRef}
           theme={temaNavegacion(c, modo === 'noche')}
@@ -199,7 +201,7 @@ function Navegacion() {
       </Stack.Navigator>
         </NavigationContainer>
         <BarraCliente ruta={ruta} />
-      </View>
+      </AppDesenfocable>
     </FlyToCartProvider>
   );
 }
