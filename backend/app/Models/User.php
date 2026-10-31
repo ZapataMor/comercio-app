@@ -14,7 +14,8 @@ use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
 #[Fillable(['name', 'apellidos', 'email', 'password', 'direccion', 'barrio', 'telefono'])]
-#[Hidden(['password', 'remember_token'])]
+// La ubicación del domiciliario solo sale por UbicacionDomiciliario::de(), a quien le toca verla.
+#[Hidden(['password', 'remember_token', 'ubicacion_lat', 'ubicacion_lng', 'ubicacion_at'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -37,6 +38,7 @@ class User extends Authenticatable
             'reputacion_domiciliario' => 'integer',
             'reputacion_domiciliario_pedidos' => 'integer',
             'domiciliario_vetado_at' => 'datetime',
+            'ubicacion_at' => 'datetime',
         ];
     }
 

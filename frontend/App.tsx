@@ -45,6 +45,7 @@ import CarritoScreen from './src/screens/CarritoScreen';
 import CheckoutScreen from './src/screens/CheckoutScreen';
 import MisPedidosScreen from './src/screens/MisPedidosScreen';
 import PedidoDetalleScreen from './src/screens/PedidoDetalleScreen';
+import MapaScreen from './src/screens/MapaScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -155,6 +156,11 @@ function Navegacion() {
               component={MiInformacionScreen}
               options={{ title: 'Mi información', headerRight: () => null }}
             />
+
+            {/* Mapa de negocios (cliente) y de domiciliarios en vivo (admin). */}
+            {(roles.includes('usuario') || roles.includes('administrador')) && (
+              <Stack.Screen name="Mapa" component={MapaScreen} options={{ title: 'Mapa' }} />
+            )}
 
             {/* Negocios: cualquier usuario puede crear los suyos o trabajar en
                 otros (el acceso lo decide la membresía, no un rol global). */}

@@ -13,12 +13,14 @@ import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import BotonesContacto from '../components/BotonesContacto';
 import Icon from '../components/Icon';
+import { haceCuanto, MapaSeguimiento, NotaEnVivo } from '../components/Mapa';
 import MotivoCancelacion from '../components/MotivoCancelacion';
 import { NivelBadge } from '../components/Reputacion';
 import { useNegocio } from '../NegocioContext';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
+import { usePolling } from '../usePolling';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ComercioPedidoDetalle'>;
 
@@ -50,6 +52,15 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
       .catch(e => toast.error('No se pudo cargar', e instanceof Error ? e.message : 'Error'))
       .finally(() => setCargando(false));
   }, [pedido, route.params.pedidoId, negocioId, toast, token]);
+
+  // Mientras el domiciliario viene a recoger, el pedido (y su posición en el
+  // mapa) se refresca cada 10 s.
+  usePolling(() => {
+    if (pedido?.estado !== 'tomado' || !negocioId) return;
+    getPedidoNegocio(token, negocioId, pedido.id)
+      .then(setPedido)
+      .catch(() => {});
+  }, 10000);
 
   // Rechazar (pendiente) o cancelar (listo y nadie lo tomó), con motivo.
   const [cancelando, setCancelando] = useState(false);
@@ -184,6 +195,23 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
             mensaje={`Hola, te escribimos de ${negocio?.nombre ?? 'la tienda'} por el pedido #${pedido.id}.`}
             etiquetaLlamar="Llamar al domiciliario"
           />
+          {/* Viene a recoger: dónde va, en vivo. */}
+          {pedido.estado === 'tomado' && !!pedido.domiciliario_ubicacion && (
+            <View style={styles.mapa}>
+              <MapaSeguimiento
+                alto={200}
+                domiciliario={pedido.domiciliario_ubicacion}
+                negocio={
+                  negocio?.lat != null && negocio?.lng != null && negocio.id === negocioId
+                    ? { punto: { lat: negocio.lat, lng: negocio.lng }, nombre: negocio.nombre, imagen: negocio.imagen }
+                    : null
+                }
+              />
+              <NotaEnVivo
+                texto={`El domiciliario viene a recoger · ubicación ${haceCuanto(pedido.domiciliario_ubicacion.hace_segundos)}`}
+              />
+            </View>
+          )}
           {pedido.estado === 'cancelado' && (
             <View style={styles.novedad}>
               <Icon name="cerrar" size={15} color={c.danger} />
@@ -312,6 +340,7 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
 
 const useStyles = makeStyles((c, shadow) => ({
   container: { flex: 1, backgroundColor: c.bg },
+  mapa: { marginTop: 12 },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg, padding: 20 },
   card: { backgroundColor: c.surface, borderRadius: radius.lg, padding: 18, ...shadow.soft },
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },

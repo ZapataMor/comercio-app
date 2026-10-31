@@ -24,6 +24,8 @@ export type RootStackParamList = {
   PedidosNegocio: undefined;
   // Cliente
   Explorar: undefined;
+  // Mapa de negocios; `admin` suma a los domiciliarios en vivo.
+  Mapa: { admin?: boolean } | undefined;
   // `productoId` opcional: al entrar desde una búsqueda de producto, el catálogo
   // resalta y hace scroll hasta ese producto.
   Negocio: { id: number; nombre: string; productoId?: number };

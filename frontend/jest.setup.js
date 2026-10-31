@@ -56,3 +56,28 @@ jest.mock('@react-native-firebase/messaging', () => ({
   requestPermission: jest.fn().mockResolvedValue(1),
   setBackgroundMessageHandler: jest.fn(),
 }));
+
+jest.mock('@react-native-community/geolocation', () => ({
+  __esModule: true,
+  default: {
+    getCurrentPosition: jest.fn(),
+    watchPosition: jest.fn(() => 1),
+    clearWatch: jest.fn(),
+    setRNConfiguration: jest.fn(),
+  },
+}));
+
+// El mapa es una vista nativa: en los tests basta con contenedores vacíos.
+jest.mock('react-native-maps', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  class MapView extends React.Component {
+    animateToRegion() {}
+    fitToCoordinates() {}
+    render() {
+      return React.createElement(View, this.props, this.props.children);
+    }
+  }
+  const Marker = props => React.createElement(View, null, props.children);
+  return { __esModule: true, default: MapView, Marker, PROVIDER_GOOGLE: 'google' };
+});

@@ -81,7 +81,16 @@ export type Negocio = {
   horario_hoy?: string | null;
   /** Mi rol en este negocio (solo en las rutas de "mis negocios"). */
   rol?: RolNegocio | null;
+  /** Pin en el mapa (null = aún no lo ha fijado). */
+  lat?: number | null;
+  lng?: number | null;
 };
+
+/** Un punto del mapa. */
+export type Coordenadas = { lat: number; lng: number };
+
+/** Posición del domiciliario; `hace_segundos` = cuándo la reportó. */
+export type UbicacionEnVivo = Coordenadas & { hace_segundos: number };
 
 export type DiaSemana = 'lun' | 'mar' | 'mie' | 'jue' | 'vie' | 'sab' | 'dom';
 /** null = ese día no abre. Horas "HH:MM" (24 h); si cierra <= abre, cierra al día siguiente. */
@@ -514,6 +523,9 @@ export type NegocioInput = {
   tiempo_preparacion?: number;
   /** null = sin horario (solo el switch Abierto/Cerrado). */
   horario?: HorarioSemana | null;
+  /** Pin en el mapa; null en ambos lo quita. */
+  lat?: number | null;
+  lng?: number | null;
 };
 
 /**
@@ -643,6 +655,8 @@ export type ComercioPedido = {
   puede_cancelar?: boolean;
   motivos_cancelacion?: string[];
   minutos_preparacion?: number | null;
+  /** Dónde va el domiciliario mientras viene a recoger (estado "tomado"). */
+  domiciliario_ubicacion?: UbicacionEnVivo | null;
   /** Justificación del domiciliario si se está demorando. */
   novedad?: string | null;
   /** Solo efectivo: lo que el negocio dijo del dinero. */
@@ -838,6 +852,23 @@ export async function getNegocios(
   };
 }
 
+/** Negocio como marcador del mapa. */
+export type NegocioMapa = Coordenadas & {
+  id: number;
+  nombre: string;
+  categoria: string | null;
+  direccion: string | null;
+  imagen?: string | null;
+  abierto: boolean;
+  horario_hoy?: string | null;
+};
+
+/** Todos los negocios que ya fijaron su pin (para el mapa). */
+export async function getNegociosMapa(token: string): Promise<NegocioMapa[]> {
+  const d = await authGet('/api/negocios/mapa', token);
+  return (d.negocios ?? []) as NegocioMapa[];
+}
+
 /** Producto de la búsqueda del cliente, con el negocio que lo vende. */
 export type ProductoConNegocio = Producto & {
   negocio: { id: number; nombre: string; abierto: boolean };
@@ -916,6 +947,21 @@ export type AdminNegocio = {
   /** Su único dueño eliminó la cuenta: ya no se ve en la app. */
   archivado?: boolean;
 };
+
+/** Domiciliario en el mapa del administrador. */
+export type DomiciliarioMapa = {
+  id: number;
+  nombre: string;
+  en_turno: boolean;
+  /** Lleva un pedido en este momento. */
+  en_entrega: boolean;
+  ubicacion: UbicacionEnVivo;
+};
+
+export async function getDomiciliariosMapa(token: string): Promise<DomiciliarioMapa[]> {
+  const d = await authGet('/api/admin/mapa/domiciliarios', token);
+  return (d.domiciliarios ?? []) as DomiciliarioMapa[];
+}
 
 export function getAdminStats(token: string): Promise<AdminStats> {
   return authGet('/api/admin/stats', token);
@@ -1062,7 +1108,14 @@ export type Pedido = {
   telefono_contacto: string | null;
   /** Justificación que reporté para una demora. */
   novedad?: string | null;
-  negocio: { nombre: string; direccion: string | null; telefono?: string | null } | null;
+  negocio: {
+    nombre: string;
+    direccion: string | null;
+    telefono?: string | null;
+    /** Pin del negocio, para "Cómo llegar". */
+    lat?: number | null;
+    lng?: number | null;
+  } | null;
   cliente: { name: string } | null;
   items: PedidoItem[];
 };
@@ -1079,6 +1132,15 @@ export async function getDisponibles(
 export async function cambiarTurno(token: string, enTurno: boolean): Promise<string> {
   const d = await authSend('PUT', '/api/domiciliario/turno', token, { en_turno: enTurno });
   return d.message as string;
+}
+
+/**
+ * Mi posición (GPS) para el mapa. Devuelve false si ya no debo compartirla
+ * (fuera de turno y sin entregas).
+ */
+export async function enviarUbicacion(token: string, punto: Coordenadas): Promise<boolean> {
+  const d = await authSend('PUT', '/api/domiciliario/ubicacion', token, punto);
+  return !!d.compartir;
 }
 
 /** Mi nivel de confiabilidad como domiciliario y sus últimos eventos. */
@@ -1176,6 +1238,9 @@ export type SeguimientoPedido = {
   puede_cancelar?: boolean;
   motivos_cancelacion?: string[];
   domiciliario_reputacion?: Reputacion | null;
+  /** Dónde va el domiciliario (solo desde que recoge hasta que entrega). */
+  domiciliario_ubicacion?: UbicacionEnVivo | null;
+  negocio_ubicacion?: Coordenadas | null;
   /** Justificación del domiciliario si se está demorando. */
   novedad?: string | null;
   items: { nombre: string; cantidad: number; precio: number }[];

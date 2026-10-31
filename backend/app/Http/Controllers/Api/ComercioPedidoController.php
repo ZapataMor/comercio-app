@@ -12,6 +12,7 @@ use App\Notifications\PedidoDisponibleParaDomiciliario;
 use App\Support\CancelarPedido;
 use App\Support\Push;
 use App\Support\Reputacion;
+use App\Support\UbicacionDomiciliario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -160,6 +161,8 @@ class ComercioPedidoController extends Controller
             'domiciliario_reputacion' => $p->domiciliario
                 ? Reputacion::resumen(Reputacion::DOMICILIARIO, $p->domiciliario)
                 : null,
+            // Mapa: el negocio ve al domiciliario mientras viene a recoger.
+            'domiciliario_ubicacion' => $p->estado === 'tomado' ? UbicacionDomiciliario::de($p->domiciliario) : null,
             'minutos_preparacion' => $p->minutos_preparacion,
             'novedad' => $p->novedad,
             'dinero_estado' => $p->dinero_estado,

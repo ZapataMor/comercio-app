@@ -95,6 +95,35 @@ class CatalogoController extends Controller
         ]);
     }
 
+    /**
+     * Negocios para el MAPA: todos los que ya fijaron su pin (abiertos y
+     * cerrados), sin paginar y solo con lo que necesita el marcador.
+     */
+    public function mapa(): JsonResponse
+    {
+        $negocios = Negocio::query()
+            ->whereNull('vetado_at')
+            ->whereNull('archivado_at')
+            ->whereNotNull('lat')
+            ->whereNotNull('lng')
+            ->with('tiposNegocio')
+            ->orderBy('nombre')
+            ->get()
+            ->map(fn (Negocio $n) => [
+                'id' => $n->id,
+                'nombre' => $n->nombre,
+                'categoria' => $n->tiposNegocio->first()?->nombre ?? $n->categoria,
+                'direccion' => $n->direccion,
+                'imagen' => $n->imagen ? '/storage/'.$n->imagen : null,
+                'abierto' => (bool) $n->activo,
+                'horario_hoy' => HorarioNegocio::textoHoy($n->horario, now()),
+                'lat' => $n->lat,
+                'lng' => $n->lng,
+            ]);
+
+        return response()->json(['negocios' => $negocios]);
+    }
+
     /** Tipos de negocio disponibles para filtrar la exploracion del cliente. */
     public function tiposNegocio(): JsonResponse
     {
@@ -216,6 +245,8 @@ class CatalogoController extends Controller
                 'horario' => HorarioNegocio::normalizar($negocio->horario),
                 'horario_hoy' => HorarioNegocio::textoHoy($negocio->horario, now()),
                 'reputacion' => Reputacion::resumen(Reputacion::NEGOCIO, $negocio),
+                'lat' => $negocio->lat,
+                'lng' => $negocio->lng,
             ],
             'productos' => ProductoResource::collection($productos),
         ]);

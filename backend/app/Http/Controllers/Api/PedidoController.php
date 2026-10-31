@@ -11,6 +11,7 @@ use App\Notifications\NuevoPedidoParaComercio;
 use App\Support\CancelarPedido;
 use App\Support\Push;
 use App\Support\Reputacion;
+use App\Support\UbicacionDomiciliario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -187,6 +188,14 @@ class PedidoController extends Controller
                 : null,
             // Justificación del domiciliario si se está demorando.
             'novedad' => $pedido->novedad,
+            // Mapa: el cliente ve al domiciliario solo mientras le lleva el
+            // pedido (desde que lo recoge hasta que lo entrega).
+            'domiciliario_ubicacion' => in_array($pedido->estado, ['recogido', 'en_camino'], true)
+                ? UbicacionDomiciliario::de($pedido->domiciliario)
+                : null,
+            'negocio_ubicacion' => $pedido->negocio?->tieneUbicacion()
+                ? ['lat' => $pedido->negocio->lat, 'lng' => $pedido->negocio->lng]
+                : null,
             'items' => $pedido->items->map(fn ($i) => [
                 'nombre' => $i->nombre,
                 'cantidad' => $i->cantidad,

@@ -59,6 +59,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // formulario de creación (atributos y sugerencias).
     Route::get('/tipos-producto', [CatalogoController::class, 'tiposProducto']);
     Route::get('/negocios', [CatalogoController::class, 'index']);
+    // Negocios con su pin, para el mapa (sin paginar).
+    Route::get('/negocios/mapa', [CatalogoController::class, 'mapa']);
     // Búsqueda de productos (por relevancia) con el negocio que los vende.
     Route::get('/productos', [CatalogoController::class, 'buscarProductos']);
 
@@ -141,6 +143,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/usuarios/{usuario}/suspender', [AdminController::class, 'suspender']);
         Route::put('/usuarios/{usuario}/reactivar', [AdminController::class, 'reactivar']);
         Route::get('/negocios', [AdminController::class, 'negocios']);
+        // Mapa: dónde están los domiciliarios que reportaron su posición hace poco.
+        Route::get('/mapa/domiciliarios', [AdminController::class, 'mapaDomiciliarios']);
         // Tarifa de domicilio (aplica a los pedidos nuevos).
         Route::put('/ajustes', [\App\Http\Controllers\Api\AjusteController::class, 'actualizar']);
         // Barrios sugeridos por clientes (aprobar → entra a la lista pública).
@@ -166,6 +170,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/historial', [ApiDomiciliarioController::class, 'historial']);
         // Entrar / salir de turno (solo en turno llegan los avisos de pedidos).
         Route::put('/turno', [ApiDomiciliarioController::class, 'turno']);
+        // Mi posición (GPS) para el mapa, cada pocos segundos en turno o en una entrega.
+        Route::put('/ubicacion', [ApiDomiciliarioController::class, 'ubicacion'])->middleware('throttle:ubicacion');
         Route::get('/reputacion', [ApiDomiciliarioController::class, 'reputacion']);
         // Justificar una demora (lluvia, tráfico...) de una entrega en curso.
         Route::put('/pedidos/{id}/novedad', [ApiDomiciliarioController::class, 'novedad']);

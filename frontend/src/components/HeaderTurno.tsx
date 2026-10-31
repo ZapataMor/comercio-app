@@ -39,7 +39,7 @@ export function publicarTurno(token: string, enTurno: boolean, vetado: boolean) 
 }
 
 /** Turno del domiciliario y cómo cambiarlo; el mismo en todas las topbars. */
-function useTurno() {
+export function useTurno() {
   const { auth } = useAuth();
   const token = auth!.token;
   const toast = useToast();

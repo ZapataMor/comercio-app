@@ -1,10 +1,10 @@
 ---
 title: Idea - Seguimiento del domiciliario
 tags: [idea]
-estado: semilla
+estado: implementado
 impacto: alto
 esfuerzo: alto
-actualizado: 2026-06-29
+actualizado: 2026-10-30
 ---
 
 # 💡 Seguimiento en vivo del domiciliario
@@ -31,6 +31,15 @@ como texto. No hay forma de ver al domiciliario avanzar ni estimar cuánto falta
 ## Notas
 - Extiende a [[Idea - Mapa en tiempo real]], que planteaba compartir ubicación
   solo durante `en_camino`; aquí la ventana arranca al **recoger** el producto.
+
+## ✅ Implementado (2026-10-30)
+- La app del domiciliario envía su GPS cada ~10 s **solo con la app abierta**, mientras está en
+  turno o lleva una entrega (`PUT /api/domiciliario/ubicacion`). Salir de turno borra la posición.
+- Quién lo ve: el **cliente** (de `recogido` a `entregado`), el **negocio** (en `tomado`, viene a
+  recoger) y el **administrador** (todos los que reportaron en los últimos 5 min).
+- Una posición de más de 5 min no se muestra.
+- Pendiente: seguimiento con la app en segundo plano (servicio en primer plano de Android y
+  declaración de ubicación en Play Store).
 
 ## 🔗 Relacionado
 - [[_MOC Ideas]] · [[Idea - Mapa en tiempo real]] · [[Idea - Orden por cercania]]

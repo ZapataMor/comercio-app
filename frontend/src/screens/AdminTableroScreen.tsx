@@ -117,6 +117,14 @@ export default function AdminTableroScreen({ navigation }: Props) {
         </View>
       </FadeInView>
 
+      <FadeInView delay={20}>
+        <PressableScale style={styles.item} onPress={() => navigation.navigate('Mapa', { admin: true })}>
+          <Icon name="moto" size={24} color={c.accent} style={styles.itemEmoji} />
+          <Text style={styles.itemTitulo}>Mapa de domiciliarios y negocios</Text>
+          <Icon name="chevron" size={20} color={c.chevron} />
+        </PressableScale>
+      </FadeInView>
+
       <FadeInView delay={40}>
         <PressableScale style={styles.item} onPress={() => navigation.navigate('AdminReputacion')}>
           <Icon name="escudo" size={24} color={c.accent} style={styles.itemEmoji} />

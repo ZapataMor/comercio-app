@@ -29,6 +29,9 @@ class Negocio extends Model
         'tiempo_preparacion',
         // Horario semanal (ver App\Support\HorarioNegocio).
         'horario',
+        // Ubicación en el mapa (pin que fija el propietario).
+        'lat',
+        'lng',
     ];
 
     protected function casts(): array
@@ -42,7 +45,15 @@ class Negocio extends Model
             'horario' => 'array',
             'activo_cambiado_at' => 'datetime',
             'archivado_at' => 'datetime',
+            'lat' => 'float',
+            'lng' => 'float',
         ];
+    }
+
+    /** ¿Tiene su pin puesto en el mapa? */
+    public function tieneUbicacion(): bool
+    {
+        return $this->lat !== null && $this->lng !== null;
     }
 
     /** Roles posibles de un miembro dentro del negocio. */

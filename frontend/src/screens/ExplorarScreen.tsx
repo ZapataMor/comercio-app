@@ -148,22 +148,32 @@ export default function ExplorarScreen({ navigation }: Props) {
         <View>
           {/* Carrito y Mis pedidos viven ahora en la barra flotante inferior;
               salir de la cuenta se hace desde "Mi perfil" (topbar). */}
-          <View style={styles.buscadorBox}>
-            <Icon name="lupa" size={16} color={c.muted} style={styles.lupa} />
-            <TextInput
-              style={styles.buscador}
-              value={busqueda}
-              onChangeText={setBusqueda}
-              placeholder="Buscar negocio o producto…"
-              placeholderTextColor={c.mutedSoft}
-              autoCapitalize="none"
-              returnKeyType="search"
-            />
-            {busqueda.length > 0 && (
-              <TouchableOpacity onPress={() => setBusqueda('')} hitSlop={8}>
-                <Icon name="cerrar" size={16} color={c.muted} />
-              </TouchableOpacity>
-            )}
+          <View style={styles.buscadorFila}>
+            <View style={[styles.buscadorBox, styles.buscadorFlex]}>
+              <Icon name="lupa" size={16} color={c.muted} style={styles.lupa} />
+              <TextInput
+                style={styles.buscador}
+                value={busqueda}
+                onChangeText={setBusqueda}
+                placeholder="Buscar negocio o producto…"
+                placeholderTextColor={c.mutedSoft}
+                autoCapitalize="none"
+                returnKeyType="search"
+              />
+              {busqueda.length > 0 && (
+                <TouchableOpacity onPress={() => setBusqueda('')} hitSlop={8}>
+                  <Icon name="cerrar" size={16} color={c.muted} />
+                </TouchableOpacity>
+              )}
+            </View>
+            {/* Los negocios en el mapa de Maicao. */}
+            <TouchableOpacity
+              style={styles.botonMapa}
+              onPress={() => navigation.navigate('Mapa')}
+              accessibilityLabel="Ver negocios en el mapa">
+              <Icon name="ubicacion" size={20} color={c.accent} />
+              <Text style={styles.botonMapaTxt}>Mapa</Text>
+            </TouchableOpacity>
           </View>
 
           {tiposNegocio.length > 0 && (
@@ -400,6 +410,13 @@ const useStyles = makeStyles((c, shadow) => ({
     flexDirection: 'row', alignItems: 'center', backgroundColor: c.surface,
     borderRadius: radius.md, paddingHorizontal: 12, marginBottom: 12, ...shadow.low,
   },
+  buscadorFila: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  buscadorFlex: { flex: 1, marginBottom: 0 },
+  botonMapa: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: c.surface,
+    borderRadius: radius.md, paddingHorizontal: 12, ...shadow.low,
+  },
+  botonMapaTxt: { color: c.text, fontFamily: font.semibold, fontSize: 13 },
   lupa: { fontSize: 15, marginRight: 6 },
   buscador: { flex: 1, paddingVertical: 11, fontSize: 15, color: c.textStrong, fontFamily: font.regular },
   categoriasFiltro: { marginBottom: 12 },

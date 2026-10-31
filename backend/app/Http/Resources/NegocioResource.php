@@ -38,6 +38,9 @@ class NegocioResource extends JsonResource
             'horario' => HorarioNegocio::normalizar($this->horario),
             'horario_hoy' => HorarioNegocio::textoHoy($this->horario, now()),
             'reputacion' => Reputacion::resumen(Reputacion::NEGOCIO, $this->resource),
+            // Pin en el mapa (null = aún no lo ha fijado).
+            'lat' => $this->lat,
+            'lng' => $this->lng,
         ];
     }
 }

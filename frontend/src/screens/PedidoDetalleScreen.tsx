@@ -8,6 +8,7 @@ import { FadeInView } from '../components/anim';
 import BotonesContacto from '../components/BotonesContacto';
 import CalificarPedido, { ResumenCalificacion } from '../components/CalificarPedido';
 import Icon from '../components/Icon';
+import { haceCuanto, MapaSeguimiento, NotaEnVivo } from '../components/Mapa';
 import MotivoCancelacion from '../components/MotivoCancelacion';
 import { NivelBadge } from '../components/Reputacion';
 import { messageFromError } from '../formErrors';
@@ -116,8 +117,10 @@ export default function PedidoDetalleScreen({ route }: Props) {
       cargarPedido();
     }, [cargarPedido]),
   );
-  // Se refresca al llegar un push (cambió el estado) y cada 15 s de respaldo.
-  usePolling(() => cargarPedido());
+  // Se refresca al llegar un push (cambió el estado) y cada 15 s de respaldo;
+  // con el pedido en camino, cada 10 s para que la moto avance en el mapa.
+  const enRuta = pedido?.estado === 'recogido' || pedido?.estado === 'en_camino';
+  usePolling(() => cargarPedido(), enRuta ? 10000 : 15000);
 
   if (cargando) {
     return <ActivityIndicator size="large" color={c.accent} style={{ marginTop: 40 }} />;
@@ -203,6 +206,33 @@ export default function PedidoDetalleScreen({ route }: Props) {
           </TouchableOpacity>
         )}
       </FadeInView>
+      )}
+
+      {/* En camino: dónde va el domiciliario, en vivo. */}
+      {enRuta && (
+        <FadeInView delay={20} style={styles.card}>
+          <Text style={styles.cardTitulo}>Tu pedido va en camino</Text>
+          {pedido.domiciliario_ubicacion ? (
+            <>
+              <MapaSeguimiento
+                domiciliario={pedido.domiciliario_ubicacion}
+                negocio={
+                  pedido.negocio_ubicacion
+                    ? { punto: pedido.negocio_ubicacion, nombre: pedido.negocio ?? 'Negocio' }
+                    : null
+                }
+              />
+              <NotaEnVivo texto={`Ubicación del domiciliario ${haceCuanto(pedido.domiciliario_ubicacion.hace_segundos)}`} />
+            </>
+          ) : (
+            <View style={styles.fila}>
+              <Icon name="moto" size={15} color={c.muted} />
+              <Text style={[styles.lineaTxt, { flex: 1 }]}>
+                En cuanto el domiciliario comparta su ubicación, lo verás aquí en el mapa.
+              </Text>
+            </View>
+          )}
+        </FadeInView>
       )}
 
       {/* Contacto con el negocio (dudas sobre el pedido). */}

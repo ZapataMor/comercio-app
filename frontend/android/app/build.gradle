@@ -83,6 +83,18 @@ if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
 }
 
+/**
+ * Clave de Google Maps (Maps SDK for Android). Se lee de MAPS_API_KEY en
+ * android/local.properties (NO se sube a git) o de la variable de entorno
+ * MAPS_API_KEY. Sin clave la app compila y abre, pero el mapa sale en gris.
+ */
+def localPropertiesFile = rootProject.file("local.properties")
+def localProperties = new Properties()
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withInputStream { localProperties.load(it) }
+}
+def mapsApiKey = localProperties['MAPS_API_KEY'] ?: System.getenv('MAPS_API_KEY') ?: ''
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -95,6 +107,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        manifestPlaceholders += [MAPS_API_KEY: mapsApiKey]
     }
     signingConfigs {
         debug {
