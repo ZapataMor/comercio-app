@@ -90,7 +90,8 @@ export default function HeaderPerfil() {
  * Menú desplegable anclado bajo el botón. La caja entra suave (fundido +
  * escala desde la esquina del ícono) y se despliega hacia abajo mientras sus
  * renglones caen en cascada, uno tras otro; detrás, la app se pone borrosa.
- * Sale con un fundido; tocar fuera o "atrás" lo cierra.
+ * Se recoge con la misma animación al revés (tocar fuera, "atrás" o elegir
+ * un módulo, que se abre cuando el menú termina de recogerse).
  */
 function MenuPerfil({ ancla, onCerrado }: { ancla: Ancla; onCerrado: () => void }) {
   const { c } = useTheme();
@@ -138,23 +139,43 @@ function MenuPerfil({ ancla, onCerrado }: { ancla: Ancla; onCerrado: () => void 
     ]).start();
   }
 
-  function cerrar() {
+  /**
+   * Salida: la entrada al revés y algo más rápida. Los renglones suben y se
+   * desvanecen de abajo hacia arriba mientras la caja se recoge hacia el
+   * ícono, y al final se desvanece la franja que queda. Luego corre `despues`.
+   */
+  function cerrar(despues?: () => void) {
     if (cerrando.current) return;
     cerrando.current = true;
     desenfocarApp(false);
-    Animated.timing(a, {
-      toValue: 0,
-      duration: 160,
-      easing: Easing.in(Easing.cubic),
-      useNativeDriver: true,
-    }).start(() => onCerrado());
+    const rapido = Easing.in(Easing.cubic);
+    Animated.parallel([
+      Animated.stagger(
+        40,
+        [...filas].reverse().map(v =>
+          Animated.timing(v, { toValue: 0, duration: 200, easing: rapido, useNativeDriver: true }),
+        ),
+      ),
+      Animated.timing(despliegue, {
+        toValue: 0,
+        duration: 400,
+        easing: Easing.inOut(Easing.cubic),
+        useNativeDriver: false,
+      }),
+      Animated.sequence([
+        Animated.delay(300),
+        Animated.timing(a, { toValue: 0, duration: 120, easing: rapido, useNativeDriver: true }),
+      ]),
+    ]).start(() => {
+      onCerrado();
+      despues?.();
+    });
   }
 
-  /** Abre el módulo de una vez (sin esperar la salida del menú). */
+  /** Recoge el menú y, al terminar, abre el módulo. */
   function elegir(accion: () => void) {
     if (cerrando.current || !navigationRef.isReady()) return;
-    accion();
-    cerrar();
+    cerrar(accion);
   }
 
   const ancho = Math.min(ANCHO_MENU, width - 24);
@@ -166,9 +187,9 @@ function MenuPerfil({ ancla, onCerrado }: { ancla: Ancla; onCerrado: () => void 
   const altoVisible = despliegue.interpolate({ inputRange: [0, 1], outputRange: [0, alto] });
 
   return (
-    <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={cerrar}>
+    <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={() => cerrar()}>
       {/* Tocar fuera del menú lo cierra (el fondo no se oscurece: se desenfoca). */}
-      <Pressable style={StyleSheet.absoluteFill} onPress={cerrar} accessibilityLabel="Cerrar menú" />
+      <Pressable style={StyleSheet.absoluteFill} onPress={() => cerrar()} accessibilityLabel="Cerrar menú" />
       <Animated.View
         style={[
           styles.menu,
@@ -188,7 +209,8 @@ function MenuPerfil({ ancla, onCerrado }: { ancla: Ancla; onCerrado: () => void 
               style={styles.listaContenido}
               onLayout={e => {
                 setAlto(e.nativeEvent.layout.height);
-                if (!empezado.current) {
+                // Si se cerró antes de medirse, ya no entra.
+                if (!empezado.current && !cerrando.current) {
                   empezado.current = true;
                   entrar();
                 }

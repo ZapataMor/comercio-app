@@ -39,7 +39,8 @@ export function AppDesenfocable({ style, children }: Props) {
     const oyente = (activo: boolean) =>
       Animated.timing(v, {
         toValue: activo ? RADIO : 0,
-        duration: activo ? 260 : 160,
+        // Al quitarse acompaña lo que tarda el menú en recogerse.
+        duration: activo ? 260 : 380,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: false,
       }).start();
