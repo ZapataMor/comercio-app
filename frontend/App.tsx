@@ -11,6 +11,7 @@ import { Colores, font, makeStyles, ThemeProvider, useTheme } from './src/theme'
 import { AuthProvider, useAuth } from './src/AuthContext';
 import { CartProvider } from './src/CartContext';
 import BarraCliente from './src/components/BarraCliente';
+import { AppDesenfocable } from './src/components/Desenfoque';
 import { FlyToCartProvider } from './src/components/FlyToCart';
 import HeaderPerfil from './src/components/HeaderPerfil';
 import { VitrinaHeaderLogo } from './src/components/Logo';
@@ -23,7 +24,6 @@ import { avisarCambioDesdePush } from './src/usePolling';
 import { useToast } from './src/Toast';
 import { RootStackParamList } from './src/navTypes';
 import HomeScreen from './src/screens/HomeScreen';
-import PerfilScreen from './src/screens/PerfilScreen';
 import MiInformacionScreen from './src/screens/MiInformacionScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
@@ -45,6 +45,7 @@ import CarritoScreen from './src/screens/CarritoScreen';
 import CheckoutScreen from './src/screens/CheckoutScreen';
 import MisPedidosScreen from './src/screens/MisPedidosScreen';
 import PedidoDetalleScreen from './src/screens/PedidoDetalleScreen';
+import MapaScreen from './src/screens/MapaScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -90,7 +91,8 @@ function Navegacion() {
 
   return (
     <FlyToCartProvider>
-      <View style={styles.raiz}>
+      {/* Se pone borrosa detrás del menú de "Mi perfil" (HeaderPerfil). */}
+      <AppDesenfocable style={styles.raiz}>
         <NavigationContainer
           ref={navigationRef}
           theme={temaNavegacion(c, modo === 'noche')}
@@ -145,16 +147,18 @@ function Navegacion() {
               component={HomeScreen}
               options={{ title: 'Vitrina', headerTitle: tituloVitrina }}
             />
-            <Stack.Screen
-              name="Perfil"
-              component={PerfilScreen}
-              options={{ title: 'Mi perfil', headerRight: () => null }}
-            />
+            {/* Mi información, Mis negocios y Privacidad se abren desde el menú
+                del ícono de usuario (HeaderPerfil), sin pantalla intermedia. */}
             <Stack.Screen
               name="MiInformacion"
               component={MiInformacionScreen}
               options={{ title: 'Mi información', headerRight: () => null }}
             />
+
+            {/* Mapa de negocios (cliente) y de domiciliarios en vivo (admin). */}
+            {(roles.includes('usuario') || roles.includes('administrador')) && (
+              <Stack.Screen name="Mapa" component={MapaScreen} options={{ title: 'Mapa' }} />
+            )}
 
             {/* Negocios: cualquier usuario puede crear los suyos o trabajar en
                 otros (el acceso lo decide la membresía, no un rol global). */}
@@ -197,7 +201,7 @@ function Navegacion() {
       </Stack.Navigator>
         </NavigationContainer>
         <BarraCliente ruta={ruta} />
-      </View>
+      </AppDesenfocable>
     </FlyToCartProvider>
   );
 }

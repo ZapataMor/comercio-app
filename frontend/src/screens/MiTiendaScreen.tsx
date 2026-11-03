@@ -13,13 +13,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { getReputacionNegocio, HorarioSemana, imagenUrl, Negocio, ReputacionDetalle } from '../api';
+import { Coordenadas, getReputacionNegocio, HorarioSemana, imagenUrl, Negocio, ReputacionDetalle } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import EditorHorario, { DIAS, errorHorario } from '../components/EditorHorario';
 import FieldError from '../components/FieldError';
 import { TarjetaReputacion } from '../components/Reputacion';
 import SelectorImagen from '../components/SelectorImagen';
+import SelectorUbicacion from '../components/SelectorUbicacion';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { useNegocio } from '../NegocioContext';
 import { RootStackParamList } from '../navTypes';
@@ -77,6 +78,8 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
   // true cuando el tipo no está en la lista y se escribe a mano ("Otro").
   const [categoriaOtra, setCategoriaOtra] = useState(false);
   const [direccion, setDireccion] = useState('');
+  // Pin en el mapa (null = el negocio no sale en el mapa).
+  const [ubicacion, setUbicacion] = useState<Coordenadas | null>(null);
   const [telefono, setTelefono] = useState('');
   const [activo, setActivo] = useState(true);
   // Tiempo promedio de preparación (minutos) que el negocio promete.
@@ -128,6 +131,7 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
     setCategoriaPersonalizada(personalizada);
     setCategoriaOtra(personalizada !== '');
     setDireccion(n?.direccion ?? '');
+    setUbicacion(n?.lat != null && n?.lng != null ? { lat: n.lat, lng: n.lng } : null);
     setTelefono(n?.telefono ?? '');
     setActivo(n?.activo ?? true);
     setTiempo(String(n?.tiempo_preparacion ?? 20));
@@ -171,6 +175,8 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
         categoria: categoriasFinales[0],
         categorias: categoriasFinales,
         direccion: direccion.trim() || null,
+        lat: ubicacion?.lat ?? null,
+        lng: ubicacion?.lng ?? null,
         telefono: telefono.trim() || null,
         activo,
         tiempo_preparacion: minutos,
@@ -224,6 +230,10 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
           />
           <Campo etiqueta="Descripción" valor={negocio.descripcion} />
           <Campo etiqueta="Dirección" valor={negocio.direccion} />
+          <Campo
+            etiqueta="Ubicación en el mapa"
+            valor={negocio.lat != null ? 'Fijada: los clientes ven tu negocio en el mapa' : null}
+          />
           <Campo etiqueta="Teléfono" valor={negocio.telefono} />
           <Campo
             etiqueta="Tiempo promedio de preparación"
@@ -383,6 +393,16 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
             editable={!guardando}
           />
           <FieldError mensaje={errores.direccion} />
+
+          <SelectorUbicacion
+            valor={ubicacion}
+            onCambiar={valor => {
+              setUbicacion(valor);
+              limpiarError('lat');
+            }}
+            disabled={guardando}
+          />
+          <FieldError mensaje={errores.lat ?? errores.lng} />
 
           <Text style={styles.label}>Teléfono</Text>
           <TextInput

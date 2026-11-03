@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Negocio;
 use App\Models\Producto;
+use App\Models\Pedido;
 use App\Models\User;
+use App\Support\UbicacionDomiciliario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -143,6 +145,29 @@ class AdminController extends Controller
         $usuario->syncRoles([$datos['rol']]);
 
         return response()->json(['message' => "Rol de {$usuario->nombre_completo} cambiado a {$datos['rol']}."]);
+    }
+
+    /**
+     * Domiciliarios en el mapa: los que reportaron su posición hace poco
+     * (en turno o con una entrega), y si en este momento llevan un pedido.
+     */
+    public function mapaDomiciliarios(): JsonResponse
+    {
+        $domiciliarios = User::role('domiciliario')
+            ->where('ubicacion_at', '>=', now()->subMinutes(UbicacionDomiciliario::VIGENCIA_MINUTOS))
+            ->withCount(['entregas as en_ruta' => fn ($q) => $q->whereIn('estado', Pedido::EN_RUTA)])
+            ->get()
+            ->map(fn (User $u) => [
+                'id' => $u->id,
+                'nombre' => $u->nombre_completo,
+                'en_turno' => (bool) $u->en_turno,
+                'en_entrega' => $u->en_ruta > 0,
+                'ubicacion' => UbicacionDomiciliario::de($u),
+            ])
+            ->filter(fn ($d) => $d['ubicacion'] !== null)
+            ->values();
+
+        return response()->json(['domiciliarios' => $domiciliarios]);
     }
 
     /** Todos los negocios (visión global): 30 por página y `?buscar=` por nombre. */

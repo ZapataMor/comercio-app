@@ -62,7 +62,7 @@ class NegocioController extends Controller
             // Tiempo promedio que promete para tener listo un pedido (minutos).
             'tiempo_preparacion' => ['sometimes', 'integer', 'min:5', 'max:180'],
             'imagen' => ['sometimes', 'image', 'max:4096'], // máx 4 MB
-        ] + HorarioNegocio::reglas());
+        ] + self::reglasUbicacion() + HorarioNegocio::reglas());
 
         if (array_key_exists('horario', $data)) {
             $data['horario'] = HorarioNegocio::normalizar($data['horario']);
@@ -138,7 +138,7 @@ class NegocioController extends Controller
             // Tiempo promedio que promete para tener listo un pedido (minutos).
             'tiempo_preparacion' => ['sometimes', 'integer', 'min:5', 'max:180'],
             'imagen' => ['sometimes', 'image', 'max:4096'],
-        ] + HorarioNegocio::reglas());
+        ] + self::reglasUbicacion() + HorarioNegocio::reglas());
 
         if (array_key_exists('horario', $data)) {
             $data['horario'] = HorarioNegocio::normalizar($data['horario']);
@@ -178,6 +178,19 @@ class NegocioController extends Controller
         if (is_string($horario)) {
             $request->merge(['horario' => $horario === '' ? null : json_decode($horario, true)]);
         }
+    }
+
+    /**
+     * Pin del negocio en el mapa: van juntos, y vacíos lo quitan del mapa.
+     *
+     * @return array<string, array<int, string>>
+     */
+    private static function reglasUbicacion(): array
+    {
+        return [
+            'lat' => ['nullable', 'required_with:lng', 'numeric', 'between:-90,90'],
+            'lng' => ['nullable', 'required_with:lat', 'numeric', 'between:-180,180'],
+        ];
     }
 
     /** Resource del negocio + el rol del usuario en él (para la app). */

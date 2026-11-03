@@ -19,12 +19,14 @@ import { useAuth } from '../AuthContext';
 import { navigationRef } from '../RootNavigation';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
+import { useCompartirUbicacion } from '../ubicacion';
 import { usePolling } from '../usePolling';
 import { FadeInView, PressableScale } from './anim';
 import BotonesContacto from './BotonesContacto';
 import { publicarMiReputacion } from './HeaderConfiabilidad';
-import { publicarTurno } from './HeaderTurno';
+import { publicarTurno, useTurno } from './HeaderTurno';
 import Icon, { IconName } from './Icon';
+import { abrirComoLlegar } from './Mapa';
 import MinutosRecogida from './MinutosRecogida';
 
 /** Lo que el Inicio le pide al panel: recargar al deslizar hacia abajo. */
@@ -62,6 +64,16 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
   const [tomando, setTomando] = useState(false);
   // Entrega cuyo estado estoy cambiando: su botón muestra que va en curso.
   const [avanzando, setAvanzando] = useState<number | null>(null);
+
+  // Mientras trabajo (en turno o con entregas) mi posición va al mapa del
+  // cliente, del negocio y del administrador. Solo con la app abierta.
+  const { enTurno } = useTurno();
+  useCompartirUbicacion(token, enTurno || entregas.length > 0, motivo =>
+    toast.error(
+      motivo === 'permiso' ? 'Activa tu ubicación' : 'Enciende el GPS',
+      'Así el cliente y el negocio te ven en el mapa mientras llevas el pedido.',
+    ),
+  );
 
   /** Disponibles y mis entregas en curso; de paso, mi nivel para la topbar. */
   const traer = useCallback(async () => {
@@ -192,6 +204,23 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
                       Entregar: {p.cliente?.name} — {p.direccion_entrega}
                     </Text>
                   </View>
+                  {/* Abre la ruta en Google Maps: al negocio antes de recoger, luego al cliente. */}
+                  <PressableScale
+                    style={styles.novedadLink}
+                    onPress={() =>
+                      abrirComoLlegar(
+                        p.estado !== 'tomado'
+                          ? `${p.direccion_entrega}, Maicao, La Guajira`
+                          : p.negocio?.lat != null && p.negocio?.lng != null
+                            ? { lat: p.negocio.lat, lng: p.negocio.lng }
+                            : `${p.negocio?.direccion ?? p.negocio?.nombre ?? ''}, Maicao, La Guajira`,
+                      )
+                    }>
+                    <Icon name="ubicacion" size={14} color={c.goldText} />
+                    <Text style={styles.novedadLinkTxt}>
+                      {p.estado === 'tomado' ? 'Cómo llegar al negocio' : 'Cómo llegar al cliente'}
+                    </Text>
+                  </PressableScale>
                   <View style={[styles.linea, styles.fila]}>
                     <Icon name="tarjeta" size={14} color={c.text} />
                     <Text style={styles.linea}>

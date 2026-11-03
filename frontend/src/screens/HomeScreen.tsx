@@ -417,7 +417,7 @@ export default function HomeScreen({ navigation }: Props) {
           />
         </View>
       )}
-      {/* "Cerrar sesión" vive solo en Mi perfil (botón de la topbar). */}
+      {/* "Cerrar sesión" vive solo en el menú de Mi perfil (ícono de la topbar). */}
     </ScrollView>
   );
 }

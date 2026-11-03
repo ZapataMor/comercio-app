@@ -55,5 +55,9 @@ class AppServiceProvider extends ServiceProvider
 
         // Lecturas públicas sin sesión (lista de barrios).
         RateLimiter::for('publico', fn (Request $r) => Limit::perMinute(60)->by('publico|'.$r->ip()));
+
+        // GPS del domiciliario: la app lo manda cada ~10 s; esto frena un
+        // celular que se quede enviando en bucle.
+        RateLimiter::for('ubicacion', fn (Request $r) => Limit::perMinute(20)->by('ubicacion|'.$r->user()?->id));
     }
 }

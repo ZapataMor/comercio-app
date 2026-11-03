@@ -24,9 +24,9 @@ import Icon from './Icon';
 const RUTAS_CLIENTE = new Set([
   'Home',
   'Explorar',
+  'Mapa',
   'Negocio',
   'PedidoDetalle',
-  'Perfil',
 ]);
 
 type Props = { ruta?: string };

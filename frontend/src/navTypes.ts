@@ -5,9 +5,8 @@ export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
   Home: undefined;
-  // Perfil PERSONAL del usuario logueado (cualquier rol).
-  Perfil: undefined;
-  // Datos personales de la cuenta: ver y modificar (se abre desde Mi perfil).
+  // Datos personales de la cuenta: ver y modificar, y eliminar la cuenta (se
+  // abre desde el menú del ícono de usuario de la topbar).
   MiInformacion: undefined;
   // Negocios (cualquier usuario puede tener o trabajar en varios).
   // Lista de mis negocios + invitaciones recibidas + crear otro.
@@ -24,6 +23,8 @@ export type RootStackParamList = {
   PedidosNegocio: undefined;
   // Cliente
   Explorar: undefined;
+  // Mapa de negocios; `admin` suma a los domiciliarios en vivo.
+  Mapa: { admin?: boolean } | undefined;
   // `productoId` opcional: al entrar desde una búsqueda de producto, el catálogo
   // resalta y hace scroll hasta ese producto.
   Negocio: { id: number; nombre: string; productoId?: number };

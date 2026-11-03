@@ -1,16 +1,18 @@
 /**
  * Mi información — datos PERSONALES de la cuenta (cualquier rol).
  *
- * Se abre desde "Mi perfil". Primero muestra la información en modo lectura
- * y, con "Editar información", pasa al formulario (datos, dirección y cambio
- * de contraseña opcional). Es la persona, no el negocio: los negocios se
- * administran en "Mis negocios".
+ * Se abre desde el menú de "Mi perfil" (ícono de usuario de la topbar).
+ * Primero muestra la información en modo lectura y, con "Editar información",
+ * pasa al formulario (datos, dirección y cambio de contraseña opcional). Es la
+ * persona, no el negocio: los negocios se administran en "Mis negocios".
+ * Al final de la vista de lectura está "Eliminar mi cuenta".
  */
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   Text,
@@ -18,7 +20,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { actualizarPerfil, Usuario } from '../api';
+import { actualizarPerfil, eliminarCuenta, Usuario } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import BarrioSelect from '../components/BarrioSelect';
@@ -35,7 +37,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'MiInformacion'>;
 export default function MiInformacionScreen(_props: Props) {
   const { c } = useTheme();
   const styles = useStyles();
-  const { auth, actualizarUsuario } = useAuth();
+  const { auth, actualizarUsuario, salir } = useAuth();
   const toast = useToast();
   const user = auth!.user;
   const { codigoPublico } = useNegocio();
@@ -58,6 +60,37 @@ export default function MiInformacionScreen(_props: Props) {
   const [errores, setErrores] = useState<FieldErrors>({});
 
   const cambiaPass = passActual.length > 0 || passNueva.length > 0 || passConfirma.length > 0;
+
+  // "Eliminar mi cuenta": se confirma escribiendo la contraseña.
+  const [eliminando, setEliminando] = useState(false);
+  const [clave, setClave] = useState('');
+  const [errorClave, setErrorClave] = useState<string | undefined>();
+  const [enviando, setEnviando] = useState(false);
+
+  function cerrarEliminar() {
+    if (enviando) return;
+    setEliminando(false);
+    setClave('');
+    setErrorClave(undefined);
+  }
+
+  async function confirmarEliminar() {
+    if (!clave) {
+      setErrorClave('Escribe tu contraseña para confirmar.');
+      return;
+    }
+    setEnviando(true);
+    try {
+      await eliminarCuenta(auth!.token, clave);
+      setEliminando(false);
+      toast.exito('Cuenta eliminada', 'Gracias por haber usado Vitrina.');
+      salir();
+    } catch (e) {
+      setErrorClave(messageFromError(e, 'No se pudo eliminar la cuenta.'));
+    } finally {
+      setEnviando(false);
+    }
+  }
 
   function limpiarError(campo: string) {
     setErrores(prev => {
@@ -199,7 +232,52 @@ export default function MiInformacionScreen(_props: Props) {
           <PressableScale style={styles.btn} onPress={empezarEdicion}>
             <Text style={styles.btnTxt}>Editar información</Text>
           </PressableScale>
+          <TouchableOpacity onPress={() => setEliminando(true)} hitSlop={8}>
+            <Text style={styles.eliminarTxt}>Eliminar mi cuenta</Text>
+          </TouchableOpacity>
         </FadeInView>
+
+        <Modal visible={eliminando} transparent animationType="fade" onRequestClose={cerrarEliminar}>
+          <KeyboardAvoidingView
+            style={styles.modalFondo}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View style={styles.modalCaja}>
+              <Text style={styles.modalTitulo}>Eliminar mi cuenta</Text>
+              <Text style={styles.modalTexto}>
+                Se borran tu nombre, correo, teléfono, direcciones y sesiones. Los pedidos ya hechos se
+                conservan sin tus datos. Si eres el único dueño de un negocio, se cierra y deja de verse.
+                No se puede deshacer.
+              </Text>
+              <TextInput
+                style={styles.inputModal}
+                value={clave}
+                onChangeText={v => {
+                  setClave(v);
+                  setErrorClave(undefined);
+                }}
+                secureTextEntry
+                placeholder="Tu contraseña"
+                placeholderTextColor={c.mutedSoft}
+                editable={!enviando}
+                autoFocus
+              />
+              <FieldError mensaje={errorClave} />
+              <TouchableOpacity
+                style={[styles.botonPeligro, enviando && styles.botonDeshabilitado]}
+                onPress={confirmarEliminar}
+                disabled={enviando}>
+                {enviando ? (
+                  <ActivityIndicator color={c.surface} />
+                ) : (
+                  <Text style={styles.botonPeligroTxt}>Eliminar definitivamente</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity onPress={cerrarEliminar} disabled={enviando}>
+                <Text style={styles.cancelar}>Cancelar</Text>
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
       </ScrollView>
     );
   }
@@ -423,4 +501,21 @@ const useStyles = makeStyles((c, shadow) => ({
   },
   btnTxt: { color: c.onAccent, fontFamily: font.bold, fontSize: 16 },
   cancelar: { textAlign: 'center', color: c.muted, fontFamily: font.semibold, marginTop: 14 },
+  // Eliminar mi cuenta
+  eliminarTxt: { textAlign: 'center', color: c.danger, fontFamily: font.semibold, fontSize: 13, marginTop: 22 },
+  modalFondo: { flex: 1, backgroundColor: c.scrim, justifyContent: 'center', padding: 24 },
+  modalCaja: { backgroundColor: c.surface, borderRadius: radius.xl, padding: 22, ...shadow.card },
+  modalTitulo: { fontSize: 18, fontFamily: font.display, color: c.textStrong, marginBottom: 8 },
+  modalTexto: { fontSize: 13, fontFamily: font.regular, color: c.text, lineHeight: 19, marginBottom: 14 },
+  inputModal: {
+    borderWidth: 1, borderColor: c.borderStrong, borderRadius: radius.md, paddingHorizontal: 14,
+    paddingVertical: 12, fontSize: 16, fontFamily: font.regular, color: c.textStrong, marginBottom: 6,
+  },
+  // El texto usa `surface` (claro de día, oscuro de noche) porque `danger`
+  // también cambia de tono por modo y así conserva el contraste.
+  botonPeligro: {
+    backgroundColor: c.danger, borderRadius: radius.md, paddingVertical: 14, alignItems: 'center', marginTop: 8,
+  },
+  botonDeshabilitado: { opacity: 0.7 },
+  botonPeligroTxt: { color: c.surface, fontFamily: font.bold, fontSize: 15 },
 }));

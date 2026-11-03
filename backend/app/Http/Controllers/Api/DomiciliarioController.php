@@ -7,6 +7,7 @@ use App\Models\Pedido;
 use App\Notifications\EstadoPedidoActualizado;
 use App\Support\Push;
 use App\Support\Reputacion;
+use App\Support\UbicacionDomiciliario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -51,7 +52,13 @@ class DomiciliarioController extends Controller
     {
         $datos = $request->validate(['en_turno' => ['required', 'boolean']]);
 
-        $request->user()->forceFill(['en_turno' => $datos['en_turno']])->save();
+        $yo = $request->user();
+        $yo->forceFill(['en_turno' => $datos['en_turno']])->save();
+
+        // Fuera de turno y sin entregas, nadie debe verlo en el mapa.
+        if (! UbicacionDomiciliario::debeCompartir($yo)) {
+            UbicacionDomiciliario::borrar($yo);
+        }
 
         return response()->json([
             'en_turno' => (bool) $datos['en_turno'],
@@ -96,6 +103,31 @@ class DomiciliarioController extends Controller
             'ultima_pagina' => $pagina->lastPage(),
             'total' => $pagina->total(),
         ]);
+    }
+
+    /**
+     * Mi posición actual (GPS del celular), cada pocos segundos. Solo se
+     * guarda en turno o con una entrega en curso; `compartir: false` le dice
+     * a la app que deje de enviarla.
+     */
+    public function ubicacion(Request $request): JsonResponse
+    {
+        $datos = $request->validate([
+            'lat' => ['required', 'numeric', 'between:-90,90'],
+            'lng' => ['required', 'numeric', 'between:-180,180'],
+        ]);
+
+        $yo = $request->user();
+
+        if (! UbicacionDomiciliario::debeCompartir($yo)) {
+            UbicacionDomiciliario::borrar($yo);
+
+            return response()->json(['compartir' => false]);
+        }
+
+        UbicacionDomiciliario::guardar($yo, (float) $datos['lat'], (float) $datos['lng']);
+
+        return response()->json(['compartir' => true]);
     }
 
     /** Mi nivel de confiabilidad y por qué (últimos eventos). */
@@ -245,6 +277,9 @@ class DomiciliarioController extends Controller
                 'nombre' => $p->negocio->nombre,
                 'direccion' => $p->negocio->direccion,
                 'telefono' => $p->negocio->telefono,
+                // Para abrir "Cómo llegar" en Google Maps.
+                'lat' => $p->negocio->lat,
+                'lng' => $p->negocio->lng,
             ] : null,
             'cliente' => $p->relationLoaded('cliente') && $p->cliente ? ['name' => $p->cliente->nombre_completo] : null,
             'items' => $p->items->map(fn ($i) => ['nombre' => $i->nombre, 'cantidad' => $i->cantidad]),

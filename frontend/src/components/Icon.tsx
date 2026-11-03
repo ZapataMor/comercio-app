@@ -34,7 +34,8 @@ export type IconName =
   | 'lupa'
   | 'reloj'
   | 'escudo'
-  | 'alerta';
+  | 'alerta'
+  | 'salir';
 
 const GLYPHS: Record<IconName, React.ReactNode> = {
   casa: (
@@ -196,6 +197,14 @@ const GLYPHS: Record<IconName, React.ReactNode> = {
       <Path d="M10.3 4.1 2.6 17.5a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 4.1a2 2 0 0 0-3.4 0z" />
       <Path d="M12 9.5v4" />
       <Path d="M12 17h.01" />
+    </>
+  ),
+  // Cerrar sesión: puerta con flecha hacia afuera.
+  salir: (
+    <>
+      <Path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <Path d="M16 17l5-5-5-5" />
+      <Path d="M21 12H9" />
     </>
   ),
 };
