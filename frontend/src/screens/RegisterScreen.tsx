@@ -26,9 +26,9 @@ import { font, makeStyles, radius, useTheme } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 
-// Modelo unificado: no se elige rol al registrarse. Toda cuenta nace como
-// cliente y luego puede crear sus negocios (o unirse a otros) desde
-// "Mis negocios". 'administrador' y 'domiciliario' los asigna un admin.
+// No se elige tipo al registrarse: toda cuenta nace como Cliente. Luego
+// puede crear sus negocios (o unirse a otros) desde "Mis negocios" y hacerse
+// domiciliario desde el menú del ícono de usuario.
 
 export default function RegisterScreen({ navigation }: Props) {
   const { c } = useTheme();

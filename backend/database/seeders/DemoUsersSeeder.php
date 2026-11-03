@@ -20,6 +20,7 @@ class DemoUsersSeeder extends Seeder
             ['administrador', 'Admin Demo', 'admin@demo.co'],
             // Cliente que además administra "El Rincón Paisa" (ver CatalogoDemoSeeder).
             ['usuario', 'Comerciante Demo', 'comerciante@demo.co'],
+            // Cliente que además reparte.
             ['domiciliario', 'Domiciliario Demo', 'domiciliario@demo.co'],
             ['usuario', 'Cliente Demo', 'cliente@demo.co'],
         ];
@@ -31,7 +32,7 @@ class DemoUsersSeeder extends Seeder
                 ['name' => $nombre, 'password' => 'password123'], // se hashea solo (cast 'hashed')
             );
 
-            $user->syncRoles([$rol]);
+            $user->syncRoles(User::rolesDelTipo($rol));
         }
     }
 }

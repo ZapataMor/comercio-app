@@ -197,11 +197,13 @@ class ComercioPedidoController extends Controller
         }
 
         // Avisa a los domiciliarios habilitados que hay un pedido para tomar.
-        // Solo a los que están en turno (y no vetados).
+        // Solo a los que están en turno (y no vetados), y no al cliente del
+        // pedido si también es domiciliario.
         $domiciliarios = User::role('domiciliario')
             ->whereNull('domiciliario_vetado_at')
             ->whereNull('suspendido_at')
             ->where('en_turno', true)
+            ->whereKeyNot($pedido->user_id)
             ->get();
         Push::enviar($domiciliarios, new PedidoDisponibleParaDomiciliario($pedido));
 

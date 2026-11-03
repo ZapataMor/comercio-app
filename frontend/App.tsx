@@ -119,8 +119,9 @@ function Navegacion() {
           </>
         ) : (
           <>
-            {/* El cliente entra directo a Explorar (su "Home" es la lista de
-                negocios). El menú Home solo existe para los demás roles. */}
+            {/* Pantallas del cliente: toda cuenta nueva lo es, y el
+                domiciliario también. Arranca en Explorar (la lista de
+                negocios), salvo el domiciliario, que arranca en Home. */}
             {roles.includes('usuario') && (
               <>
                 <Stack.Screen
@@ -140,8 +141,9 @@ function Navegacion() {
               </>
             )}
 
-            {/* Home: menú de los demás roles y panel del negocio activo. El
-                cliente llega aquí desde "Mis negocios" si tiene alguno. */}
+            {/* Home: menú de los demás roles, panel del negocio activo y
+                entregas del domiciliario. El cliente llega aquí desde "Mis
+                negocios" o "Mis entregas" (menú del ícono de usuario). */}
             <Stack.Screen
               name="Home"
               component={HomeScreen}

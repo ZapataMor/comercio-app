@@ -6,10 +6,11 @@ export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 /**
  * Pantalla con la que arranca cada quien: el cliente en Explorar y los demás
- * en el Inicio (el domiciliario ve ahí mismo sus entregas, bajo el saludo).
+ * en el Inicio. El domiciliario (que también es cliente) arranca en el
+ * Inicio porque ahí, bajo el saludo, van sus entregas.
  */
 export function rutaInicio(roles: string[]): 'Explorar' | 'Home' {
-  return roles.includes('usuario') ? 'Explorar' : 'Home';
+  return roles.includes('usuario') && !roles.includes('domiciliario') ? 'Explorar' : 'Home';
 }
 
 type PushData = {

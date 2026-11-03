@@ -21,6 +21,20 @@ export type Usuario = {
   en_turno?: boolean;
 };
 
+/**
+ * Nombre para mostrar de cada tipo de cuenta. Toda cuenta nueva es Cliente
+ * (rol 'usuario'); el domiciliario es un cliente que además reparte.
+ */
+const TIPOS_CUENTA: Record<string, string> = {
+  administrador: 'Administrador',
+  usuario: 'Cliente',
+  domiciliario: 'Domiciliario',
+};
+
+export function nombreTipoCuenta(rol: string): string {
+  return TIPOS_CUENTA[rol] ?? rol;
+}
+
 /** Una página de una lista paginada del backend. */
 /** `total`: cuántos hay en todas las páginas (solo en las listas que lo envían). */
 export type Pagina<T> = { items: T[]; pagina: number; ultima_pagina: number; total?: number };
@@ -449,6 +463,15 @@ export async function actualizarPerfil(token: string, body: PerfilInput): Promis
     ...(body.password ? { password_confirmation: body.password } : {}),
   });
   return d.user as Usuario;
+}
+
+/**
+ * El cliente se vuelve domiciliario (sigue siendo cliente). Falla con 422 si
+ * su cuenta no tiene teléfono.
+ */
+export async function hacerseDomiciliario(token: string): Promise<{ message: string; user: Usuario }> {
+  const d = await authSend('POST', '/api/perfil/domiciliario', token);
+  return { message: d.message as string, user: d.user as Usuario };
 }
 
 /**

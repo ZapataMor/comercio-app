@@ -2,7 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Animated, Easing, RefreshControl, ScrollView, Text, View } from 'react-native';
-import { ComercioPedido, getPedidosComercio } from '../api';
+import { ComercioPedido, getPedidosComercio, nombreTipoCuenta } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import BotonMantener from '../components/BotonMantener';
@@ -233,7 +233,7 @@ export default function HomeScreen({ navigation }: Props) {
         <Text style={styles.saludo}>¡Hola, {user.name}!</Text>
         <View style={styles.rolesRow}>
           {user.roles.map(r => (
-            <Text key={r} style={styles.rol}>{r}</Text>
+            <Text key={r} style={styles.rol}>{nombreTipoCuenta(r)}</Text>
           ))}
         </View>
       </FadeInView>

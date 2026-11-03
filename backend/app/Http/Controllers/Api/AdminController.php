@@ -18,6 +18,7 @@ use Illuminate\Validation\Rule;
  */
 class AdminController extends Controller
 {
+    /** Tipos de cuenta (ver User::TIPOS): el domiciliario también es cliente. */
     private const ROLES = ['administrador', 'usuario', 'domiciliario'];
 
     /** Números generales para el tablero. */
@@ -47,11 +48,11 @@ class AdminController extends Controller
 
         $conteos = [];
         foreach (self::ROLES as $r) {
-            $conteos[$r] = User::role($r)->count();
+            $conteos[$r] = User::deTipo($r)->count();
         }
 
         $buscar = trim((string) $request->get('buscar', ''));
-        $pagina = User::role($rol)
+        $pagina = User::deTipo($rol)
             ->when($buscar !== '', fn ($q) => $q->where(fn ($qq) => $qq
                 ->where('name', 'like', "%{$buscar}%")
                 ->orWhere('apellidos', 'like', "%{$buscar}%")
@@ -63,7 +64,7 @@ class AdminController extends Controller
             'id' => $u->id,
             'name' => $u->nombre_completo,
             'email' => $u->email,
-            'rol' => $u->getRoleNames()->first(),
+            'rol' => $u->tipoCuenta(),
             'suspendido' => $u->suspendido_at !== null,
             'motivo_suspension' => $u->motivo_suspension,
         ])->values();
@@ -123,14 +124,14 @@ class AdminController extends Controller
             'email' => $datos['email'],
             'password' => $datos['password'],
         ]);
-        $user->assignRole($datos['rol']);
+        $user->syncRoles(User::rolesDelTipo($datos['rol']));
 
         return response()->json([
             'usuario' => ['id' => $user->id, 'name' => $user->nombre_completo, 'email' => $user->email, 'rol' => $datos['rol']],
         ], 201);
     }
 
-    /** Cambiar el rol de un usuario. */
+    /** Cambiar el tipo de cuenta de un usuario (domiciliario = cliente que reparte). */
     public function updateRol(Request $request, User $usuario): JsonResponse
     {
         $datos = $request->validate([
@@ -142,9 +143,10 @@ class AdminController extends Controller
             return response()->json(['message' => 'No puedes quitarte tu propio rol de administrador.'], 422);
         }
 
-        $usuario->syncRoles([$datos['rol']]);
+        $usuario->syncRoles(User::rolesDelTipo($datos['rol']));
+        $tipo = User::TIPOS[$datos['rol']];
 
-        return response()->json(['message' => "Rol de {$usuario->nombre_completo} cambiado a {$datos['rol']}."]);
+        return response()->json(['message' => "{$usuario->nombre_completo} ahora es {$tipo}."]);
     }
 
     /**

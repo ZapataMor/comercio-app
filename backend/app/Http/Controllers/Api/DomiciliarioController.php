@@ -34,6 +34,8 @@ class DomiciliarioController extends Controller
 
         $pedidos = Pedido::where('estado', 'listo')
             ->whereNull('domiciliario_id')
+            // También es cliente: su propio pedido no lo reparte él.
+            ->where('user_id', '!=', $yo->id)
             ->with(['negocio', 'items'])
             ->latest()
             ->get();
@@ -158,6 +160,7 @@ class DomiciliarioController extends Controller
         $afectados = Pedido::where('id', $id)
             ->where('estado', 'listo')
             ->whereNull('domiciliario_id')
+            ->where('user_id', '!=', $request->user()->id)
             ->update([
                 'estado' => 'tomado',
                 'domiciliario_id' => $request->user()->id,

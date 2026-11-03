@@ -42,6 +42,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Perfil personal del usuario logueado (cualquier rol).
     Route::put('/perfil', [AuthController::class, 'actualizarPerfil']);
+    // Un cliente se vuelve domiciliario (sigue siendo cliente).
+    Route::post('/perfil/domiciliario', [AuthController::class, 'hacerseDomiciliario']);
     // Eliminar mi cuenta (anonimiza; exige la contraseña).
     Route::delete('/cuenta', [\App\Http\Controllers\Api\CuentaController::class, 'destroy']);
 

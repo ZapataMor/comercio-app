@@ -45,13 +45,14 @@ class AdminController extends Controller
         // Conteo por tipo (para las pestañas).
         $conteos = [];
         foreach ($roles as $rol) {
-            $conteos[$rol] = User::role($rol)->count();
+            $conteos[$rol] = User::deTipo($rol)->count();
         }
 
         // Solo los usuarios del tipo seleccionado.
-        $usuarios = User::role($rolActual)->orderBy('name')->get();
+        $usuarios = User::deTipo($rolActual)->orderBy('name')->get();
+        $tipos = User::TIPOS;
 
-        return view('admin.usuarios', compact('usuarios', 'roles', 'rolActual', 'conteos'));
+        return view('admin.usuarios', compact('usuarios', 'roles', 'rolActual', 'conteos', 'tipos'));
     }
 
     /** Crear un nuevo usuario con un rol asignado. */
@@ -70,12 +71,12 @@ class AdminController extends Controller
             'password' => $datos['password'], // se hashea solo (cast 'hashed')
         ]);
 
-        $user->assignRole($datos['rol']);
+        $user->syncRoles(User::rolesDelTipo($datos['rol']));
 
         // Vuelve a la pestaña del tipo recién creado.
         return redirect()
             ->route('admin.usuarios', ['rol' => $datos['rol']])
-            ->with('ok', "Usuario {$user->name} creado como {$datos['rol']}.");
+            ->with('ok', "Usuario {$user->name} creado como ".User::TIPOS[$datos['rol']].'.');
     }
 
     /** Cambiar el rol de un usuario. */
@@ -91,9 +92,9 @@ class AdminController extends Controller
             return back()->with('error', 'No puedes quitarte tu propio rol de administrador.');
         }
 
-        $usuario->syncRoles([$datos['rol']]);
+        $usuario->syncRoles(User::rolesDelTipo($datos['rol']));
 
-        return back()->with('ok', "Rol de {$usuario->name} cambiado a {$datos['rol']}.");
+        return back()->with('ok', "{$usuario->name} ahora es ".User::TIPOS[$datos['rol']].'.');
     }
 
     /** Vista global de todos los negocios. */

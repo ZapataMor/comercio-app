@@ -8,7 +8,15 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { AdminUsuario, cambiarRol, crearUsuario, getAdminUsuarios, reactivarUsuario, suspenderUsuario } from '../api';
+import {
+  AdminUsuario,
+  cambiarRol,
+  crearUsuario,
+  getAdminUsuarios,
+  nombreTipoCuenta,
+  reactivarUsuario,
+  suspenderUsuario,
+} from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import FieldError from '../components/FieldError';
@@ -217,7 +225,7 @@ export default function AdminUsuariosScreen() {
                   limpiarError('rol');
                 }}
                   style={[styles.chip, formRol === r && styles.chipOn]}>
-                  <Text style={[styles.chipTxt, formRol === r && styles.chipTxtOn]}>{r}</Text>
+                  <Text style={[styles.chipTxt, formRol === r && styles.chipTxtOn]}>{nombreTipoCuenta(r)}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -241,7 +249,7 @@ export default function AdminUsuariosScreen() {
           <TouchableOpacity onPress={() => cargar(item, 'carga', buscar)}
             style={[styles.tab, item === rolActual && styles.tabOn]}>
             <Text style={[styles.tabTxt, item === rolActual && styles.tabTxtOn]}>
-              {item} {conteos[item] ?? 0}
+              {nombreTipoCuenta(item)} {conteos[item] ?? 0}
             </Text>
           </TouchableOpacity>
         )}
@@ -294,7 +302,7 @@ export default function AdminUsuariosScreen() {
                   {roles.map(r => (
                     <TouchableOpacity key={r} onPress={() => onCambiarRol(item, r)}
                       style={[styles.chip, item.rol === r && styles.chipOn]}>
-                      <Text style={[styles.chipTxt, item.rol === r && styles.chipTxtOn]}>{r}</Text>
+                      <Text style={[styles.chipTxt, item.rol === r && styles.chipTxtOn]}>{nombreTipoCuenta(r)}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>

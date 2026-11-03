@@ -17,10 +17,10 @@ class AuthController extends Controller
     /**
      * Registro de un nuevo usuario. Devuelve un token Sanctum.
      *
-     * Modelo UNIFICADO: ya no se elige "cliente" o "comerciante" al crear la
-     * cuenta. Toda persona es cliente por defecto y puede crear sus negocios
-     * después, desde "Mis negocios". Los roles 'administrador' y
-     * 'domiciliario' los asigna un admin manualmente.
+     * Toda cuenta nueva es de tipo Cliente (rol 'usuario'). Desde ahí la
+     * persona puede crear sus negocios ("Mis negocios") y hacerse
+     * domiciliaria (hacerseDomiciliario). El rol 'administrador' lo asigna
+     * otro admin.
      */
     public function register(Request $request): JsonResponse
     {
@@ -180,6 +180,33 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'Perfil actualizado.',
             'user' => $this->userPayload($user),
+        ]);
+    }
+
+    /**
+     * Un cliente se vuelve domiciliario: sigue siendo cliente y además puede
+     * entrar en turno y tomar pedidos. Necesita un teléfono, porque el
+     * cliente y el negocio lo ven para llamarlo durante la entrega.
+     */
+    public function hacerseDomiciliario(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (! $user->hasRole('usuario')) {
+            return response()->json(['message' => 'Solo una cuenta de cliente puede hacerse domiciliaria.'], 403);
+        }
+
+        if (blank($user->telefono)) {
+            return response()->json([
+                'message' => 'Agrega tu teléfono en Mi información: el cliente y el negocio lo usan para llamarte.',
+            ], 422);
+        }
+
+        $user->assignRole('domiciliario');
+
+        return response()->json([
+            'message' => 'Ya eres domiciliario. Entra en turno para recibir pedidos.',
+            'user' => $this->userPayload($user->fresh()),
         ]);
     }
 

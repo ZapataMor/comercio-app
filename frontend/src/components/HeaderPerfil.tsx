@@ -3,13 +3,16 @@
  * TODOS los roles. Solo muestra el ícono de la persona; al tocarlo despliega
  * justo debajo el menú de la cuenta PERSONAL (la persona, no el negocio), sin
  * cambiar de pantalla: recuadros pequeños con "Mi información", "Mis
- * negocios" y "Privacidad", y al final "Cerrar sesión".
+ * negocios" y "Privacidad", y al final "Cerrar sesión". El domiciliario
+ * tiene además "Mis entregas", y al cliente que aún no lo es se le ofrece
+ * "Ser domiciliario" en un recuadro destacado.
  *
  * Al domiciliario se le muestran al lado su nivel de confiabilidad
  * (HeaderConfiabilidad) y su turno (HeaderTurno).
  */
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   Easing,
   Linking,
@@ -20,24 +23,51 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { ApiError, hacerseDomiciliario } from '../api';
 import { useAuth } from '../AuthContext';
 import { WEB_URL } from '../config';
+import { messageFromError } from '../formErrors';
 import { navigationRef } from '../RootNavigation';
 import { font, makeStyles, radius, useTheme } from '../theme';
+import { useToast } from '../Toast';
 import { PressableScale } from './anim';
 import { desenfocarApp } from './Desenfoque';
 import HeaderConfiabilidad from './HeaderConfiabilidad';
 import HeaderTurno from './HeaderTurno';
 import Icon, { IconName } from './Icon';
 
-type Modulo = { titulo: string; icono: IconName; abrir: () => void };
+type Modulo = {
+  titulo: string;
+  icono: IconName;
+  abrir: () => void;
+  /** Línea pequeña bajo el título (solo en el recuadro destacado). */
+  detalle?: string;
+  destacado?: boolean;
+};
 
-const MODULOS: Modulo[] = [
-  { titulo: 'Mi información', icono: 'usuario', abrir: () => navigationRef.navigate('MiInformacion') },
-  { titulo: 'Mis negocios', icono: 'tienda', abrir: () => navigationRef.navigate('MisNegocios') },
+/** Módulos del menú según la cuenta. */
+function modulosPara(roles: string[], serDomiciliario: () => void): Modulo[] {
+  const modulos: Modulo[] = [
+    { titulo: 'Mi información', icono: 'usuario', abrir: () => navigationRef.navigate('MiInformacion') },
+    { titulo: 'Mis negocios', icono: 'tienda', abrir: () => navigationRef.navigate('MisNegocios') },
+  ];
+  if (roles.includes('domiciliario')) {
+    // Sus entregas van en el Inicio, bajo el saludo.
+    modulos.push({ titulo: 'Mis entregas', icono: 'moto', abrir: () => navigationRef.navigate('Home') });
+  }
   // Política de privacidad: página pública del servidor.
-  { titulo: 'Privacidad', icono: 'escudo', abrir: () => Linking.openURL(`${WEB_URL}/privacidad`) },
-];
+  modulos.push({ titulo: 'Privacidad', icono: 'escudo', abrir: () => Linking.openURL(`${WEB_URL}/privacidad`) });
+  if (roles.includes('usuario') && !roles.includes('domiciliario')) {
+    modulos.push({
+      titulo: 'Ser domiciliario',
+      detalle: 'Lleva pedidos de los negocios a los clientes',
+      icono: 'moto',
+      abrir: serDomiciliario,
+      destacado: true,
+    });
+  }
+  return modulos;
+}
 
 /** Posición del botón en la ventana: el menú se ancla debajo de él. */
 type Ancla = { x: number; y: number; w: number; h: number };
@@ -50,6 +80,8 @@ export default function HeaderPerfil() {
   const { width } = useWindowDimensions();
   const boton = useRef<View>(null);
   const [ancla, setAncla] = useState<Ancla | null>(null);
+  const { auth, actualizarUsuario } = useAuth();
+  const toast = useToast();
 
   function abrir() {
     const nodo = boton.current;
@@ -62,6 +94,37 @@ export default function HeaderPerfil() {
     nodo.measureInWindow((x, y, w, h) =>
       setAncla(Number.isFinite(x) && Number.isFinite(y) && w > 0 ? { x, y, w, h } : respaldo),
     );
+  }
+
+  /** "Ser domiciliario": se confirma y, ya activo, lleva al Inicio, donde van las entregas. */
+  function serDomiciliario() {
+    Alert.alert(
+      '¿Quieres ser domiciliario?',
+      'Sigues siendo cliente y además podrás llevar pedidos de los negocios a los clientes. ' +
+        'Para recibir avisos de pedidos, entra en turno manteniendo presionada la moto de arriba.',
+      [
+        { text: 'Ahora no', style: 'cancel' },
+        { text: 'Quiero serlo', onPress: activarDomiciliario },
+      ],
+    );
+  }
+
+  async function activarDomiciliario() {
+    if (!auth) return;
+    try {
+      const r = await hacerseDomiciliario(auth.token);
+      actualizarUsuario(r.user);
+      toast.exito('¡Ya eres domiciliario!', 'Mantén presionada la moto para entrar en turno.');
+      if (navigationRef.isReady()) navigationRef.navigate('Home');
+    } catch (e) {
+      // Sin teléfono no se activa: lo lleva a donde lo agrega.
+      if (e instanceof ApiError && e.status === 422) {
+        toast.info('Falta tu teléfono', 'Agrégalo aquí y vuelve a intentarlo.');
+        if (navigationRef.isReady()) navigationRef.navigate('MiInformacion');
+        return;
+      }
+      toast.error('No se pudo activar', messageFromError(e, 'Error'));
+    }
   }
 
   return (
@@ -81,7 +144,9 @@ export default function HeaderPerfil() {
           <Icon name="usuario" size={18} color={c.onHeader} strokeWidth={2} />
         </PressableScale>
       </View>
-      {ancla && <MenuPerfil ancla={ancla} onCerrado={() => setAncla(null)} />}
+      {ancla && (
+        <MenuPerfil ancla={ancla} onSerDomiciliario={serDomiciliario} onCerrado={() => setAncla(null)} />
+      )}
     </View>
   );
 }
@@ -89,22 +154,33 @@ export default function HeaderPerfil() {
 /**
  * Menú desplegable anclado bajo el botón. La caja entra suave (fundido +
  * escala desde la esquina del ícono) y se despliega hacia abajo mientras sus
- * renglones caen en cascada, uno tras otro; detrás, la app se pone borrosa.
- * Se recoge con la misma animación al revés (tocar fuera, "atrás" o elegir
- * un módulo, que se abre cuando el menú termina de recogerse).
+ * renglones caen en cascada, uno tras otro; detrás, la app se pone borrosa
+ * menos el botón, que queda nítido. Se recoge con la misma animación al revés
+ * (tocar fuera, el botón, "atrás" o elegir un módulo, que se abre cuando el
+ * menú termina de recogerse).
  */
-function MenuPerfil({ ancla, onCerrado }: { ancla: Ancla; onCerrado: () => void }) {
+function MenuPerfil({
+  ancla,
+  onSerDomiciliario,
+  onCerrado,
+}: {
+  ancla: Ancla;
+  onSerDomiciliario: () => void;
+  onCerrado: () => void;
+}) {
   const { c } = useTheme();
   const styles = useStyles();
   const { width } = useWindowDimensions();
   const { auth, salir } = useAuth();
   const user = auth?.user;
+  // Fijos mientras el menú está abierto: cada renglón tiene su valor de cascada.
+  const [modulos] = useState(() => modulosPara(user?.roles ?? [], onSerDomiciliario));
   const a = useRef(new Animated.Value(0)).current;
   // Alto real de la lista (medido) y cuánto lleva desplegada la caja.
   const [alto, setAlto] = useState(0);
   const despliegue = useRef(new Animated.Value(0)).current;
   // Un valor por renglón (cabecera, módulos y "Cerrar sesión") para la cascada.
-  const filas = useRef(Array.from({ length: MODULOS.length + 2 }, () => new Animated.Value(0))).current;
+  const filas = useRef(Array.from({ length: modulos.length + 2 }, () => new Animated.Value(0))).current;
   const empezado = useRef(false);
   const cerrando = useRef(false);
 
@@ -190,6 +266,20 @@ function MenuPerfil({ ancla, onCerrado }: { ancla: Ancla; onCerrado: () => void 
     <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={() => cerrar()}>
       {/* Tocar fuera del menú lo cierra (el fondo no se oscurece: se desenfoca). */}
       <Pressable style={StyleSheet.absoluteFill} onPress={() => cerrar()} accessibilityLabel="Cerrar menú" />
+      {/* El desenfoque alcanza toda la app, botón incluido: encima va una
+          copia nítida en el mismo sitio, sobre un círculo del color de la
+          topbar que tapa al original (su fondo es translúcido). */}
+      <View style={[styles.botonNitido, { left: ancla.x, top: ancla.y, width: ancla.w, height: ancla.h }]}>
+        <PressableScale
+          style={styles.boton}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Mi perfil"
+          accessibilityState={{ expanded: true }}
+          onPress={() => cerrar()}>
+          <Icon name="usuario" size={18} color={c.onHeader} strokeWidth={2} />
+        </PressableScale>
+      </View>
       <Animated.View
         style={[
           styles.menu,
@@ -233,21 +323,25 @@ function MenuPerfil({ ancla, onCerrado }: { ancla: Ancla; onCerrado: () => void 
                 </Cascada>
               )}
     
-              {MODULOS.map((m, i) => (
+              {modulos.map((m, i) => (
                 <Cascada key={m.titulo} v={filas[i + 1]}>
                   <PressableScale
-                    style={styles.modulo}
+                    style={[styles.modulo, m.destacado && styles.destacado]}
                     accessibilityRole="button"
+                    accessibilityHint={m.detalle}
                     onPress={() => elegir(m.abrir)}>
-                    <View style={styles.moduloIcono}>
-                      <Icon name={m.icono} size={18} color={c.accent} strokeWidth={2} />
+                    <View style={[styles.moduloIcono, m.destacado && styles.destacadoIcono]}>
+                      <Icon name={m.icono} size={18} color={m.destacado ? c.onAccent : c.accent} strokeWidth={2} />
                     </View>
-                    <Text style={styles.moduloTxt}>{m.titulo}</Text>
+                    <View style={styles.moduloTexto}>
+                      <Text style={styles.moduloTxt}>{m.titulo}</Text>
+                      {!!m.detalle && <Text style={styles.moduloDetalle}>{m.detalle}</Text>}
+                    </View>
                   </PressableScale>
                 </Cascada>
               ))}
-    
-              <Cascada v={filas[MODULOS.length + 1]}>
+
+              <Cascada v={filas[modulos.length + 1]}>
                 <PressableScale
                   style={[styles.modulo, styles.salir]}
                   accessibilityRole="button"
@@ -282,6 +376,7 @@ const useStyles = makeStyles((c, shadow) => ({
     borderRadius: radius.pill,
     backgroundColor: 'rgba(255,255,255,0.14)',
   },
+  botonNitido: { position: 'absolute', borderRadius: radius.pill, backgroundColor: c.header },
   // Menú desplegable
   // Crece desde la esquina del ícono.
   menu: { position: 'absolute', transformOrigin: 'top right' },
@@ -310,7 +405,12 @@ const useStyles = makeStyles((c, shadow) => ({
     width: 30, height: 30, borderRadius: radius.sm, backgroundColor: c.accentSoft,
     alignItems: 'center', justifyContent: 'center',
   },
-  moduloTxt: { flex: 1, fontSize: 14, fontFamily: font.semibold, color: c.textStrong },
+  moduloTexto: { flex: 1 },
+  moduloTxt: { fontSize: 14, fontFamily: font.semibold, color: c.textStrong },
+  moduloDetalle: { fontSize: 11.5, lineHeight: 15, fontFamily: font.regular, color: c.muted, marginTop: 1 },
+  // "Ser domiciliario": invita a repartir, en el color de la marca.
+  destacado: { backgroundColor: c.accentSoft, borderColor: c.accent, marginTop: 4 },
+  destacadoIcono: { backgroundColor: c.accent },
   // "Cerrar sesión" cierra la lista, en rojo.
   salir: { backgroundColor: c.dangerSoft, borderColor: c.dangerSoft, marginTop: 4 },
   salirIcono: { backgroundColor: c.surface },

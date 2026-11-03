@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -123,6 +124,44 @@ class User extends Authenticatable
     public function clienteDirecciones(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(ClienteDireccion::class);
+    }
+
+    /**
+     * Tipos de cuenta y su nombre para mostrar. Toda cuenta nueva es Cliente
+     * (rol 'usuario'); el Domiciliario es un cliente que además reparte, así
+     * que lleva los dos roles. Ser comerciante no es un tipo: lo da tener un
+     * negocio (membresía).
+     */
+    public const TIPOS = [
+        'administrador' => 'Administrador',
+        'usuario' => 'Cliente',
+        'domiciliario' => 'Domiciliario',
+    ];
+
+    /** Roles que lleva cada tipo de cuenta. */
+    public static function rolesDelTipo(string $tipo): array
+    {
+        return $tipo === 'domiciliario' ? ['usuario', 'domiciliario'] : [$tipo];
+    }
+
+    /** Tipo principal de la cuenta: administrador > domiciliario > cliente. */
+    public function tipoCuenta(): ?string
+    {
+        foreach (['administrador', 'domiciliario', 'usuario'] as $tipo) {
+            if ($this->hasRole($tipo)) {
+                return $tipo;
+            }
+        }
+
+        return null;
+    }
+
+    /** Usuarios de un tipo: los clientes son los que no reparten. */
+    public function scopeDeTipo(Builder $query, string $tipo): Builder
+    {
+        return $tipo === 'usuario'
+            ? $query->role('usuario')->withoutRole('domiciliario')
+            : $query->role($tipo);
     }
 
     /** ¿Vetado como domiciliario por baja reputación? No puede tomar pedidos. */

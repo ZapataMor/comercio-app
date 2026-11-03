@@ -29,7 +29,7 @@
                        class="rounded-lg border border-slate-300 px-3 py-2">
                 <select name="rol" class="rounded-lg border border-slate-300 px-3 py-2">
                     @foreach ($roles as $rol)
-                        <option value="{{ $rol }}" @selected(old('rol', $rolActual) === $rol)>{{ ucfirst($rol) }}</option>
+                        <option value="{{ $rol }}" @selected(old('rol', $rolActual) === $rol)>{{ $tipos[$rol] }}</option>
                     @endforeach
                 </select>
             </div>
@@ -45,7 +45,7 @@
     @foreach ($roles as $rol)
         <a href="{{ route('admin.usuarios', ['rol' => $rol]) }}"
            class="px-3 py-1.5 rounded-lg text-sm {{ $rol === $rolActual ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50' }}">
-            {{ ucfirst($rol) }}
+            {{ $tipos[$rol] }}
             <span class="ml-1 text-xs {{ $rol === $rolActual ? 'text-indigo-100' : 'text-slate-400' }}">{{ $conteos[$rol] }}</span>
         </a>
     @endforeach
@@ -64,14 +64,14 @@
                 @method('PUT')
                 <select name="rol" class="rounded-lg border border-slate-300 px-2 py-1.5 text-sm">
                     @foreach ($roles as $rol)
-                        <option value="{{ $rol }}" @selected($u->hasRole($rol))>{{ ucfirst($rol) }}</option>
+                        <option value="{{ $rol }}" @selected($u->tipoCuenta() === $rol)>{{ $tipos[$rol] }}</option>
                     @endforeach
                 </select>
                 <button class="text-sm bg-slate-800 hover:bg-slate-900 text-white rounded-lg px-3 py-1.5">Guardar</button>
             </form>
         </div>
     @empty
-        <p class="text-slate-400 text-sm p-4">No hay usuarios de tipo «{{ ucfirst($rolActual) }}».</p>
+        <p class="text-slate-400 text-sm p-4">No hay usuarios de tipo «{{ $tipos[$rolActual] }}».</p>
     @endforelse
 </div>
 
