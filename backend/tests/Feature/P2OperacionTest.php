@@ -2,6 +2,7 @@
 
 use App\Models\Negocio;
 use App\Models\User;
+use App\Support\Festivos;
 use App\Support\HorarioNegocio;
 use Illuminate\Support\Carbon;
 use Laravel\Sanctum\Sanctum;
@@ -38,7 +39,7 @@ function horarioSemana(): array
 
 test('el horario dice si debe estar abierto, incluso pasando la medianoche', function () {
     $semana = horarioSemana();
-    $lunes = Carbon::parse('2026-11-02 10:00'); // lunes
+    $lunes = Carbon::parse('2026-11-09 10:00'); // lunes (no festivo)
 
     expect(HorarioNegocio::deberiaEstarAbierto($semana, $lunes))->toBeTrue()
         ->and(HorarioNegocio::deberiaEstarAbierto($semana, $lunes->copy()->setTime(21, 0)))->toBeFalse()
@@ -55,11 +56,11 @@ test('la tarea abre y cierra el negocio a sus horas', function () {
         'nombre' => 'Panadería', 'activo' => false, 'horario' => horarioSemana(),
     ]);
 
-    $this->travelTo(Carbon::parse('2026-11-02 07:01'));
+    $this->travelTo(Carbon::parse('2026-11-09 07:01'));
     $this->artisan('negocios:aplicar-horario')->assertSuccessful();
     expect($negocio->fresh()->activo)->toBeTrue();
 
-    $this->travelTo(Carbon::parse('2026-11-02 20:01'));
+    $this->travelTo(Carbon::parse('2026-11-09 20:01'));
     $this->artisan('negocios:aplicar-horario')->assertSuccessful();
     expect($negocio->fresh()->activo)->toBeFalse();
 });
@@ -69,16 +70,16 @@ test('abrir a mano fuera de horario se respeta hasta la siguiente hora del horar
     $negocio = $dueno->negocio()->create(['nombre' => 'Panadería', 'activo' => false, 'horario' => horarioSemana()]);
 
     // Lunes 21:00 (ya cerró): el dueño abre a mano.
-    $this->travelTo(Carbon::parse('2026-11-02 21:00'));
+    $this->travelTo(Carbon::parse('2026-11-09 21:00'));
     Sanctum::actingAs($dueno);
     $this->putJson("/api/negocios/{$negocio->id}", ['activo' => true])->assertOk();
 
-    $this->travelTo(Carbon::parse('2026-11-02 22:00'));
+    $this->travelTo(Carbon::parse('2026-11-09 22:00'));
     $this->artisan('negocios:aplicar-horario');
     expect($negocio->fresh()->activo)->toBeTrue();
 
     // El martes a las 07:00 manda el horario (abierto) y a las 20:00 cierra.
-    $this->travelTo(Carbon::parse('2026-11-03 20:05'));
+    $this->travelTo(Carbon::parse('2026-11-10 20:05'));
     $this->artisan('negocios:aplicar-horario');
     expect($negocio->fresh()->activo)->toBeFalse();
 });
@@ -94,10 +95,61 @@ test('el propietario guarda el horario y el cliente ve el de hoy', function () {
         ->assertJsonPath('negocio.horario.lun.abre', '07:00')
         ->assertJsonPath('negocio.horario.dom', null);
 
-    $this->travelTo(Carbon::parse('2026-11-02 10:00'));
+    $this->travelTo(Carbon::parse('2026-11-09 10:00'));
     Sanctum::actingAs(usuarioRol('usuario'));
     $this->getJson("/api/negocios/{$negocio->id}")
         ->assertJsonPath('negocio.horario_hoy', 'Hoy de 7:00 a. m. a 8:00 p. m.');
+});
+
+// ---------------------------------------------------------------------------
+// Festivos
+// ---------------------------------------------------------------------------
+
+test('conoce los festivos de Colombia, con los que se corren al lunes', function () {
+    expect(array_keys(Festivos::delAnio(2026)))->toEqualCanonicalizing([
+        '01-01', '01-12', '03-23', '04-02', '04-03', '05-01', '05-18', '06-08', '06-15',
+        '06-29', '07-20', '08-07', '08-17', '10-12', '11-02', '11-16', '12-08', '12-25',
+    ]);
+    expect(Festivos::esFestivo(Carbon::parse('2026-11-16')))->toBeTrue()
+        ->and(Festivos::esFestivo(Carbon::parse('2026-11-11')))->toBeFalse(); // se corrió al lunes 16
+});
+
+test('en festivo rige el horario de festivos', function () {
+    $semana = horarioSemana() + ['fes' => ['abre' => '08:00', 'cierra' => '13:00']];
+    $festivo = Carbon::parse('2026-11-16 10:00'); // lunes festivo
+
+    expect(HorarioNegocio::deberiaEstarAbierto($semana, $festivo))->toBeTrue()
+        ->and(HorarioNegocio::deberiaEstarAbierto($semana, $festivo->copy()->setTime(15, 0)))->toBeFalse()
+        ->and(HorarioNegocio::textoHoy($semana, $festivo))->toBe('Hoy es festivo: de 8:00 a. m. a 1:00 p. m.');
+
+    $cierraFestivos = horarioSemana() + ['fes' => null];
+    expect(HorarioNegocio::deberiaEstarAbierto($cierraFestivos, $festivo))->toBeFalse()
+        ->and(HorarioNegocio::textoHoy($cierraFestivos, $festivo))->toBe('Hoy es festivo y no abre');
+});
+
+test('un horario de antes de los festivos abre en festivo como el domingo', function () {
+    $semana = horarioSemana(); // sin 'fes'; el domingo no abre
+    $semana['dom'] = ['abre' => '09:00', 'cierra' => '12:00'];
+
+    expect(HorarioNegocio::normalizar($semana)['fes'])->toBe(['abre' => '09:00', 'cierra' => '12:00'])
+        ->and(HorarioNegocio::deberiaEstarAbierto($semana, Carbon::parse('2026-11-16 10:00')))->toBeTrue()
+        ->and(HorarioNegocio::deberiaEstarAbierto($semana, Carbon::parse('2026-11-16 15:00')))->toBeFalse();
+});
+
+test('el propietario guarda el horario de festivos', function () {
+    $dueno = usuarioRol('usuario');
+    $negocio = $dueno->negocio()->create(['nombre' => 'Panadería', 'activo' => true]);
+    Sanctum::actingAs($dueno);
+
+    $horario = horarioSemana() + ['fes' => ['abre' => '08:00', 'cierra' => '13:00']];
+    $this->putJson("/api/negocios/{$negocio->id}", ['horario' => json_encode($horario)])
+        ->assertOk()
+        ->assertJsonPath('negocio.horario.fes.abre', '08:00')
+        ->assertJsonPath('negocio.horario.fes.cierra', '13:00');
+
+    $this->putJson("/api/negocios/{$negocio->id}", ['horario' => ['fes' => ['abre' => '8am', 'cierra' => '13:00']]])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['horario.fes.abre']);
 });
 
 test('un horario con horas inválidas no se guarda', function () {

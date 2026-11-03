@@ -22,6 +22,8 @@ class Negocio extends Model
         'descripcion',
         'categoria',
         'direccion',
+        // Barrio de Maicao (texto; ver Barrio::registrarSiEsNuevo).
+        'barrio',
         'telefono',
         'activo',
         // Minutos que promete tardar en tener listo un pedido. La reputación

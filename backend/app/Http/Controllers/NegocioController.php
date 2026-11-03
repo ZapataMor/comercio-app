@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Resources\NegocioResource;
+use App\Models\Barrio;
 use App\Models\Negocio;
 use App\Models\TipoNegocio;
 use App\Support\HorarioNegocio;
@@ -57,6 +58,7 @@ class NegocioController extends Controller
             'categorias' => ['required_without:categoria', 'array', 'min:1'],
             'categorias.*' => ['required', 'string', 'max:100', 'distinct'],
             'direccion' => ['nullable', 'string', 'max:255'],
+            'barrio' => ['required', 'string', 'max:100'],
             'telefono' => ['nullable', 'string', 'max:30'],
             'activo' => ['sometimes', 'boolean'],
             // Tiempo promedio que promete para tener listo un pedido (minutos).
@@ -74,6 +76,7 @@ class NegocioController extends Controller
 
         // Se crea ligado al usuario autenticado: imposible crearlo para otro.
         $negocio = $request->user()->negocio()->create($data);
+        Barrio::registrarSiEsNuevo($data['barrio'], $request->user()->id);
         $this->sincronizarCategorias($negocio, $categorias);
 
         $this->guardarImagen($request, $negocio);
@@ -133,6 +136,7 @@ class NegocioController extends Controller
             'categorias' => ['sometimes', 'array', 'min:1'],
             'categorias.*' => ['required', 'string', 'max:100', 'distinct'],
             'direccion' => ['nullable', 'string', 'max:255'],
+            'barrio' => ['sometimes', 'required', 'string', 'max:100'],
             'telefono' => ['nullable', 'string', 'max:30'],
             'activo' => ['sometimes', 'boolean'],
             // Tiempo promedio que promete para tener listo un pedido (minutos).
@@ -156,6 +160,9 @@ class NegocioController extends Controller
         }
 
         $negocio->update($data);
+        if (array_key_exists('barrio', $data)) {
+            Barrio::registrarSiEsNuevo($data['barrio'], $request->user()->id);
+        }
 
         if (isset($categorias)) {
             $this->sincronizarCategorias($negocio, $categorias);

@@ -5,13 +5,16 @@
  *
  * Las horas se escriben en formato 24 h ("07:00", "20:30"). Si la hora de
  * cierre es menor que la de apertura, cierra al día siguiente (18:00 → 02:00).
+ *
+ * Al final va "Festivo": el horario de los días festivos de Colombia, que
+ * esos días reemplaza al del día de la semana (el servidor sabe cuáles son).
  */
 import React from 'react';
 import { Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { DiaSemana, HorarioSemana } from '../api';
+import { ClaveHorario, HorarioSemana } from '../api';
 import { font, makeStyles, radius, useTheme } from '../theme';
 
-export const DIAS: { clave: DiaSemana; nombre: string }[] = [
+export const DIAS: { clave: ClaveHorario; nombre: string }[] = [
   { clave: 'lun', nombre: 'Lunes' },
   { clave: 'mar', nombre: 'Martes' },
   { clave: 'mie', nombre: 'Miércoles' },
@@ -19,25 +22,32 @@ export const DIAS: { clave: DiaSemana; nombre: string }[] = [
   { clave: 'vie', nombre: 'Viernes' },
   { clave: 'sab', nombre: 'Sábado' },
   { clave: 'dom', nombre: 'Domingo' },
+  { clave: 'fes', nombre: 'Festivo' },
 ];
 
 const FRANJA_TIPICA = { abre: '07:00', cierra: '20:00' };
 
-/** Horario de arranque: lunes a sábado de 7:00 a 20:00. */
+/** Horario de arranque: lunes a sábado de 7:00 a 20:00; domingos y festivos no abre. */
 export function horarioInicial(): HorarioSemana {
   return {
     lun: { ...FRANJA_TIPICA }, mar: { ...FRANJA_TIPICA }, mie: { ...FRANJA_TIPICA }, jue: { ...FRANJA_TIPICA },
-    vie: { ...FRANJA_TIPICA }, sab: { ...FRANJA_TIPICA }, dom: null,
+    vie: { ...FRANJA_TIPICA }, sab: { ...FRANJA_TIPICA }, dom: null, fes: null,
   };
 }
 
 const HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
 
+/** "07:00" → "7:00 a. m."; "20:30" → "8:30 p. m." (como lo escribe el servidor). */
+export function hora12(hhmm: string): string {
+  const [h, m] = hhmm.split(':').map(Number);
+  return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'a. m.' : 'p. m.'}`;
+}
+
 /** Mensaje de error si alguna hora está mal escrita, o null si todo bien. */
 export function errorHorario(h: HorarioSemana | null): string | null {
   if (!h) return null;
   for (const { clave, nombre } of DIAS) {
-    const f = h[clave];
+    const f = h[clave] ?? null;
     if (!f) continue;
     if (!HORA.test(f.abre) || !HORA.test(f.cierra)) {
       return `${nombre}: escribe las horas como 07:00 o 20:30.`;
@@ -78,7 +88,7 @@ export default function EditorHorario({ valor, onCambiar, disabled }: Props) {
   const styles = useStyles();
   const activo = valor !== null;
 
-  function cambiarDia(dia: DiaSemana, franja: { abre: string; cierra: string } | null) {
+  function cambiarDia(dia: ClaveHorario, franja: { abre: string; cierra: string } | null) {
     if (!valor) return;
     onCambiar({ ...valor, [dia]: franja });
   }
@@ -88,7 +98,7 @@ export default function EditorHorario({ valor, onCambiar, disabled }: Props) {
     const lunes = valor.lun;
     const nuevo = { ...valor };
     DIAS.forEach(({ clave }) => {
-      if (clave !== 'lun' && clave !== 'dom') nuevo[clave] = lunes ? { ...lunes } : null;
+      if (clave !== 'lun' && clave !== 'dom' && clave !== 'fes') nuevo[clave] = lunes ? { ...lunes } : null;
     });
     onCambiar(nuevo);
   }
@@ -113,9 +123,10 @@ export default function EditorHorario({ valor, onCambiar, disabled }: Props) {
 
       {activo &&
         DIAS.map(({ clave, nombre }) => {
-          const franja = valor![clave];
+          const franja = valor![clave] ?? null;
           return (
-            <View key={clave} style={styles.dia}>
+            // El festivo va aparte, bajo una línea: no es un día de la semana.
+            <View key={clave} style={[styles.dia, clave === 'fes' && styles.festivo]}>
               <Switch
                 value={franja !== null}
                 onValueChange={v => cambiarDia(clave, v ? { ...FRANJA_TIPICA } : null)}
@@ -158,6 +169,10 @@ export default function EditorHorario({ valor, onCambiar, disabled }: Props) {
         })}
 
       {activo && (
+        <Text style={styles.ayuda}>Festivo: rige los días festivos en lugar del día de la semana.</Text>
+      )}
+
+      {activo && (
         <TouchableOpacity onPress={copiarLunes} disabled={disabled}>
           <Text style={styles.copiar}>Copiar el horario del lunes de martes a sábado</Text>
         </TouchableOpacity>
@@ -180,6 +195,8 @@ const useStyles = makeStyles(c => ({
   },
   a: { color: c.muted, fontFamily: font.regular },
   noAbre: { flex: 1, color: c.muted, fontFamily: font.regular, fontSize: 13 },
+  festivo: { borderTopWidth: 1, borderTopColor: c.border, paddingTop: 10, marginTop: 12 },
+  ayuda: { color: c.muted, fontFamily: font.regular, fontSize: 12, marginTop: 6 },
   copiar: { color: c.goldText, fontFamily: font.semibold, fontSize: 13, marginTop: 12 },
   // Aire antes del switch "Negocio abierto" que va debajo en el formulario.
   contenedor: { marginBottom: 18 },

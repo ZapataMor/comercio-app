@@ -26,6 +26,8 @@ type Props = {
   onSeleccionar: (barrio: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  /** Título de la lista ("Tu barrio" para el cliente, "Barrio del negocio"...). */
+  titulo?: string;
 };
 
 /**
@@ -34,7 +36,13 @@ type Props = {
  * texto que escribió: se envía tal cual y queda como sugerencia para que el
  * administrador lo apruebe (mientras tanto solo lo ve ese usuario).
  */
-export default function BarrioSelect({ valor, onSeleccionar, disabled, placeholder = 'Elige tu barrio' }: Props) {
+export default function BarrioSelect({
+  valor,
+  onSeleccionar,
+  disabled,
+  placeholder = 'Elige tu barrio',
+  titulo = 'Tu barrio',
+}: Props) {
   const { c } = useTheme();
   const styles = useStyles();
   const [abierto, setAbierto] = useState(false);
@@ -86,7 +94,7 @@ export default function BarrioSelect({ valor, onSeleccionar, disabled, placehold
         <View style={styles.fondo}>
           <View style={styles.hoja}>
             <View style={styles.encabezado}>
-              <Text style={styles.titulo}>Tu barrio</Text>
+              <Text style={styles.titulo}>{titulo}</Text>
               <TouchableOpacity onPress={() => setAbierto(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <Text style={styles.cerrar}>Cerrar</Text>
               </TouchableOpacity>
@@ -126,7 +134,7 @@ export default function BarrioSelect({ valor, onSeleccionar, disabled, placehold
                     <TouchableOpacity style={styles.agregar} onPress={() => elegir(textoNuevo)}>
                       <Text style={styles.agregarTexto}>Usar «{textoNuevo}»</Text>
                       <Text style={styles.agregarNota}>
-                        Tu barrio no está en la lista. Puedes pedir con este nombre y quedará
+                        Ese barrio no está en la lista. Puedes usar este nombre y quedará
                         pendiente de que el administrador lo añada.
                       </Text>
                     </TouchableOpacity>

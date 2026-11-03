@@ -13,6 +13,10 @@ use Illuminate\Support\Carbon;
  * (null = ese día no abre). Si `cierra` es menor o igual que `abre`, cierra
  * al día siguiente (un bar de 18:00 a 02:00).
  *
+ * Además de los 7 días va 'fes': el horario de los festivos (ver Festivos),
+ * que esos días reemplaza al del día de la semana. Un horario guardado antes
+ * de existir 'fes' toma en festivos el del domingo.
+ *
  * El switch Abierto/Cerrado sigue mandando: si el dueño lo toca a mano, se
  * respeta hasta la siguiente hora de apertura o cierre del horario.
  */
@@ -21,16 +25,22 @@ class HorarioNegocio
     /** Días en orden ISO (lunes = 1 … domingo = 7). */
     public const DIAS = ['lun', 'mar', 'mie', 'jue', 'vie', 'sab', 'dom'];
 
+    /** Clave del horario de los días festivos. */
+    public const FESTIVO = 'fes';
+
+    /** Todas las claves del horario: los 7 días y el festivo. */
+    public const CLAVES = [...self::DIAS, self::FESTIVO];
+
     private const NOMBRES = [
         'lun' => 'lunes', 'mar' => 'martes', 'mie' => 'miércoles', 'jue' => 'jueves',
-        'vie' => 'viernes', 'sab' => 'sábado', 'dom' => 'domingo',
+        'vie' => 'viernes', 'sab' => 'sábado', 'dom' => 'domingo', 'fes' => 'festivos',
     ];
 
     /** Reglas de validación para `horario` en el formulario del negocio. */
     public static function reglas(): array
     {
         $reglas = ['horario' => ['sometimes', 'nullable', 'array']];
-        foreach (self::DIAS as $dia) {
+        foreach (self::CLAVES as $dia) {
             $reglas["horario.{$dia}"] = ['nullable', 'array'];
             $reglas["horario.{$dia}.abre"] = ["required_with:horario.{$dia}", 'date_format:H:i'];
             $reglas["horario.{$dia}.cierra"] = ["required_with:horario.{$dia}", 'date_format:H:i', "different:horario.{$dia}.abre"];
@@ -39,15 +49,23 @@ class HorarioNegocio
         return $reglas;
     }
 
-    /** Deja solo los 7 días con {abre, cierra} o null; null si no abre nunca. */
+    /**
+     * Deja solo los 7 días y el festivo con {abre, cierra} o null; null si no
+     * abre nunca. Sin 'fes' (horario de antes de los festivos), en festivos
+     * abre como el domingo.
+     */
     public static function normalizar(?array $horario): ?array
     {
         if (! $horario) {
             return null;
         }
 
+        if (! array_key_exists(self::FESTIVO, $horario)) {
+            $horario[self::FESTIVO] = $horario['dom'] ?? null;
+        }
+
         $limpio = [];
-        foreach (self::DIAS as $dia) {
+        foreach (self::CLAVES as $dia) {
             $d = $horario[$dia] ?? null;
             $limpio[$dia] = is_array($d) && ! empty($d['abre']) && ! empty($d['cierra'])
                 ? ['abre' => $d['abre'], 'cierra' => $d['cierra']]
@@ -55,6 +73,12 @@ class HorarioNegocio
         }
 
         return array_filter($limpio) ? $limpio : null;
+    }
+
+    /** Clave del horario que rige ese día: 'fes' si es festivo, o la del día de la semana. */
+    public static function claveDelDia(CarbonInterface $dia): string
+    {
+        return Festivos::esFestivo($dia) ? self::FESTIVO : self::DIAS[$dia->dayOfWeekIso - 1];
     }
 
     /**
@@ -65,10 +89,11 @@ class HorarioNegocio
      */
     private static function franjas(array $horario, CarbonInterface $ahora): array
     {
+        $horario = self::normalizar($horario) ?? [];
         $franjas = [];
         for ($atras = 7; $atras >= 0; $atras--) {
             $dia = Carbon::instance($ahora)->subDays($atras)->startOfDay();
-            $h = $horario[self::DIAS[$dia->dayOfWeekIso - 1]] ?? null;
+            $h = $horario[self::claveDelDia($dia)] ?? null;
             if (! $h) {
                 continue;
             }
@@ -138,7 +163,10 @@ class HorarioNegocio
         return true;
     }
 
-    /** Texto para el cliente: "Hoy de 7:00 a. m. a 8:00 p. m." / "Hoy no abre". */
+    /**
+     * Texto para el cliente: "Hoy de 7:00 a. m. a 8:00 p. m." / "Hoy no abre",
+     * y en festivo "Hoy es festivo: de 8:00 a. m. a 1:00 p. m." / "Hoy es festivo y no abre".
+     */
     public static function textoHoy(?array $horario, CarbonInterface $ahora): ?string
     {
         $horario = self::normalizar($horario);
@@ -146,12 +174,13 @@ class HorarioNegocio
             return null;
         }
 
-        $hoy = $horario[self::DIAS[$ahora->dayOfWeekIso - 1]];
+        $festivo = Festivos::esFestivo($ahora);
+        $hoy = $horario[self::claveDelDia($ahora)];
         if (! $hoy) {
-            return 'Hoy no abre';
+            return $festivo ? 'Hoy es festivo y no abre' : 'Hoy no abre';
         }
 
-        return 'Hoy de '.self::hora($hoy['abre']).' a '.self::hora($hoy['cierra']);
+        return ($festivo ? 'Hoy es festivo: de ' : 'Hoy de ').self::hora($hoy['abre']).' a '.self::hora($hoy['cierra']);
     }
 
     /** "07:00" → "7:00 a. m."; "20:30" → "8:30 p. m." */

@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import {
   buscarProductos,
+  direccionConBarrio,
   getNegocios,
   getTiposNegocio,
   imagenUrl,
@@ -369,10 +370,10 @@ const CardNegocio = React.memo(function CardNegocio({
               <Text style={styles.categoriaTxt}>{item.horario_hoy}</Text>
             </View>
           )}
-          {!!item.direccion && (
+          {!!direccionConBarrio(item) && (
             <View style={[styles.dir, styles.filaAccion]}>
               <Icon name="ubicacion" size={13} color={c.mutedSoft} />
-              <Text style={styles.dir}>{item.direccion}</Text>
+              <Text style={styles.dir}>{direccionConBarrio(item)}</Text>
             </View>
           )}
           {/* Nivel de confiabilidad y tiempo que promete en preparar. */}

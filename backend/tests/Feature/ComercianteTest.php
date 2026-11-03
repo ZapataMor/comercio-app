@@ -85,6 +85,7 @@ test('cualquier usuario crea un negocio y queda como propietario', function () {
     $this->postJson('/api/negocios', [
         'nombre' => 'Donde Pepe',
         'categorias' => ['Restaurante', 'Comidas rápidas'],
+        'barrio' => 'Centro',
     ])
         ->assertStatus(201)
         ->assertJsonPath('negocio.nombre', 'Donde Pepe')
@@ -92,9 +93,10 @@ test('cualquier usuario crea un negocio y queda como propietario', function () {
         ->assertJsonPath('negocio.categorias.0', 'Restaurante')
         ->assertJsonPath('negocio.categorias.1', 'Comidas rápidas')
         ->assertJsonPath('negocio.activo', true)
+        ->assertJsonPath('negocio.barrio', 'Centro')
         ->assertJsonPath('negocio.rol', Negocio::ROL_PROPIETARIO);
 
-    $this->assertDatabaseHas('negocios', ['nombre' => 'Donde Pepe', 'categoria' => 'Restaurante']);
+    $this->assertDatabaseHas('negocios', ['nombre' => 'Donde Pepe', 'categoria' => 'Restaurante', 'barrio' => 'Centro']);
     $this->assertDatabaseHas('tipos_negocio', ['nombre' => 'Comidas rápidas']);
 
     $negocio = Negocio::where('nombre', 'Donde Pepe')->firstOrFail();
@@ -104,15 +106,39 @@ test('cualquier usuario crea un negocio y queda como propietario', function () {
 test('crear un negocio exige la categoría (tipo de negocio)', function () {
     actuarComo('usuario');
 
-    $this->postJson('/api/negocios', ['nombre' => 'Sin Tipo'])
+    $this->postJson('/api/negocios', ['nombre' => 'Sin Tipo', 'barrio' => 'Centro'])
         ->assertStatus(422)
         ->assertJsonValidationErrors('categoria');
+});
+
+test('crear un negocio exige el barrio, y uno nuevo queda sugerido al administrador', function () {
+    $user = actuarComo('usuario');
+
+    $this->postJson('/api/negocios', ['nombre' => 'Sin Barrio', 'categorias' => ['Farmacia']])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('barrio');
+
+    $this->postJson('/api/negocios', ['nombre' => 'Droguería', 'categorias' => ['Farmacia'], 'barrio' => 'Villa Nueva'])
+        ->assertStatus(201);
+    $this->assertDatabaseHas('barrios', ['nombre' => 'Villa Nueva', 'aprobado' => false, 'creado_por' => $user->id]);
+});
+
+test('el propietario cambia el barrio del negocio', function () {
+    [, $negocio] = comercianteConNegocio();
+
+    $this->putJson("/api/negocios/{$negocio->id}", ['barrio' => 'San José'])
+        ->assertOk()
+        ->assertJsonPath('negocio.barrio', 'San José');
+
+    $this->putJson("/api/negocios/{$negocio->id}", ['barrio' => ''])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('barrio');
 });
 
 test('una persona puede tener varios negocios', function () {
     comercianteConNegocio();
 
-    $this->postJson('/api/negocios', ['nombre' => 'Otro', 'categorias' => ['Farmacia']])
+    $this->postJson('/api/negocios', ['nombre' => 'Otro', 'categorias' => ['Farmacia'], 'barrio' => 'Centro'])
         ->assertStatus(201);
 
     $this->getJson('/api/negocios/mios')

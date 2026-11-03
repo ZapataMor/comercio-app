@@ -83,6 +83,8 @@ export type Negocio = {
   categoria: string | null;
   categorias: string[];
   direccion: string | null;
+  /** Barrio de Maicao donde queda (null en negocios de antes de pedirlo). */
+  barrio?: string | null;
   telefono: string | null;
   activo: boolean;
   imagen?: string | null; // ruta relativa "/storage/negocios/x.jpg"
@@ -93,6 +95,8 @@ export type Negocio = {
   horario?: HorarioSemana | null;
   /** "Hoy de 7:00 a. m. a 8:00 p. m." / "Hoy no abre" (null sin horario). */
   horario_hoy?: string | null;
+  /** Hoy es festivo: rige el horario de festivos ('fes'). */
+  festivo_hoy?: boolean;
   /** Mi rol en este negocio (solo en las rutas de "mis negocios"). */
   rol?: RolNegocio | null;
   /** Pin en el mapa (null = aún no lo ha fijado). */
@@ -107,8 +111,15 @@ export type Coordenadas = { lat: number; lng: number };
 export type UbicacionEnVivo = Coordenadas & { hace_segundos: number };
 
 export type DiaSemana = 'lun' | 'mar' | 'mie' | 'jue' | 'vie' | 'sab' | 'dom';
+/** Los 7 días y 'fes': el horario de los festivos, que esos días reemplaza al del día. */
+export type ClaveHorario = DiaSemana | 'fes';
 /** null = ese día no abre. Horas "HH:MM" (24 h); si cierra <= abre, cierra al día siguiente. */
-export type HorarioSemana = Record<DiaSemana, { abre: string; cierra: string } | null>;
+export type HorarioSemana = Record<ClaveHorario, { abre: string; cierra: string } | null>;
+
+/** "Calle 12 #8-30 · Centro": la dirección con el barrio, si lo tiene. */
+export function direccionConBarrio(n: { direccion?: string | null; barrio?: string | null }): string {
+  return [n.direccion, n.barrio].filter(Boolean).join(' · ');
+}
 
 export type Categoria = { id: number; nombre: string; productos?: number };
 export type TipoNegocio = { id: number; nombre: string; slug: string };
@@ -153,6 +164,7 @@ export type NegocioLista = {
   categoria: string | null;
   categorias: string[];
   direccion: string | null;
+  barrio?: string | null;
   imagen?: string | null;
   productos: number;
   abierto: boolean;
@@ -550,6 +562,7 @@ export type NegocioInput = {
   categoria?: string | null;
   categorias?: string[];
   direccion?: string | null;
+  barrio?: string;
   telefono?: string | null;
   activo?: boolean;
   tiempo_preparacion?: number;

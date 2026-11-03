@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { getCatalogo, imagenUrl, Negocio, Producto } from '../api';
+import { direccionConBarrio, getCatalogo, imagenUrl, Negocio, Producto } from '../api';
 import { useAuth } from '../AuthContext';
 import { useCart } from '../CartContext';
 import { FadeInView, PressableScale } from '../components/anim';
@@ -182,10 +182,10 @@ export default function NegocioScreen({ route }: Props) {
                     <Text style={styles.heroDatoTxt} numberOfLines={1}>{negocio.horario_hoy}</Text>
                   </View>
                 )}
-                {!!negocio.direccion && (
+                {!!direccionConBarrio(negocio) && (
                   <View style={styles.heroDato}>
                     <Icon name="ubicacion" size={13} color="rgba(255,255,255,0.78)" />
-                    <Text style={styles.heroDatoTxt} numberOfLines={1}>{negocio.direccion}</Text>
+                    <Text style={styles.heroDatoTxt} numberOfLines={1}>{direccionConBarrio(negocio)}</Text>
                   </View>
                 )}
               </View>

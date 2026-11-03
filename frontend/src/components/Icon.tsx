@@ -34,6 +34,8 @@ export type IconName =
   | 'lista'
   | 'lupa'
   | 'reloj'
+  | 'calendario'
+  | 'mapa'
   | 'escudo'
   | 'alerta'
   | 'salir';
@@ -192,6 +194,21 @@ const GLYPHS: Record<IconName, React.ReactNode> = {
     <>
       <Circle cx="12" cy="12" r="9" />
       <Path d="M12 7.5V12l3 2" />
+    </>
+  ),
+  calendario: (
+    <>
+      <Rect x="3" y="4.5" width="18" height="16.5" rx="2" />
+      <Path d="M3 9.5h18" />
+      <Path d="M8 2.5v4" />
+      <Path d="M16 2.5v4" />
+    </>
+  ),
+  mapa: (
+    <>
+      <Path d="M9 4 3 6.5V20l6-2.5 6 2.5 6-2.5V4l-6 2.5L9 4z" />
+      <Path d="M9 4v13.5" />
+      <Path d="M15 6.5V20" />
     </>
   ),
   // Confiabilidad (reputación de negocios y domiciliarios).

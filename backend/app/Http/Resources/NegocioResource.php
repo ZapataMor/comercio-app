@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Support\Festivos;
 use App\Support\HorarioNegocio;
 use App\Support\Reputacion;
 use Illuminate\Http\Request;
@@ -28,6 +29,7 @@ class NegocioResource extends JsonResource
             'categoria' => $categorias[0] ?? $this->categoria,
             'categorias' => $categorias,
             'direccion' => $this->direccion,
+            'barrio' => $this->barrio,
             'telefono' => $this->telefono,
             'activo' => $this->activo,
             // Ruta relativa servida por el symlink storage (ej "/storage/negocios/x.jpg")
@@ -37,6 +39,8 @@ class NegocioResource extends JsonResource
             // Horario semanal (lun..dom → {abre, cierra} | null) y el texto de hoy.
             'horario' => HorarioNegocio::normalizar($this->horario),
             'horario_hoy' => HorarioNegocio::textoHoy($this->horario, now()),
+            // Hoy rige el horario de festivos (la app lo resalta).
+            'festivo_hoy' => Festivos::esFestivo(now()),
             'reputacion' => Reputacion::resumen(Reputacion::NEGOCIO, $this->resource),
             // Pin en el mapa (null = aún no lo ha fijado).
             'lat' => $this->lat,
