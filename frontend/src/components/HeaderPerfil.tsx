@@ -12,7 +12,6 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Alert,
   Animated,
   Easing,
   Linking,
@@ -31,6 +30,7 @@ import { navigationRef } from '../RootNavigation';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 import { PressableScale } from './anim';
+import Confirmacion from './Confirmacion';
 import { desenfocarApp } from './Desenfoque';
 import HeaderConfiabilidad from './HeaderConfiabilidad';
 import HeaderTurno from './HeaderTurno';
@@ -96,34 +96,30 @@ export default function HeaderPerfil() {
     );
   }
 
-  /** "Ser domiciliario": se confirma y, ya activo, lleva al Inicio, donde van las entregas. */
-  function serDomiciliario() {
-    Alert.alert(
-      '¿Quieres ser domiciliario?',
-      'Sigues siendo cliente y además podrás llevar pedidos de los negocios a los clientes. ' +
-        'Para recibir avisos de pedidos, entra en turno manteniendo presionada la moto de arriba.',
-      [
-        { text: 'Ahora no', style: 'cancel' },
-        { text: 'Quiero serlo', onPress: activarDomiciliario },
-      ],
-    );
-  }
+  // "Ser domiciliario": se confirma y, ya activo, lleva al Inicio, donde van las entregas.
+  const [confirmando, setConfirmando] = useState(false);
+  const [activando, setActivando] = useState(false);
 
   async function activarDomiciliario() {
     if (!auth) return;
+    setActivando(true);
     try {
       const r = await hacerseDomiciliario(auth.token);
+      setConfirmando(false);
       actualizarUsuario(r.user);
       toast.exito('¡Ya eres domiciliario!', 'Mantén presionada la moto para entrar en turno.');
       if (navigationRef.isReady()) navigationRef.navigate('Home');
     } catch (e) {
       // Sin teléfono no se activa: lo lleva a donde lo agrega.
       if (e instanceof ApiError && e.status === 422) {
+        setConfirmando(false);
         toast.info('Falta tu teléfono', 'Agrégalo aquí y vuelve a intentarlo.');
         if (navigationRef.isReady()) navigationRef.navigate('MiInformacion');
         return;
       }
       toast.error('No se pudo activar', messageFromError(e, 'Error'));
+    } finally {
+      setActivando(false);
     }
   }
 
@@ -145,8 +141,23 @@ export default function HeaderPerfil() {
         </PressableScale>
       </View>
       {ancla && (
-        <MenuPerfil ancla={ancla} onSerDomiciliario={serDomiciliario} onCerrado={() => setAncla(null)} />
+        <MenuPerfil ancla={ancla} onSerDomiciliario={() => setConfirmando(true)} onCerrado={() => setAncla(null)} />
       )}
+      <Confirmacion
+        visible={confirmando}
+        icono="moto"
+        titulo="¿Quieres ser domiciliario?"
+        texto="Lleva pedidos de los negocios a los clientes de tu ciudad."
+        puntos={[
+          { icono: 'usuario', texto: 'Sigues siendo cliente: puedes comprar como siempre.' },
+          { icono: 'moto', texto: 'Mantén presionada la moto de arriba para entrar en turno y recibir pedidos.' },
+          { icono: 'escudo', texto: 'Tu confiabilidad sube cuando entregas a tiempo.' },
+        ]}
+        textoBoton="Quiero ser domiciliario"
+        enviando={activando}
+        onCerrar={() => setConfirmando(false)}
+        onConfirmar={activarDomiciliario}
+      />
     </View>
   );
 }
