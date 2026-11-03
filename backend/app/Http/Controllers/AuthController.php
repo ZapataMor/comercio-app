@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Middleware\CuentaActiva;
 use App\Models\Barrio;
 use App\Models\User;
+use App\Support\UbicacionDomiciliario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -206,6 +207,37 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Ya eres domiciliario. Entra en turno para recibir pedidos.',
+            'user' => $this->userPayload($user->fresh()),
+        ]);
+    }
+
+    /**
+     * El domiciliario deja de repartir y queda solo como cliente. No puede
+     * con entregas en curso. Su confiabilidad (y un veto, si lo tiene) se
+     * conserva por si vuelve.
+     */
+    public function dejarDeSerDomiciliario(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (! $user->hasRole('domiciliario')) {
+            return response()->json(['message' => 'Tu cuenta no es de domiciliario.'], 409);
+        }
+
+        if (UbicacionDomiciliario::tieneEntregaEnCurso($user)) {
+            return response()->json(['message' => 'Tienes entregas en curso. Termínalas antes de dejar de ser domiciliario.'], 409);
+        }
+
+        $user->removeRole('domiciliario');
+        if (! $user->hasRole('usuario')) {
+            $user->assignRole('usuario');
+        }
+        // Fuera de turno y fuera del mapa.
+        $user->forceFill(['en_turno' => false])->save();
+        UbicacionDomiciliario::borrar($user);
+
+        return response()->json([
+            'message' => 'Ya no eres domiciliario. Sigues siendo cliente.',
             'user' => $this->userPayload($user->fresh()),
         ]);
     }

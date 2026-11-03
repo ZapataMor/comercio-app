@@ -5,12 +5,14 @@
  * Primero muestra la información en modo lectura y, con "Editar información",
  * pasa al formulario (datos, dirección y cambio de contraseña opcional). Es la
  * persona, no el negocio: los negocios se administran en "Mis negocios".
- * Al final de la vista de lectura está "Eliminar mi cuenta".
+ * Al final de la vista de lectura están "Dejar de ser domiciliario" (solo
+ * para el domiciliario) y "Eliminar mi cuenta".
  */
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -20,7 +22,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { actualizarPerfil, eliminarCuenta, Usuario } from '../api';
+import { actualizarPerfil, dejarDeSerDomiciliario, eliminarCuenta, Usuario } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import BarrioSelect from '../components/BarrioSelect';
@@ -43,6 +45,7 @@ export default function MiInformacionScreen(_props: Props) {
   const { codigoPublico } = useNegocio();
 
   const esCliente = user.roles.includes('usuario');
+  const esDomiciliario = user.roles.includes('domiciliario');
 
   // 'ver' = solo lectura · 'editar' = formulario.
   const [modo, setModo] = useState<'ver' | 'editar'>('ver');
@@ -90,6 +93,31 @@ export default function MiInformacionScreen(_props: Props) {
     } finally {
       setEnviando(false);
     }
+  }
+
+  /** "Dejar de ser domiciliario": sigue siendo cliente; se puede volver desde el menú. */
+  function confirmarDejarDomiciliario() {
+    Alert.alert(
+      'Dejar de ser domiciliario',
+      'Ya no podrás tomar pedidos ni te llegarán sus avisos. Sigues siendo cliente y puedes volver a ' +
+        'ser domiciliario cuando quieras desde el menú de tu cuenta.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Dejar de serlo',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const r = await dejarDeSerDomiciliario(auth!.token);
+              actualizarUsuario(r.user);
+              toast.exito('Listo', 'Ya no eres domiciliario. Sigues siendo cliente.');
+            } catch (e) {
+              toast.error('No se pudo cambiar', messageFromError(e, 'Error'));
+            }
+          },
+        },
+      ],
+    );
   }
 
   function limpiarError(campo: string) {
@@ -232,6 +260,11 @@ export default function MiInformacionScreen(_props: Props) {
           <PressableScale style={styles.btn} onPress={empezarEdicion}>
             <Text style={styles.btnTxt}>Editar información</Text>
           </PressableScale>
+          {esDomiciliario && (
+            <TouchableOpacity onPress={confirmarDejarDomiciliario} hitSlop={8}>
+              <Text style={styles.dejarTxt}>Dejar de ser domiciliario</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity onPress={() => setEliminando(true)} hitSlop={8}>
             <Text style={styles.eliminarTxt}>Eliminar mi cuenta</Text>
           </TouchableOpacity>
@@ -501,6 +534,8 @@ const useStyles = makeStyles((c, shadow) => ({
   },
   btnTxt: { color: c.onAccent, fontFamily: font.bold, fontSize: 16 },
   cancelar: { textAlign: 'center', color: c.muted, fontFamily: font.semibold, marginTop: 14 },
+  // Dejar de ser domiciliario (se puede volver: no va en rojo)
+  dejarTxt: { textAlign: 'center', color: c.muted, fontFamily: font.semibold, fontSize: 13, marginTop: 22 },
   // Eliminar mi cuenta
   eliminarTxt: { textAlign: 'center', color: c.danger, fontFamily: font.semibold, fontSize: 13, marginTop: 22 },
   modalFondo: { flex: 1, backgroundColor: c.scrim, justifyContent: 'center', padding: 24 },

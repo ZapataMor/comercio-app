@@ -475,6 +475,15 @@ export async function hacerseDomiciliario(token: string): Promise<{ message: str
 }
 
 /**
+ * El domiciliario deja de repartir y queda solo como cliente. Falla con 409
+ * si tiene entregas en curso.
+ */
+export async function dejarDeSerDomiciliario(token: string): Promise<{ message: string; user: Usuario }> {
+  const d = await authSend('DELETE', '/api/perfil/domiciliario', token);
+  return { message: d.message as string, user: d.user as Usuario };
+}
+
+/**
  * Elimina la cuenta (anonimiza los datos; exige la contraseña). Puede fallar
  * con 409 si hay pedidos o entregas en curso.
  */

@@ -88,6 +88,29 @@ test('un administrador no se hace domiciliario desde la app', function () {
     $this->postJson('/api/perfil/domiciliario')->assertForbidden();
 });
 
+test('el domiciliario deja de serlo y queda como cliente, fuera de turno', function () {
+    $domiciliario = cuentaDeTipo('domiciliario', ['en_turno' => true]);
+    Sanctum::actingAs($domiciliario);
+
+    $this->deleteJson('/api/perfil/domiciliario')
+        ->assertOk()
+        ->assertJsonPath('user.roles', ['usuario'])
+        ->assertJsonPath('user.en_turno', false);
+
+    $this->getJson('/api/domiciliario/disponibles')->assertForbidden();
+    $this->getJson('/api/cliente/direcciones')->assertOk();
+});
+
+test('no se deja de ser domiciliario con una entrega en curso', function () {
+    $domiciliario = cuentaDeTipo('domiciliario');
+    pedidoListoDe(cuentaDeTipo('usuario'))->update(['estado' => 'tomado', 'domiciliario_id' => $domiciliario->id]);
+    Sanctum::actingAs($domiciliario);
+
+    $this->deleteJson('/api/perfil/domiciliario')->assertStatus(409);
+
+    expect($domiciliario->fresh()->hasRole('domiciliario'))->toBeTrue();
+});
+
 test('el domiciliario no ve, no toma ni recibe el aviso de su propio pedido', function () {
     $domiciliario = cuentaDeTipo('domiciliario', ['en_turno' => true]);
     $otro = cuentaDeTipo('domiciliario', ['en_turno' => true]);
