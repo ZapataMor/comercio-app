@@ -9,6 +9,10 @@
  *  - "Mi Tienda" (ver/crear/editar) y "Mis negocios" (cambiar de negocio).
  *
  * Así no hay copias distintas que se desincronicen.
+ *
+ * Al abrir la app o iniciar sesión, el comerciante (propietario de algún
+ * negocio) arranca en el primero que creó; quien solo trabaja en negocios
+ * ajenos, en el último que gestionó.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, {
@@ -26,10 +30,33 @@ import {
   getMisNegocios,
   Negocio,
   NegocioInput,
+  Usuario,
 } from './api';
 import { useAuth } from './AuthContext';
 
 const CLAVE_ACTIVO = 'negocio_activo';
+
+/** El primer negocio que creé: el más antiguo (id más bajo) de los que soy propietario. */
+function primeroPropio(lista: Negocio[]): Negocio | undefined {
+  return lista
+    .filter(n => n.rol === 'propietario')
+    .reduce<Negocio | undefined>((primero, n) => (!primero || n.id < primero.id ? n : primero), undefined);
+}
+
+/** Lo que la sesión guardada recuerda de mis negocios (Usuario.negocios). */
+function resumen(lista: Negocio[]): NonNullable<Usuario['negocios']> {
+  return lista.map(n => ({ id: n.id, nombre: n.nombre, rol: n.rol ?? 'trabajador' }));
+}
+
+/** ¿La sesión ya recuerda estos negocios, con el mismo nombre y mi rol? */
+function mismosNegocios(a: Usuario['negocios'], b: Usuario['negocios']): boolean {
+  return (
+    !!a &&
+    !!b &&
+    a.length === b.length &&
+    a.every(n => b.some(r => r.id === n.id && r.nombre === n.nombre && r.rol === n.rol))
+  );
+}
 
 type NegocioContextType = {
   /** Todos los negocios donde soy miembro activo (con mi rol). */
@@ -70,10 +97,12 @@ const NegocioContext = createContext<NegocioContextType>({
 });
 
 export function NegocioProvider({ children }: { children: React.ReactNode }) {
-  const { auth } = useAuth();
+  const { auth, actualizarUsuario } = useAuth();
   const token = auth?.token ?? null;
 
   const [negocios, setNegocios] = useState<Negocio[]>([]);
+  // La lista ya llegó del servidor en esta sesión (antes de eso está vacía).
+  const [cargados, setCargados] = useState(false);
   const [activoId, setActivoId] = useState<number | null>(null);
   const [codigoPublico, setCodigoPublico] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
@@ -86,6 +115,7 @@ export function NegocioProvider({ children }: { children: React.ReactNode }) {
   const recargar = useCallback(async () => {
     if (!token) {
       setNegocios([]);
+      setCargados(false);
       setActivoId(null);
       setCodigoPublico(null);
       return;
@@ -97,11 +127,14 @@ export function NegocioProvider({ children }: { children: React.ReactNode }) {
         AsyncStorage.getItem(CLAVE_ACTIVO).catch(() => null),
       ]);
       setNegocios(lista);
+      setCargados(true);
       setCodigoPublico(codigo);
-      // Conserva el activo si sigue siendo mío; si no (me quitaron, o es la
-      // primera vez), toma el primero de la lista.
+      // Conserva el activo si sigue siendo mío. Al abrir la app o iniciar
+      // sesión (aún no hay activo) toma el primero que creé; sin negocios
+      // propios, el último que gestioné. Si no (me quitaron), el primero de
+      // la lista.
       setActivoId(prev => {
-        const preferido = prev ?? (guardado ? Number(guardado) : null);
+        const preferido = prev ?? primeroPropio(lista)?.id ?? (guardado ? Number(guardado) : null);
         return lista.some(n => n.id === preferido) ? preferido : lista[0]?.id ?? null;
       });
     } catch {
@@ -114,8 +147,22 @@ export function NegocioProvider({ children }: { children: React.ReactNode }) {
   // Carga inicial (y al cambiar de sesión).
   useEffect(() => {
     setActivoId(null);
+    setCargados(false);
     recargar();
   }, [recargar]);
+
+  // La sesión guardada recuerda mis negocios: con ellos se decide en qué
+  // pantalla arranco la próxima vez que abra la app (rutaInicio), sin
+  // esperar a que la lista llegue del servidor.
+  useEffect(() => {
+    if (!auth || !cargados) {
+      return;
+    }
+    const actuales = resumen(negocios);
+    if (!mismosNegocios(actuales, auth.user.negocios)) {
+      actualizarUsuario({ ...auth.user, negocios: actuales });
+    }
+  }, [auth, cargados, negocios, actualizarUsuario]);
 
   const negocio = useMemo(
     () => negocios.find(n => n.id === activoId) ?? null,

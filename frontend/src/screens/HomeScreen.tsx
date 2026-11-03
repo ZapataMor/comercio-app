@@ -6,6 +6,7 @@ import { ComercioPedido, getPedidosComercio, nombreTipoCuenta } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import BotonMantener from '../components/BotonMantener';
+import HeaderNegocios from '../components/HeaderNegocios';
 import HeaderPerfil from '../components/HeaderPerfil';
 import Icon from '../components/Icon';
 import PanelDomiciliario, { PanelDomiciliarioRef } from '../components/PanelDomiciliario';
@@ -170,13 +171,14 @@ export default function HomeScreen({ navigation }: Props) {
   const panelY = useRef(0);
   const [refrescando, setRefrescando] = useState(false);
 
-  // Topbar: con negocio, el switch Abierto/Cerrado va junto a "Mi perfil".
-  // (Sin negocio aplica el headerRight global con solo "Mi perfil".)
+  // Topbar: con negocio, el switch Abierto/Cerrado y la lista de mis
+  // negocios van junto a "Mi perfil". (Sin negocio no se muestran.)
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => (
         <View style={styles.headerDerecha}>
           <HeaderEstadoNegocio />
+          <HeaderNegocios />
           <HeaderPerfil />
         </View>
       ),

@@ -12,6 +12,7 @@ import { Circle, G, Path, Polyline, Rect, Svg } from 'react-native-svg';
 export type IconName =
   | 'casa'
   | 'tienda'
+  | 'negocios'
   | 'etiqueta'
   | 'bolsa'
   | 'herramientas'
@@ -51,6 +52,14 @@ const GLYPHS: Record<IconName, React.ReactNode> = {
       <Path d="M3 9h18" />
       <Path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9" />
       <Path d="M9.5 20.5v-5.5h5v5.5" />
+    </>
+  ),
+  // Varios negocios: capas apiladas (la tienda sola es el Abierto/Cerrado).
+  negocios: (
+    <>
+      <Path d="M12 3 3 7.5 12 12l9-4.5L12 3z" />
+      <Path d="M3 12l9 4.5 9-4.5" />
+      <Path d="M3 16.5 12 21l9-4.5" />
     </>
   ),
   etiqueta: (

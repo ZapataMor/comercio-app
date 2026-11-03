@@ -88,7 +88,7 @@ function Navegacion() {
     );
   }
 
-  const inicial = !auth ? 'Login' : rutaInicio(roles);
+  const inicial = !auth ? 'Login' : rutaInicio(auth.user);
 
   return (
     <FlyToCartProvider>
@@ -122,7 +122,8 @@ function Navegacion() {
           <>
             {/* Pantallas del cliente: toda cuenta nueva lo es, y el
                 domiciliario también. Arranca en Explorar (la lista de
-                negocios), salvo el domiciliario, que arranca en Home. */}
+                negocios), salvo el domiciliario y el comerciante, que
+                arrancan en Home (ver rutaInicio). */}
             {roles.includes('usuario') && (
               <>
                 <Stack.Screen
@@ -144,7 +145,8 @@ function Navegacion() {
 
             {/* Home: menú de los demás roles, panel del negocio activo y
                 entregas del domiciliario. El cliente llega aquí desde "Mis
-                negocios" o "Mis entregas" (menú del ícono de usuario). */}
+                negocios" o "Mis entregas" (menú del ícono de usuario); el
+                comerciante arranca aquí. */}
             <Stack.Screen
               name="Home"
               component={HomeScreen}

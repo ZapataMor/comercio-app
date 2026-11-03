@@ -5,11 +5,25 @@ import { Usuario } from './api';
 export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 /**
- * Pantalla con la que arranca cada quien: el cliente en Explorar y los demás
- * en el Inicio. El domiciliario (que también es cliente) arranca en el
- * Inicio porque ahí, bajo el saludo, van sus entregas.
+ * ¿Es comerciante? No hay un rol global: lo es quien es propietario de al
+ * menos un negocio.
  */
-export function rutaInicio(roles: string[]): 'Explorar' | 'Home' {
+export function esComerciante(user: Usuario): boolean {
+  return !!user.negocios?.some(n => n.rol === 'propietario');
+}
+
+/**
+ * Pantalla con la que arranca cada quien: el comerciante en la
+ * administración de su negocio (el Inicio, con el primero que creó; ver
+ * NegocioContext), el cliente en Explorar y los demás en el Inicio. El
+ * domiciliario (que también es cliente) arranca en el Inicio porque ahí,
+ * bajo el saludo, van sus entregas.
+ */
+export function rutaInicio(user: Usuario): 'Explorar' | 'Home' {
+  const roles = user.roles ?? [];
+  if (esComerciante(user)) {
+    return 'Home';
+  }
   return roles.includes('usuario') && !roles.includes('domiciliario') ? 'Explorar' : 'Home';
 }
 
@@ -63,7 +77,7 @@ function navigateFromData(data: PushData, user: Usuario) {
   if (roles.includes('usuario')) {
     navigationRef.navigate('MisPedidos');
   } else {
-    navigationRef.navigate(rutaInicio(roles));
+    navigationRef.navigate(rutaInicio(user));
   }
 }
 
