@@ -8,12 +8,16 @@
  * otro; detrás, la app se pone borrosa menos el botón, que queda nítido. Se
  * recoge con la misma animación al revés (tocar fuera, el botón, "atrás" o
  * elegir una opción, que se abre cuando el menú termina de recogerse).
+ *
+ * Los menús se pintan en CapaMenus, encima de toda la app. En cuanto uno
+ * empieza a recogerse deja pasar los toques: se puede tocar enseguida otro
+ * botón de la topbar sin esperar a que termine la animación.
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  BackHandler,
   Easing,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -41,28 +45,108 @@ type Props = {
   ancho?: number;
 };
 
-/** Posición del botón en la ventana: el menú se ancla debajo de él. */
-type Ancla = { x: number; y: number; w: number; h: number };
+/**
+ * Posición del botón en la ventana: el menú se ancla debajo de él. `n`
+ * distingue cada apertura (si se reabre mientras se recoge, es otro menú).
+ */
+type Ancla = { x: number; y: number; w: number; h: number; n: number };
 
-export default function MenuDesplegable({ icono, etiqueta, renglones, ancho = 240 }: Props) {
+type Capa = {
+  mostrar: (n: number, menu: React.ReactNode) => void;
+  quitar: (n: number) => void;
+  /** Esquina de la capa en la ventana (las medidas de los botones son de la ventana). */
+  origen: React.MutableRefObject<{ x: number; y: number }>;
+};
+
+const CapaContext = createContext<Capa | null>(null);
+
+let aperturas = 0;
+
+/**
+ * Capa sobre toda la app donde se pintan los menús abiertos. Va FUERA de la
+ * parte que se desenfoca (AppDesenfocable, en App.tsx), así el menú queda
+ * nítido. No es un Modal a propósito: el Modal es otra ventana y se traga
+ * los toques hasta que el menú termina de recogerse.
+ */
+export function CapaMenus({ children }: { children: React.ReactNode }) {
+  const [menus, setMenus] = useState<{ n: number; menu: React.ReactNode }[]>([]);
+  const capa = useRef<View>(null);
+  const origen = useRef({ x: 0, y: 0 });
+  const api = useMemo<Capa>(
+    () => ({
+      mostrar: (n, menu) => setMenus(lista => [...lista, { n, menu }]),
+      quitar: n => setMenus(lista => lista.filter(m => m.n !== n)),
+      origen,
+    }),
+    [],
+  );
+
+  function medir() {
+    capa.current?.measureInWindow((x, y) => {
+      if (Number.isFinite(x) && Number.isFinite(y)) {
+        origen.current = { x, y };
+      }
+    });
+  }
+
+  return (
+    <CapaContext.Provider value={api}>
+      {children}
+      <View ref={capa} style={StyleSheet.absoluteFill} pointerEvents="box-none" collapsable={false} onLayout={medir}>
+        {menus.map(m => (
+          <React.Fragment key={m.n}>{m.menu}</React.Fragment>
+        ))}
+      </View>
+    </CapaContext.Provider>
+  );
+}
+
+export default function MenuDesplegable(props: Props) {
+  const { icono, etiqueta } = props;
   const { c } = useTheme();
   const styles = useStyles();
   const { width } = useWindowDimensions();
+  const capa = useContext(CapaContext);
   const boton = useRef<View>(null);
   const [ancla, setAncla] = useState<Ancla | null>(null);
+  // Los renglones se arman al abrir, con los datos de ese momento.
+  const ultimas = useRef(props);
+  ultimas.current = props;
 
   function abrir() {
+    const n = ++aperturas;
     const nodo = boton.current;
     // Sin medida (p. ej. en pruebas): esquina superior derecha.
-    const respaldo = { x: width - 46, y: 10, w: 34, h: 34 };
+    const respaldo = { x: width - 46, y: 10, w: 34, h: 34, n };
     if (!nodo) {
       setAncla(respaldo);
       return;
     }
     nodo.measureInWindow((x, y, w, h) =>
-      setAncla(Number.isFinite(x) && Number.isFinite(y) && w > 0 ? { x, y, w, h } : respaldo),
+      setAncla(Number.isFinite(x) && Number.isFinite(y) && w > 0 ? { x, y, w, h, n } : respaldo),
     );
   }
+
+  // El menú abierto vive en la capa mientras haya ancla.
+  useEffect(() => {
+    if (!ancla || !capa) {
+      return;
+    }
+    const actuales = ultimas.current;
+    capa.mostrar(
+      ancla.n,
+      <Menu
+        ancla={ancla}
+        icono={actuales.icono}
+        etiqueta={actuales.etiqueta}
+        renglones={actuales.renglones}
+        ancho={actuales.ancho ?? 240}
+        // Solo si sigue siendo este menú (no otro abierto mientras se recogía).
+        onCerrado={() => setAncla(a => (a === ancla ? null : a))}
+      />,
+    );
+    return () => capa.quitar(ancla.n);
+  }, [ancla, capa]);
 
   return (
     // PressableScale no reenvía la ref: este View es el que se mide.
@@ -76,16 +160,6 @@ export default function MenuDesplegable({ icono, etiqueta, renglones, ancho = 24
         onPress={abrir}>
         <Icon name={icono} size={18} color={c.onHeader} strokeWidth={2} />
       </PressableScale>
-      {ancla && (
-        <Menu
-          ancla={ancla}
-          icono={icono}
-          etiqueta={etiqueta}
-          renglones={renglones}
-          ancho={ancho}
-          onCerrado={() => setAncla(null)}
-        />
-      )}
     </View>
   );
 }
@@ -101,6 +175,7 @@ function Menu({
   const { c } = useTheme();
   const styles = useStyles();
   const { width } = useWindowDimensions();
+  const capa = useContext(CapaContext);
   // Fijos mientras el menú está abierto.
   const [contenido] = useState(() => renglones(elegir).filter(Boolean));
   const a = useRef(new Animated.Value(0)).current;
@@ -111,10 +186,33 @@ function Menu({
   const filas = useRef(contenido.map(() => new Animated.Value(0))).current;
   const empezado = useRef(false);
   const cerrando = useRef(false);
+  // Al recogerse deja pasar los toques a la app (y a los otros botones).
+  const [saliendo, setSaliendo] = useState(false);
 
   // Si el menú desaparece de golpe (p. ej. al cerrar sesión), la app no
-  // queda borrosa.
-  useEffect(() => () => desenfocarApp(false), []);
+  // queda borrosa. Si ya se estaba recogiendo no se toca: quizá ya se abrió
+  // otro menú, que es el que la tiene borrosa.
+  useEffect(
+    () => () => {
+      if (!cerrando.current) {
+        desenfocarApp(false);
+      }
+    },
+    [],
+  );
+
+  // "Atrás" recoge el menú; si ya se está recogiendo, sigue la navegación.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (cerrando.current) {
+        return false;
+      }
+      cerrar();
+      return true;
+    });
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /** Entrada: arranca cuando ya se conoce el alto, para desplegar sin saltos. */
   function entrar() {
@@ -147,10 +245,12 @@ function Menu({
    * Salida: la entrada al revés y algo más rápida. Los renglones suben y se
    * desvanecen de abajo hacia arriba mientras la caja se recoge hacia el
    * ícono, y al final se desvanece la franja que queda. Luego corre `despues`.
+   * Desde el primer momento deja pasar los toques.
    */
   function cerrar(despues?: () => void) {
     if (cerrando.current) return;
     cerrando.current = true;
+    setSaliendo(true);
     desenfocarApp(false);
     const rapido = Easing.in(Easing.cubic);
     Animated.parallel([
@@ -182,22 +282,26 @@ function Menu({
     cerrar(accion);
   }
 
+  // Del botón medido en la ventana a la capa.
+  const origen = capa?.origen.current ?? { x: 0, y: 0 };
+  const x = ancla.x - origen.x;
+  const y = ancla.y - origen.y;
   const anchoMenu = Math.min(ancho, width - 24);
   // Borde derecho del menú alineado con el del botón; el pico apunta a su centro.
-  const derecha = Math.max(12, width - (ancla.x + ancla.w));
-  const pico = Math.max(14, width - (ancla.x + ancla.w / 2) - derecha - 7);
+  const derecha = Math.max(12, width - (x + ancla.w));
+  const pico = Math.max(14, width - (x + ancla.w / 2) - derecha - 7);
   const translateY = a.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] });
   const scale = a.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] });
   const altoVisible = despliegue.interpolate({ inputRange: [0, 1], outputRange: [0, alto] });
 
   return (
-    <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={() => cerrar()}>
+    <View style={StyleSheet.absoluteFill} pointerEvents={saliendo ? 'none' : 'box-none'}>
       {/* Tocar fuera del menú lo cierra (el fondo no se oscurece: se desenfoca). */}
       <Pressable style={StyleSheet.absoluteFill} onPress={() => cerrar()} accessibilityLabel="Cerrar menú" />
       {/* El desenfoque alcanza toda la app, botón incluido: encima va una
           copia nítida en el mismo sitio, sobre un círculo del color de la
           topbar que tapa al original (su fondo es translúcido). */}
-      <View style={[styles.botonNitido, { left: ancla.x, top: ancla.y, width: ancla.w, height: ancla.h }]}>
+      <View style={[styles.botonNitido, { left: x, top: y, width: ancla.w, height: ancla.h }]}>
         <PressableScale
           style={styles.boton}
           hitSlop={8}
@@ -212,7 +316,7 @@ function Menu({
         style={[
           styles.menu,
           {
-            top: ancla.y + ancla.h + 10,
+            top: y + ancla.h + 10,
             right: derecha,
             width: anchoMenu,
             opacity: a,
@@ -242,7 +346,7 @@ function Menu({
           </Animated.View>
         </View>
       </Animated.View>
-    </Modal>
+    </View>
   );
 }
 

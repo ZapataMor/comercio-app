@@ -15,6 +15,7 @@ import { ConfirmacionProvider } from './src/components/Confirmacion';
 import { AppDesenfocable } from './src/components/Desenfoque';
 import { FlyToCartProvider } from './src/components/FlyToCart';
 import HeaderPerfil from './src/components/HeaderPerfil';
+import { CapaMenus } from './src/components/MenuDesplegable';
 import { VitrinaHeaderLogo } from './src/components/Logo';
 import SplashVitrina from './src/components/SplashVitrina';
 import { NegocioProvider } from './src/NegocioContext';
@@ -92,7 +93,9 @@ function Navegacion() {
 
   return (
     <FlyToCartProvider>
-      {/* Se pone borrosa detrás del menú de "Mi perfil" (HeaderPerfil). */}
+      {/* Los menús de la topbar ("Mi perfil", "Mis negocios") se pintan
+          encima, nítidos; la app se pone borrosa detrás. */}
+      <CapaMenus>
       <AppDesenfocable style={styles.raiz}>
         <NavigationContainer
           ref={navigationRef}
@@ -207,6 +210,7 @@ function Navegacion() {
         </NavigationContainer>
         <BarraCliente ruta={ruta} />
       </AppDesenfocable>
+      </CapaMenus>
     </FlyToCartProvider>
   );
 }

@@ -1,9 +1,10 @@
 /**
  * Fondo borroso (sin oscurecerlo) detrás de un menú flotante.
  *
- * El menú va en un Modal, que Android pinta en su propia ventana: basta con
- * desenfocar la raíz de la app (`AppDesenfocable`, en App.tsx) para que todo
- * lo de atrás, topbar incluida, quede borroso y el menú se vea nítido.
+ * El menú va en una capa encima de la app y fuera de ella (CapaMenus, en
+ * MenuDesplegable): basta con desenfocar la raíz de la app
+ * (`AppDesenfocable`, en App.tsx) para que todo lo de atrás, topbar
+ * incluida, quede borroso y el menú se vea nítido.
  *
  * Usa `filter: blur`, que React Native aplica solo en Android 12+ (New
  * Architecture). En iOS y en Android anteriores el fondo no cambia.
