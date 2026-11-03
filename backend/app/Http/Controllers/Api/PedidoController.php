@@ -211,10 +211,15 @@ class PedidoController extends Controller
                 'negocio' => Reputacion::opcionesCliente(Reputacion::NEGOCIO),
                 'domiciliario' => Reputacion::opcionesCliente(Reputacion::DOMICILIARIO),
             ] : null,
+            // Amabilidad, rapidez y estado del producto (caritas de 1 a 5).
+            'aspectos_domiciliario' => $puedeCalificar && $pedido->domiciliario
+                ? Reputacion::aspectosCliente()
+                : null,
             'calificacion' => $calificacion ? [
                 'negocio_ok' => $calificacion->negocio_ok,
                 'negocio_problemas' => $this->etiquetas(Reputacion::NEGOCIO, $calificacion->negocio_problemas),
                 'domiciliario_ok' => $calificacion->domiciliario_ok,
+                'domiciliario_caritas' => $this->caritasDadas($calificacion->domiciliario_caritas),
                 'domiciliario_problemas' => $this->etiquetas(Reputacion::DOMICILIARIO, $calificacion->domiciliario_problemas),
                 'comentario' => $calificacion->comentario,
             ] : null,
@@ -246,8 +251,10 @@ class PedidoController extends Controller
     }
 
     /**
-     * Calificar un pedido entregado: ¿el negocio y el domiciliario cumplieron?
-     * Si no, qué falló. Cada respuesta sube o baja su nivel de confiabilidad.
+     * Calificar un pedido entregado: ¿el negocio cumplió? (si no, qué falló),
+     * caritas de 1 a 5 para el domiciliario en amabilidad, rapidez y estado
+     * del producto, y si pasó algo grave con él. Si el pedido nunca llegó no
+     * se piden caritas. Cada respuesta sube o baja su nivel de confiabilidad.
      * Una sola vez por pedido y dentro de `reputacion.horas_para_calificar`.
      */
     public function calificar(Request $request, int $id): JsonResponse
@@ -265,37 +272,52 @@ class PedidoController extends Controller
         }
 
         $conDomiciliario = $pedido->domiciliario !== null;
+        $aspectos = array_keys(Reputacion::ASPECTOS_DOMICILIARIO);
+        // Si el pedido nunca llegó, no hay trato, rapidez ni estado que calificar.
+        $noLlego = in_array('no_llego', (array) $request->input('domiciliario_problemas', []), true);
+        $pideCaritas = $conDomiciliario && ! $noLlego;
 
-        $datos = $request->validate([
+        $reglas = [
             'negocio_ok' => ['required', 'boolean'],
             'negocio_problemas' => [Rule::requiredIf(! $request->boolean('negocio_ok')), 'array'],
             'negocio_problemas.*' => [Rule::in(array_keys(Reputacion::PROBLEMAS_CLIENTE[Reputacion::NEGOCIO]))],
-            'domiciliario_ok' => [Rule::requiredIf($conDomiciliario), 'boolean'],
-            'domiciliario_problemas' => [
-                Rule::requiredIf($conDomiciliario && ! $request->boolean('domiciliario_ok')),
-                'array',
-            ],
+            'domiciliario_caritas' => [Rule::requiredIf($pideCaritas), 'array:'.implode(',', $aspectos)],
+            'domiciliario_problemas' => ['nullable', 'array'],
             'domiciliario_problemas.*' => [Rule::in(array_keys(Reputacion::PROBLEMAS_CLIENTE[Reputacion::DOMICILIARIO]))],
             'comentario' => ['nullable', 'string', 'max:500'],
-        ], [
+        ];
+        $mensajes = [
             'negocio_problemas.required' => 'Cuéntanos qué falló con el negocio.',
-            'domiciliario_problemas.required' => 'Cuéntanos qué falló con el domiciliario.',
-        ]);
+            'domiciliario_caritas.required' => 'Califica al domiciliario con las caritas.',
+        ];
+        foreach ($aspectos as $aspecto) {
+            $reglas["domiciliario_caritas.{$aspecto}"] = [Rule::requiredIf($pideCaritas), 'integer', 'between:1,5'];
+            $mensajes["domiciliario_caritas.{$aspecto}.required"] =
+                'Elige una carita para «'.Reputacion::ASPECTOS_DOMICILIARIO[$aspecto]['nombre'].'».';
+        }
+
+        $datos = $request->validate($reglas, $mensajes);
 
         $negocioProblemas = $datos['negocio_ok']
             ? []
             : array_values(array_unique($datos['negocio_problemas']));
-        $domiciliarioProblemas = ! $conDomiciliario || $datos['domiciliario_ok']
-            ? []
-            : array_values(array_unique($datos['domiciliario_problemas']));
+        $domiciliarioProblemas = $conDomiciliario
+            ? array_values(array_unique($datos['domiciliario_problemas'] ?? []))
+            : [];
+        // {"amabilidad": 5, "rapidez": 4, "estado_producto": 5}
+        $caritas = $pideCaritas
+            ? collect($aspectos)->mapWithKeys(fn ($a) => [$a => (int) $datos['domiciliario_caritas'][$a]])->all()
+            : null;
         $comentario = filled($datos['comentario'] ?? null) ? trim($datos['comentario']) : null;
 
-        DB::transaction(function () use ($pedido, $datos, $conDomiciliario, $negocioProblemas, $domiciliarioProblemas, $comentario) {
+        DB::transaction(function () use ($pedido, $datos, $conDomiciliario, $negocioProblemas, $domiciliarioProblemas, $caritas, $comentario) {
             $pedido->calificacion()->create([
                 'user_id' => $pedido->user_id,
                 'negocio_ok' => $datos['negocio_ok'],
                 'negocio_problemas' => $negocioProblemas ?: null,
-                'domiciliario_ok' => $conDomiciliario ? $datos['domiciliario_ok'] : null,
+                // "Cumplió": nada grave y ninguna carita por debajo de 3.
+                'domiciliario_ok' => $conDomiciliario ? (! $domiciliarioProblemas && min($caritas) >= 3) : null,
+                'domiciliario_caritas' => $caritas,
                 'domiciliario_problemas' => $domiciliarioProblemas ?: null,
                 'comentario' => $comentario,
             ]);
@@ -311,10 +333,19 @@ class PedidoController extends Controller
             }
 
             if ($conDomiciliario) {
-                foreach ($domiciliarioProblemas ?: ['cliente_conforme'] as $motivo) {
+                // Motivo => ¿es una queja? (caritas de 1 o 2 y lo grave).
+                $motivos = [];
+                foreach ($caritas ?? [] as $aspecto => $n) {
+                    $motivos[Reputacion::motivoCarita($aspecto, $n)] = $n <= 2;
+                }
+                foreach ($domiciliarioProblemas as $motivo) {
+                    $motivos[$motivo] = true;
+                }
+
+                foreach ($motivos as $motivo => $esQueja) {
                     Reputacion::registrar(
                         Reputacion::DOMICILIARIO, $pedido->domiciliario, $motivo, $pedido,
-                        ReputacionEvento::ORIGEN_CLIENTE, $domiciliarioProblemas ? $nota : null,
+                        ReputacionEvento::ORIGEN_CLIENTE, $esQueja ? $nota : null,
                     );
                 }
             }
@@ -327,7 +358,27 @@ class PedidoController extends Controller
     private function etiquetas(string $tipo, ?array $claves): array
     {
         return collect($claves ?? [])
-            ->map(fn ($clave) => Reputacion::PROBLEMAS_CLIENTE[$tipo][$clave] ?? $clave)
+            // Quejas de antes de las caritas (llegó tarde, mal trato): su descripción.
+            ->map(fn ($clave) => Reputacion::PROBLEMAS_CLIENTE[$tipo][$clave] ?? Reputacion::descripcion($tipo, $clave))
+            ->values()
+            ->all();
+    }
+
+    /** {"rapidez": 4, ...} → [{clave, nombre, nota, texto}] para mostrarle al cliente. */
+    private function caritasDadas(?array $caritas): ?array
+    {
+        if (! $caritas) {
+            return null;
+        }
+
+        return collect(Reputacion::ASPECTOS_DOMICILIARIO)
+            ->filter(fn ($a, $clave) => isset($caritas[$clave]))
+            ->map(fn ($a, $clave) => [
+                'clave' => $clave,
+                'nombre' => $a['nombre'],
+                'nota' => (int) $caritas[$clave],
+                'texto' => $a['caritas'][$caritas[$clave] - 1],
+            ])
             ->values()
             ->all();
     }

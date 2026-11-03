@@ -57,7 +57,7 @@ class AdminReputacionController extends Controller
         ]);
     }
 
-    /** Detalle: nivel + todos los eventos (también los anulados). */
+    /** Detalle: nivel + todos los eventos (también los anulados) y, del domiciliario, sus caritas. */
     public function show(string $tipo, int $id): JsonResponse
     {
         $sujeto = $this->sujeto($tipo, $id);
@@ -68,6 +68,7 @@ class AdminReputacionController extends Controller
         return response()->json([
             'reputacion' => Reputacion::resumen($tipo, $sujeto),
             'eventos' => Reputacion::historial($tipo, $sujeto, limite: 100, conAnulados: true),
+            'caritas' => $tipo === Reputacion::DOMICILIARIO ? Reputacion::caritasPromedio($sujeto) : null,
         ]);
     }
 

@@ -766,6 +766,8 @@ export type ReputacionDetalle = {
   reputacion: Reputacion;
   eventos: EventoReputacion[];
   tiempo_preparacion?: number;
+  /** Solo domiciliarios: promedio de caritas (null si nadie lo ha calificado). */
+  caritas?: CaritasPromedio | null;
 };
 
 /** Nivel de confiabilidad de un negocio mío y sus últimos eventos. */
@@ -1228,10 +1230,28 @@ export type MiPedido = {
 /** Problema que el cliente puede reportar al calificar. */
 export type OpcionProblema = { clave: string; label: string };
 
+/** Nota de 1 (carita muy brava) a 5 (muy feliz). */
+export type NotaCarita = 1 | 2 | 3 | 4 | 5;
+
+/** Lo que el cliente califica del domiciliario con caritas (amabilidad, rapidez...). */
+export type AspectoCaritas = {
+  clave: string;
+  nombre: string;
+  /** Pregunta corta debajo del nombre ("¿Cómo te trató?"). */
+  ayuda: string;
+  /** Texto de cada carita, de la 1 a la 5. */
+  caritas: string[];
+};
+
+/** Una carita que el cliente ya dio. */
+export type CaritaDada = { clave: string; nombre: string; nota: NotaCarita; texto: string };
+
 export type CalificacionPedido = {
   negocio_ok: boolean;
   negocio_problemas: string[];
   domiciliario_ok: boolean | null;
+  /** null en calificaciones de antes de las caritas. */
+  domiciliario_caritas?: CaritaDada[] | null;
   domiciliario_problemas: string[];
   comentario: string | null;
 };
@@ -1239,9 +1259,17 @@ export type CalificacionPedido = {
 export type NuevaCalificacion = {
   negocio_ok: boolean;
   negocio_problemas?: string[];
-  domiciliario_ok?: boolean;
+  /** { amabilidad: 5, rapidez: 4, estado_producto: 5 }; no hace falta si nunca llegó. */
+  domiciliario_caritas?: Record<string, NotaCarita>;
+  /** Solo lo grave: nunca llegó, llegó abierto, cobró de más. */
   domiciliario_problemas?: string[];
   comentario?: string;
+};
+
+/** Promedio de caritas que los clientes le dan a un domiciliario. */
+export type CaritasPromedio = {
+  calificaciones: number;
+  aspectos: { clave: string; nombre: string; promedio: number | null; votos: number }[];
 };
 
 export type SeguimientoPedido = {
@@ -1278,6 +1306,7 @@ export type SeguimientoPedido = {
   items: { nombre: string; cantidad: number; precio: number }[];
   puede_calificar?: boolean;
   opciones_problemas?: { negocio: OpcionProblema[]; domiciliario: OpcionProblema[] } | null;
+  aspectos_domiciliario?: AspectoCaritas[] | null;
   calificacion?: CalificacionPedido | null;
 };
 

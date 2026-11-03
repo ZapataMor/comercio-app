@@ -15,7 +15,8 @@ use Illuminate\Support\Collection;
  *  - Todo negocio/domiciliario arranca en `reputacion.inicial` (80).
  *  - Lo que pasa en cada pedido queda como un EVENTO con sus puntos
  *    (tabla reputacion_eventos): +2 si el cliente quedó conforme, -35 si el
- *    pedido nunca llegó, etc. Ver MOTIVOS.
+ *    pedido nunca llegó, etc. Ver MOTIVOS. Al domiciliario el cliente lo
+ *    califica con caritas de 1 a 5 (ver ASPECTOS_DOMICILIARIO).
  *  - El puntaje se recalcula repasando los eventos en orden, topado entre 0 y
  *    100: portarse bien mucho tiempo no "ahorra" puntos sin límite, y si un
  *    admin anula un evento injusto, todo se recalcula solo.
@@ -51,9 +52,10 @@ class Reputacion
             'producto_equivocado' => [-8, 'Mandó productos que no eran', false],
         ],
         self::DOMICILIARIO => [
-            'cliente_conforme' => [2, 'El cliente quedó conforme', false],
             'dinero_entregado' => [2, 'Entregó el dinero completo al negocio', false],
             'recogida_tarde' => [-3, 'Recogió el pedido después de lo que prometió', false],
+            // De antes de las caritas: siguen en el historial de cada uno.
+            'cliente_conforme' => [2, 'El cliente quedó conforme', false],
             'llego_tarde' => [-5, 'El pedido llegó tarde', false],
             'mal_trato' => [-5, 'Mal trato con el cliente', false],
             'pedido_manipulado' => [-15, 'El pedido llegó abierto o manipulado', false],
@@ -66,6 +68,7 @@ class Reputacion
 
     /**
      * Lo que el cliente puede reportar al calificar (motivo => texto para él).
+     * Del domiciliario solo lo grave: el resto lo dicen las caritas.
      *
      * @var array<string, array<string, string>>
      */
@@ -77,13 +80,41 @@ class Reputacion
             'mala_atencion' => 'Mala atención',
         ],
         self::DOMICILIARIO => [
-            'llego_tarde' => 'Llegó tarde',
             'no_llego' => 'Nunca me llegó el pedido',
             'pedido_manipulado' => 'Llegó abierto o manipulado',
             'cobro_de_mas' => 'Me cobró de más',
-            'mal_trato' => 'Me trató mal',
         ],
     ];
+
+    /**
+     * Lo que el cliente califica del domiciliario, de 1 (carita muy brava) a
+     * 5 (muy feliz). `caritas` es el texto de cada una, de la 1 a la 5.
+     *
+     * @var array<string, array{nombre: string, ayuda: string, caritas: array<int, string>}>
+     */
+    public const ASPECTOS_DOMICILIARIO = [
+        'amabilidad' => [
+            'nombre' => 'Amabilidad',
+            'ayuda' => '¿Cómo te trató?',
+            'caritas' => ['Muy grosero', 'Poco amable', 'Normal', 'Amable', 'Muy amable'],
+        ],
+        'rapidez' => [
+            'nombre' => 'Rapidez',
+            'ayuda' => '¿Llegó en el tiempo que esperabas?',
+            'caritas' => ['Muy lento', 'Lento', 'Normal', 'Rápido', 'Rapidísimo'],
+        ],
+        'estado_producto' => [
+            'nombre' => 'Estado del producto',
+            'ayuda' => '¿Llegó sin regarse, aplastarse ni enfriarse?',
+            'caritas' => ['Muy maltratado', 'Maltratado', 'Aceptable', 'Bien cuidado', 'Perfecto'],
+        ],
+    ];
+
+    /**
+     * Puntos de confiabilidad por carita: 4 o 5 suman, 3 no cambia nada y
+     * 1 o 2 restan (un 1 pesa como las quejas de antes: llegó tarde, mal trato).
+     */
+    public const PUNTOS_CARITA = [1 => -5, 2 => -2, 3 => 0, 4 => 1, 5 => 1];
 
     /** Demoras que no restan si el domiciliario reportó una novedad. */
     private const PERDONABLES_CON_NOVEDAD = ['recogida_tarde', 'llego_tarde'];
@@ -116,10 +147,12 @@ class Reputacion
         string $origen = ReputacionEvento::ORIGEN_SISTEMA,
         ?string $comentario = null,
     ): ReputacionEvento {
-        [$puntos, , $grave] = self::MOTIVOS[$tipo][$motivo];
+        [$puntos, , $grave] = self::datosMotivo($tipo, $motivo)
+            ?? throw new \InvalidArgumentException("Motivo de reputación desconocido: {$tipo}.{$motivo}");
 
         // Demora con justificación del domiciliario: queda anotada, sin castigo.
-        if ($pedido?->novedad && in_array($motivo, self::PERDONABLES_CON_NOVEDAD, true)) {
+        $esDemora = in_array($motivo, self::PERDONABLES_CON_NOVEDAD, true) || str_starts_with($motivo, 'rapidez_');
+        if ($pedido?->novedad && $esDemora && $puntos < 0) {
             $puntos = 0;
             $comentario = 'Justificó: '.$pedido->novedad;
         }
@@ -296,7 +329,7 @@ class Reputacion
             return 'Un administrador lo suspendió';
         }
 
-        return self::MOTIVOS[$tipo][$motivo][1] ?? $motivo;
+        return self::datosMotivo($tipo, $motivo)[1] ?? $motivo;
     }
 
     /** Opciones de problemas para el formulario de calificación del cliente. */
@@ -306,6 +339,85 @@ class Reputacion
             ->map(fn ($label, $clave) => ['clave' => $clave, 'label' => $label])
             ->values()
             ->all();
+    }
+
+    /** Lo que se califica con caritas, para el formulario del cliente. */
+    public static function aspectosCliente(): array
+    {
+        return collect(self::ASPECTOS_DOMICILIARIO)
+            ->map(fn ($a, $clave) => ['clave' => $clave, ...$a])
+            ->values()
+            ->all();
+    }
+
+    /** Motivo del evento de una carita: "rapidez_4". */
+    public static function motivoCarita(string $aspecto, int $nota): string
+    {
+        return "{$aspecto}_{$nota}";
+    }
+
+    /**
+     * Promedio de caritas (1 a 5) que los clientes le han dado al
+     * domiciliario en cada aspecto. Sale de los eventos, así que lo que un
+     * admin anula tampoco cuenta aquí. null si nadie lo ha calificado aún.
+     *
+     * @return array{calificaciones: int, aspectos: array<int, array{clave: string, nombre: string, promedio: ?float, votos: int}>}|null
+     */
+    public static function caritasPromedio(Model $domiciliario): ?array
+    {
+        $motivos = [];
+        foreach (array_keys(self::ASPECTOS_DOMICILIARIO) as $aspecto) {
+            foreach (array_keys(self::PUNTOS_CARITA) as $nota) {
+                $motivos[] = self::motivoCarita($aspecto, $nota);
+            }
+        }
+
+        $eventos = ReputacionEvento::where('tipo', self::DOMICILIARIO)
+            ->where('sujeto_id', $domiciliario->getKey())
+            ->whereNull('anulado_at')
+            ->whereIn('motivo', $motivos)
+            ->get(['motivo', 'pedido_id']);
+
+        if ($eventos->isEmpty()) {
+            return null;
+        }
+
+        // "estado_producto_4" => ["estado_producto", 4]
+        $notas = $eventos->groupBy(fn ($e) => substr($e->motivo, 0, -2))
+            ->map(fn ($grupo) => $grupo->map(fn ($e) => (int) substr($e->motivo, -1)));
+
+        return [
+            'calificaciones' => $eventos->pluck('pedido_id')->unique()->count(),
+            'aspectos' => collect(self::ASPECTOS_DOMICILIARIO)
+                ->map(fn ($a, $clave) => [
+                    'clave' => $clave,
+                    'nombre' => $a['nombre'],
+                    'promedio' => isset($notas[$clave]) ? round($notas[$clave]->avg(), 1) : null,
+                    'votos' => isset($notas[$clave]) ? $notas[$clave]->count() : 0,
+                ])
+                ->values()
+                ->all(),
+        ];
+    }
+
+    /**
+     * [puntos, descripción, ¿grave?] de un motivo, incluidas las caritas
+     * ("amabilidad_5" → "Amabilidad: 5 de 5 · Muy amable"). null si no existe.
+     *
+     * @return array{0: int, 1: string, 2: bool}|null
+     */
+    private static function datosMotivo(string $tipo, string $motivo): ?array
+    {
+        if ($tipo === self::DOMICILIARIO && preg_match('/^(\w+)_([1-5])$/', $motivo, $m)) {
+            $aspecto = self::ASPECTOS_DOMICILIARIO[$m[1]] ?? null;
+            if ($aspecto) {
+                $nota = (int) $m[2];
+
+                return [self::PUNTOS_CARITA[$nota], "{$aspecto['nombre']}: {$nota} de 5 · {$aspecto['caritas'][$nota - 1]}", false];
+            }
+        }
+
+        return self::MOTIVOS[$tipo][$motivo] ?? null;
     }
 
     /**

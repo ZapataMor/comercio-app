@@ -14,7 +14,7 @@ import { useAuth } from '../AuthContext';
 import { animarDespliegue, Desplegable, FadeInView, PressableScale } from '../components/anim';
 import { useConfirmar } from '../components/Confirmacion';
 import Icon from '../components/Icon';
-import { FilaEvento, NivelBadge } from '../components/Reputacion';
+import { FilaEvento, NivelBadge, PromedioCaritas } from '../components/Reputacion';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 
@@ -225,6 +225,7 @@ function Sujeto({
               <ActivityIndicator color={c.accent} />
             ) : (
               <>
+                {!!detalle.caritas && <PromedioCaritas caritas={detalle.caritas} />}
                 <Text style={styles.subtitulo}>
                   Historial · {detalle.reputacion.pedidos} pedido(s) evaluado(s)
                 </Text>

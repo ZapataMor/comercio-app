@@ -48,6 +48,12 @@ function repPedido(Negocio $negocio, User $cliente, string $estado = 'entregado'
     ], $extra));
 }
 
+/** Caritas para el domiciliario: amabilidad, rapidez y estado del producto. */
+function caritas(int $amabilidad, int $rapidez, int $estado): array
+{
+    return ['amabilidad' => $amabilidad, 'rapidez' => $rapidez, 'estado_producto' => $estado];
+}
+
 function puntaje(Negocio|User $sujeto): int
 {
     $sujeto->refresh();
@@ -69,25 +75,30 @@ test('si el cliente queda conforme, suben el negocio y el domiciliario', functio
     $this->getJson("/api/pedidos/{$pedido->id}")
         ->assertOk()
         ->assertJsonPath('puede_calificar', true)
-        ->assertJsonPath('opciones_problemas.domiciliario.1.clave', 'no_llego');
+        ->assertJsonPath('opciones_problemas.domiciliario.0.clave', 'no_llego')
+        ->assertJsonPath('aspectos_domiciliario.0.clave', 'amabilidad')
+        ->assertJsonPath('aspectos_domiciliario.1.caritas.4', 'Rapidísimo');
 
     $this->postJson("/api/pedidos/{$pedido->id}/calificacion", [
         'negocio_ok' => true,
-        'domiciliario_ok' => true,
+        'domiciliario_caritas' => caritas(5, 5, 4),
     ])->assertCreated();
 
     expect(puntaje($negocio))->toBe(82)
-        ->and(puntaje($domi))->toBe(82);
+        ->and(puntaje($domi))->toBe(83); // 80 + 1 + 1 + 1
 
     // Una sola vez por pedido.
     $this->postJson("/api/pedidos/{$pedido->id}/calificacion", [
         'negocio_ok' => true,
-        'domiciliario_ok' => true,
+        'domiciliario_caritas' => caritas(5, 5, 5),
     ])->assertStatus(409);
 
     $this->getJson("/api/pedidos/{$pedido->id}")
         ->assertJsonPath('puede_calificar', false)
-        ->assertJsonPath('calificacion.negocio_ok', true);
+        ->assertJsonPath('calificacion.negocio_ok', true)
+        ->assertJsonPath('calificacion.domiciliario_ok', true)
+        ->assertJsonPath('calificacion.domiciliario_caritas.2.nota', 4)
+        ->assertJsonPath('calificacion.domiciliario_caritas.2.texto', 'Bien cuidado');
 });
 
 test('los problemas que reporta el cliente bajan a quien corresponde', function () {
@@ -100,13 +111,22 @@ test('los problemas que reporta el cliente bajan a quien corresponde', function 
     $this->postJson("/api/pedidos/{$pedido->id}/calificacion", [
         'negocio_ok' => false,
         'negocio_problemas' => ['producto_equivocado', 'pedido_incompleto'],
-        'domiciliario_ok' => false,
-        'domiciliario_problemas' => ['llego_tarde'],
+        'domiciliario_caritas' => caritas(4, 1, 2),
         'comentario' => 'Pedí pan y llegó arepa, y tarde.',
     ])->assertCreated();
 
     expect(puntaje($negocio))->toBe(64) // 80 - 8 - 8
-        ->and(puntaje($domi))->toBe(75); // 80 - 5
+        ->and(puntaje($domi))->toBe(74); // 80 + 1 - 5 - 2
+
+    // El comentario acompaña solo las caritas bajas.
+    $this->assertDatabaseHas('reputacion_eventos', [
+        'sujeto_id' => $domi->id,
+        'motivo' => 'rapidez_1',
+        'puntos' => -5,
+        'comentario' => 'Pedí pan y llegó arepa, y tarde.',
+    ]);
+    $this->assertDatabaseHas('reputacion_eventos', ['sujeto_id' => $domi->id, 'motivo' => 'amabilidad_4', 'comentario' => null]);
+    $this->assertDatabaseHas('calificaciones', ['pedido_id' => $pedido->id, 'domiciliario_ok' => false]);
 
     $this->assertDatabaseHas('reputacion_eventos', [
         'tipo' => 'negocio',
@@ -124,14 +144,38 @@ test('si dice que algo falló, tiene que decir qué', function () {
 
     $this->postJson("/api/pedidos/{$pedido->id}/calificacion", [
         'negocio_ok' => false,
-        'domiciliario_ok' => true,
+        'domiciliario_caritas' => caritas(5, 5, 5),
     ])->assertStatus(422)->assertJsonValidationErrors('negocio_problemas');
 
     $this->postJson("/api/pedidos/{$pedido->id}/calificacion", [
         'negocio_ok' => true,
-        'domiciliario_ok' => false,
+        'domiciliario_caritas' => caritas(5, 5, 5),
         'domiciliario_problemas' => ['se_comio_las_papas'],
     ])->assertStatus(422)->assertJsonValidationErrors('domiciliario_problemas.0');
+});
+
+test('al domiciliario se le califican las tres cosas, de 1 a 5', function () {
+    $cliente = repUsuario();
+    $pedido = repPedido(repNegocio(), $cliente, 'entregado', repUsuario('domiciliario'));
+    Sanctum::actingAs($cliente);
+
+    $this->postJson("/api/pedidos/{$pedido->id}/calificacion", ['negocio_ok' => true])
+        ->assertStatus(422)->assertJsonValidationErrors('domiciliario_caritas');
+
+    $this->postJson("/api/pedidos/{$pedido->id}/calificacion", [
+        'negocio_ok' => true,
+        'domiciliario_caritas' => ['amabilidad' => 5, 'estado_producto' => 4],
+    ])->assertStatus(422)->assertJsonValidationErrors(['domiciliario_caritas.rapidez' => 'Elige una carita para «Rapidez».']);
+
+    $this->postJson("/api/pedidos/{$pedido->id}/calificacion", [
+        'negocio_ok' => true,
+        'domiciliario_caritas' => caritas(6, 0, 3),
+    ])->assertStatus(422)->assertJsonValidationErrors(['domiciliario_caritas.amabilidad', 'domiciliario_caritas.rapidez']);
+
+    // Sin domiciliario no se piden caritas.
+    $sinDomi = repPedido(repNegocio(), $cliente, 'entregado');
+    $this->getJson("/api/pedidos/{$sinDomi->id}")->assertJsonPath('aspectos_domiciliario', null);
+    $this->postJson("/api/pedidos/{$sinDomi->id}/calificacion", ['negocio_ok' => true])->assertCreated();
 });
 
 test('solo se califica un pedido propio, entregado y reciente', function () {
@@ -142,7 +186,7 @@ test('solo se califica un pedido propio, entregado y reciente', function () {
     $viejo = repPedido($negocio, $cliente, 'entregado', null, ['entregado_at' => now()->subDays(5)]);
     Sanctum::actingAs($cliente);
 
-    $this->postJson("/api/pedidos/{$enCamino->id}/calificacion", ['negocio_ok' => true, 'domiciliario_ok' => true])
+    $this->postJson("/api/pedidos/{$enCamino->id}/calificacion", ['negocio_ok' => true, 'domiciliario_caritas' => caritas(5, 5, 5)])
         ->assertStatus(409);
     $this->postJson("/api/pedidos/{$ajeno->id}/calificacion", ['negocio_ok' => true])
         ->assertStatus(404);
@@ -158,14 +202,13 @@ test('una demora justificada con una novedad queda anotada pero no resta', funct
 
     $this->postJson("/api/pedidos/{$pedido->id}/calificacion", [
         'negocio_ok' => true,
-        'domiciliario_ok' => false,
-        'domiciliario_problemas' => ['llego_tarde'],
+        'domiciliario_caritas' => caritas(3, 1, 3),
     ])->assertCreated();
 
     expect(puntaje($domi))->toBe(80);
     $this->assertDatabaseHas('reputacion_eventos', [
         'sujeto_id' => $domi->id,
-        'motivo' => 'llego_tarde',
+        'motivo' => 'rapidez_1',
         'puntos' => 0,
         'comentario' => 'Justificó: Aguacero fuerte',
     ]);
@@ -184,7 +227,6 @@ test('dos pedidos que nunca llegaron vetan al domiciliario', function () {
         Sanctum::actingAs($cliente);
         $this->postJson("/api/pedidos/{$pedido->id}/calificacion", [
             'negocio_ok' => true,
-            'domiciliario_ok' => false,
             'domiciliario_problemas' => ['no_llego'],
         ])->assertCreated();
     }
@@ -215,13 +257,53 @@ test('una sola falta grave baja mucho pero no veta todavía', function () {
 
     $this->postJson("/api/pedidos/{$pedido->id}/calificacion", [
         'negocio_ok' => true,
-        'domiciliario_ok' => false,
         'domiciliario_problemas' => ['no_llego'],
     ])->assertCreated();
 
     $domi->refresh();
     expect($domi->domiciliarioVetado())->toBeFalse()
         ->and(Reputacion::resumen('domiciliario', $domi)['nivel'])->toBe('riesgo');
+});
+
+test('el domiciliario ve el promedio de sus caritas y el historial dice cuántas le dieron', function () {
+    $domi = repUsuario('domiciliario');
+    $negocio = repNegocio();
+
+    foreach ([caritas(5, 4, 5), caritas(3, 4, 5)] as $c) {
+        $cliente = repUsuario();
+        $pedido = repPedido($negocio, $cliente, 'entregado', $domi);
+        Sanctum::actingAs($cliente);
+        $this->postJson("/api/pedidos/{$pedido->id}/calificacion", ['negocio_ok' => true, 'domiciliario_caritas' => $c])
+            ->assertCreated();
+    }
+
+    Sanctum::actingAs($domi);
+    $this->getJson('/api/domiciliario/reputacion')
+        ->assertOk()
+        ->assertJsonPath('caritas.calificaciones', 2)
+        ->assertJsonPath('caritas.aspectos.0.clave', 'amabilidad')
+        ->assertJsonPath('caritas.aspectos.0.promedio', 4)
+        ->assertJsonPath('caritas.aspectos.2.promedio', 5)
+        ->assertJsonPath('eventos.0.descripcion', 'Estado del producto: 5 de 5 · Perfecto');
+
+    // Si un admin anula una carita injusta, deja de contar en el promedio.
+    ReputacionEvento::where('motivo', 'amabilidad_3')->first()->update(['anulado_at' => now()]);
+    $this->getJson('/api/domiciliario/reputacion')->assertJsonPath('caritas.aspectos.0.promedio', 5);
+});
+
+test('si el pedido nunca llegó no se piden caritas', function () {
+    $cliente = repUsuario();
+    $domi = repUsuario('domiciliario');
+    $pedido = repPedido(repNegocio(), $cliente, 'entregado', $domi);
+    Sanctum::actingAs($cliente);
+
+    $this->postJson("/api/pedidos/{$pedido->id}/calificacion", [
+        'negocio_ok' => true,
+        'domiciliario_problemas' => ['no_llego'],
+    ])->assertCreated();
+
+    $this->assertDatabaseHas('calificaciones', ['pedido_id' => $pedido->id, 'domiciliario_ok' => false, 'domiciliario_caritas' => null]);
+    expect(ReputacionEvento::where('sujeto_id', $domi->id)->pluck('motivo')->all())->toBe(['no_llego']);
 });
 
 // ===========================================================================

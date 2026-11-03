@@ -18,10 +18,11 @@ import Icon from './Icon';
 import { colorNivel, TarjetaReputacion } from './Reputacion';
 
 const EXPLICACION =
-  'Sube cuando el cliente queda conforme y cuando entregas el dinero completo al negocio. ' +
-  'Baja si recoges después de lo que prometiste, si llegas tarde sin avisar o si hay quejas. ' +
+  'Los clientes te califican con caritas de 1 a 5 en amabilidad, rapidez y estado del producto: ' +
+  '4 o 5 caritas suman, 1 o 2 restan. También sube cuando entregas el dinero completo al negocio, ' +
+  'y baja si recoges después de lo que prometiste o si hay quejas graves. ' +
   'Con menos de 30 puntos, o 2 faltas graves (pedido que no llegó, dinero no entregado) en 30 días, ' +
-  'la cuenta se suspende. ¿Te vas a demorar? Reporta una novedad y la demora no te resta.';
+  'la cuenta se suspende. ¿Te vas a demorar? Reporta una novedad y la rapidez no te resta.';
 
 // Último nivel conocido de la sesión y los íconos que lo muestran.
 let ultimo: { token: string; detalle: ReputacionDetalle } | null = null;
@@ -106,6 +107,7 @@ function BotonConfiabilidad({ token }: { token: string }) {
                 <TarjetaReputacion
                   reputacion={detalle.reputacion}
                   eventos={detalle.eventos}
+                  caritas={detalle.caritas}
                   titulo="Tu nivel de confiabilidad"
                   explicacion={EXPLICACION}
                   style={styles.tarjeta}

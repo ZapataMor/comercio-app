@@ -3,15 +3,17 @@
  *
  *   <NivelBadge reputacion={r} />            ← pastilla "Confiable · 86"
  *   <TarjetaReputacion reputacion={r} eventos={e} explicacion="…" />
+ *   <PromedioCaritas caritas={c} />          ← domiciliario: caritas promedio
  *
  * El puntaje va de 0 a 100: sube cuando cumplen y baja cuando fallan. Por
  * debajo de 50 se muestra "En riesgo" y por debajo de 30 queda vetado.
  */
 import React, { useState } from 'react';
 import { StyleProp, Text, View, ViewStyle } from 'react-native';
-import { EventoReputacion, NivelReputacion, Reputacion } from '../api';
+import { CaritasPromedio, EventoReputacion, NivelReputacion, Reputacion } from '../api';
 import { Colores, font, makeStyles, radius, useTheme } from '../theme';
 import { FadeInView, PressableScale } from './anim';
+import Carita, { notaDePromedio } from './Carita';
 import Icon from './Icon';
 
 /** Umbrales (coinciden con backend/config/reputacion.php). */
@@ -64,12 +66,15 @@ export function TarjetaReputacion({
   eventos,
   titulo = 'Nivel de confiabilidad',
   explicacion,
+  caritas,
   style,
 }: {
   reputacion: Reputacion;
   eventos?: EventoReputacion[];
   titulo?: string;
   explicacion?: string;
+  /** Domiciliario: promedio de las caritas que le dan los clientes. */
+  caritas?: CaritasPromedio | null;
   /** Ajustes del contenedor (p. ej. sin marco de tarjeta dentro de un modal). */
   style?: StyleProp<ViewStyle>;
 }) {
@@ -125,6 +130,8 @@ export function TarjetaReputacion({
         </View>
       ) : null}
 
+      {!!caritas && <PromedioCaritas caritas={caritas} titulo="Cómo te califican los clientes" />}
+
       {!!explicacion && <Text style={styles.explicacion}>{explicacion}</Text>}
 
       {lista.length > 0 && (
@@ -141,6 +148,44 @@ export function TarjetaReputacion({
         </View>
       )}
     </FadeInView>
+  );
+}
+
+/**
+ * Promedio de caritas (1 a 5) de un domiciliario en amabilidad, rapidez y
+ * estado del producto: la carita que le corresponde y el número ("4,6").
+ */
+export function PromedioCaritas({
+  caritas,
+  titulo = 'Calificación de los clientes',
+}: {
+  caritas: CaritasPromedio;
+  titulo?: string;
+}) {
+  const styles = useStyles();
+  return (
+    <View style={styles.caritas}>
+      <Text style={styles.histTitulo}>{titulo}</Text>
+      <View style={styles.caritasFila}>
+        {caritas.aspectos.map(a => (
+          <View key={a.clave} style={styles.caritaCaja}>
+            {a.promedio !== null ? (
+              <Carita nota={notaDePromedio(a.promedio)} size={38} />
+            ) : (
+              <View style={styles.caritaVacia} />
+            )}
+            <Text style={styles.caritaPromedio}>
+              {a.promedio !== null ? a.promedio.toFixed(1).replace('.', ',') : '–'}
+              <Text style={styles.caritaSobre}> / 5</Text>
+            </Text>
+            <Text style={styles.caritaNombre}>{a.nombre}</Text>
+          </View>
+        ))}
+      </View>
+      <Text style={styles.caritaPie}>
+        {caritas.calificaciones === 1 ? 'Según 1 calificación' : `Según ${caritas.calificaciones} calificaciones`}
+      </Text>
+    </View>
   );
 }
 
@@ -195,6 +240,17 @@ const useStyles = makeStyles((c, shadow) => ({
   },
   avisoTxt: { flex: 1, color: c.danger, fontSize: 13, fontFamily: font.medium },
   explicacion: { color: c.muted, fontSize: 13, lineHeight: 19, marginTop: 10, fontFamily: font.regular },
+  caritas: { borderTopWidth: 1, borderTopColor: c.border, marginTop: 12, paddingTop: 10 },
+  caritasFila: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  caritaCaja: {
+    flex: 1, alignItems: 'center', backgroundColor: c.surface2, borderRadius: radius.sm,
+    paddingVertical: 10, paddingHorizontal: 4,
+  },
+  caritaVacia: { width: 38, height: 38 },
+  caritaPromedio: { fontFamily: font.extra, color: c.textStrong, fontSize: 17, marginTop: 4 },
+  caritaSobre: { fontFamily: font.semibold, color: c.muted, fontSize: 11 },
+  caritaNombre: { color: c.muted, fontSize: 11, textAlign: 'center', fontFamily: font.medium },
+  caritaPie: { color: c.mutedSoft, fontSize: 12, marginTop: 6, fontFamily: font.regular },
   historial: { borderTopWidth: 1, borderTopColor: c.border, marginTop: 12, paddingTop: 10 },
   histTitulo: { fontSize: 12, fontFamily: font.bold, color: c.mutedSoft, marginBottom: 4, textTransform: 'uppercase' },
   evento: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 7 },

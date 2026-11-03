@@ -132,7 +132,7 @@ class DomiciliarioController extends Controller
         return response()->json(['compartir' => true]);
     }
 
-    /** Mi nivel de confiabilidad y por qué (últimos eventos). */
+    /** Mi nivel de confiabilidad, por qué (últimos eventos) y mis caritas promedio. */
     public function reputacion(Request $request): JsonResponse
     {
         $yo = $request->user();
@@ -140,6 +140,7 @@ class DomiciliarioController extends Controller
         return response()->json([
             'reputacion' => Reputacion::resumen(Reputacion::DOMICILIARIO, $yo),
             'eventos' => Reputacion::historial(Reputacion::DOMICILIARIO, $yo),
+            'caritas' => Reputacion::caritasPromedio($yo),
         ]);
     }
 

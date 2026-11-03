@@ -6,9 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Lo que contestó el cliente al terminar un pedido: si el negocio y el
- * domiciliario cumplieron y, si no, qué falló (claves de
- * App\Support\Reputacion::PROBLEMAS_CLIENTE). Una por pedido.
+ * Lo que contestó el cliente al terminar un pedido: si el negocio cumplió y,
+ * si no, qué falló; las caritas (1 a 5) que le dio al domiciliario y si
+ * reportó algo grave de él (claves de App\Support\Reputacion::PROBLEMAS_CLIENTE).
+ * Una por pedido.
  */
 class Calificacion extends Model
 {
@@ -20,6 +21,7 @@ class Calificacion extends Model
         'negocio_ok',
         'negocio_problemas',
         'domiciliario_ok',
+        'domiciliario_caritas',
         'domiciliario_problemas',
         'comentario',
     ];
@@ -30,6 +32,7 @@ class Calificacion extends Model
             'negocio_ok' => 'boolean',
             'negocio_problemas' => 'array',
             'domiciliario_ok' => 'boolean',
+            'domiciliario_caritas' => 'array',
             'domiciliario_problemas' => 'array',
         ];
     }
