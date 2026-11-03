@@ -2,26 +2,78 @@
  * Diálogo de confirmación con los estilos de Vitrina, en lugar de la alerta
  * genérica del sistema: ícono en un círculo, título, explicación, puntos
  * opcionales (ícono + texto) y dos acciones. La tarjeta entra con un pequeño
- * zoom sobre el fondo oscurecido.
+ * zoom sobre el fondo oscurecido. (Los avisos que no piden nada van con
+ * Toast.)
  *
- *   <Confirmacion
- *     visible={abierto}
- *     icono="moto"
- *     titulo="¿Quieres ser domiciliario?"
- *     texto="…"
- *     textoBoton="Quiero serlo"
- *     enviando={enviando}
- *     onCerrar={() => setAbierto(false)}
- *     onConfirmar={activar}
- *   />
+ * Se usa con `useConfirmar` (el ConfirmacionProvider va en App.tsx): la
+ * acción corre al aceptar, con la ruedita en el botón, y al terminar el
+ * diálogo se cierra. Sus errores los avisa la propia acción.
+ *
+ *   const confirmar = useConfirmar();
+ *   confirmar({
+ *     icono: 'basura',
+ *     titulo: '¿Eliminar este producto?',
+ *     texto: '…',
+ *     textoBoton: 'Eliminar',
+ *     peligro: true,
+ *     accion: async () => { … },
+ *   });
  *
  * `peligro` pinta el ícono y el botón en rojo (acciones que quitan algo).
  */
-import React, { useEffect, useRef } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { PressableScale } from './anim';
 import Icon, { IconName } from './Icon';
+
+/** Lo que se le pasa a `confirmar`: el contenido del diálogo y qué hacer al aceptar. */
+export type OpcionesConfirmacion = Omit<Props, 'visible' | 'enviando' | 'onCerrar' | 'onConfirmar'> & {
+  accion: () => unknown;
+};
+
+const ConfirmacionContext = createContext<(opciones: OpcionesConfirmacion) => void>(() => {});
+
+export const useConfirmar = () => useContext(ConfirmacionContext);
+
+export function ConfirmacionProvider({ children }: { children: React.ReactNode }) {
+  // Las opciones se quedan al cerrar para que el fundido de salida no se vacíe.
+  const [opciones, setOpciones] = useState<OpcionesConfirmacion | null>(null);
+  const [visible, setVisible] = useState(false);
+  const [enviando, setEnviando] = useState(false);
+
+  const confirmar = useCallback((o: OpcionesConfirmacion) => {
+    setOpciones(o);
+    setEnviando(false);
+    setVisible(true);
+  }, []);
+
+  async function aceptar() {
+    if (!opciones) return;
+    setEnviando(true);
+    try {
+      await opciones.accion();
+    } finally {
+      setEnviando(false);
+      setVisible(false);
+    }
+  }
+
+  return (
+    <ConfirmacionContext.Provider value={confirmar}>
+      {children}
+      {opciones && (
+        <Confirmacion
+          {...opciones}
+          visible={visible}
+          enviando={enviando}
+          onCerrar={() => setVisible(false)}
+          onConfirmar={aceptar}
+        />
+      )}
+    </ConfirmacionContext.Provider>
+  );
+}
 
 type Props = {
   visible: boolean;

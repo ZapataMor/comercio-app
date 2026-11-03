@@ -2,7 +2,6 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Dimensions,
   FlatList,
@@ -32,6 +31,7 @@ import {
 import { useAuth } from '../AuthContext';
 import { useNegocio } from '../NegocioContext';
 import { FadeInView, PressableScale } from '../components/anim';
+import { useConfirmar } from '../components/Confirmacion';
 import { Dropdown } from '../components/Dropdown';
 import FieldError from '../components/FieldError';
 import Icon from '../components/Icon';
@@ -76,6 +76,7 @@ export default function MisProductosScreen({ navigation }: Props) {
   const { auth } = useAuth();
   const token = auth!.token;
   const toast = useToast();
+  const confirmar = useConfirmar();
   // Catálogo del negocio ACTIVO (una persona puede gestionar varios).
   const { negocio, cargando: cargandoNegocio } = useNegocio();
   const negocioId = negocio?.id ?? null;
@@ -278,27 +279,28 @@ export default function MisProductosScreen({ navigation }: Props) {
   }
 
   function onEliminar(p: Producto) {
-    Alert.alert('Eliminar producto', `¿Eliminar "${p.nombre}"?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Eliminar',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            if (!negocioId) {
-              return;
-            }
-            await eliminarProducto(token, negocioId, p.id);
-            toast.exito('Eliminado', `"${p.nombre}" se quitó del catálogo.`);
-            // Sale de la lista al instante; luego se confirma con el servidor.
-            setProductos(prev => prev.filter(x => x.id !== p.id));
-            cargar('silencioso');
-          } catch (e) {
-            toast.error('No se pudo eliminar', e instanceof Error ? e.message : 'Error');
+    confirmar({
+      icono: 'basura',
+      titulo: '¿Eliminar este producto?',
+      texto: `"${p.nombre}" se quitará de tu catálogo y los clientes ya no lo verán.`,
+      textoBoton: 'Eliminar producto',
+      textoCancelar: 'Cancelar',
+      peligro: true,
+      accion: async () => {
+        try {
+          if (!negocioId) {
+            return;
           }
-        },
+          await eliminarProducto(token, negocioId, p.id);
+          toast.exito('Eliminado', `"${p.nombre}" se quitó del catálogo.`);
+          // Sale de la lista al instante; luego se confirma con el servidor.
+          setProductos(prev => prev.filter(x => x.id !== p.id));
+          cargar('silencioso');
+        } catch (e) {
+          toast.error('No se pudo eliminar', e instanceof Error ? e.message : 'Error');
+        }
       },
-    ]);
+    });
   }
 
   if (!negocio) {

@@ -1,6 +1,6 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import {
   cancelarPedidoNegocio,
   ComercioPedido,
@@ -12,6 +12,7 @@ import {
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import BotonesContacto from '../components/BotonesContacto';
+import { useConfirmar } from '../components/Confirmacion';
 import Icon from '../components/Icon';
 import { haceCuanto, MapaSeguimiento, NotaEnVivo } from '../components/Mapa';
 import MotivoCancelacion from '../components/MotivoCancelacion';
@@ -34,6 +35,7 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
   const { auth } = useAuth();
   const token = auth!.token;
   const toast = useToast();
+  const confirmar = useConfirmar();
   const { negocio } = useNegocio();
   // Desde un push el pedido puede ser de un negocio que no es el activo.
   const negocioId = route.params.negocioId ?? negocio?.id ?? null;
@@ -116,16 +118,18 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
       return;
     }
     // Acusar al domiciliario le baja mucho la confiabilidad: se confirma.
-    Alert.alert(
-      estado === 'no_recibido' ? '¿No te entregó el dinero?' : '¿Te entregó menos dinero?',
-      estado === 'no_recibido'
-        ? 'Es una falta grave: le baja mucho el nivel al domiciliario y, si se repite, queda vetado.'
-        : 'Le bajará el nivel de confiabilidad al domiciliario.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Sí, reportar', style: 'destructive', onPress: () => enviarDinero(estado) },
-      ],
-    );
+    confirmar({
+      icono: 'efectivo',
+      titulo: estado === 'no_recibido' ? '¿No te entregó el dinero?' : '¿Te entregó menos dinero?',
+      texto:
+        estado === 'no_recibido'
+          ? 'Es una falta grave: le baja mucho el nivel al domiciliario y, si se repite, queda vetado.'
+          : 'Le bajará el nivel de confiabilidad al domiciliario.',
+      textoBoton: 'Sí, reportar',
+      textoCancelar: 'Cancelar',
+      peligro: true,
+      accion: () => enviarDinero(estado),
+    });
   }
 
   if (cargando) {

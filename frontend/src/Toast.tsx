@@ -2,7 +2,8 @@
  * Notificaciones tipo "toast" con estilo de la app.
  * Aparecen a la derecha, justo debajo de la topbar (para no tapar sus botones),
  * de forma temporal, y se cierran solas.
- * Reemplazan a los `Alert.alert` genéricos para avisos (no para confirmaciones).
+ * Reemplazan a los `Alert.alert` genéricos para avisos; las confirmaciones van
+ * con `useConfirmar` (components/Confirmacion).
  *
  * Uso:
  *   const toast = useToast();

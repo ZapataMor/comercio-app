@@ -25,7 +25,7 @@ import { actualizarPerfil, dejarDeSerDomiciliario, eliminarCuenta, Usuario } fro
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import BarrioSelect from '../components/BarrioSelect';
-import Confirmacion from '../components/Confirmacion';
+import { useConfirmar } from '../components/Confirmacion';
 import FieldError from '../components/FieldError';
 import Icon, { IconName } from '../components/Icon';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
@@ -41,6 +41,7 @@ export default function MiInformacionScreen(_props: Props) {
   const styles = useStyles();
   const { auth, actualizarUsuario, salir } = useAuth();
   const toast = useToast();
+  const confirmar = useConfirmar();
   const user = auth!.user;
   const { codigoPublico } = useNegocio();
 
@@ -95,22 +96,27 @@ export default function MiInformacionScreen(_props: Props) {
     }
   }
 
-  // "Dejar de ser domiciliario": sigue siendo cliente; se puede volver desde el menú.
-  const [dejando, setDejando] = useState(false);
-  const [enviandoDejar, setEnviandoDejar] = useState(false);
-
-  async function dejarDomiciliario() {
-    setEnviandoDejar(true);
-    try {
-      const r = await dejarDeSerDomiciliario(auth!.token);
-      setDejando(false);
-      actualizarUsuario(r.user);
-      toast.exito('Listo', 'Ya no eres domiciliario. Sigues siendo cliente.');
-    } catch (e) {
-      toast.error('No se pudo cambiar', messageFromError(e, 'Error'));
-    } finally {
-      setEnviandoDejar(false);
-    }
+  /** "Dejar de ser domiciliario": sigue siendo cliente; se puede volver desde el menú. */
+  function confirmarDejarDomiciliario() {
+    confirmar({
+      icono: 'moto',
+      titulo: '¿Dejar de ser domiciliario?',
+      texto:
+        'Ya no podrás tomar pedidos ni te llegarán sus avisos. Sigues siendo cliente y puedes volver ' +
+        'a serlo cuando quieras desde el menú de tu cuenta.',
+      textoBoton: 'Dejar de serlo',
+      textoCancelar: 'Cancelar',
+      peligro: true,
+      accion: async () => {
+        try {
+          const r = await dejarDeSerDomiciliario(auth!.token);
+          actualizarUsuario(r.user);
+          toast.exito('Listo', 'Ya no eres domiciliario. Sigues siendo cliente.');
+        } catch (e) {
+          toast.error('No se pudo cambiar', messageFromError(e, 'Error'));
+        }
+      },
+    });
   }
 
   function limpiarError(campo: string) {
@@ -254,7 +260,7 @@ export default function MiInformacionScreen(_props: Props) {
             <Text style={styles.btnTxt}>Editar información</Text>
           </PressableScale>
           {esDomiciliario && (
-            <TouchableOpacity onPress={() => setDejando(true)} hitSlop={8}>
+            <TouchableOpacity onPress={confirmarDejarDomiciliario} hitSlop={8}>
               <Text style={styles.dejarTxt}>Dejar de ser domiciliario</Text>
             </TouchableOpacity>
           )}
@@ -262,19 +268,6 @@ export default function MiInformacionScreen(_props: Props) {
             <Text style={styles.eliminarTxt}>Eliminar mi cuenta</Text>
           </TouchableOpacity>
         </FadeInView>
-
-        <Confirmacion
-          visible={dejando}
-          icono="moto"
-          titulo="¿Dejar de ser domiciliario?"
-          texto="Ya no podrás tomar pedidos ni te llegarán sus avisos. Sigues siendo cliente y puedes volver a serlo cuando quieras desde el menú de tu cuenta."
-          textoBoton="Dejar de serlo"
-          textoCancelar="Cancelar"
-          peligro
-          enviando={enviandoDejar}
-          onCerrar={() => setDejando(false)}
-          onConfirmar={dejarDomiciliario}
-        />
 
         <Modal visible={eliminando} transparent animationType="fade" onRequestClose={cerrarEliminar}>
           <KeyboardAvoidingView

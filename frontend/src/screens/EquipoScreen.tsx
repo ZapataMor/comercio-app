@@ -9,7 +9,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
   cancelarInvitacion,
   getEquipo,
@@ -22,6 +22,7 @@ import {
 } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
+import { useConfirmar } from '../components/Confirmacion';
 import FieldError from '../components/FieldError';
 import Icon from '../components/Icon';
 import { messageFromError } from '../formErrors';
@@ -38,6 +39,7 @@ export default function EquipoScreen({ navigation }: Props) {
   const { auth } = useAuth();
   const token = auth!.token;
   const toast = useToast();
+  const confirmar = useConfirmar();
   const { negocio, esPropietario, recargar } = useNegocio();
   const negocioId = negocio?.id ?? null;
 
@@ -123,66 +125,69 @@ export default function EquipoScreen({ navigation }: Props) {
     if (!negocioId) {
       return;
     }
-    Alert.alert('Cancelar invitación', `¿Cancelar la invitación de ${inv.nombre ?? 'esta persona'}?`, [
-      { text: 'No', style: 'cancel' },
-      {
-        text: 'Cancelar invitación',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await cancelarInvitacion(token, negocioId, inv.id);
-            setPendientes(lista => lista.filter(i => i.id !== inv.id));
-          } catch (e) {
-            toast.error('No se pudo cancelar', messageFromError(e, 'Error'));
-          }
-        },
+    confirmar({
+      icono: 'cerrar',
+      titulo: '¿Cancelar la invitación?',
+      texto: `${inv.nombre ?? 'Esta persona'} ya no podrá unirse a ${negocio?.nombre ?? 'tu negocio'} con ella.`,
+      textoBoton: 'Cancelar invitación',
+      textoCancelar: 'Volver',
+      peligro: true,
+      accion: async () => {
+        try {
+          await cancelarInvitacion(token, negocioId, inv.id);
+          setPendientes(lista => lista.filter(i => i.id !== inv.id));
+        } catch (e) {
+          toast.error('No se pudo cancelar', messageFromError(e, 'Error'));
+        }
       },
-    ]);
+    });
   }
 
   function onQuitar(m: MiembroNegocio) {
     if (!negocioId) {
       return;
     }
-    Alert.alert('Quitar del equipo', `¿Quitar a ${m.name} de ${negocio?.nombre}? Ya no podrá gestionar el negocio.`, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Quitar',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await quitarMiembro(token, negocioId, m.id);
-            toast.exito('Listo', `${m.name} ya no hace parte del negocio.`);
-            setMiembros(lista => lista.filter(x => x.id !== m.id));
-          } catch (e) {
-            toast.error('No se pudo quitar', messageFromError(e, 'Error'));
-          }
-        },
+    confirmar({
+      icono: 'usuarios',
+      titulo: `¿Quitar a ${m.name} del equipo?`,
+      texto: `Ya no podrá gestionar ${negocio?.nombre ?? 'el negocio'}.`,
+      textoBoton: 'Quitar del equipo',
+      textoCancelar: 'Cancelar',
+      peligro: true,
+      accion: async () => {
+        try {
+          await quitarMiembro(token, negocioId, m.id);
+          toast.exito('Listo', `${m.name} ya no hace parte del negocio.`);
+          setMiembros(lista => lista.filter(x => x.id !== m.id));
+        } catch (e) {
+          toast.error('No se pudo quitar', messageFromError(e, 'Error'));
+        }
       },
-    ]);
+    });
   }
 
   function onSalir() {
     if (!negocioId) {
       return;
     }
-    Alert.alert('Salir del negocio', `¿Dejar de trabajar en ${negocio?.nombre}?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Salir',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await salirDelNegocio(token, negocioId);
-            await recargar();
-            toast.exito('Saliste del negocio', negocio?.nombre);
-            navigation.navigate('MisNegocios');
-          } catch (e) {
-            toast.error('No se pudo salir', messageFromError(e, 'Error'));
-          }
-        },
+    confirmar({
+      icono: 'salir',
+      titulo: '¿Salir del negocio?',
+      texto: `Dejarás de trabajar en ${negocio?.nombre ?? 'este negocio'}. Para volver, tendrán que invitarte otra vez.`,
+      textoBoton: 'Salir del negocio',
+      textoCancelar: 'Cancelar',
+      peligro: true,
+      accion: async () => {
+        try {
+          await salirDelNegocio(token, negocioId);
+          await recargar();
+          toast.exito('Saliste del negocio', negocio?.nombre);
+          navigation.navigate('MisNegocios');
+        } catch (e) {
+          toast.error('No se pudo salir', messageFromError(e, 'Error'));
+        }
       },
-    ]);
+    });
   }
 
   if (!negocio) {

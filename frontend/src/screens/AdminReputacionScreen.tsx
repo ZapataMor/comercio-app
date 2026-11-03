@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, RefreshControl, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, Text, TextInput, View } from 'react-native';
 import {
   anularEventoReputacion,
   getAdminReputacion,
@@ -12,6 +12,7 @@ import {
 } from '../api';
 import { useAuth } from '../AuthContext';
 import { animarDespliegue, Desplegable, FadeInView, PressableScale } from '../components/anim';
+import { useConfirmar } from '../components/Confirmacion';
 import Icon from '../components/Icon';
 import { FilaEvento, NivelBadge } from '../components/Reputacion';
 import { font, makeStyles, radius, useTheme } from '../theme';
@@ -131,6 +132,7 @@ function Sujeto({
   const { auth } = useAuth();
   const token = auth!.token;
   const toast = useToast();
+  const confirmar = useConfirmar();
   const [detalle, setDetalle] = useState<ReputacionDetalle | null>(null);
   const [motivo, setMotivo] = useState('');
 
@@ -160,21 +162,26 @@ function Sujeto({
   }
 
   function onAnular(eventoId: number, descripcion: string) {
-    Alert.alert('¿Anular este evento?', `"${descripcion}" deja de contar y el puntaje se recalcula.`, [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Anular', style: 'destructive', onPress: () => ejecutar(() => anularEventoReputacion(token, eventoId), 'Evento anulado') },
-    ]);
+    confirmar({
+      icono: 'lista',
+      titulo: '¿Anular este evento?',
+      texto: `"${descripcion}" deja de contar y el puntaje se recalcula.`,
+      textoBoton: 'Anular evento',
+      textoCancelar: 'Cancelar',
+      peligro: true,
+      accion: () => ejecutar(() => anularEventoReputacion(token, eventoId), 'Evento anulado'),
+    });
   }
 
   function onLevantar() {
-    Alert.alert(
-      '¿Dar una segunda oportunidad?',
-      'Se quita el veto y queda "En riesgo" (50 puntos). Las faltas graves anteriores ya no cuentan.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Levantar veto', onPress: () => ejecutar(() => levantarVeto(token, tipo, sujeto.id), 'Veto levantado') },
-      ],
-    );
+    confirmar({
+      icono: 'escudo',
+      titulo: '¿Dar una segunda oportunidad?',
+      texto: 'Se quita el veto y queda "En riesgo" (50 puntos). Las faltas graves anteriores ya no cuentan.',
+      textoBoton: 'Levantar veto',
+      textoCancelar: 'Cancelar',
+      accion: () => ejecutar(() => levantarVeto(token, tipo, sujeto.id), 'Veto levantado'),
+    });
   }
 
   function onSuspender() {
@@ -182,15 +189,16 @@ function Sujeto({
       toast.error('Falta el motivo', 'Escribe por qué lo suspendes.');
       return;
     }
-    Alert.alert(`¿Suspender a ${sujeto.nombre}?`, motivo.trim(), [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Suspender',
-        style: 'destructive',
-        onPress: () =>
-          ejecutar(() => suspenderSujeto(token, tipo, sujeto.id, motivo.trim()), 'Suspendido').then(() => setMotivo('')),
-      },
-    ]);
+    confirmar({
+      icono: 'alerta',
+      titulo: `¿Suspender a ${sujeto.nombre}?`,
+      texto: `Motivo: "${motivo.trim()}". Queda vetado sin importar su puntaje, hasta que le levantes el veto.`,
+      textoBoton: 'Suspender',
+      textoCancelar: 'Cancelar',
+      peligro: true,
+      accion: () =>
+        ejecutar(() => suspenderSujeto(token, tipo, sujeto.id, motivo.trim()), 'Suspendido').then(() => setMotivo('')),
+    });
   }
 
   const r = sujeto.reputacion;

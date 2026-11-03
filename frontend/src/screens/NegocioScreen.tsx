@@ -2,7 +2,6 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   GestureResponderEvent,
   Image,
@@ -13,11 +12,13 @@ import { getCatalogo, imagenUrl, Negocio, Producto } from '../api';
 import { useAuth } from '../AuthContext';
 import { useCart } from '../CartContext';
 import { FadeInView, PressableScale } from '../components/anim';
+import { useConfirmar } from '../components/Confirmacion';
 import { useFlyToCart } from '../components/FlyToCart';
 import Icon from '../components/Icon';
 import { NivelBadge } from '../components/Reputacion';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
+import { useToast } from '../Toast';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Negocio'>;
 
@@ -52,6 +53,8 @@ export default function NegocioScreen({ route }: Props) {
   const { auth } = useAuth();
   const cart = useCart();
   const { volar } = useFlyToCart();
+  const toast = useToast();
+  const confirmar = useConfirmar();
   const { id, nombre, productoId } = route.params;
   const [negocio, setNegocio] = useState<Negocio | null>(null);
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -85,7 +88,7 @@ export default function NegocioScreen({ route }: Props) {
 
   function onAgregar(p: Producto, e: GestureResponderEvent) {
     if (!negocioAbierto) {
-      Alert.alert('Negocio cerrado', 'Este negocio está cerrado ahora. Puedes revisar el catálogo, pero no hacer pedidos.');
+      toast.info('Negocio cerrado', 'Puedes ver el catálogo, pero no hacer pedidos.');
       return;
     }
 
@@ -97,20 +100,17 @@ export default function NegocioScreen({ route }: Props) {
       volar(desde);
       return;
     }
-    Alert.alert(
-      'Tienes otra tienda en el carrito',
-      `Tu carrito tiene productos de "${cart.negocioNombre}". Vacíalo para pedir de "${nombre}".`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Vaciar y agregar',
-          onPress: () => {
-            cart.reemplazar(id, nombre, p);
-            volar(desde);
-          },
-        },
-      ],
-    );
+    confirmar({
+      icono: 'carrito',
+      titulo: '¿Vaciar el carrito?',
+      texto: `Tu carrito tiene productos de "${cart.negocioNombre}". Cada pedido es de una sola tienda: vacíalo para pedir de "${nombre}".`,
+      textoBoton: 'Vaciar y agregar',
+      textoCancelar: 'Cancelar',
+      accion: () => {
+        cart.reemplazar(id, nombre, p);
+        volar(desde);
+      },
+    });
   }
 
   if (cargando) {

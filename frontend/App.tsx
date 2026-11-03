@@ -11,6 +11,7 @@ import { Colores, font, makeStyles, ThemeProvider, useTheme } from './src/theme'
 import { AuthProvider, useAuth } from './src/AuthContext';
 import { CartProvider } from './src/CartContext';
 import BarraCliente from './src/components/BarraCliente';
+import { ConfirmacionProvider } from './src/components/Confirmacion';
 import { AppDesenfocable } from './src/components/Desenfoque';
 import { FlyToCartProvider } from './src/components/FlyToCart';
 import HeaderPerfil from './src/components/HeaderPerfil';
@@ -252,12 +253,15 @@ function AppContenido() {
         <CartProvider>
           <SafeAreaProvider>
             <ToastProvider>
-              <StatusBar barStyle="light-content" backgroundColor={c.header} />
-              <PushBridge />
-              <View style={styles.raiz}>
-                <Navegacion />
-                {splashVisible && <SplashVitrina onFin={ocultarSplash} />}
-              </View>
+              {/* Diálogos de confirmación con el estilo de la app (useConfirmar). */}
+              <ConfirmacionProvider>
+                <StatusBar barStyle="light-content" backgroundColor={c.header} />
+                <PushBridge />
+                <View style={styles.raiz}>
+                  <Navegacion />
+                  {splashVisible && <SplashVitrina onFin={ocultarSplash} />}
+                </View>
+              </ConfirmacionProvider>
             </ToastProvider>
           </SafeAreaProvider>
         </CartProvider>
