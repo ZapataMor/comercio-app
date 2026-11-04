@@ -1,9 +1,10 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Image,
+  Pressable,
   RefreshControl,
   ScrollView,
   Text,
@@ -13,7 +14,6 @@ import {
 } from 'react-native';
 import {
   buscarProductos,
-  direccionConBarrio,
   getNegocios,
   getTiposNegocio,
   imagenUrl,
@@ -22,26 +22,69 @@ import {
   TipoNegocio,
 } from '../api';
 import { useAuth } from '../AuthContext';
-import {
-  animarDespliegue,
-  CardSkeletons,
-  Desplegable,
-  FadeInView,
-  PressableScale,
-} from '../components/anim';
-import Icon from '../components/Icon';
+import { FadeInView, PressableScale, Skeleton } from '../components/anim';
+import Icon, { IconName } from '../components/Icon';
 import { NivelBadge } from '../components/Reputacion';
 import { RootStackParamList } from '../navTypes';
+import { precioDe } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Explorar'>;
 
-function precioCOP(n: number) {
-  return '$' + Math.round(n).toLocaleString('es-CO');
+/** Espera tras dejar de teclear antes de buscar (ms). */
+const ESPERA_BUSQUEDA = 350;
+
+type Fila =
+  | { tipo: 'titulo'; key: string; texto: string }
+  | { tipo: 'negocio'; key: string; negocio: NegocioLista }
+  | { tipo: 'negocioHallado'; key: string; negocio: NegocioLista }
+  | { tipo: 'producto'; key: string; producto: ProductoConNegocio };
+
+const titulo = (texto: string): Fila => ({ tipo: 'titulo', key: `titulo-${texto}`, texto });
+
+/** Sin tildes ni mayúsculas: "rincon" encuentra "El Rincón Paisa". */
+const normalizar = (texto: string) =>
+  texto
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase();
+
+/** Lo esencial de un negocio en una sola línea. */
+function metaNegocio(n: NegocioLista) {
+  return [n.categoria, n.tiempo_preparacion ? `~${n.tiempo_preparacion} min` : null, n.barrio]
+    .filter(Boolean)
+    .join(' · ');
 }
 
-function categoriasNegocio(item: { categorias?: string[]; categoria?: string | null }) {
-  return item.categorias?.length ? item.categorias : item.categoria ? [item.categoria] : [];
+/** Listado normal: la API trae primero los abiertos. */
+function filasListado(negocios: NegocioLista[]): Fila[] {
+  const fila = (negocio: NegocioLista): Fila => ({ tipo: 'negocio', key: `n-${negocio.id}`, negocio });
+  const abiertos = negocios.filter(n => n.abierto);
+  const cerrados = negocios.filter(n => !n.abierto);
+  return [
+    ...(abiertos.length ? [titulo('Abiertos ahora')] : []),
+    ...abiertos.map(fila),
+    ...(cerrados.length ? [titulo('Cerrados por ahora')] : []),
+    ...cerrados.map(fila),
+  ];
+}
+
+/**
+ * Resultados de una búsqueda. La API también devuelve los negocios que venden
+ * lo buscado, pero esos ya salen en "Productos": aquí van solo los que
+ * coinciden por su nombre o su categoría.
+ */
+function filasBusqueda(negocios: NegocioLista[], productos: ProductoConNegocio[], consulta: string): Fila[] {
+  const texto = normalizar(consulta);
+  const hallados = negocios.filter(n =>
+    [n.nombre, ...n.categorias].some(valor => normalizar(valor).includes(texto)),
+  );
+  return [
+    ...(hallados.length ? [titulo('Negocios')] : []),
+    ...hallados.map((negocio): Fila => ({ tipo: 'negocioHallado', key: `h-${negocio.id}`, negocio })),
+    ...(productos.length ? [titulo('Productos')] : []),
+    ...productos.map((producto): Fila => ({ tipo: 'producto', key: `p-${producto.id}`, producto })),
+  ];
 }
 
 export default function ExplorarScreen({ navigation }: Props) {
@@ -50,6 +93,9 @@ export default function ExplorarScreen({ navigation }: Props) {
   const { auth } = useAuth();
   const [negocios, setNegocios] = useState<NegocioLista[]>([]);
   const [productos, setProductos] = useState<ProductoConNegocio[]>([]);
+  // Texto de los resultados en pantalla; vacío = listado normal. Va aparte de
+  // `busqueda`, que cambia con cada tecla antes de que lleguen los resultados.
+  const [consulta, setConsulta] = useState('');
   const [tiposNegocio, setTiposNegocio] = useState<TipoNegocio[]>([]);
   const [tipoSeleccionadoId, setTipoSeleccionadoId] = useState<number | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -61,21 +107,16 @@ export default function ExplorarScreen({ navigation }: Props) {
   const [pagina, setPagina] = useState(1);
   const [ultimaPagina, setUltimaPagina] = useState(1);
   const cargandoMasRef = useRef(false);
+  // Solo vale la respuesta de la última petición: una búsqueda vieja que llegue
+  // tarde no puede pisar los resultados de la nueva.
+  const ultimaPeticion = useRef(0);
+  const ultimaBusqueda = useRef('');
 
-  // Id del negocio con la card extendida (imagen + botón). Solo puede haber
-  // una a la vez: tocar otra card recoge la anterior.
-  const [expandidaId, setExpandidaId] = useState<number | null>(null);
-
-  // Estable entre renders para que React.memo de CardNegocio surta efecto:
-  // al tocar, solo se redibujan la card que se abre y la que se cierra.
-  const alternarCard = useCallback((id: number) => {
-    animarDespliegue();
-    setExpandidaId(prev => (prev === id ? null : id));
-  }, []);
-
-  // Con texto solo buscamos productos; con categoria seleccionada mostramos negocios filtrados.
-  const mostrandoProductos = busqueda.trim().length > 0 && tipoSeleccionadoId == null;
   const tipoSeleccionado = tiposNegocio.find(tipo => tipo.id === tipoSeleccionadoId) ?? null;
+  const filas = useMemo(
+    () => (consulta ? filasBusqueda(negocios, productos, consulta) : filasListado(negocios)),
+    [negocios, productos, consulta],
+  );
 
   useEffect(() => {
     if (!auth?.token) return;
@@ -88,17 +129,29 @@ export default function ExplorarScreen({ navigation }: Props) {
     (texto: string, refresco = false) => {
       refresco ? setRefrescando(true) : setCargando(true);
       setError(null);
+      const turno = ++ultimaPeticion.current;
       const t = texto.trim();
-      const peticion = t && tipoSeleccionadoId == null
-        ? buscarProductos(auth!.token, t).then(setProductos)
-        : getNegocios(auth!.token, t || undefined, 1, tipoSeleccionadoId).then(p => {
-            setNegocios(p.negocios);
-            setPagina(p.pagina);
-            setUltimaPagina(p.ultimaPagina);
-          });
-      peticion
-        .catch(e => setError(e.message))
+      // Con una categoría elegida el texto filtra sus negocios; sin ella se
+      // buscan negocios y productos a la vez.
+      const conProductos = !!t && tipoSeleccionadoId == null;
+
+      Promise.all([
+        getNegocios(auth!.token, t || undefined, 1, tipoSeleccionadoId),
+        conProductos ? buscarProductos(auth!.token, t) : Promise.resolve([]),
+      ])
+        .then(([p, hallados]) => {
+          if (turno !== ultimaPeticion.current) return;
+          setNegocios(p.negocios);
+          setPagina(p.pagina);
+          setUltimaPagina(p.ultimaPagina);
+          setProductos(hallados);
+          setConsulta(conProductos ? t : '');
+        })
+        .catch(e => {
+          if (turno === ultimaPeticion.current) setError(e.message);
+        })
         .finally(() => {
+          if (turno !== ultimaPeticion.current) return;
           setCargando(false);
           setRefrescando(false);
         });
@@ -108,12 +161,14 @@ export default function ExplorarScreen({ navigation }: Props) {
 
   // Carga la siguiente página de negocios al llegar al final de la lista.
   const cargarMas = useCallback(() => {
-    if (mostrandoProductos || cargando || refrescando) return;
+    if (consulta || cargando || refrescando) return;
     if (cargandoMasRef.current || pagina >= ultimaPagina) return;
     cargandoMasRef.current = true;
     setCargandoMas(true);
+    const turno = ultimaPeticion.current;
     getNegocios(auth!.token, busqueda.trim() || undefined, pagina + 1, tipoSeleccionadoId)
       .then(p => {
+        if (turno !== ultimaPeticion.current) return;
         setNegocios(prev => {
           // Evita duplicados si una página se repite (p. ej. tras un refresco).
           const vistos = new Set(prev.map(n => n.id));
@@ -127,22 +182,40 @@ export default function ExplorarScreen({ navigation }: Props) {
         cargandoMasRef.current = false;
         setCargandoMas(false);
       });
-  }, [auth, mostrandoProductos, cargando, refrescando, pagina, ultimaPagina, tipoSeleccionadoId, busqueda]);
+  }, [auth, consulta, cargando, refrescando, pagina, ultimaPagina, tipoSeleccionadoId, busqueda]);
 
-  // Búsqueda con "debounce": espera 350 ms tras dejar de teclear.
+  // Solo el teclado espera a que dejen de escribir; cambiar de categoría es inmediato.
   useEffect(() => {
-    const t = setTimeout(() => cargar(busqueda), 350);
+    const espera = busqueda === ultimaBusqueda.current ? 0 : ESPERA_BUSQUEDA;
+    ultimaBusqueda.current = busqueda;
+    const t = setTimeout(() => cargar(busqueda), espera);
     return () => clearTimeout(t);
   }, [busqueda, tipoSeleccionadoId, cargar]);
 
+  function elegirTipo(id: number | null) {
+    if (id === tipoSeleccionadoId) return;
+    // Otra categoría es otra lista: se muestran los fantasmas, no la anterior.
+    setNegocios([]);
+    setProductos([]);
+    setCargando(true);
+    setTipoSeleccionadoId(id);
+  }
+
+  const abrirNegocio = useCallback(
+    (n: NegocioLista) => navigation.navigate('Negocio', { id: n.id, nombre: n.nombre }),
+    [navigation],
+  );
+
+  const texto = busqueda.trim();
+  const nombre = auth?.user.name.trim().split(/\s+/)[0];
+
   return (
-    <FlatList<NegocioLista | ProductoConNegocio>
+    <FlatList<Fila>
       style={styles.container}
-      data={cargando ? [] : mostrandoProductos ? productos : negocios}
-      keyExtractor={item => `${mostrandoProductos ? 'p' : 'n'}-${item.id}`}
-      extraData={`${expandidaId}-${tipoSeleccionadoId}`}
+      data={filas}
+      keyExtractor={fila => fila.key}
       // Aire abajo para la barra flotante fija (Carrito / Mis pedidos).
-      contentContainerStyle={{ padding: 16, paddingBottom: 110 }}
+      contentContainerStyle={styles.contenido}
       keyboardShouldPersistTaps="handled"
       refreshControl={
         <RefreshControl
@@ -154,66 +227,64 @@ export default function ExplorarScreen({ navigation }: Props) {
       }
       ListHeaderComponent={
         <View>
-          {/* Carrito y Mis pedidos viven ahora en la barra flotante inferior;
-              salir de la cuenta se hace desde "Mi perfil" (topbar). */}
-          <View style={styles.buscadorFila}>
-            <View style={[styles.buscadorBox, styles.buscadorFlex]}>
-              <Icon name="lupa" size={16} color={c.muted} style={styles.lupa} />
-              <TextInput
-                style={styles.buscador}
-                value={busqueda}
-                onChangeText={setBusqueda}
-                placeholder="Buscar negocio o producto…"
-                placeholderTextColor={c.mutedSoft}
-                autoCapitalize="none"
-                returnKeyType="search"
-              />
-              {busqueda.length > 0 && (
-                <TouchableOpacity onPress={() => setBusqueda('')} hitSlop={8}>
-                  <Icon name="cerrar" size={16} color={c.muted} />
-                </TouchableOpacity>
-              )}
+          {/* Carrito y Mis pedidos viven en la barra flotante inferior; salir
+              de la cuenta se hace desde "Mi perfil" (topbar). */}
+          <View style={styles.cabecera}>
+            {!!nombre && <Text style={styles.saludo}>Hola, {nombre}</Text>}
+            <Text style={styles.titular}>¿Qué necesitas hoy?</Text>
+
+            <View style={styles.buscadorFila}>
+              <View style={styles.buscador}>
+                <Icon name="lupa" size={18} color={c.muted} />
+                <TextInput
+                  style={styles.buscadorTexto}
+                  value={busqueda}
+                  onChangeText={setBusqueda}
+                  placeholder="Busca negocios o productos"
+                  placeholderTextColor={c.mutedSoft}
+                  autoCapitalize="none"
+                  returnKeyType="search"
+                />
+                {busqueda.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setBusqueda('')}
+                    hitSlop={10}
+                    accessibilityLabel="Borrar búsqueda">
+                    <Icon name="cerrar" size={16} color={c.muted} />
+                  </TouchableOpacity>
+                )}
+              </View>
+              {/* Los negocios en el mapa de Maicao. */}
+              <PressableScale
+                style={styles.botonMapa}
+                scaleTo={0.92}
+                onPress={() => navigation.navigate('Mapa')}
+                accessibilityLabel="Ver negocios en el mapa">
+                <Icon name="mapa" size={20} color={c.textStrong} />
+              </PressableScale>
             </View>
-            {/* Los negocios en el mapa de Maicao. */}
-            <TouchableOpacity
-              style={styles.botonMapa}
-              onPress={() => navigation.navigate('Mapa')}
-              accessibilityLabel="Ver negocios en el mapa">
-              <Icon name="ubicacion" size={20} color={c.accent} />
-              <Text style={styles.botonMapaTxt}>Mapa</Text>
-            </TouchableOpacity>
           </View>
 
           {tiposNegocio.length > 0 && (
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              style={styles.categoriasFiltro}
-              contentContainerStyle={styles.categoriasFiltroContent}>
-              <TouchableOpacity
-                style={[styles.filtroChip, tipoSeleccionadoId == null && styles.filtroChipActivo]}
-                onPress={() => setTipoSeleccionadoId(null)}>
-                <Text style={[styles.filtroChipTxt, tipoSeleccionadoId == null && styles.filtroChipTxtActivo]}>
-                  Todos
-                </Text>
-              </TouchableOpacity>
-              {tiposNegocio.map(tipo => {
-                const activa = tipo.id === tipoSeleccionadoId;
-                return (
-                  <TouchableOpacity
-                    key={tipo.id}
-                    style={[styles.filtroChip, activa && styles.filtroChipActivo]}
-                    onPress={() => setTipoSeleccionadoId(prev => (prev === tipo.id ? null : tipo.id))}>
-                    <Text style={[styles.filtroChipTxt, activa && styles.filtroChipTxtActivo]}>
-                      {tipo.nombre}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.pestanas}>
+              <Pestana texto="Todos" activa={tipoSeleccionadoId == null} onPress={() => elegirTipo(null)} />
+              {tiposNegocio.map(tipo => (
+                <Pestana
+                  key={tipo.id}
+                  texto={tipo.nombre}
+                  activa={tipo.id === tipoSeleccionadoId}
+                  // Tocar la categoría activa vuelve a mostrar todos.
+                  onPress={() => elegirTipo(tipo.id === tipoSeleccionadoId ? null : tipo.id)}
+                />
+              ))}
             </ScrollView>
           )}
 
-          {cargando && <CardSkeletons count={4} />}
+          {cargando && filas.length === 0 && <NegociosFantasma />}
           {error ? <Text style={styles.error}>{error}</Text> : null}
         </View>
       }
@@ -225,286 +296,338 @@ export default function ExplorarScreen({ navigation }: Props) {
         ) : null
       }
       ListEmptyComponent={
-        !cargando ? (
-          <Text style={styles.vacio}>
-            {mostrandoProductos
-              ? busqueda.trim()
-                ? `Sin resultados para "${busqueda}".`
-                : 'Sin productos.'
-              : tipoSeleccionado
-                ? `Sin negocios en ${tipoSeleccionado.nombre}.`
-              : 'Aún no hay negocios registrados.'}
-          </Text>
+        !cargando && !error ? (
+          <SinResultados
+            titulo={
+              texto
+                ? `No encontramos "${texto}"`
+                : tipoSeleccionado
+                  ? `Aún no hay negocios en ${tipoSeleccionado.nombre}`
+                  : 'Aún no hay negocios'
+            }
+            detalle={texto ? 'Prueba con otro nombre o producto.' : null}
+            accion={tipoSeleccionado ? 'Ver todas las categorías' : null}
+            onAccion={() => elegirTipo(null)}
+          />
         ) : null
       }
-      renderItem={({ item, index }) =>
-        mostrandoProductos ? (
-          <TarjetaProducto item={item as ProductoConNegocio} navigation={navigation} index={index} />
-        ) : (
-          <CardNegocio
-            item={item as NegocioLista}
-            index={index}
-            navigation={navigation}
-            expandida={expandidaId === item.id}
-            onToggle={alternarCard}
-          />
-        )
-      }
+      renderItem={({ item, index }) => {
+        switch (item.tipo) {
+          case 'titulo':
+            return <Text style={styles.seccion}>{item.texto}</Text>;
+          case 'negocio':
+            return <CardNegocio item={item.negocio} index={index} onAbrir={abrirNegocio} />;
+          case 'negocioHallado':
+            return (
+              <FilaResultado
+                imagen={item.negocio.imagen}
+                icono="tienda"
+                nombre={item.negocio.nombre}
+                linea={metaNegocio(item.negocio)}
+                detalle={item.negocio.abierto ? null : 'Cerrado'}
+                index={index}
+                onPress={() => abrirNegocio(item.negocio)}
+              />
+            );
+          case 'producto': {
+            const { negocio } = item.producto;
+            return (
+              <FilaResultado
+                imagen={item.producto.imagen}
+                icono="caja"
+                nombre={item.producto.nombre}
+                linea={precioDe(item.producto)}
+                lineaResaltada
+                detalle={negocio.abierto ? negocio.nombre : `${negocio.nombre} · Cerrado`}
+                index={index}
+                onPress={() =>
+                  navigation.navigate('Negocio', {
+                    id: negocio.id,
+                    nombre: negocio.nombre,
+                    productoId: item.producto.id,
+                  })
+                }
+              />
+            );
+          }
+        }
+      }}
     />
   );
 }
 
-/** Tarjeta de producto (resultado de búsqueda): imagen, info y negocio. */
-function TarjetaProducto({
-  item,
-  navigation,
-  index,
-}: {
-  item: ProductoConNegocio;
-  navigation: Props['navigation'];
-  index: number;
-}) {
-  const { c } = useTheme();
+function Pestana({ texto, activa, onPress }: { texto: string; activa: boolean; onPress: () => void }) {
   const styles = useStyles();
-  const img = imagenUrl(item.imagen);
   return (
-    <FadeInView delay={Math.min(index, 8) * 45}>
-      <PressableScale
-        style={[styles.card, styles.cardSeparada]}
-        onPress={() =>
-          navigation.navigate('Negocio', {
-            id: item.negocio.id,
-            nombre: item.negocio.nombre,
-            productoId: item.id,
-          })
-        }>
-        <View style={styles.prodFila}>
-          {img ? (
-            <Image source={{ uri: img }} style={styles.prodThumb} resizeMode="cover" />
-          ) : (
-            <View style={[styles.prodThumb, styles.prodThumbVacio]}>
-              <Icon name="caja" size={26} color={c.muted} />
-            </View>
-          )}
-          <View style={styles.prodTexto}>
-            <Text style={styles.nombre} numberOfLines={1}>{item.nombre}</Text>
-            <Text style={styles.precio}>{item.precio_formateado ?? precioCOP(item.precio)}</Text>
-            {!!item.descripcion && (
-              <Text style={styles.prodDesc} numberOfLines={2}>{item.descripcion}</Text>
-            )}
-            <View style={[styles.negocioFila, styles.filaAccion]}>
-              <Icon name="tienda" size={13} color={c.accent} />
-              <Text style={styles.negocioTxt} numberOfLines={1}>{item.negocio.nombre}</Text>
-              <Text style={item.negocio.abierto ? styles.abiertoMini : styles.cerradoMini}>
-                {item.negocio.abierto ? 'Abierto' : 'Cerrado'}
-              </Text>
-            </View>
-          </View>
-          <Icon name="chevron" size={18} color={c.chevron} />
-        </View>
-      </PressableScale>
-    </FadeInView>
+    <Pressable
+      style={styles.pestana}
+      hitSlop={{ top: 6, bottom: 6 }}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: activa }}
+      onPress={onPress}>
+      <Text style={[styles.pestanaTxt, activa && styles.pestanaTxtActiva]}>{texto}</Text>
+      <View style={[styles.pestanaMarca, activa && styles.pestanaMarcaActiva]} />
+    </Pressable>
   );
 }
 
-/**
- * Tarjeta de negocio (vista por defecto, sin búsqueda).
- *
- * Recogida muestra nombre, categoría, dirección y si está abierto. Al tocarla
- * se extiende: aparece la imagen del negocio arriba y el botón "Entrar a la
- * tienda". Solo una card puede estar extendida a la vez (lo controla el padre
- * con `expandida`/`onToggle`).
- */
+/** Negocio del listado: la foto manda y un toque lleva a su catálogo. */
 const CardNegocio = React.memo(function CardNegocio({
   item,
-  navigation,
   index,
-  expandida,
-  onToggle,
+  onAbrir,
 }: {
   item: NegocioLista;
-  navigation: Props['navigation'];
   index: number;
-  expandida: boolean;
-  onToggle: (id: number) => void;
+  onAbrir: (n: NegocioLista) => void;
 }) {
   const { c } = useTheme();
   const styles = useStyles();
   const img = imagenUrl(item.imagen);
+  const meta = metaNegocio(item);
+  // "Nuevo" no distingue a nadie en la lista: solo se muestra el nivel ganado.
+  const conNivel = !!item.reputacion && item.reputacion.nivel !== 'nuevo';
+
   return (
-    <FadeInView delay={Math.min(index, 8) * 45}>
-      {/* La escala del toque va en este envoltorio sin fondo y la card en la
-          View interna: así el despliegue nunca se corta (ver Desplegable). */}
-      <PressableScale style={styles.cardSeparada} onPress={() => onToggle(item.id)}>
-        <View style={[styles.card, !item.abierto && styles.cardCerrada]}>
-          <Desplegable abierto={expandida}>
-            {img ? (
-              <Image source={{ uri: img }} style={styles.portada} resizeMode="cover" />
-            ) : (
-              <View style={[styles.portada, styles.portadaVacia]}>
-                <Icon name="tienda" size={40} color={c.mutedSoft} />
-              </View>
-            )}
-          </Desplegable>
-  
-          <View style={styles.cardHead}>
-            <Text style={styles.nombre}>{item.nombre}</Text>
-            <Text style={item.abierto ? styles.abierto : styles.cerrado}>
-              {item.abierto ? 'Abierto' : 'Cerrado'}
-            </Text>
-          </View>
-  
-          {/* Extendida, la categoría pasa a los chips de abajo. Se recoge en vez
-              de desmontarse para que el cambio también sea fluido. */}
-          {!!item.categoria && (
-            <Desplegable abierto={!expandida}>
-              <View style={[styles.categoriaFila, styles.filaAccion]}>
-                <Icon name="tienda" size={13} color={c.accent} />
-                <Text style={styles.categoriaTxt}>{item.categoria}</Text>
-              </View>
-            </Desplegable>
+    <FadeInView delay={Math.min(index, 6) * 45} style={styles.negocio}>
+      <PressableScale
+        scaleTo={0.98}
+        accessibilityRole="button"
+        accessibilityLabel={item.abierto ? item.nombre : `${item.nombre}, cerrado`}
+        onPress={() => onAbrir(item)}>
+        <View style={styles.portada}>
+          {img ? (
+            <Image source={{ uri: img }} style={styles.portadaImagen} resizeMode="cover" />
+          ) : (
+            <Icon name="tienda" size={38} color={c.mutedSoft} />
           )}
-          {!!item.horario_hoy && (
-            <View style={[styles.categoriaFila, styles.filaAccion]}>
-              <Icon name="reloj" size={13} color={c.muted} />
-              <Text style={styles.categoriaTxt}>{item.horario_hoy}</Text>
-            </View>
+          {!item.abierto && (
+            <>
+              <View style={styles.portadaVelo} />
+              <Text style={styles.sello}>Cerrado</Text>
+            </>
           )}
-          {!!direccionConBarrio(item) && (
-            <View style={[styles.dir, styles.filaAccion]}>
-              <Icon name="ubicacion" size={13} color={c.mutedSoft} />
-              <Text style={styles.dir}>{direccionConBarrio(item)}</Text>
-            </View>
-          )}
-          {/* Nivel de confiabilidad y tiempo que promete en preparar. */}
-          <View style={[styles.reputacionFila, styles.filaAccion]}>
-            <NivelBadge reputacion={item.reputacion} />
-            {!!item.tiempo_preparacion && (
-              <>
-                <Icon name="reloj" size={13} color={c.mutedSoft} />
-                <Text style={styles.tiempoTxt}>Prepara en ~{item.tiempo_preparacion} min</Text>
-              </>
-            )}
-          </View>
-  
-          <Desplegable abierto={expandida}>
-            {categoriasNegocio(item).length > 0 && (
-              <View style={styles.categoriasChips}>
-                {categoriasNegocio(item).map(categoria => (
-                  <View key={categoria} style={styles.categoriaChip}>
-                    <Text style={styles.categoriaChipTxt}>{categoria}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-            {!!item.descripcion && (
-              <Text style={styles.desc} numberOfLines={3}>{item.descripcion}</Text>
-            )}
-            <TouchableOpacity
-              style={[styles.botonEntrar, !item.abierto && styles.botonEntrarOff]}
-              disabled={!item.abierto || !expandida}
-              onPress={() =>
-                navigation.navigate('Negocio', { id: item.id, nombre: item.nombre })
-              }>
-              <Text style={[styles.botonEntrarTxt, !item.abierto && styles.botonEntrarTxtOff]}>
-                {item.abierto ? 'Entrar a la tienda' : 'Tienda cerrada'}
-              </Text>
-            </TouchableOpacity>
-          </Desplegable>
         </View>
+
+        <View style={styles.negocioCabecera}>
+          <Text style={styles.negocioNombre} numberOfLines={1}>{item.nombre}</Text>
+          {conNivel && <NivelBadge reputacion={item.reputacion} sinPuntaje />}
+        </View>
+        {!!meta && <Text style={styles.meta} numberOfLines={1}>{meta}</Text>}
+        {/* Cerrado, lo que importa es cuándo vuelve a abrir. */}
+        {!item.abierto && !!item.horario_hoy && (
+          <Text style={styles.meta} numberOfLines={1}>{item.horario_hoy}</Text>
+        )}
       </PressableScale>
     </FadeInView>
   );
 });
 
-const useStyles = makeStyles((c, shadow) => ({
+/** Resultado de búsqueda, más compacto: negocio o producto. */
+function FilaResultado({
+  imagen,
+  icono,
+  nombre,
+  linea,
+  lineaResaltada,
+  detalle,
+  index,
+  onPress,
+}: {
+  imagen?: string | null;
+  icono: IconName;
+  nombre: string;
+  linea: string;
+  lineaResaltada?: boolean;
+  detalle?: string | null;
+  index: number;
+  onPress: () => void;
+}) {
+  const { c } = useTheme();
+  const styles = useStyles();
+  const uri = imagenUrl(imagen);
+
+  return (
+    <FadeInView delay={Math.min(index, 6) * 35} offset={8}>
+      <PressableScale style={styles.resultado} scaleTo={0.98} accessibilityRole="button" onPress={onPress}>
+        <View style={styles.resultadoFoto}>
+          {uri ? (
+            <Image source={{ uri }} style={styles.portadaImagen} resizeMode="cover" />
+          ) : (
+            <Icon name={icono} size={24} color={c.mutedSoft} />
+          )}
+        </View>
+        <View style={styles.resultadoTexto}>
+          <Text style={styles.resultadoNombre} numberOfLines={1}>{nombre}</Text>
+          {!!linea && (
+            <Text style={lineaResaltada ? styles.resultadoPrecio : styles.meta} numberOfLines={1}>
+              {linea}
+            </Text>
+          )}
+          {!!detalle && <Text style={styles.meta} numberOfLines={1}>{detalle}</Text>}
+        </View>
+      </PressableScale>
+    </FadeInView>
+  );
+}
+
+function NegociosFantasma() {
+  const styles = useStyles();
+  return (
+    <View style={styles.fantasmas}>
+      {[0, 1, 2].map(i => (
+        <View key={i} style={styles.negocio}>
+          <Skeleton height={172} r={radius.lg} />
+          <Skeleton width="55%" height={16} style={styles.fantasmaNombre} />
+          <Skeleton width="38%" height={12} style={styles.fantasmaMeta} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function SinResultados({
+  titulo: texto,
+  detalle,
+  accion,
+  onAccion,
+}: {
+  titulo: string;
+  detalle?: string | null;
+  accion?: string | null;
+  onAccion: () => void;
+}) {
+  const { c } = useTheme();
+  const styles = useStyles();
+  return (
+    <View style={styles.vacio}>
+      <Icon name="lupa" size={30} color={c.chevron} />
+      <Text style={styles.vacioTitulo}>{texto}</Text>
+      {!!detalle && <Text style={styles.vacioDetalle}>{detalle}</Text>}
+      {!!accion && (
+        <TouchableOpacity hitSlop={8} onPress={onAccion}>
+          <Text style={styles.vacioAccion}>{accion}</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+const useStyles = makeStyles(c => ({
   container: { flex: 1, backgroundColor: c.bg },
-  filaAccion: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  buscadorBox: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: c.surface,
-    borderRadius: radius.md, paddingHorizontal: 12, marginBottom: 12, ...shadow.low,
-  },
-  buscadorFila: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  buscadorFlex: { flex: 1, marginBottom: 0 },
-  botonMapa: {
-    flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: c.surface,
-    borderRadius: radius.md, paddingHorizontal: 12, ...shadow.low,
-  },
-  botonMapaTxt: { color: c.text, fontFamily: font.semibold, fontSize: 13 },
-  lupa: { fontSize: 15, marginRight: 6 },
-  buscador: { flex: 1, paddingVertical: 11, fontSize: 15, color: c.textStrong, fontFamily: font.regular },
-  categoriasFiltro: { marginBottom: 12 },
-  categoriasFiltroContent: { gap: 8, paddingRight: 18 },
-  filtroChip: {
-    borderWidth: 1,
-    borderColor: c.borderStrong,
+  contenido: { paddingBottom: 110 },
+  cabecera: { paddingHorizontal: 20, paddingTop: 22 },
+  saludo: { color: c.muted, fontFamily: font.medium, fontSize: 14, marginBottom: 2 },
+  titular: { color: c.textStrong, fontFamily: font.display, fontSize: 26, lineHeight: 33 },
+  buscadorFila: { flexDirection: 'row', gap: 10, marginTop: 16 },
+  buscador: {
+    flex: 1,
+    height: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
     borderRadius: radius.pill,
     backgroundColor: c.surface,
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-  },
-  filtroChipActivo: { backgroundColor: c.brand, borderColor: c.brand },
-  filtroChipTxt: { color: c.text, fontFamily: font.semibold, fontSize: 13 },
-  filtroChipTxtActivo: { color: c.onBrand },
-  card: {
-    backgroundColor: c.surface, borderRadius: radius.lg, padding: 16, ...shadow.soft,
-  },
-  cardSeparada: { marginBottom: 12 },
-  portada: { width: '100%', height: 140, borderRadius: radius.md, marginBottom: 10, backgroundColor: c.surface2 },
-  portadaVacia: { alignItems: 'center', justifyContent: 'center' },
-  cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  nombre: { fontSize: 17, fontFamily: font.bold, color: c.textStrong, flex: 1 },
-  abierto: {
-    fontSize: 11, fontFamily: font.bold, backgroundColor: c.successSoft, color: c.success,
-    paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, overflow: 'hidden',
-  },
-  cerrado: {
-    fontSize: 11, fontFamily: font.bold, backgroundColor: c.dangerSoft, color: c.danger,
-    paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, overflow: 'hidden',
-  },
-  cardCerrada: { opacity: 0.55 },
-  pieCarga: { marginVertical: 16 },
-  desc: { color: c.muted, marginTop: 10, fontFamily: font.regular },
-  dir: { color: c.mutedSoft, fontSize: 12, marginTop: 8, fontFamily: font.regular },
-  categoriaFila: { marginTop: 7 },
-  reputacionFila: { marginTop: 8 },
-  tiempoTxt: { color: c.mutedSoft, fontSize: 12, fontFamily: font.regular },
-  categoriaTxt: { color: c.goldText, fontFamily: font.semibold, fontSize: 13 },
-  categoriasChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
-  categoriaChip: {
-    backgroundColor: c.accentSoft,
-    borderColor: c.accent,
     borderWidth: 1,
-    borderRadius: radius.sm,
+    borderColor: c.border,
+  },
+  buscadorTexto: {
+    flex: 1,
+    height: '100%',
+    paddingVertical: 0,
+    fontSize: 15,
+    color: c.textStrong,
+    fontFamily: font.regular,
+  },
+  botonMapa: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: c.surface,
+    borderWidth: 1,
+    borderColor: c.border,
+  },
+  // De borde a borde: las categorías se deslizan por debajo del margen.
+  pestanas: { gap: 22, paddingHorizontal: 20, marginTop: 14 },
+  pestana: { paddingTop: 8 },
+  pestanaTxt: { color: c.muted, fontFamily: font.medium, fontSize: 14 },
+  pestanaTxtActiva: { color: c.textStrong, fontFamily: font.semibold },
+  pestanaMarca: { height: 2, marginTop: 7, borderRadius: radius.pill },
+  pestanaMarcaActiva: { backgroundColor: c.accent },
+  seccion: {
+    color: c.textStrong,
+    fontFamily: font.displaySemi,
+    fontSize: 17,
+    paddingHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 14,
+  },
+  negocio: { marginHorizontal: 20, marginBottom: 24 },
+  portada: {
+    aspectRatio: 2,
+    borderRadius: radius.lg,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: c.surface2,
+  },
+  portadaImagen: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%' },
+  portadaVelo: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(15,13,10,0.5)' },
+  // Sobre la foto oscurecida: va en claro en ambos modos.
+  sello: {
+    position: 'absolute',
+    left: 10,
+    bottom: 10,
+    color: '#FFFFFF',
+    backgroundColor: 'rgba(15,13,10,0.62)',
+    fontFamily: font.semibold,
+    fontSize: 12,
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    overflow: 'hidden',
   },
-  categoriaChipTxt: { color: c.goldText, fontFamily: font.semibold, fontSize: 12 },
-  // Botón minimalista "Entrar a la tienda" de la card extendida.
-  botonEntrar: {
-    marginTop: 14, paddingVertical: 11, borderRadius: radius.md, alignItems: 'center',
-    borderWidth: 1.2, borderColor: c.accent, backgroundColor: 'transparent',
+  negocioCabecera: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },
+  negocioNombre: { flex: 1, color: c.textStrong, fontFamily: font.displaySemi, fontSize: 16, lineHeight: 22 },
+  meta: { color: c.muted, fontFamily: font.regular, fontSize: 13, lineHeight: 19, marginTop: 1 },
+  resultado: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, marginBottom: 16 },
+  resultadoFoto: {
+    width: 68,
+    height: 68,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: c.surface2,
   },
-  botonEntrarOff: { borderColor: c.border },
-  botonEntrarTxt: { color: c.goldText, fontFamily: font.bold, fontSize: 14 },
-  botonEntrarTxtOff: { color: c.mutedSoft },
-  // --- Tarjeta de producto (búsqueda) ---
-  prodFila: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  prodThumb: { width: 64, height: 64, borderRadius: radius.md, backgroundColor: c.surface2 },
-  prodThumbVacio: { alignItems: 'center', justifyContent: 'center' },
-  prodTexto: { flex: 1 },
-  prodDesc: { color: c.muted, fontSize: 13, marginTop: 2, fontFamily: font.regular },
-  precio: { color: c.goldText, fontFamily: font.extra, fontSize: 15, marginTop: 2 },
-  negocioFila: { marginTop: 8 },
-  negocioTxt: { color: c.goldText, fontFamily: font.semibold, fontSize: 13, flexShrink: 1 },
-  abiertoMini: {
-    fontSize: 10, fontFamily: font.bold, backgroundColor: c.successSoft, color: c.success,
-    paddingHorizontal: 6, paddingVertical: 2, borderRadius: radius.pill, overflow: 'hidden',
+  resultadoTexto: { flex: 1 },
+  resultadoNombre: { color: c.textStrong, fontFamily: font.semibold, fontSize: 15, lineHeight: 21 },
+  resultadoPrecio: { color: c.text, fontFamily: font.bold, fontSize: 14, lineHeight: 20 },
+  fantasmas: { paddingTop: 20 },
+  fantasmaNombre: { marginTop: 12 },
+  fantasmaMeta: { marginTop: 8 },
+  pieCarga: { marginVertical: 16 },
+  vacio: { alignItems: 'center', paddingHorizontal: 32, paddingTop: 56 },
+  vacioTitulo: {
+    color: c.textStrong,
+    fontFamily: font.semibold,
+    fontSize: 15,
+    lineHeight: 21,
+    textAlign: 'center',
+    marginTop: 12,
   },
-  cerradoMini: {
-    fontSize: 10, fontFamily: font.bold, backgroundColor: c.dangerSoft, color: c.danger,
-    paddingHorizontal: 6, paddingVertical: 2, borderRadius: radius.pill, overflow: 'hidden',
+  vacioDetalle: { color: c.muted, fontFamily: font.regular, fontSize: 14, marginTop: 4, textAlign: 'center' },
+  vacioAccion: { color: c.goldText, fontFamily: font.semibold, fontSize: 14, marginTop: 14 },
+  error: {
+    color: c.danger,
+    backgroundColor: c.dangerSoft,
+    padding: 12,
+    borderRadius: radius.sm,
+    marginHorizontal: 20,
+    marginTop: 16,
+    fontFamily: font.medium,
   },
-  vacio: { textAlign: 'center', color: c.muted, marginTop: 40, fontFamily: font.regular },
-  error: { color: c.danger, backgroundColor: c.dangerSoft, padding: 12, borderRadius: radius.sm, marginBottom: 12, fontFamily: font.medium },
 }));

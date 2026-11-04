@@ -8,7 +8,7 @@ import ChipsEleccion from '../components/ChipsEleccion';
 import { useFlyToCart } from '../components/FlyToCart';
 import Icon from '../components/Icon';
 import { RootStackParamList } from '../navTypes';
-import { coloresDe, informacionDe, ingredientesDe, tallasDe } from '../opcionesProducto';
+import { coloresDe, informacionDe, ingredientesDe, precioDe, tallasDe } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useAgregarAlCarrito } from '../useAgregarAlCarrito';
 
@@ -78,11 +78,7 @@ export default function ProductoScreen({ navigation, route }: Props) {
 
         <FadeInView style={styles.cuerpo}>
           <Text style={styles.nombre}>{producto.nombre}</Text>
-          <Text style={styles.precio}>
-            {producto.unidad_medida && producto.unidad_medida !== 'unidad'
-              ? producto.precio_formateado ?? cop(producto.precio)
-              : cop(producto.precio)}
-          </Text>
+          <Text style={styles.precio}>{precioDe(producto)}</Text>
           {!!producto.descripcion && <Text style={styles.descripcion}>{producto.descripcion}</Text>}
 
           {tallas.length > 0 && (

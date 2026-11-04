@@ -15,7 +15,7 @@ import { useFlyToCart } from '../components/FlyToCart';
 import Icon from '../components/Icon';
 import { NivelBadge } from '../components/Reputacion';
 import { RootStackParamList } from '../navTypes';
-import { pideEleccion } from '../opcionesProducto';
+import { pideEleccion, precioDe } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 import { useAgregarAlCarrito } from '../useAgregarAlCarrito';
@@ -27,14 +27,6 @@ const COLUMNAS = 2;
 type CatalogoFila =
   | { tipo: 'categoria'; key: string; nombre: string; cantidad: number }
   | { tipo: 'productos'; key: string; productos: Producto[] };
-
-/** Precio limpio: la unidad solo se dice cuando no es por unidad ("/ kg"). */
-function precioDe(p: Producto) {
-  if (p.unidad_medida && p.unidad_medida !== 'unidad' && p.precio_formateado) {
-    return p.precio_formateado;
-  }
-  return '$' + Math.round(p.precio).toLocaleString('es-CO');
-}
 
 function categoriasNegocio(negocio: Negocio) {
   return negocio.categorias?.length ? negocio.categorias : negocio.categoria ? [negocio.categoria] : [];

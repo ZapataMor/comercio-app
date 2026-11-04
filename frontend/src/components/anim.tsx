@@ -195,26 +195,3 @@ export function Skeleton({ width = '100%', height = 14, r = radius.sm, style }: 
     />
   );
 }
-
-/** Lista de tarjetas "fantasma" para pantallas que cargan (Explorar, etc.). */
-export function CardSkeletons({ count = 4 }: { count?: number }) {
-  const { c } = useTheme();
-  return (
-    <>
-      {Array.from({ length: count }).map((_, i) => (
-        <Animated.View
-          key={i}
-          style={{
-            backgroundColor: c.surface,
-            borderRadius: radius.lg,
-            padding: 16,
-            marginBottom: 12,
-          }}>
-          <Skeleton width="100%" height={120} r={radius.md} style={{ marginBottom: 12 }} />
-          <Skeleton width="60%" height={16} style={{ marginBottom: 8 }} />
-          <Skeleton width="40%" height={12} />
-        </Animated.View>
-      ))}
-    </>
-  );
-}

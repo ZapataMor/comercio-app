@@ -28,6 +28,14 @@ export const informacionDe = (p: Producto) => (esComida(p) || esRopa(p) ? [] : p
 /** No se puede agregar sin pasar por el detalle: hay que elegir talla o color. */
 export const pideEleccion = (p: Producto) => tallasDe(p).length > 0 || coloresDe(p).length > 0;
 
+/** Precio para el cliente: la unidad solo se dice cuando no es por unidad ("/ kg"). */
+export function precioDe(p: Producto) {
+  if (p.unidad_medida && p.unidad_medida !== 'unidad' && p.precio_formateado) {
+    return p.precio_formateado;
+  }
+  return '$' + Math.round(p.precio).toLocaleString('es-CO');
+}
+
 /** Las opciones de una línea, para leerlas de corrido (igual que el servidor). */
 export function detalleOpciones(o?: OpcionesLinea): string | null {
   if (!o) {
