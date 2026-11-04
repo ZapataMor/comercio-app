@@ -28,6 +28,8 @@ export type IconName =
   | 'efectivo'
   | 'banco'
   | 'check'
+  | 'mas'
+  | 'menos'
   | 'cerrar'
   | 'imagen'
   | 'chevron'
@@ -161,6 +163,8 @@ const GLYPHS: Record<IconName, React.ReactNode> = {
     </>
   ),
   check: <Path d="M20 6 9 17l-5-5" />,
+  mas: <Path d="M12 5v14M5 12h14" />,
+  menos: <Path d="M5 12h14" />,
   cerrar: (
     <>
       <Path d="M18 6 6 18" />

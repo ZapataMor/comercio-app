@@ -98,6 +98,9 @@ export default function MisProductosScreen({ navigation }: Props) {
   const [atributos, setAtributos] = useState<string[]>([]);
   // Valores con los que se monta ListaAtributos (se limpia al cambiar de tipo).
   const [atributosIniciales, setAtributosIniciales] = useState<string[]>([]);
+  // Colores disponibles (solo los tipos con colores: ropa y calzado).
+  const [colores, setColores] = useState<string[]>([]);
+  const [coloresIniciales, setColoresIniciales] = useState<string[]>([]);
   const [imagenUri, setImagenUri] = useState<string | null>(null);
   const [disponible, setDisponible] = useState(true);
   const [guardando, setGuardando] = useState(false);
@@ -200,6 +203,8 @@ export default function MisProductosScreen({ navigation }: Props) {
     setTipoId(null);
     setAtributos([]);
     setAtributosIniciales([]);
+    setColores([]);
+    setColoresIniciales([]);
     setImagenUri(null);
     setDisponible(true);
     setErrores({});
@@ -216,6 +221,8 @@ export default function MisProductosScreen({ navigation }: Props) {
     setTipoId(p.tipo_producto?.id ?? null);
     setAtributos(p.atributos ?? []);
     setAtributosIniciales(p.atributos ?? []);
+    setColores(p.colores ?? []);
+    setColoresIniciales(p.colores ?? []);
     setImagenUri(null);
     setDisponible(p.disponible);
     setErrores({});
@@ -244,6 +251,7 @@ export default function MisProductosScreen({ navigation }: Props) {
     const u = UNIDADES.find(x => x.value === unidad)!;
     // Atributos limpios: sin espacios sobrantes, vacíos ni repetidos.
     const atributosLimpios = [...new Set(atributos.map(a => a.trim()).filter(Boolean))];
+    const coloresLimpios = [...new Set(colores.map(a => a.trim()).filter(Boolean))];
     setGuardando(true);
     try {
       const body = {
@@ -255,6 +263,7 @@ export default function MisProductosScreen({ navigation }: Props) {
         tipo_producto_id: tipoId,
         // null (y no []) para que también se limpien al subir con imagen.
         atributos: atributosLimpios.length ? atributosLimpios : null,
+        colores: coloresLimpios.length ? coloresLimpios : null,
         disponible,
       };
       if (editando) {
@@ -395,6 +404,8 @@ export default function MisProductosScreen({ navigation }: Props) {
                   // Al cambiar de tipo, los atributos anteriores ya no aplican.
                   setAtributos([]);
                   setAtributosIniciales([]);
+                  setColores([]);
+                  setColoresIniciales([]);
                   limpiarError('tipo_producto');
                 }}
                 placeholder="¿Qué vas a vender?"
@@ -454,6 +465,28 @@ export default function MisProductosScreen({ navigation }: Props) {
                     disabled={guardando}
                   />
                   <FieldError mensaje={errores.atributos} />
+                  {tipoSeleccionado.slug === 'comida' && (
+                    <Text style={styles.ayudaGrupo}>
+                      El cliente podrá quitar estos ingredientes o pedir más de ellos en su pedido.
+                    </Text>
+                  )}
+                  {tipoSeleccionado.sugerencias_colores && (
+                    <>
+                      <ListaAtributos
+                        key={`colores-${editando?.id ?? 'nuevo'}-${tipoSeleccionado.id}`}
+                        label="Colores disponibles"
+                        textoBoton="Añadir color"
+                        sugerencias={tipoSeleccionado.sugerencias_colores}
+                        iniciales={coloresIniciales}
+                        onChange={setColores}
+                        disabled={guardando}
+                      />
+                      <FieldError mensaje={errores.colores} />
+                      <Text style={styles.ayudaGrupo}>
+                        El cliente elige una talla y un color al pedir.
+                      </Text>
+                    </>
+                  )}
                 </>
               )}
 
@@ -563,6 +596,7 @@ const useStyles = makeStyles((c, shadow) => ({
   modalTitulo: { fontSize: 18, fontFamily: font.display, color: c.textStrong, marginBottom: 16 },
   label: { fontSize: 13, fontFamily: font.semibold, color: c.text, marginBottom: 6 },
   ayudaCampo: { fontSize: 12, color: c.muted, fontFamily: font.regular, marginBottom: 6 },
+  ayudaGrupo: { fontSize: 12, lineHeight: 17, color: c.muted, fontFamily: font.regular, marginBottom: 16 },
   input: {
     borderWidth: 1, borderColor: c.borderStrong, borderRadius: radius.md,
     paddingHorizontal: 14, paddingVertical: 11, fontSize: 16, marginBottom: 14, color: c.textStrong, fontFamily: font.regular,

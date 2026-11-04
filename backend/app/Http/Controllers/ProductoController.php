@@ -163,6 +163,9 @@ class ProductoController extends Controller
             'atributos' => ['sometimes', 'nullable', 'array', 'max:30'],
             // nullable: Laravel convierte '' en null; luego se descartan.
             'atributos.*' => ['nullable', 'string', 'max:100'],
+            // Colores disponibles (ropa y calzado).
+            'colores' => ['sometimes', 'nullable', 'array', 'max:30'],
+            'colores.*' => ['nullable', 'string', 'max:100'],
             // Cómo se selecciona la cantidad: cantidad | peso | volumen | longitud.
             'tipo_venta' => ['sometimes', Rule::in(Producto::TIPOS_VENTA)],
             // Etiqueta de la medida del precio: 'unidad', 'kg', 'litro', 'metro', 'combo'...
@@ -185,16 +188,18 @@ class ProductoController extends Controller
      */
     private function normalizarAtributos(array $data): array
     {
-        if (! array_key_exists('atributos', $data)) {
-            return $data;
-        }
+        foreach (['atributos', 'colores'] as $campo) {
+            if (! array_key_exists($campo, $data)) {
+                continue;
+            }
 
-        $data['atributos'] = collect($data['atributos'] ?? [])
-            ->map(fn ($a) => trim((string) $a))
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
+            $data[$campo] = collect($data[$campo] ?? [])
+                ->map(fn ($a) => trim((string) $a))
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+        }
 
         return $data;
     }

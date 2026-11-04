@@ -9,6 +9,7 @@ use App\Models\Pedido;
 use App\Models\ReputacionEvento;
 use App\Notifications\NuevoPedidoParaComercio;
 use App\Support\CancelarPedido;
+use App\Support\OpcionesPedido;
 use App\Support\Push;
 use App\Support\Reputacion;
 use App\Support\UbicacionDomiciliario;
@@ -32,6 +33,14 @@ class PedidoController extends Controller
             'items' => ['required', 'array', 'min:1'],
             'items.*.producto_id' => ['required', 'integer'],
             'items.*.cantidad' => ['required', 'integer', 'min:1', 'max:99'],
+            // Ropa y calzado.
+            'items.*.talla' => ['nullable', 'string', 'max:100'],
+            'items.*.color' => ['nullable', 'string', 'max:100'],
+            // Comida: ingredientes que no quiere o de los que quiere más.
+            'items.*.sin' => ['nullable', 'array', 'max:30'],
+            'items.*.sin.*' => ['string', 'max:100'],
+            'items.*.extra' => ['nullable', 'array', 'max:30'],
+            'items.*.extra.*' => ['string', 'max:100'],
             'metodo_pago' => ['required', Rule::in(Pedido::METODOS_PAGO)],
             'direccion_entrega' => ['required', 'string', 'max:255'],
             'telefono_contacto' => ['required', 'string', 'max:30'],
@@ -52,6 +61,7 @@ class PedidoController extends Controller
         $productos = $negocio->productos()
             ->where('disponible', true)
             ->whereIn('id', $ids)
+            ->with('tipoProducto')
             ->get()
             ->keyBy('id');
 
@@ -59,6 +69,11 @@ class PedidoController extends Controller
         foreach ($datos['items'] as $item) {
             if (! $productos->has($item['producto_id'])) {
                 return response()->json(['message' => 'Hay un producto que ya no está disponible.'], 422);
+            }
+
+            $problema = OpcionesPedido::problema($productos[$item['producto_id']], $item);
+            if ($problema) {
+                return response()->json(['message' => $problema], 422);
             }
         }
 
@@ -83,6 +98,7 @@ class PedidoController extends Controller
                     'nombre' => $p->nombre,
                     'precio' => $p->precio,
                     'cantidad' => $item['cantidad'],
+                    'opciones' => OpcionesPedido::normalizar($p, $item),
                 ]);
                 $subtotal += $p->precio * $item['cantidad'];
             }
@@ -200,6 +216,7 @@ class PedidoController extends Controller
                 'nombre' => $i->nombre,
                 'cantidad' => $i->cantidad,
                 'precio' => (float) $i->precio,
+                'detalle' => $i->detalle(),
             ]),
             // Cancelación: quién, por qué y si el cliente aún puede cancelar.
             'cancelado_por' => $pedido->cancelado_por,

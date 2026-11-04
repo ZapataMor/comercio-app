@@ -238,7 +238,10 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
           {pedido.items.map((it, idx) => (
             <View key={idx} style={styles.itemRow}>
               <Text style={styles.itemCant}>{it.cantidad}×</Text>
-              <Text style={styles.itemNombre}>{it.nombre}</Text>
+              <View style={styles.itemTexto}>
+                <Text style={styles.itemNombre}>{it.nombre}</Text>
+                {!!it.detalle && <Text style={styles.itemDetalle}>{it.detalle}</Text>}
+              </View>
             </View>
           ))}
         </View>
@@ -359,7 +362,10 @@ const useStyles = makeStyles((c, shadow) => ({
   notaInline: { marginTop: 0 },
   itemRow: { flexDirection: 'row', marginTop: 4 },
   itemCant: { fontFamily: font.bold, color: c.goldText, width: 36 },
-  itemNombre: { color: c.text, fontSize: 15, flex: 1, fontFamily: font.regular },
+  itemTexto: { flex: 1 },
+  itemNombre: { color: c.text, fontSize: 15, fontFamily: font.regular },
+  // Lo que el negocio debe preparar distinto: que no se pase por alto.
+  itemDetalle: { color: c.goldText, fontSize: 13, lineHeight: 18, marginTop: 1, fontFamily: font.semibold },
   desglose: { borderTopWidth: 1, borderTopColor: c.border, paddingTop: 10, marginTop: 12, gap: 2 },
   btnRechazar: {
     marginTop: 14, borderWidth: 1, borderColor: c.danger, borderRadius: radius.md,

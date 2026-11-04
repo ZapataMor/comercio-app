@@ -30,6 +30,8 @@ class ProductoResource extends JsonResource
             'disponible' => $this->disponible,
             // Ingredientes, usos, tallas... según el tipo de producto.
             'atributos' => $this->atributos ?? [],
+            // Solo ropa y calzado: ahí `atributos` son las tallas.
+            'colores' => $this->colores ?? [],
             // Solo incluye la categoría si fue cargada (evita consultas N+1).
             'categoria' => new CategoriaResource($this->whenLoaded('categoria')),
             // Tipo global (Comida, Medicamento...); null en productos antiguos.

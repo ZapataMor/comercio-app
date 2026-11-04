@@ -75,7 +75,7 @@ test('reemplazar vacía el carrito y lo deja con el producto nuevo', () => {
   expect(cart.current.negocioId).toBe(2);
   expect(cart.current.negocioNombre).toBe('Tienda B');
   expect(cart.current.items).toEqual([
-    { producto_id: 20, nombre: 'Queso', precio: 8000, cantidad: 1 },
+    expect.objectContaining({ producto_id: 20, nombre: 'Queso', precio: 8000, cantidad: 1 }),
   ]);
   expect(cart.current.count).toBe(1);
   expect(cart.current.total).toBe(8000);

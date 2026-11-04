@@ -12,6 +12,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class TipoProducto extends Model
 {
+    /** En la comida el cliente quita ingredientes o pide más de los que trae. */
+    public const SLUG_COMIDA = 'comida';
+
+    /** En la ropa y el calzado el cliente elige talla y color. */
+    public const SLUG_ROPA = 'ropa-y-calzado';
+
     protected $table = 'tipos_producto';
 
     protected $fillable = [
@@ -20,6 +26,7 @@ class TipoProducto extends Model
         'atributo_label',
         'atributo_boton',
         'sugerencias',
+        'sugerencias_colores',
         'orden',
     ];
 
@@ -27,6 +34,7 @@ class TipoProducto extends Model
     {
         return [
             'sugerencias' => 'array',
+            'sugerencias_colores' => 'array',
         ];
     }
 

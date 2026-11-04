@@ -147,7 +147,7 @@ class CatalogoController extends Controller
         $tipos = TipoProducto::query()
             ->orderBy('orden')
             ->orderBy('nombre')
-            ->get(['id', 'nombre', 'slug', 'atributo_label', 'atributo_boton', 'sugerencias']);
+            ->get(['id', 'nombre', 'slug', 'atributo_label', 'atributo_boton', 'sugerencias', 'sugerencias_colores']);
 
         return response()->json(['tipos_producto' => $tipos]);
     }
@@ -227,7 +227,7 @@ class CatalogoController extends Controller
 
         $productos = $negocio->productos()
             ->where('disponible', true)
-            ->with('categoria')
+            ->with(['categoria', 'tipoProducto'])
             ->orderBy('nombre')
             ->get();
 

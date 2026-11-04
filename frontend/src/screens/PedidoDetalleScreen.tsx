@@ -263,7 +263,10 @@ export default function PedidoDetalleScreen({ route }: Props) {
         <Text style={styles.cardTitulo}>Detalle</Text>
         {pedido.items.map((it, idx) => (
           <View key={idx} style={styles.linea}>
-            <Text style={styles.lineaTxt}>{it.cantidad}× {it.nombre}</Text>
+            <View style={styles.lineaProducto}>
+              <Text style={styles.lineaTxt}>{it.cantidad}× {it.nombre}</Text>
+              {!!it.detalle && <Text style={styles.lineaDetalle}>{it.detalle}</Text>}
+            </View>
             <Text style={styles.lineaTxt}>{cop(it.precio * it.cantidad)}</Text>
           </View>
         ))}
@@ -317,6 +320,8 @@ const useStyles = makeStyles((c, shadow) => ({
   novedadTxt: { flex: 1, color: c.warning, fontSize: 13, fontFamily: font.medium },
   linea: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
   lineaTxt: { color: c.text, fontFamily: font.regular },
+  lineaProducto: { flex: 1, marginRight: 12 },
+  lineaDetalle: { color: c.muted, fontSize: 12, lineHeight: 17, marginTop: 1, fontFamily: font.regular },
   subtotalRow: {
     flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, paddingBottom: 3,
     borderTopWidth: 1, borderTopColor: c.border,

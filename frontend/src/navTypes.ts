@@ -1,5 +1,5 @@
 // Rutas de navegación de la app (React Navigation - native stack).
-import { ComercioPedido } from './api';
+import { ComercioPedido, Producto } from './api';
 
 export type RootStackParamList = {
   Login: undefined;
@@ -28,6 +28,8 @@ export type RootStackParamList = {
   // `productoId` opcional: al entrar desde una búsqueda de producto, el catálogo
   // resalta y hace scroll hasta ese producto.
   Negocio: { id: number; nombre: string; productoId?: number };
+  // Detalle de un producto del catálogo; `abierto`: si el negocio recibe pedidos.
+  Producto: { negocioId: number; negocioNombre: string; abierto: boolean; producto: Producto };
   Carrito: undefined;
   Checkout: undefined;
   MisPedidos: undefined;

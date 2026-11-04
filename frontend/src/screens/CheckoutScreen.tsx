@@ -18,6 +18,7 @@ import {
 } from '../api';
 import { useAuth } from '../AuthContext';
 import { useCart } from '../CartContext';
+import { detalleOpciones } from '../opcionesProducto';
 import { FadeInView, PressableScale } from '../components/anim';
 import BarrioSelect from '../components/BarrioSelect';
 import FieldError from '../components/FieldError';
@@ -154,7 +155,7 @@ export default function CheckoutScreen({ navigation }: Props) {
 
       await crearPedido(auth!.token, {
         negocio_id: negocioId,
-        items: cart.items.map(i => ({ producto_id: i.producto_id, cantidad: i.cantidad })),
+        items: cart.items.map(i => ({ producto_id: i.producto_id, cantidad: i.cantidad, ...i.opciones })),
         metodo_pago: pago,
         direccion_entrega: direccionEntrega,
         telefono_contacto: telefonoContacto,
@@ -209,12 +210,18 @@ export default function CheckoutScreen({ navigation }: Props) {
           <Icon name="tienda" size={15} color={c.text} />
           <Text style={styles.resumenTitulo}>{cart.negocioNombre}</Text>
         </View>
-        {cart.items.map(i => (
-          <View key={i.producto_id} style={styles.linea}>
-            <Text style={styles.lineaTxt}>{i.cantidad}x {i.nombre}</Text>
-            <Text style={styles.lineaTxt}>{cop(i.precio * i.cantidad)}</Text>
-          </View>
-        ))}
+        {cart.items.map(i => {
+          const detalle = detalleOpciones(i.opciones);
+          return (
+            <View key={i.linea} style={styles.linea}>
+              <View style={styles.lineaProducto}>
+                <Text style={styles.lineaTxt}>{i.cantidad}x {i.nombre}</Text>
+                {!!detalle && <Text style={styles.lineaDetalle}>{detalle}</Text>}
+              </View>
+              <Text style={styles.lineaTxt}>{cop(i.precio * i.cantidad)}</Text>
+            </View>
+          );
+        })}
         <View style={styles.subtotalRow}>
           <Text style={styles.lineaTxt}>Productos</Text>
           <Text style={styles.lineaTxt}>{cop(cart.total)}</Text>
@@ -399,6 +406,8 @@ const useStyles = makeStyles((c, shadow) => ({
   fila: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   linea: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3, gap: 12 },
   lineaTxt: { color: c.text, fontFamily: font.regular, flexShrink: 1 },
+  lineaProducto: { flex: 1, marginRight: 12 },
+  lineaDetalle: { color: c.muted, fontSize: 12, lineHeight: 17, marginTop: 1, fontFamily: font.regular },
   subtotalRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, paddingBottom: 3, borderTopWidth: 1, borderTopColor: c.border },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: c.border },
   totalLabel: { fontFamily: font.bold, color: c.textStrong },

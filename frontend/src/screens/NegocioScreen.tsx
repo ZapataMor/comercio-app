@@ -10,24 +10,30 @@ import {
 } from 'react-native';
 import { direccionConBarrio, getCatalogo, imagenUrl, Negocio, Producto } from '../api';
 import { useAuth } from '../AuthContext';
-import { useCart } from '../CartContext';
 import { FadeInView, PressableScale } from '../components/anim';
-import { useConfirmar } from '../components/Confirmacion';
 import { useFlyToCart } from '../components/FlyToCart';
 import Icon from '../components/Icon';
 import { NivelBadge } from '../components/Reputacion';
 import { RootStackParamList } from '../navTypes';
+import { pideEleccion } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
+import { useAgregarAlCarrito } from '../useAgregarAlCarrito';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Negocio'>;
 
+const COLUMNAS = 2;
+
 type CatalogoFila =
   | { tipo: 'categoria'; key: string; nombre: string; cantidad: number }
-  | { tipo: 'producto'; key: string; producto: Producto };
+  | { tipo: 'productos'; key: string; productos: Producto[] };
 
-function precioCOP(n: number) {
-  return '$' + Math.round(n).toLocaleString('es-CO');
+/** Precio limpio: la unidad solo se dice cuando no es por unidad ("/ kg"). */
+function precioDe(p: Producto) {
+  if (p.unidad_medida && p.unidad_medida !== 'unidad' && p.precio_formateado) {
+    return p.precio_formateado;
+  }
+  return '$' + Math.round(p.precio).toLocaleString('es-CO');
 }
 
 function categoriasNegocio(negocio: Negocio) {
@@ -40,22 +46,69 @@ function construirCatalogo(productos: Producto[]): CatalogoFila[] {
     const categoria = producto.categoria?.nombre?.trim() || 'Sin categoría';
     grupos.set(categoria, [...(grupos.get(categoria) ?? []), producto]);
   });
+  // Un negocio sin categorías no necesita un título "Sin categoría".
+  const sinTitulos = grupos.size === 1 && grupos.has('Sin categoría');
 
-  return Array.from(grupos.entries()).flatMap(([categoria, items]) => [
-    { tipo: 'categoria' as const, key: `cat-${categoria}`, nombre: categoria, cantidad: items.length },
-    ...items.map(producto => ({ tipo: 'producto' as const, key: `prod-${producto.id}`, producto })),
-  ]);
+  return Array.from(grupos.entries()).flatMap(([categoria, items]) => {
+    const filas: CatalogoFila[] = [];
+    if (!sinTitulos) {
+      filas.push({ tipo: 'categoria', key: `cat-${categoria}`, nombre: categoria, cantidad: items.length });
+    }
+    for (let i = 0; i < items.length; i += COLUMNAS) {
+      const fila = items.slice(i, i + COLUMNAS);
+      filas.push({ tipo: 'productos', key: `fila-${fila[0].id}`, productos: fila });
+    }
+    return filas;
+  });
 }
 
-export default function NegocioScreen({ route }: Props) {
+type TarjetaProps = {
+  producto: Producto;
+  destacado: boolean;
+  /** Con el negocio cerrado el producto se puede ver, pero no agregar. */
+  abierto: boolean;
+  onVer: () => void;
+  onAgregar: (e: GestureResponderEvent) => void;
+};
+
+function TarjetaProducto({ producto, destacado, abierto, onVer, onAgregar }: TarjetaProps) {
+  const { c } = useTheme();
+  const styles = useStyles();
+  const uri = imagenUrl(producto.imagen);
+
+  return (
+    <PressableScale style={styles.tarjeta} scaleTo={0.98} onPress={onVer}>
+      <View style={[styles.foto, destacado && styles.fotoDestacada]}>
+        {uri ? (
+          <Image source={{ uri }} style={styles.fotoImagen} resizeMode="cover" />
+        ) : (
+          <Icon name="caja" size={30} color={c.mutedSoft} />
+        )}
+        {abierto && (
+          <PressableScale
+            style={styles.agregar}
+            hitSlop={8}
+            scaleTo={0.88}
+            accessibilityLabel={`Agregar ${producto.nombre}`}
+            onPress={onAgregar}>
+            <Icon name="mas" size={18} color={c.onBrand} strokeWidth={2.4} />
+          </PressableScale>
+        )}
+      </View>
+      <Text style={styles.nombre} numberOfLines={2}>{producto.nombre}</Text>
+      <Text style={styles.precio}>{precioDe(producto)}</Text>
+    </PressableScale>
+  );
+}
+
+export default function NegocioScreen({ navigation, route }: Props) {
   const { c } = useTheme();
   const styles = useStyles();
   const { auth } = useAuth();
-  const cart = useCart();
   const { volar } = useFlyToCart();
   const toast = useToast();
-  const confirmar = useConfirmar();
   const { id, nombre, productoId } = route.params;
+  const agregar = useAgregarAlCarrito(id, nombre);
   const [negocio, setNegocio] = useState<Negocio | null>(null);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -78,7 +131,9 @@ export default function NegocioScreen({ route }: Props) {
   // que el catálogo cargó, para mostrarlo resaltado dentro de la lista.
   useEffect(() => {
     if (productoId == null || catalogo.length === 0) return;
-    const indice = catalogo.findIndex(fila => fila.tipo === 'producto' && fila.producto.id === productoId);
+    const indice = catalogo.findIndex(
+      fila => fila.tipo === 'productos' && fila.productos.some(p => p.id === productoId),
+    );
     if (indice < 0) return;
     const t = setTimeout(() => {
       listaRef.current?.scrollToIndex({ index: indice, viewPosition: 0.3, animated: true });
@@ -86,31 +141,30 @@ export default function NegocioScreen({ route }: Props) {
     return () => clearTimeout(t);
   }, [productoId, catalogo]);
 
+  function verProducto(p: Producto) {
+    navigation.navigate('Producto', {
+      negocioId: id,
+      negocioNombre: nombre,
+      abierto: negocioAbierto,
+      producto: p,
+    });
+  }
+
   function onAgregar(p: Producto, e: GestureResponderEvent) {
     if (!negocioAbierto) {
       toast.info('Negocio cerrado', 'Puedes ver el catálogo, pero no hacer pedidos.');
       return;
     }
-
-    // Punto exacto del toque sobre "Pedir": desde ahí salta el paquetito
-    // que vuela hasta el botón flotante de Carrito.
-    const desde = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
-    const ok = cart.agregar(id, nombre, p);
-    if (ok) {
-      volar(desde);
+    // Hay que elegir talla o color: eso se hace en el detalle del producto.
+    if (pideEleccion(p)) {
+      verProducto(p);
       return;
     }
-    confirmar({
-      icono: 'carrito',
-      titulo: '¿Vaciar el carrito?',
-      texto: `Tu carrito tiene productos de "${cart.negocioNombre}". Cada pedido es de una sola tienda: vacíalo para pedir de "${nombre}".`,
-      textoBoton: 'Vaciar y agregar',
-      textoCancelar: 'Cancelar',
-      accion: () => {
-        cart.reemplazar(id, nombre, p);
-        volar(desde);
-      },
-    });
+
+    // Punto exacto del toque sobre "+": desde ahí salta el paquetito que vuela
+    // hasta el botón flotante de Carrito.
+    const desde = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
+    agregar(p, { alAgregar: () => volar(desde) });
   }
 
   if (cargando) {
@@ -120,6 +174,9 @@ export default function NegocioScreen({ route }: Props) {
     return <Text style={styles.error}>{error}</Text>;
   }
 
+  const portada = imagenUrl(negocio?.imagen);
+  const etiquetas = negocio ? categoriasNegocio(negocio).join(' · ') : '';
+
   return (
     <FlatList
       ref={listaRef}
@@ -127,7 +184,7 @@ export default function NegocioScreen({ route }: Props) {
       data={catalogo}
       keyExtractor={fila => fila.key}
       // Aire abajo para la barra flotante fija (Carrito / Mis pedidos).
-      contentContainerStyle={{ padding: 16, paddingBottom: 110 }}
+      contentContainerStyle={styles.contenido}
       // El scroll a un índice puede fallar si aún no se midió: reintentamos por
       // offset aproximado y luego al índice exacto.
       onScrollToIndexFailed={info => {
@@ -145,101 +202,60 @@ export default function NegocioScreen({ route }: Props) {
       }}
       ListHeaderComponent={
         negocio ? (
-          <View style={styles.cabecera}>
-            <View style={styles.hero}>
-              {imagenUrl(negocio.imagen) ? (
-                <Image
-                  source={{ uri: imagenUrl(negocio.imagen) }}
-                  style={styles.heroImagen}
-                  resizeMode="cover"
-                  blurRadius={6}
-                />
+          <View>
+            <View style={styles.portada}>
+              {portada ? (
+                <Image source={{ uri: portada }} style={styles.portadaImagen} resizeMode="cover" />
               ) : (
-                <View style={[styles.heroImagen, styles.heroVacio]}>
-                  <Icon name="tienda" size={52} color={c.mutedSoft} />
-                </View>
+                <Icon name="tienda" size={44} color={c.mutedSoft} />
               )}
-              <View style={styles.heroScrim} />
-              <View style={styles.heroContenido}>
-                {!!negocio.categoria && <Text style={styles.heroCategoria}>{negocio.categoria}</Text>}
-                <Text style={styles.heroNombre} numberOfLines={2}>{negocio.nombre}</Text>
-                <Text style={negocio.activo ? styles.heroEstadoAbierto : styles.heroEstadoCerrado}>
+            </View>
+            <View style={styles.cabecera}>
+              {!!etiquetas && <Text style={styles.etiquetas} numberOfLines={1}>{etiquetas}</Text>}
+              <Text style={styles.titulo} numberOfLines={2}>{negocio.nombre}</Text>
+              <View style={styles.estadoFila}>
+                <View style={[styles.punto, negocio.activo ? styles.puntoAbierto : styles.puntoCerrado]} />
+                <Text style={[styles.estado, !negocio.activo && styles.estadoCerrado]}>
                   {negocio.activo ? 'Abierto' : 'Cerrado'}
                 </Text>
-                {/* Nivel de confiabilidad y tiempo que promete en preparar. */}
-                <View style={styles.heroDato}>
-                  <NivelBadge reputacion={negocio.reputacion} />
-                  {!!negocio.tiempo_preparacion && (
-                    <>
-                      <Icon name="reloj" size={13} color="rgba(255,255,255,0.78)" />
-                      <Text style={styles.heroDatoTxt}>~{negocio.tiempo_preparacion} min</Text>
-                    </>
-                  )}
-                </View>
-                {!!negocio.horario_hoy && (
-                  <View style={styles.heroDato}>
-                    <Icon name="reloj" size={13} color="rgba(255,255,255,0.78)" />
-                    <Text style={styles.heroDatoTxt} numberOfLines={1}>{negocio.horario_hoy}</Text>
-                  </View>
+                {!!negocio.tiempo_preparacion && (
+                  <Text style={styles.dato}>· ~{negocio.tiempo_preparacion} min</Text>
                 )}
-                {!!direccionConBarrio(negocio) && (
-                  <View style={styles.heroDato}>
-                    <Icon name="ubicacion" size={13} color="rgba(255,255,255,0.78)" />
-                    <Text style={styles.heroDatoTxt} numberOfLines={1}>{direccionConBarrio(negocio)}</Text>
-                  </View>
-                )}
+                <NivelBadge reputacion={negocio.reputacion} />
               </View>
+              {!!negocio.horario_hoy && (
+                <Text style={styles.dato} numberOfLines={1}>{negocio.horario_hoy}</Text>
+              )}
+              {!!direccionConBarrio(negocio) && (
+                <Text style={styles.dato} numberOfLines={1}>{direccionConBarrio(negocio)}</Text>
+              )}
+              {!!negocio.descripcion && <Text style={styles.descripcion}>{negocio.descripcion}</Text>}
             </View>
-            {!!negocio.descripcion && <Text style={styles.desc}>{negocio.descripcion}</Text>}
-            {categoriasNegocio(negocio).length > 0 && (
-              <View style={styles.categoriasChips}>
-                {categoriasNegocio(negocio).map(categoria => (
-                  <View key={categoria} style={styles.categoriaChip}>
-                    <Text style={styles.categoriaChipTxt}>{categoria}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-            <Text style={styles.catalogoTitulo}>Catálogo</Text>
           </View>
         ) : null
       }
       ListEmptyComponent={<Text style={styles.vacio}>Este negocio no tiene productos disponibles.</Text>}
       renderItem={({ item, index }) =>
         item.tipo === 'categoria' ? (
-          <View style={styles.seccionHead}>
+          <View style={styles.seccion}>
             <Text style={styles.seccionTitulo}>{item.nombre}</Text>
-            <Text style={styles.seccionConteo}>{item.cantidad} {item.cantidad === 1 ? 'producto' : 'productos'}</Text>
+            <Text style={styles.seccionConteo}>{item.cantidad}</Text>
           </View>
         ) : (
-        <FadeInView delay={Math.min(index, 8) * 45}>
-          <View style={[styles.item, item.producto.id === productoId && styles.itemDestacado]}>
-            {imagenUrl(item.producto.imagen) ? (
-              <Image source={{ uri: imagenUrl(item.producto.imagen) }} style={styles.thumb} resizeMode="cover" />
-            ) : (
-              <View style={[styles.thumb, styles.thumbVacio]}>
-                <Icon name="caja" size={22} color={c.muted} />
-              </View>
-            )}
-            <View style={styles.itemTexto}>
-              <Text style={styles.nombre}>{item.producto.nombre}</Text>
-              {!!item.producto.descripcion && (
-                <Text style={styles.productoDesc} numberOfLines={2}>{item.producto.descripcion}</Text>
-              )}
-              <Text style={styles.precio}>
-                {item.producto.precio_formateado ?? precioCOP(item.producto.precio)}
-              </Text>
-            </View>
-            <PressableScale
-              style={[styles.addBtn, !negocioAbierto && styles.addBtnOff]}
-              disabled={!negocioAbierto}
-              onPress={e => onAgregar(item.producto, e)}>
-              <Text style={[styles.addTxt, !negocioAbierto && styles.addTxtOff]}>
-                {negocioAbierto ? '+ Pedir' : 'Cerrado'}
-              </Text>
-            </PressableScale>
-          </View>
-        </FadeInView>
+          <FadeInView delay={Math.min(index, 6) * 45} style={styles.fila}>
+            {item.productos.map(p => (
+              <TarjetaProducto
+                key={p.id}
+                producto={p}
+                destacado={p.id === productoId}
+                abierto={negocioAbierto}
+                onVer={() => verProducto(p)}
+                onAgregar={e => onAgregar(p, e)}
+              />
+            ))}
+            {/* Fila incompleta: el hueco conserva el ancho de la columna. */}
+            {item.productos.length < COLUMNAS && <View style={styles.tarjeta} />}
+          </FadeInView>
         )
       }
     />
@@ -248,88 +264,61 @@ export default function NegocioScreen({ route }: Props) {
 
 const useStyles = makeStyles((c, shadow) => ({
   container: { flex: 1, backgroundColor: c.bg },
-  cabecera: { marginBottom: 6 },
-  hero: {
-    height: 220,
-    borderRadius: radius.lg,
-    marginBottom: 14,
-    overflow: 'hidden',
-    backgroundColor: c.surface2,
-    ...shadow.card,
-  },
-  heroImagen: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%' },
-  heroVacio: { alignItems: 'center', justifyContent: 'center', backgroundColor: c.surface2 },
-  heroScrim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(31,27,22,0.42)' },
-  heroContenido: {
-    flex: 1,
+  contenido: { paddingBottom: 110 },
+  portada: {
+    height: 176,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 22,
+    backgroundColor: c.surface2,
   },
-  heroCategoria: {
-    color: 'rgba(255,255,255,0.84)',
-    fontSize: 12,
-    fontFamily: font.semibold,
-    letterSpacing: 0,
-    marginBottom: 8,
-    textTransform: 'uppercase',
-  },
-  heroNombre: {
-    color: '#FFFFFF',
-    fontFamily: font.displayExtra,
-    fontSize: 31,
-    lineHeight: 38,
-    textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.34)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
-  },
-  heroEstadoAbierto: {
-    marginTop: 12, color: c.success, backgroundColor: c.successSoft, fontFamily: font.bold,
-    fontSize: 12, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, overflow: 'hidden',
-  },
-  heroEstadoCerrado: {
-    marginTop: 12, color: c.danger, backgroundColor: c.dangerSoft, fontFamily: font.bold,
-    fontSize: 12, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, overflow: 'hidden',
-  },
-  heroDato: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 12, maxWidth: '92%' },
-  heroDatoTxt: { color: 'rgba(255,255,255,0.78)', fontSize: 13, fontFamily: font.medium, flexShrink: 1 },
-  desc: { color: c.text, fontSize: 15, lineHeight: 21, fontFamily: font.regular, marginBottom: 14 },
-  categoriasChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
-  categoriaChip: {
-    backgroundColor: c.accentSoft,
-    borderColor: c.accent,
-    borderWidth: 1,
-    borderRadius: radius.sm,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  categoriaChipTxt: { color: c.goldText, fontFamily: font.semibold, fontSize: 12 },
-  catalogoTitulo: { color: c.textStrong, fontSize: 22, fontFamily: font.display, marginBottom: 2 },
-  seccionHead: {
+  portadaImagen: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%' },
+  cabecera: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 6, gap: 4 },
+  etiquetas: { color: c.muted, fontSize: 12, fontFamily: font.medium },
+  titulo: { color: c.textStrong, fontFamily: font.display, fontSize: 26, lineHeight: 32 },
+  estadoFila: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 4, marginBottom: 4 },
+  punto: { width: 7, height: 7, borderRadius: radius.pill },
+  puntoAbierto: { backgroundColor: c.success },
+  puntoCerrado: { backgroundColor: c.danger },
+  estado: { color: c.success, fontSize: 13, fontFamily: font.semibold },
+  estadoCerrado: { color: c.danger },
+  dato: { color: c.muted, fontSize: 13, lineHeight: 18, fontFamily: font.regular },
+  descripcion: { color: c.text, fontSize: 14, lineHeight: 20, fontFamily: font.regular, marginTop: 8 },
+  seccion: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    marginTop: 14,
-    marginBottom: 8,
+    alignItems: 'baseline',
+    gap: 8,
+    paddingHorizontal: 20,
+    marginTop: 26,
+    marginBottom: 12,
   },
-  seccionTitulo: { color: c.textStrong, fontSize: 18, fontFamily: font.displaySemi, flex: 1 },
-  seccionConteo: { color: c.muted, fontSize: 12, fontFamily: font.medium, marginLeft: 10 },
-  item: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: c.surface, borderRadius: radius.md, padding: 14, marginBottom: 10, ...shadow.low,
+  seccionTitulo: { color: c.textStrong, fontSize: 17, fontFamily: font.displaySemi },
+  seccionConteo: { color: c.mutedSoft, fontSize: 13, fontFamily: font.medium },
+  fila: { flexDirection: 'row', gap: 14, paddingHorizontal: 20, marginBottom: 20 },
+  tarjeta: { flex: 1 },
+  foto: {
+    aspectRatio: 1,
+    borderRadius: radius.lg,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: c.surface2,
   },
-  itemDestacado: { borderWidth: 2, borderColor: c.accent, backgroundColor: c.accentSoft },
-  thumb: { width: 52, height: 52, borderRadius: radius.sm, marginRight: 12, backgroundColor: c.surface2 },
-  thumbVacio: { alignItems: 'center', justifyContent: 'center' },
-  itemTexto: { flex: 1, marginRight: 10 },
-  nombre: { fontSize: 15, fontFamily: font.semibold, color: c.textStrong },
-  productoDesc: { color: c.muted, fontSize: 12, lineHeight: 16, marginTop: 2, fontFamily: font.regular },
-  precio: { color: c.goldText, fontFamily: font.extra, fontSize: 15, marginTop: 4 },
-  addBtn: { backgroundColor: c.accent, borderRadius: radius.sm, paddingHorizontal: 14, paddingVertical: 9, ...shadow.gold },
-  addTxt: { color: c.onAccent, fontFamily: font.bold },
-  addBtnOff: { backgroundColor: c.surface2, shadowOpacity: 0, elevation: 0 },
-  addTxtOff: { color: c.mutedSoft },
+  fotoDestacada: { borderWidth: 2, borderColor: c.accent },
+  fotoImagen: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%' },
+  agregar: {
+    position: 'absolute',
+    right: 8,
+    bottom: 8,
+    width: 34,
+    height: 34,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: c.brand,
+    ...shadow.soft,
+  },
+  nombre: { color: c.textStrong, fontSize: 14, lineHeight: 19, fontFamily: font.medium, marginTop: 10 },
+  precio: { color: c.text, fontSize: 14, fontFamily: font.bold, marginTop: 3 },
   vacio: { textAlign: 'center', color: c.muted, marginTop: 40, fontFamily: font.regular },
   error: { color: c.danger, backgroundColor: c.dangerSoft, padding: 12, borderRadius: radius.sm, margin: 16, fontFamily: font.medium },
 }));

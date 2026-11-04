@@ -14,6 +14,7 @@ class PedidoItem extends Model
         'nombre',
         'precio',
         'cantidad',
+        'opciones',
     ];
 
     protected function casts(): array
@@ -21,6 +22,7 @@ class PedidoItem extends Model
         return [
             'precio' => 'decimal:2',
             'cantidad' => 'integer',
+            'opciones' => 'array',
         ];
     }
 
@@ -28,6 +30,25 @@ class PedidoItem extends Model
     public function subtotal(): float
     {
         return (float) $this->precio * $this->cantidad;
+    }
+
+    /**
+     * Lo que pidió el cliente en esta línea, para leerlo de corrido.
+     * Ej: "Talla M · Negro" o "Sin lechuga, tomate · Extra queso".
+     */
+    public function detalle(): ?string
+    {
+        $o = $this->opciones ?? [];
+        $lista = fn (string $clave) => mb_strtolower(implode(', ', $o[$clave]));
+
+        $partes = array_filter([
+            isset($o['talla']) ? "Talla {$o['talla']}" : null,
+            $o['color'] ?? null,
+            empty($o['sin']) ? null : 'Sin '.$lista('sin'),
+            empty($o['extra']) ? null : 'Extra '.$lista('extra'),
+        ]);
+
+        return $partes ? implode(' · ', $partes) : null;
     }
 
     public function pedido(): BelongsTo

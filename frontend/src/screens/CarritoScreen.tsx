@@ -1,10 +1,13 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { useCart } from '../CartContext';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Easing, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { imagenUrl } from '../api';
+import { CartItem, DURACION_RETIRO, useCart } from '../CartContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import Icon from '../components/Icon';
+import PersonalizarLinea from '../components/PersonalizarLinea';
 import { RootStackParamList } from '../navTypes';
+import { detalleOpciones } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Carrito'>;
@@ -13,12 +16,123 @@ function cop(n: number) {
   return '$' + Math.round(n).toLocaleString('es-CO');
 }
 
+/** Texto del enlace para ajustar la línea, según lo que se pueda cambiar. */
+function textoAjuste(i: CartItem): string | null {
+  if (i.ingredientes?.length) return 'Personalizar';
+  const cambiaTalla = (i.tallas?.length ?? 0) > 1;
+  const cambiaColor = (i.colores?.length ?? 0) > 1;
+  if (cambiaTalla && cambiaColor) return 'Cambiar talla o color';
+  if (cambiaTalla) return 'Cambiar talla';
+  if (cambiaColor) return 'Cambiar color';
+  return null;
+}
+
+/**
+ * Relleno de la tarjeta que se vacía de derecha a izquierda, como una barra de
+ * carga al revés: cuando llega al final la línea sale del carrito. Calcula lo
+ * que falta con `saleEn`, así sigue en su punto si el cliente sale y vuelve.
+ */
+function RellenoRetiro({ saleEn }: { saleEn: number }) {
+  const styles = useStyles();
+  const escala = useRef(new Animated.Value((saleEn - Date.now()) / DURACION_RETIRO)).current;
+
+  useEffect(() => {
+    const animacion = Animated.timing(escala, {
+      toValue: 0,
+      duration: Math.max(0, saleEn - Date.now()),
+      easing: Easing.linear,
+      useNativeDriver: true,
+    });
+    animacion.start();
+    return () => animacion.stop();
+  }, [escala, saleEn]);
+
+  return <Animated.View pointerEvents="none" style={[styles.relleno, { transform: [{ scaleX: escala }] }]} />;
+}
+
+function LineaCarrito({ item, onAjustar }: { item: CartItem; onAjustar: () => void }) {
+  const { c } = useTheme();
+  const styles = useStyles();
+  const { cambiar, quitar } = useCart();
+  const saliendo = !!item.saleEn;
+  const uri = imagenUrl(item.imagen);
+  const detalle = detalleOpciones(item.opciones);
+  const ajuste = textoAjuste(item);
+
+  return (
+    <View style={styles.item}>
+      {!!item.saleEn && <RellenoRetiro saleEn={item.saleEn} />}
+      <View style={styles.thumb}>
+        {uri ? (
+          <Image source={{ uri }} style={styles.thumbImagen} resizeMode="cover" />
+        ) : (
+          <Icon name="caja" size={22} color={c.mutedSoft} />
+        )}
+      </View>
+
+      <View style={styles.itemCuerpo}>
+        <View style={styles.itemCabecera}>
+          <Text style={styles.nombre} numberOfLines={2}>{item.nombre}</Text>
+          <TouchableOpacity
+            style={saliendo && styles.oculto}
+            disabled={saliendo}
+            hitSlop={10}
+            accessibilityLabel={`Quitar ${item.nombre}`}
+            onPress={() => quitar(item.linea)}>
+            <Icon name="cerrar" size={15} color={c.mutedSoft} />
+          </TouchableOpacity>
+        </View>
+
+        {!!detalle && <Text style={styles.detalle} numberOfLines={3}>{detalle}</Text>}
+        {!!ajuste && (
+          <TouchableOpacity
+            style={[styles.ajuste, saliendo && styles.oculto]}
+            disabled={saliendo}
+            hitSlop={6}
+            onPress={onAjustar}>
+            <Text style={styles.ajusteTxt}>{ajuste}</Text>
+          </TouchableOpacity>
+        )}
+
+        <View style={styles.itemPie}>
+          {saliendo ? (
+            <Text style={styles.deshacer} numberOfLines={2}>Toca + para conservarlo</Text>
+          ) : (
+            <Text style={styles.precio}>{cop(item.precio * item.cantidad)}</Text>
+          )}
+          <View style={styles.qtyRow}>
+            <PressableScale
+              style={[styles.qtyBtn, saliendo && styles.qtyBtnOff]}
+              disabled={saliendo}
+              hitSlop={6}
+              accessibilityLabel="Quitar una unidad"
+              onPress={() => cambiar(item.linea, -1)}>
+              <Icon name="menos" size={15} color={c.textStrong} strokeWidth={2.2} />
+            </PressableScale>
+            <Text style={styles.qty}>{saliendo ? 0 : item.cantidad}</Text>
+            <PressableScale
+              style={styles.qtyBtn}
+              hitSlop={6}
+              accessibilityLabel="Agregar una unidad"
+              onPress={() => cambiar(item.linea, 1)}>
+              <Icon name="mas" size={15} color={c.textStrong} strokeWidth={2.2} />
+            </PressableScale>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export default function CarritoScreen({ navigation }: Props) {
   const { c } = useTheme();
   const styles = useStyles();
-  const { items, negocioNombre, total, cambiar, quitar, vaciar } = useCart();
+  const { items, lineas, negocioNombre, total, personalizar, vaciar } = useCart();
+  // Línea en la hoja de ajustes. Se guarda la clave y no la línea: así la hoja
+  // se cierra sola si la línea sale mientras está abierta.
+  const [ajustando, setAjustando] = useState<string | null>(null);
 
-  if (items.length === 0) {
+  if (lineas.length === 0) {
     return (
       <View style={styles.vacioBox}>
         <Icon name="carrito" size={48} color={c.chevron} />
@@ -39,26 +153,9 @@ export default function CarritoScreen({ navigation }: Props) {
             <Text style={styles.tienda}>{negocioNombre}</Text>
           </View>
         )}
-        {items.map((i, idx) => (
-          <FadeInView key={i.producto_id} delay={idx * 45}>
-            <View style={styles.item}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.nombre}>{i.nombre}</Text>
-                <Text style={styles.precio}>{cop(i.precio)} c/u</Text>
-              </View>
-              <View style={styles.qtyRow}>
-                <TouchableOpacity style={styles.qtyBtn} onPress={() => cambiar(i.producto_id, -1)}>
-                  <Text style={styles.qtyTxt}>−</Text>
-                </TouchableOpacity>
-                <Text style={styles.qty}>{i.cantidad}</Text>
-                <TouchableOpacity style={styles.qtyBtn} onPress={() => cambiar(i.producto_id, 1)}>
-                  <Text style={styles.qtyTxt}>+</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => quitar(i.producto_id)} hitSlop={8}>
-                  <Icon name="cerrar" size={16} color={c.danger} />
-                </TouchableOpacity>
-              </View>
-            </View>
+        {lineas.map((i, idx) => (
+          <FadeInView key={i.linea} delay={idx * 45}>
+            <LineaCarrito item={i} onAjustar={() => setAjustando(i.linea)} />
           </FadeInView>
         ))}
         <TouchableOpacity onPress={vaciar} style={{ marginTop: 8 }}>
@@ -72,10 +169,22 @@ export default function CarritoScreen({ navigation }: Props) {
           <Text style={styles.totalValor}>{cop(total)}</Text>
         </View>
         <Text style={styles.notaDomicilio}>El domicilio se suma en el siguiente paso.</Text>
-        <PressableScale style={styles.btn} onPress={() => navigation.navigate('Checkout')}>
+        <PressableScale
+          style={[styles.btn, items.length === 0 && styles.btnOff]}
+          disabled={items.length === 0}
+          onPress={() => navigation.navigate('Checkout')}>
           <Text style={styles.btnTxt}>Continuar al pago →</Text>
         </PressableScale>
       </View>
+
+      <PersonalizarLinea
+        item={items.find(i => i.linea === ajustando) ?? null}
+        onCerrar={() => setAjustando(null)}
+        onGuardar={(linea, opciones, unidades) => {
+          personalizar(linea, opciones, unidades);
+          setAjustando(null);
+        }}
+      />
     </View>
   );
 }
@@ -85,15 +194,57 @@ const useStyles = makeStyles((c, shadow) => ({
   tienda: { fontFamily: font.bold, color: c.text, marginBottom: 12 },
   fila: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   item: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: c.surface,
-    borderRadius: radius.md, padding: 14, marginBottom: 10, ...shadow.low,
+    flexDirection: 'row',
+    gap: 12,
+    backgroundColor: c.surface,
+    borderRadius: radius.lg,
+    padding: 12,
+    marginBottom: 10,
+    overflow: 'hidden',
+    ...shadow.low,
   },
-  nombre: { fontFamily: font.semibold, color: c.textStrong },
-  precio: { color: c.muted, fontSize: 13, marginTop: 2, fontFamily: font.regular },
-  qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  qtyBtn: { width: 32, height: 32, borderRadius: radius.sm, backgroundColor: c.accentSoft, alignItems: 'center', justifyContent: 'center' },
-  qtyTxt: { fontSize: 18, color: c.goldText, fontFamily: font.bold },
-  qty: { minWidth: 18, textAlign: 'center', fontFamily: font.bold, color: c.textStrong },
+  // Cubre toda la tarjeta y se encoge hacia la izquierda.
+  relleno: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    transformOrigin: 'left',
+    backgroundColor: c.dangerSoft,
+  },
+  thumb: {
+    width: 72,
+    height: 72,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: c.surface2,
+  },
+  thumbImagen: { width: '100%', height: '100%' },
+  itemCuerpo: { flex: 1 },
+  itemCabecera: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  nombre: { flex: 1, fontFamily: font.semibold, fontSize: 15, lineHeight: 20, color: c.textStrong },
+  detalle: { color: c.muted, fontSize: 13, lineHeight: 18, marginTop: 3, fontFamily: font.regular },
+  ajuste: { alignSelf: 'flex-start', marginTop: 4 },
+  ajusteTxt: { color: c.goldText, fontSize: 13, fontFamily: font.semibold },
+  // Oculto sin soltar su lugar: la tarjeta no cambia de alto al salir.
+  oculto: { opacity: 0 },
+  itemPie: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
+  precio: { color: c.textStrong, fontSize: 15, fontFamily: font.bold },
+  deshacer: { color: c.danger, fontSize: 13, lineHeight: 18, fontFamily: font.medium, flex: 1, marginRight: 8 },
+  qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  qtyBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.pill,
+    backgroundColor: c.surface2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  qtyBtnOff: { opacity: 0.35 },
+  qty: { minWidth: 22, textAlign: 'center', fontFamily: font.bold, color: c.textStrong },
   vaciar: { color: c.danger, textAlign: 'center', fontFamily: font.semibold },
   footer: { padding: 16, backgroundColor: c.surface, borderTopWidth: 1, borderTopColor: c.border },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
@@ -101,6 +252,7 @@ const useStyles = makeStyles((c, shadow) => ({
   totalLabel: { color: c.muted, fontSize: 16, fontFamily: font.medium },
   totalValor: { fontSize: 22, fontFamily: font.extra, color: c.textStrong },
   btn: { backgroundColor: c.accent, borderRadius: radius.md, paddingVertical: 15, alignItems: 'center', ...shadow.gold },
+  btnOff: { opacity: 0.5 },
   btnTxt: { color: c.onAccent, fontFamily: font.bold, fontSize: 16 },
   vacioBox: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: c.bg },
   vacio: { color: c.muted, marginTop: 8, fontFamily: font.regular },

@@ -1,4 +1,5 @@
 import { API_URL } from './config';
+import type { OpcionesLinea } from './opcionesProducto';
 
 /** Rol de una persona DENTRO de un negocio (no es un rol global). */
 export type RolNegocio = 'propietario' | 'trabajador';
@@ -136,6 +137,8 @@ export type TipoProducto = {
   atributo_label: string;
   atributo_boton: string;
   sugerencias: string[] | null;
+  /** Solo los tipos que manejan colores (ropa y calzado). */
+  sugerencias_colores?: string[] | null;
 };
 
 export type Producto = {
@@ -151,6 +154,8 @@ export type Producto = {
   categoria: Categoria | null;
   /** Ingredientes, usos, tallas... según el tipo de producto. */
   atributos?: string[];
+  /** Colores disponibles (ropa y calzado). */
+  colores?: string[];
   /** Tipo global; null en productos creados antes de existir esta función. */
   tipo_producto?: { id: number; nombre: string; slug: string; atributo_label: string } | null;
 };
@@ -637,6 +642,7 @@ export type ProductoInput = {
   tipo_producto_id?: number;
   /** Ingredientes, usos, tallas... `null` los borra (lista vacía). */
   atributos?: string[] | null;
+  colores?: string[] | null;
 };
 
 /** Tipos globales de producto con su configuración de atributos. */
@@ -707,7 +713,7 @@ export type ComercioPedido = {
   /** Solo efectivo: lo que el negocio dijo del dinero. */
   dinero_estado?: DineroEstado | null;
   puede_confirmar_dinero?: boolean;
-  items: { nombre: string; cantidad: number }[];
+  items: PedidoItem[];
 };
 
 export type DineroEstado = 'recibido' | 'incompleto' | 'no_recibido';
@@ -1135,7 +1141,12 @@ export async function eliminarDeviceToken(token: string, fcmToken: string): Prom
 
 // ---------- Domiciliario (pedidos) ----------
 
-export type PedidoItem = { nombre: string; cantidad: number };
+export type PedidoItem = {
+  nombre: string;
+  cantidad: number;
+  /** Lo que eligió el cliente: "Talla M · Negro", "Sin lechuga · Extra queso". */
+  detalle?: string | null;
+};
 
 export type Pedido = {
   id: number;
@@ -1316,7 +1327,7 @@ export type SeguimientoPedido = {
   negocio_ubicacion?: Coordenadas | null;
   /** Justificación del domiciliario si se está demorando. */
   novedad?: string | null;
-  items: { nombre: string; cantidad: number; precio: number }[];
+  items: (PedidoItem & { precio: number })[];
   puede_calificar?: boolean;
   opciones_problemas?: { negocio: OpcionProblema[]; domiciliario: OpcionProblema[] } | null;
   aspectos_domiciliario?: AspectoCaritas[] | null;
@@ -1325,7 +1336,7 @@ export type SeguimientoPedido = {
 
 export type NuevoPedido = {
   negocio_id: number;
-  items: { producto_id: number; cantidad: number }[];
+  items: ({ producto_id: number; cantidad: number } & OpcionesLinea)[];
   metodo_pago: string;
   direccion_entrega: string;
   telefono_contacto: string;

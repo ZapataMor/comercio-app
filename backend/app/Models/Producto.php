@@ -29,6 +29,7 @@ class Producto extends Model
         'categoria_id',
         'tipo_producto_id',
         'atributos',
+        'colores',
     ];
 
     /** Tipos de venta válidos (cómo se selecciona la cantidad del producto). */
@@ -40,6 +41,7 @@ class Producto extends Model
             'precio' => 'decimal:2',
             'disponible' => 'boolean',
             'atributos' => 'array',
+            'colores' => 'array',
         ];
     }
 

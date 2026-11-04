@@ -25,5 +25,8 @@ class DatabaseSeeder extends Seeder
 
         // Catálogo realista: 60+ negocios con categorías y productos.
         $this->call(CatalogoDemoSeeder::class);
+
+        // Tipo de cada producto e información: ingredientes, tallas, colores...
+        $this->call(OpcionesDemoSeeder::class);
     }
 }
