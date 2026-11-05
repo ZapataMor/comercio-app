@@ -29,12 +29,12 @@ import Icon, { IconName } from './Icon';
 import { abrirComoLlegar } from './Mapa';
 import MinutosRecogida from './MinutosRecogida';
 
-/** Lo que el Inicio le pide al panel: recargar al deslizar hacia abajo. */
+/** Lo que "Mis entregas" le pide al panel: recargar al deslizar hacia abajo. */
 export type PanelDomiciliarioRef = { recargar: () => Promise<void> };
 
 type Props = {
   ref?: Ref<PanelDomiciliarioRef>;
-  /** Al tomar un pedido: el Inicio sube hasta el panel para mostrarlo en curso. */
+  /** Al tomar un pedido: la pantalla sube hasta el panel para mostrarlo en curso. */
   onTomado?: () => void;
 };
 
@@ -43,7 +43,7 @@ function cop(n: number) {
 }
 
 /**
- * Panel del domiciliario en su Inicio, debajo del saludo: arriba las entregas
+ * Panel de "Mis entregas", debajo del saludo: arriba las entregas
  * que lleva (la última que tomó primero) y debajo los pedidos disponibles para
  * recoger. Al tomar uno, ese sube a "en curso" y los demás disponibles quedan
  * debajo.

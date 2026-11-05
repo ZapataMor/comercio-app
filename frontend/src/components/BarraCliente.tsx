@@ -23,6 +23,7 @@ import Icon from './Icon';
 /** Rutas del flujo cliente donde la barra queda fija. */
 const RUTAS_CLIENTE = new Set([
   'Home',
+  'Entregas',
   'Explorar',
   'Mapa',
   'Negocio',

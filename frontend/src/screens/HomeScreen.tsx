@@ -1,16 +1,16 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Animated, Easing, RefreshControl, ScrollView, Text, View } from 'react-native';
-import { ComercioPedido, getPedidosComercio, nombreTipoCuenta } from '../api';
+import { Animated, Easing, ScrollView, Text, View } from 'react-native';
+import { ComercioPedido, getPedidosComercio } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import BotonMantener from '../components/BotonMantener';
 import HeaderNegocios from '../components/HeaderNegocios';
 import HeaderPerfil from '../components/HeaderPerfil';
 import Icon from '../components/Icon';
-import PanelDomiciliario, { PanelDomiciliarioRef } from '../components/PanelDomiciliario';
 import { NivelBadge } from '../components/Reputacion';
+import { IrAExplorar, Saludo } from '../components/SaludoInicio';
 import { useNegocio } from '../NegocioContext';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
@@ -165,16 +165,14 @@ export default function HomeScreen({ navigation }: Props) {
   // de "comerciante"; los negocios se crean desde Mis negocios).
   const tienePanel = negocios.length > 0;
   const [pedidos, setPedidos] = useState<ComercioPedido[]>([]);
-  // Domiciliario: sus entregas van en el Inicio, debajo del saludo.
-  const scroll = useRef<ScrollView>(null);
-  const panelDomiciliario = useRef<PanelDomiciliarioRef>(null);
-  const panelY = useRef(0);
-  const [refrescando, setRefrescando] = useState(false);
 
   // Topbar: con negocio, el switch Abierto/Cerrado y la lista de mis
   // negocios van junto a "Mi perfil". (Sin negocio no se muestran.)
   useLayoutEffect(() => {
     navigation.setOptions({
+      // El domiciliario llega aquí desde sus entregas: con la flecha de volver
+      // y sus botones en la topbar, el logo se montaría sobre "Abierto".
+      ...(esDomiciliario && { headerTitle: '' }),
       headerRight: () => (
         <View style={styles.headerDerecha}>
           <HeaderEstadoNegocio />
@@ -183,7 +181,7 @@ export default function HomeScreen({ navigation }: Props) {
         </View>
       ),
     });
-  }, [navigation, styles]);
+  }, [navigation, styles, esDomiciliario]);
 
   const cargarPedidos = useCallback(() => {
     if (!negocioId) {
@@ -208,37 +206,16 @@ export default function HomeScreen({ navigation }: Props) {
   );
   usePolling(cargarPedidos);
 
-  // Deslizar hacia abajo recarga las entregas (y los pedidos del negocio, si tiene).
-  async function refrescar() {
-    setRefrescando(true);
-    cargarPedidos();
-    await panelDomiciliario.current?.recargar();
-    setRefrescando(false);
-  }
-
   const enEspera = pedidos.filter(p => p.estado === 'pendiente');
   // Efectivo: falta decir si el domiciliario entregó el dinero.
   const porConfirmar = pedidos.filter(p => p.puede_confirmar_dinero);
 
   return (
     <ScrollView
-      ref={scroll}
       style={styles.container}
       // El cliente lleva la barra flotante abajo: dejamos aire para no taparla.
-      contentContainerStyle={[styles.content, esCliente && styles.contentCliente]}
-      refreshControl={
-        esDomiciliario ? (
-          <RefreshControl refreshing={refrescando} onRefresh={refrescar} colors={[c.accent]} tintColor={c.accent} />
-        ) : undefined
-      }>
-      <FadeInView>
-        <Text style={styles.saludo}>¡Hola, {user.name}!</Text>
-        <View style={styles.rolesRow}>
-          {user.roles.map(r => (
-            <Text key={r} style={styles.rol}>{nombreTipoCuenta(r)}</Text>
-          ))}
-        </View>
-      </FadeInView>
+      contentContainerStyle={[styles.content, esCliente && styles.contentCliente]}>
+      <Saludo />
 
       {tienePanel && (
         <>
@@ -383,18 +360,7 @@ export default function HomeScreen({ navigation }: Props) {
         </>
       )}
 
-      {esCliente && (
-        <FadeInView delay={60}>
-          <PressableScale style={styles.item} onPress={() => navigation.navigate('Explorar')}>
-            <Icon name="bolsa" size={26} color={c.accent} style={styles.itemEmoji} />
-            <View style={styles.itemTexto}>
-              <Text style={styles.itemTitulo}>Explorar negocios</Text>
-              <Text style={styles.itemSub}>Mira los comercios abiertos</Text>
-            </View>
-            <Icon name="chevron" size={20} color={c.chevron} />
-          </PressableScale>
-        </FadeInView>
-      )}
+      <IrAExplorar />
 
       {esAdmin && (
         <FadeInView delay={120}>
@@ -408,17 +374,6 @@ export default function HomeScreen({ navigation }: Props) {
           </PressableScale>
         </FadeInView>
       )}
-
-      {/* Turno, entregas en curso y pedidos disponibles, directamente aquí. */}
-      {esDomiciliario && (
-        <View onLayout={e => (panelY.current = e.nativeEvent.layout.y)}>
-          <PanelDomiciliario
-            ref={panelDomiciliario}
-            // Al tomar un pedido se sube hasta el panel: queda arriba, en curso.
-            onTomado={() => scroll.current?.scrollTo({ y: panelY.current, animated: true })}
-          />
-        </View>
-      )}
       {/* "Cerrar sesión" vive solo en el menú de Mi perfil (ícono de la topbar). */}
     </ScrollView>
   );
@@ -429,12 +384,6 @@ const useStyles = makeStyles((c, shadow) => ({
   content: { padding: 20 },
   contentCliente: { paddingBottom: 110 },
   headerDerecha: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  saludo: { fontSize: 24, fontFamily: font.display, color: c.textStrong, marginTop: 8 },
-  rolesRow: { flexDirection: 'row', gap: 8, marginTop: 8, marginBottom: 24 },
-  rol: {
-    backgroundColor: c.accentSoft, color: c.goldText, fontFamily: font.bold, fontSize: 12,
-    paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, overflow: 'hidden',
-  },
   item: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: c.surface,
     borderRadius: radius.lg, padding: 16, marginBottom: 12, ...shadow.soft,

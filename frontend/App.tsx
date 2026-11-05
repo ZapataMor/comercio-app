@@ -43,6 +43,7 @@ import AdminUsuariosScreen from './src/screens/AdminUsuariosScreen';
 import AdminNegociosScreen from './src/screens/AdminNegociosScreen';
 import AdminBarriosScreen from './src/screens/AdminBarriosScreen';
 import AdminReputacionScreen from './src/screens/AdminReputacionScreen';
+import EntregasScreen from './src/screens/EntregasScreen';
 import PedidosEntregadosScreen from './src/screens/PedidosEntregadosScreen';
 import CarritoScreen from './src/screens/CarritoScreen';
 import CheckoutScreen from './src/screens/CheckoutScreen';
@@ -98,7 +99,11 @@ function Navegacion() {
           encima, nítidos; la app se pone borrosa detrás. */}
       <CapaMenus>
       <AppDesenfocable style={styles.raiz}>
+        {/* La key la rearma al entrar o salir de la cuenta: el navegador solo
+            lee initialRouteName al montarse, y sin esto, tras iniciar sesión
+            abriría la primera pantalla de la lista en vez de rutaInicio. */}
         <NavigationContainer
+          key={auth ? `usuario-${auth.user.id}` : 'sin-sesion'}
           ref={navigationRef}
           theme={temaNavegacion(c, modo === 'noche')}
           onReady={() => {
@@ -126,8 +131,8 @@ function Navegacion() {
           <>
             {/* Pantallas del cliente: toda cuenta nueva lo es, y el
                 domiciliario también. Arranca en Explorar (la lista de
-                negocios), salvo el domiciliario y el comerciante, que
-                arrancan en Home (ver rutaInicio). */}
+                negocios), salvo el domiciliario, que arranca en Entregas, y
+                el comerciante, en Home (ver rutaInicio). */}
             {roles.includes('usuario') && (
               <>
                 <Stack.Screen
@@ -152,14 +157,21 @@ function Navegacion() {
               </>
             )}
 
-            {/* Home: menú de los demás roles, panel del negocio activo y
-                entregas del domiciliario. El cliente llega aquí desde "Mis
-                negocios" o "Mis entregas" (menú del ícono de usuario); el
-                comerciante arranca aquí. */}
+            {/* Home: menú de los demás roles y panel del negocio activo. El
+                cliente llega aquí desde "Mis negocios" (menú del ícono de
+                usuario); el comerciante arranca aquí. */}
             <Stack.Screen
               name="Home"
               component={HomeScreen}
               options={{ title: 'Vitrina', headerTitle: tituloVitrina }}
+            />
+            {/* "Mis entregas" del domiciliario. Va sin condición de rol porque
+                "Ser domiciliario" navega aquí en cuanto activa el rol, antes
+                de que esta lista se vuelva a pintar. */}
+            <Stack.Screen
+              name="Entregas"
+              component={EntregasScreen}
+              options={{ title: 'Mis entregas', headerTitle: tituloVitrina }}
             />
             {/* Mi información, Mis negocios y Privacidad se abren desde el menú
                 del ícono de usuario (HeaderPerfil), sin pantalla intermedia. */}
@@ -201,8 +213,7 @@ function Navegacion() {
               </>
             )}
 
-            {/* Las entregas del domiciliario van en su Inicio (Home); aparte
-                solo queda el historial de las que ya completó. */}
+            {/* Historial de las entregas que el domiciliario ya completó. */}
             {roles.includes('domiciliario') && (
               <Stack.Screen
                 name="PedidosEntregados"

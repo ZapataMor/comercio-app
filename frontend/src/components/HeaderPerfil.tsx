@@ -18,7 +18,7 @@ import { useAuth } from '../AuthContext';
 import { WEB_URL } from '../config';
 import { messageFromError } from '../formErrors';
 import { useNegocio } from '../NegocioContext';
-import { navigationRef } from '../RootNavigation';
+import { abrirEntregas, navigationRef } from '../RootNavigation';
 import { font, makeStyles, radius } from '../theme';
 import { useToast } from '../Toast';
 import { useConfirmar } from './Confirmacion';
@@ -50,7 +50,7 @@ const RUTAS_NEGOCIO = new Set([
 function enSusNegocios(tieneNegocios: boolean): boolean {
   const ruta = navigationRef.isReady() ? navigationRef.getCurrentRoute()?.name : undefined;
   // El Inicio es la administración del negocio si tiene alguno; si no, es el
-  // del domiciliario o el del administrador.
+  // del administrador.
   return !!ruta && (RUTAS_NEGOCIO.has(ruta) || (ruta === 'Home' && tieneNegocios));
 }
 
@@ -64,8 +64,7 @@ function modulosPara(roles: string[], enNegocio: boolean, serDomiciliario: () =>
       : { titulo: 'Mis negocios', icono: 'tienda', abrir: () => navigationRef.navigate('MisNegocios') },
   ];
   if (roles.includes('domiciliario')) {
-    // Sus entregas van en el Inicio, bajo el saludo.
-    modulos.push({ titulo: 'Mis entregas', icono: 'moto', abrir: () => navigationRef.navigate('Home') });
+    modulos.push({ titulo: 'Mis entregas', icono: 'moto', abrir: abrirEntregas });
   }
   // Política de privacidad: página pública del servidor.
   modulos.push({ titulo: 'Privacidad', icono: 'escudo', abrir: () => Linking.openURL(`${WEB_URL}/privacidad`) });
@@ -89,7 +88,7 @@ export default function HeaderPerfil() {
   const confirmar = useConfirmar();
   const user = auth?.user;
 
-  /** "Ser domiciliario": se confirma y, ya activo, lleva al Inicio, donde van las entregas. */
+  /** "Ser domiciliario": se confirma y, ya activo, lleva a "Mis entregas". */
   function serDomiciliario() {
     confirmar({
       icono: 'moto',
@@ -111,7 +110,7 @@ export default function HeaderPerfil() {
       const r = await hacerseDomiciliario(auth.token);
       actualizarUsuario(r.user);
       toast.exito('¡Ya eres domiciliario!', 'Mantén presionada la moto para entrar en turno.');
-      if (navigationRef.isReady()) navigationRef.navigate('Home');
+      if (navigationRef.isReady()) abrirEntregas();
     } catch (e) {
       // Sin teléfono no se activa: lo lleva a donde lo agrega.
       if (e instanceof ApiError && e.status === 422) {

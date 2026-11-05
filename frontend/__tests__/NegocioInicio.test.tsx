@@ -107,3 +107,9 @@ test('si la sesión ya los recuerda, no la vuelve a guardar', async () => {
 test('el trabajador sin negocios propios arranca como cliente', () => {
   expect(rutaInicio(usuario([{ id: 1, nombre: 'Ferretería', rol: 'trabajador' }]))).toBe('Explorar');
 });
+
+test('el domiciliario arranca en sus entregas, aunque también sea comerciante', () => {
+  const domiciliario = { ...usuario([]), roles: ['usuario', 'domiciliario'] };
+  expect(rutaInicio(domiciliario)).toBe('Entregas');
+  expect(rutaInicio({ ...domiciliario, negocios: [{ id: 3, nombre: 'Zapatería', rol: 'propietario' }] })).toBe('Entregas');
+});

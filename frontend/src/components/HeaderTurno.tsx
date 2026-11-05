@@ -7,7 +7,7 @@
  * Para que no cambie sin querer, hay que mantenerla presionada
  * (BotonMantener). Un toque solo explica cómo se usa.
  *
- * Solo aparece para el rol domiciliario (y no si está suspendido). El Inicio,
+ * Solo aparece para el rol domiciliario (y no si está suspendido). "Mis entregas",
  * que refresca cada 15 s y con cada push, le avisa el turno del servidor con
  * `publicarTurno`.
  */

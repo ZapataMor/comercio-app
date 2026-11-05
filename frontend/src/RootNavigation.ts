@@ -13,18 +13,26 @@ export function esComerciante(user: Usuario): boolean {
 }
 
 /**
- * Pantalla con la que arranca cada quien: el comerciante en la
- * administración de su negocio (el Inicio, con el primero que creó; ver
- * NegocioContext), el cliente en Explorar y los demás en el Inicio. El
- * domiciliario (que también es cliente) arranca en el Inicio porque ahí,
- * bajo el saludo, van sus entregas.
+ * Pantalla con la que arranca cada quien al abrir la app o iniciar sesión: el
+ * domiciliario en "Mis entregas" (aunque también sea comerciante), el
+ * comerciante en la administración de su negocio (el Inicio, con el primero
+ * que creó; ver NegocioContext), el cliente en Explorar y los demás en el
+ * Inicio.
  */
-export function rutaInicio(user: Usuario): 'Explorar' | 'Home' {
+export function rutaInicio(user: Usuario): 'Entregas' | 'Explorar' | 'Home' {
   const roles = user.roles ?? [];
+  if (roles.includes('domiciliario')) {
+    return 'Entregas';
+  }
   if (esComerciante(user)) {
     return 'Home';
   }
-  return roles.includes('usuario') && !roles.includes('domiciliario') ? 'Explorar' : 'Home';
+  return roles.includes('usuario') ? 'Explorar' : 'Home';
+}
+
+/** Abre "Mis entregas"; si ya está en el historial vuelve a ella, no apila otra. */
+export function abrirEntregas() {
+  navigationRef.navigate('Entregas', undefined, { pop: true });
 }
 
 type PushData = {
@@ -70,7 +78,7 @@ function navigateFromData(data: PushData, user: Usuario) {
   }
 
   if (data.tipo === 'pedido_disponible' && roles.includes('domiciliario')) {
-    navigationRef.navigate('Home');
+    abrirEntregas();
     return;
   }
 

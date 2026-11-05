@@ -42,7 +42,8 @@ export type RootStackParamList = {
   AdminBarrios: undefined;
   // Confiabilidad de domiciliarios y negocios (vetados, en riesgo, eventos).
   AdminReputacion: undefined;
-  // Domiciliario: entregas que ya completé (paginadas). Las disponibles y las
-  // en curso van en su Inicio (Home).
+  // Domiciliario: "Mis entregas", con las disponibles y las que lleva en curso.
+  Entregas: undefined;
+  // Domiciliario: entregas que ya completé (paginadas).
   PedidosEntregados: undefined;
 };
