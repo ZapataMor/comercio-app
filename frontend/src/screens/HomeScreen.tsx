@@ -239,11 +239,14 @@ export default function HomeScreen({ navigation }: Props) {
   const esAdmin = user.roles.includes('administrador');
   const esDomiciliario = user.roles.includes('domiciliario');
 
-  const { negocio, negocios } = useNegocio();
+  const { negocio, negocios, recargar } = useNegocio();
   const negocioId = negocio?.id ?? null;
   // Panel de negocio: quien es miembro de algún negocio (no hay rol global
   // de "comerciante"; los negocios se crean desde Mis negocios).
   const tienePanel = negocios.length > 0;
+  // La sesión ya dice que tiene negocios, pero la lista llega un momento después:
+  // mientras tanto no se le muestra el Inicio de quien no tiene ninguno.
+  const cargandoPanel = !tienePanel && (user.negocios?.length ?? 0) > 0;
   const [pedidos, setPedidos] = useState<ComercioPedido[]>([]);
   // Pedido que se está aceptando: su botón muestra que va en curso.
   const [aceptando, setAceptando] = useState<number | null>(null);
@@ -286,7 +289,13 @@ export default function HomeScreen({ navigation }: Props) {
       cargarPedidos();
     }, [cargarPedidos]),
   );
-  usePolling(cargarPedidos);
+  usePolling(() => {
+    if (cargandoPanel) {
+      recargar();
+    } else {
+      cargarPedidos();
+    }
+  });
 
   /** Si el código no es correcto, el error lo muestra el mismo campo. */
   async function entregarAlDomiciliario(pedido: ComercioPedido, codigo: string) {
@@ -342,6 +351,8 @@ export default function HomeScreen({ navigation }: Props) {
       // Con el teclado abierto, el primer toque debe llegar a "Confirmar".
       keyboardShouldPersistTaps="handled">
       <Saludo />
+
+      {cargandoPanel && <ActivityIndicator size="large" color={c.accent} accessibilityLabel="Cargando tu negocio" />}
 
       {tienePanel && (
         <>
@@ -459,7 +470,7 @@ export default function HomeScreen({ navigation }: Props) {
       )}
 
       {/* Con panel de negocio, Explorar es uno de los cuadros. */}
-      {!tienePanel && <IrAExplorar />}
+      {!tienePanel && !cargandoPanel && <IrAExplorar />}
 
       {esAdmin && (
         <FadeInView delay={120}>
