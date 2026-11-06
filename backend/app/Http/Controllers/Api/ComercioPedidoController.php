@@ -186,8 +186,10 @@ class ComercioPedidoController extends Controller
             'domiciliario_reputacion' => $p->domiciliario
                 ? Reputacion::resumen(Reputacion::DOMICILIARIO, $p->domiciliario)
                 : null,
-            // Mapa: el negocio ve al domiciliario mientras viene a recoger.
-            'domiciliario_ubicacion' => $p->estado === 'tomado' ? UbicacionDomiciliario::de($p->domiciliario) : null,
+            // Mapa: el negocio no le pierde el rastro hasta recibir el dinero.
+            'domiciliario_ubicacion' => $p->negocioVeDomiciliario()
+                ? UbicacionDomiciliario::de($p->domiciliario, aunqueSeaVieja: true)
+                : null,
             'minutos_preparacion' => $p->minutos_preparacion,
             // Sin aceptar: segundos que quedan antes de que venza.
             'segundos_para_aceptar' => $p->estado === 'pendiente' ? $p->segundosParaAceptar() : null,

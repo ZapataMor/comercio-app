@@ -1224,9 +1224,14 @@ export type Pedido = {
 /** `vetado`: mi cuenta está suspendida y no puedo tomar pedidos nuevos. */
 export async function getDisponibles(
   token: string,
-): Promise<{ pedidos: Pedido[]; vetado: boolean; en_turno: boolean }> {
+): Promise<{ pedidos: Pedido[]; vetado: boolean; en_turno: boolean; compartir_ubicacion: boolean }> {
   const d = await authGet('/api/domiciliario/disponibles', token);
-  return { pedidos: (d.pedidos ?? []) as Pedido[], vetado: !!d.vetado, en_turno: !!d.en_turno };
+  return {
+    pedidos: (d.pedidos ?? []) as Pedido[],
+    vetado: !!d.vetado,
+    en_turno: !!d.en_turno,
+    compartir_ubicacion: !!d.compartir_ubicacion,
+  };
 }
 
 /** Entrar / salir de turno: solo en turno llegan los avisos de pedidos listos. */

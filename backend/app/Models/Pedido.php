@@ -149,6 +149,25 @@ class Pedido extends Model
             && $this->recogido_at?->gte(now()->subHours((int) config('reputacion.horas_para_confirmar_dinero')));
     }
 
+    /**
+     * ¿El domiciliario le debe el dinero al negocio? Sí, hasta que el negocio
+     * confirme que lo recibió completo, dentro del plazo para responder.
+     */
+    public function debeDineroAlNegocio(): bool
+    {
+        return $this->metodo_pago === 'efectivo'
+            && $this->domiciliario_id !== null
+            && $this->estado === 'entregado'
+            && $this->dinero_estado !== 'recibido'
+            && $this->recogido_at?->gte(now()->subHours((int) config('reputacion.horas_para_confirmar_dinero')));
+    }
+
+    /** ¿El negocio sigue viendo dónde está el domiciliario de este pedido? */
+    public function negocioVeDomiciliario(): bool
+    {
+        return in_array($this->estado, self::EN_RUTA, true) || $this->debeDineroAlNegocio();
+    }
+
     // ---------- Relaciones ----------
 
     public function negocio(): BelongsTo

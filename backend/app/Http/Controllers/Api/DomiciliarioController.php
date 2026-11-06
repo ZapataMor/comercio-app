@@ -26,14 +26,20 @@ class DomiciliarioController extends Controller
 {
     /**
      * Pedidos listos y sin domiciliario (disponibles para tomar). `en_turno`
-     * dice si me llegan los avisos de pedidos nuevos.
+     * dice si me llegan los avisos de pedidos nuevos, y `compartir_ubicacion` si
+     * la app debe enviar mi posición.
      */
     public function disponibles(Request $request): JsonResponse
     {
         $yo = $request->user();
 
         if ($yo->domiciliarioVetado()) {
-            return response()->json(['pedidos' => [], 'vetado' => true, 'en_turno' => (bool) $yo->en_turno]);
+            return response()->json([
+                'pedidos' => [],
+                'vetado' => true,
+                'en_turno' => (bool) $yo->en_turno,
+                'compartir_ubicacion' => UbicacionDomiciliario::debeCompartir($yo),
+            ]);
         }
 
         $pedidos = Pedido::where('estado', 'listo')
@@ -47,6 +53,7 @@ class DomiciliarioController extends Controller
         return response()->json([
             'pedidos' => $pedidos->map(fn ($p) => $this->map($p)),
             'en_turno' => (bool) $yo->en_turno,
+            'compartir_ubicacion' => UbicacionDomiciliario::debeCompartir($yo),
         ]);
     }
 

@@ -34,6 +34,13 @@ function cop(n: number) {
   return '$' + Math.round(n).toLocaleString('es-CO');
 }
 
+/** Qué está haciendo el domiciliario que se ve en el mapa. */
+function notaDomiciliario(estado: string) {
+  if (estado === 'tomado') return 'El domiciliario viene a recoger';
+  if (estado === 'entregado') return 'Falta que te entregue el dinero';
+  return 'El domiciliario lleva el pedido';
+}
+
 export default function ComercioPedidoDetalleScreen({ route, navigation }: Props) {
   const { c, estadoColor } = useTheme();
   const styles = useStyles();
@@ -64,8 +71,10 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
 
   // Mientras siga en curso se refresca cada 10 s: otro del equipo pudo
   // atenderlo, el cliente cancelarlo, y se ve dónde viene el domiciliario.
+  // Entregado se sigue su rastro mientras falte confirmar el dinero.
   usePolling(() => {
-    if (pedido?.estado === 'entregado' || pedido?.estado === 'cancelado') return;
+    if (pedido?.estado === 'cancelado') return;
+    if (pedido?.estado === 'entregado' && !pedido.domiciliario_ubicacion) return;
     recargar().catch(() => {});
   }, 10000);
 
@@ -139,7 +148,13 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
     }
     try {
       const msg = await confirmarDinero(token, negocioId, pedido.id, estado);
-      setPedido({ ...pedido, dinero_estado: estado, puede_confirmar_dinero: false });
+      setPedido({
+        ...pedido,
+        dinero_estado: estado,
+        puede_confirmar_dinero: false,
+        // Con el dinero recibido se acaba el seguimiento.
+        domiciliario_ubicacion: estado === 'recibido' ? null : pedido.domiciliario_ubicacion,
+      });
       toast.exito('Registrado', msg);
     } catch (e) {
       toast.error('No se pudo', e instanceof Error ? e.message : 'Error');
@@ -233,8 +248,8 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
             mensaje={`Hola, te escribimos de ${negocio?.nombre ?? 'la tienda'} por el pedido #${pedido.id}.`}
             etiquetaLlamar="Llamar al domiciliario"
           />
-          {/* Viene a recoger: dónde va, en vivo. */}
-          {pedido.estado === 'tomado' && !!pedido.domiciliario_ubicacion && (
+          {/* Dónde va, hasta recibir el dinero (o hasta la entrega si ya estaba pagado). */}
+          {!!pedido.domiciliario_ubicacion && (
             <View style={styles.mapa}>
               <MapaSeguimiento
                 alto={200}
@@ -246,7 +261,7 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
                 }
               />
               <NotaEnVivo
-                texto={`El domiciliario viene a recoger · ubicación ${haceCuanto(pedido.domiciliario_ubicacion.hace_segundos)}`}
+                texto={`${notaDomiciliario(pedido.estado)} · ubicación ${haceCuanto(pedido.domiciliario_ubicacion.hace_segundos)}`}
               />
             </View>
           )}

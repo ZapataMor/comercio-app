@@ -8,6 +8,10 @@
  * la notificación con la app cerrada (ver ofertasPedidos.ts).
  *
  * Mientras se ve, los Toast quedan detrás del Modal.
+ *
+ * Como vive en toda la app, también envía la posición del domiciliario cuando el
+ * servidor lo pide (en turno, con entregas o debiendo dinero): no importa en qué
+ * pantalla esté. Solo con la app abierta (ver ubicacion.ts).
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { AppState, Modal, Text, View } from 'react-native';
@@ -17,6 +21,7 @@ import { alAceptarOferta, ofertasRechazadas, quitarOferta, rechazarOferta } from
 import { abrirEntregas, navigationRef } from '../RootNavigation';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
+import { useCompartirUbicacion } from '../ubicacion';
 import { alCambiarDesdePush, avisarCambioDesdePush } from '../usePolling';
 import { PressableScale } from './anim';
 import Icon from './Icon';
@@ -40,12 +45,19 @@ export default function OfertaPedido() {
   // Pedido aceptado: se está preguntando en cuántos minutos lo recoge.
   const [porTomar, setPorTomar] = useState<Pedido | null>(null);
   const [tomando, setTomando] = useState(false);
+  const [compartir, setCompartir] = useState(false);
+
+  useCompartirUbicacion(token, compartir, motivo =>
+    toast.error(
+      motivo === 'permiso' ? 'Activa tu ubicación' : 'Enciende el GPS',
+      'Así el cliente y el negocio te ven en el mapa mientras llevas el pedido.',
+    ),
+  );
 
   const revisar = useCallback(async () => {
-    const [{ pedidos, en_turno: enTurno, vetado }, rechazados] = await Promise.all([
-      getDisponibles(token),
-      ofertasRechazadas(),
-    ]);
+    const [{ pedidos, en_turno: enTurno, vetado, compartir_ubicacion: compartirUbicacion }, rechazados] =
+      await Promise.all([getDisponibles(token), ofertasRechazadas()]);
+    setCompartir(compartirUbicacion);
     setDescartados(rechazados);
     // Del más viejo al más nuevo: el que lleva más tiempo esperando va primero.
     setOfertas(enTurno && !vetado ? [...pedidos].sort((a, b) => a.id - b.id) : []);

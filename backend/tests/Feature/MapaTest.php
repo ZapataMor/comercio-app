@@ -3,6 +3,7 @@
 use App\Models\Negocio;
 use App\Models\Pedido;
 use App\Models\User;
+use App\Support\UbicacionDomiciliario;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
@@ -177,7 +178,7 @@ test('una posición vieja ya no se muestra', function () {
     $this->getJson("/api/pedidos/{$pedido->id}")->assertJsonPath('domiciliario_ubicacion', null);
 });
 
-test('el negocio ve al domiciliario mientras viene a recoger', function () {
+test('el negocio ve al domiciliario desde que toma el pedido', function () {
     $dueno = mapaUsuario('usuario');
     $negocio = mapaNegocio($dueno);
     $domi = mapaUsuario('domiciliario', ['en_turno' => true]);
@@ -189,9 +190,83 @@ test('el negocio ve al domiciliario mientras viene a recoger', function () {
         ->assertOk()
         ->assertJsonPath('domiciliario_ubicacion.lat', 11.3843);
 
-    $pedido->update(['estado' => 'recogido']);
+    $pedido->update(['estado' => 'en_camino']);
+    $this->getJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}")
+        ->assertJsonPath('domiciliario_ubicacion.lat', 11.3843);
+});
+
+test('en efectivo el negocio lo sigue viendo hasta confirmar el dinero', function () {
+    $dueno = mapaUsuario('usuario');
+    $negocio = mapaNegocio($dueno);
+    $domi = mapaUsuario('domiciliario');
+    $pedido = mapaPedido($negocio, mapaUsuario('usuario'), $domi, 'en_camino');
+    $pedido->update(['metodo_pago' => 'efectivo', 'recogido_at' => now()]);
+    $ruta = "/api/negocios/{$negocio->id}/pedidos/{$pedido->id}";
+    reportarUbicacion($domi);
+
+    // Entregó y salió de turno: sigue compartiendo porque debe el dinero.
+    $pedido->update(['estado' => 'entregado']);
+    expect(UbicacionDomiciliario::debeCompartir($domi->fresh()))->toBeTrue();
+    reportarUbicacion($domi, 11.39)->assertJsonPath('compartir', true);
+
+    Sanctum::actingAs($dueno);
+    $this->getJson($ruta)->assertJsonPath('domiciliario_ubicacion.lat', 11.39);
+
+    // Decir que no lo recibió no lo deja de mostrar.
+    $pedido->update(['dinero_estado' => 'no_recibido']);
+    $this->getJson($ruta)->assertJsonPath('domiciliario_ubicacion.lat', 11.39);
+
+    $pedido->update(['dinero_estado' => 'recibido']);
+    $this->getJson($ruta)->assertJsonPath('domiciliario_ubicacion', null);
+    expect(UbicacionDomiciliario::debeCompartir($domi->fresh()))->toBeFalse();
+});
+
+test('el negocio ve la última posición aunque sea vieja; el cliente no', function () {
+    $dueno = mapaUsuario('usuario');
+    $negocio = mapaNegocio($dueno);
+    $domi = mapaUsuario('domiciliario');
+    $cliente = mapaUsuario('usuario');
+    $pedido = mapaPedido($negocio, $cliente, $domi, 'en_camino');
+    reportarUbicacion($domi);
+    $domi->forceFill(['ubicacion_at' => now()->subHour()])->save();
+
+    Sanctum::actingAs($dueno);
+    $this->getJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}")
+        ->assertJsonPath('domiciliario_ubicacion.lat', 11.3843)
+        ->assertJsonPath('domiciliario_ubicacion.hace_segundos', fn ($s) => $s >= 3600);
+
+    Sanctum::actingAs($cliente);
+    $this->getJson("/api/pedidos/{$pedido->id}")->assertJsonPath('domiciliario_ubicacion', null);
+});
+
+test('pagado por transferencia deja de verse al entregar', function () {
+    $dueno = mapaUsuario('usuario');
+    $negocio = mapaNegocio($dueno);
+    $domi = mapaUsuario('domiciliario');
+    $pedido = mapaPedido($negocio, mapaUsuario('usuario'), $domi, 'en_camino');
+    $pedido->update(['metodo_pago' => 'transferencia', 'recogido_at' => now()]);
+    reportarUbicacion($domi);
+
+    $pedido->update(['estado' => 'entregado']);
+
+    Sanctum::actingAs($dueno);
     $this->getJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}")
         ->assertJsonPath('domiciliario_ubicacion', null);
+    expect(UbicacionDomiciliario::debeCompartir($domi->fresh()))->toBeFalse();
+});
+
+test('sin confirmar el dinero el rastreo termina con el plazo para responder', function () {
+    $dueno = mapaUsuario('usuario');
+    $negocio = mapaNegocio($dueno);
+    $domi = mapaUsuario('domiciliario');
+    $pedido = mapaPedido($negocio, mapaUsuario('usuario'), $domi, 'entregado');
+    $pedido->update(['metodo_pago' => 'efectivo', 'recogido_at' => now()->subHours(73)]);
+    reportarUbicacion($domi);
+
+    Sanctum::actingAs($dueno);
+    $this->getJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}")
+        ->assertJsonPath('domiciliario_ubicacion', null);
+    expect(UbicacionDomiciliario::debeCompartir($domi->fresh()))->toBeFalse();
 });
 
 test('el administrador ve a los domiciliarios con posición reciente', function () {
