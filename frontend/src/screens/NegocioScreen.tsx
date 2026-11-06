@@ -19,6 +19,7 @@ import { pideEleccion, precioDe } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 import { useAgregarAlCarrito } from '../useAgregarAlCarrito';
+import { REFRESCO_NEGOCIOS, usePolling } from '../usePolling';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Negocio'>;
 
@@ -118,6 +119,14 @@ export default function NegocioScreen({ navigation, route }: Props) {
       .catch(e => setError(e.message))
       .finally(() => setCargando(false));
   }, [auth, id]);
+
+  // Si el negocio abre o cierra se nota aquí mismo. Solo cambia el negocio: tocar
+  // los productos volvería a llevar la lista al producto resaltado.
+  usePolling(() => {
+    getCatalogo(auth!.token, id)
+      .then(({ negocio: n }) => setNegocio(n))
+      .catch(() => {});
+  }, REFRESCO_NEGOCIOS);
 
   // Si llegamos desde una búsqueda de producto, hacemos scroll hasta él una vez
   // que el catálogo cargó, para mostrarlo resaltado dentro de la lista.

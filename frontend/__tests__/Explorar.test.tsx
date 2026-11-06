@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Text } from 'react-native';
+import { FlatList, Text } from 'react-native';
 import ReactTestRenderer, { act } from 'react-test-renderer';
 import { buscarProductos, getNegocios, NegocioLista, ProductoConNegocio } from '../src/api';
 import ExplorarScreen from '../src/screens/ExplorarScreen';
@@ -19,6 +19,15 @@ jest.mock('../src/api', () => ({
   getNegocios: jest.fn(),
   buscarProductos: jest.fn(),
   getTiposNegocio: jest.fn(async () => []),
+}));
+
+// Sin navegador no hay foco: la prueba dispara el refresco cuando le conviene.
+let mockRefrescar = () => {};
+jest.mock('../src/usePolling', () => ({
+  REFRESCO_NEGOCIOS: 5000,
+  usePolling: (cargar: () => void) => {
+    mockRefrescar = cargar;
+  },
 }));
 
 const mockNegocios = getNegocios as jest.Mock;
@@ -85,7 +94,18 @@ async function montar() {
       raiz.root.findAll(n => n.props.accessibilityLabel === etiqueta && !!n.props.onPress)[0].props.onPress();
     });
   };
-  return { navigation, textos, buscar, tocar };
+  const finDeLista = async () => {
+    await act(async () => {
+      raiz.root.findByType(FlatList).props.onEndReached();
+    });
+  };
+  return { navigation, textos, buscar, tocar, finDeLista };
+}
+
+async function refrescar() {
+  await act(async () => {
+    mockRefrescar();
+  });
 }
 
 beforeEach(() => {
@@ -105,6 +125,58 @@ test('saluda por el primer nombre y separa abiertos de cerrados', async () => {
   expect(textos()).toEqual(
     expect.arrayContaining(['Hola, Ana', 'Abiertos ahora', 'Cerrados por ahora', 'Cerrado']),
   );
+});
+
+test('un negocio que cierra pasa a cerrados sin salir de la pantalla', async () => {
+  mockNegocios.mockResolvedValue(pagina([negocio(1, 'El Rincón'), negocio(2, 'La Fonda')]));
+  const { textos } = await montar();
+  expect(textos()).not.toContain('Cerrados por ahora');
+
+  mockNegocios.mockResolvedValue(pagina([negocio(1, 'El Rincón'), negocio(2, 'La Fonda', false)]));
+  await refrescar();
+
+  expect(textos()).toEqual(expect.arrayContaining(['Abiertos ahora', 'Cerrados por ahora', 'Cerrado']));
+});
+
+test('el refresco conserva las páginas ya cargadas', async () => {
+  mockNegocios.mockImplementation(async (_t, _b, n = 1) => ({
+    negocios: [negocio(n, `Negocio ${n}`)],
+    pagina: n,
+    ultimaPagina: 3,
+  }));
+  const { textos, finDeLista } = await montar();
+  await finDeLista();
+  expect(textos()).toContain('Negocio 2');
+
+  await refrescar();
+
+  expect(textos()).toEqual(expect.arrayContaining(['Negocio 1', 'Negocio 2']));
+  expect(textos()).not.toContain('Negocio 3');
+});
+
+test('un refresco fallido no borra la lista ni muestra error', async () => {
+  mockNegocios.mockResolvedValue(pagina([negocio(1, 'El Rincón')]));
+  const { textos } = await montar();
+
+  mockNegocios.mockRejectedValue(new Error('Sin conexión'));
+  await refrescar();
+
+  expect(textos()).toContain('El Rincón');
+  expect(textos()).not.toContain('Sin conexión');
+});
+
+test('el refresco mantiene los resultados de la búsqueda', async () => {
+  mockNegocios.mockResolvedValue(pagina([negocio(1, 'El Rincón')]));
+  mockProductos.mockResolvedValue([producto(5, 'Empanada', 'El Rincón')]);
+  const { textos, buscar } = await montar();
+  await buscar('empa');
+
+  mockProductos.mockResolvedValue([
+    { ...producto(5, 'Empanada', 'El Rincón'), negocio: { id: 90, nombre: 'El Rincón', abierto: false } },
+  ]);
+  await refrescar();
+
+  expect(textos()).toEqual(expect.arrayContaining(['Empanada', 'El Rincón · Cerrado']));
 });
 
 test('si todos están abiertos no aparece la sección de cerrados', async () => {

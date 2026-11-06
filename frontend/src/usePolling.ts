@@ -12,6 +12,12 @@ import { AppState } from 'react-native';
  * Al volver a primer plano refresca de una vez.
  */
 
+/**
+ * Abrir o cerrar un negocio no manda push a los clientes, así que lo que se ve
+ * de su estado se consulta seguido: es lo único que avisa del cambio.
+ */
+export const REFRESCO_NEGOCIOS = 5000;
+
 type Oyente = () => void;
 const oyentes = new Set<Oyente>();
 

@@ -28,6 +28,7 @@ import { NivelBadge } from '../components/Reputacion';
 import { RootStackParamList } from '../navTypes';
 import { precioDe } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
+import { REFRESCO_NEGOCIOS, usePolling } from '../usePolling';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Explorar'>;
 
@@ -107,6 +108,8 @@ export default function ExplorarScreen({ navigation }: Props) {
   const [pagina, setPagina] = useState(1);
   const [ultimaPagina, setUltimaPagina] = useState(1);
   const cargandoMasRef = useRef(false);
+  const paginaRef = useRef(pagina);
+  paginaRef.current = pagina;
   // Solo vale la respuesta de la última petición: una búsqueda vieja que llegue
   // tarde no puede pisar los resultados de la nueva.
   const ultimaPeticion = useRef(0);
@@ -183,6 +186,39 @@ export default function ExplorarScreen({ navigation }: Props) {
         setCargandoMas(false);
       });
   }, [auth, consulta, cargando, refrescando, pagina, ultimaPagina, tipoSeleccionadoId, busqueda]);
+
+  // Trae de nuevo lo que hay en pantalla, sin indicadores ni avisos de error, para
+  // que un negocio que abre o cierra cambie solo. Son todas las páginas cargadas:
+  // con solo la primera, la lista se recortaría bajo el dedo del cliente.
+  usePolling(() => {
+    if (cargando || refrescando || cargandoMasRef.current) return;
+    const turno = ultimaPeticion.current;
+    const paginaVista = pagina;
+    const t = busqueda.trim();
+    const conProductos = !!t && tipoSeleccionadoId == null;
+    const paginas = Array.from({ length: paginaVista }, (_, i) => i + 1);
+
+    Promise.all([
+      Promise.all(paginas.map(n => getNegocios(auth!.token, t || undefined, n, tipoSeleccionadoId))),
+      conProductos ? buscarProductos(auth!.token, t) : Promise.resolve([]),
+    ])
+      .then(([respuestas, hallados]) => {
+        // Si mientras tanto cambió la lista (búsqueda, otra página), esto ya es viejo.
+        if (
+          turno !== ultimaPeticion.current ||
+          cargandoMasRef.current ||
+          paginaRef.current !== paginaVista
+        ) {
+          return;
+        }
+        // Un negocio puede salir en dos páginas si cambió de lugar entre peticiones.
+        const porId = new Map(respuestas.flatMap(p => p.negocios).map(n => [n.id, n]));
+        setNegocios(Array.from(porId.values()));
+        setUltimaPagina(respuestas[0].ultimaPagina);
+        setProductos(hallados);
+      })
+      .catch(() => {});
+  }, REFRESCO_NEGOCIOS);
 
   // Solo el teclado espera a que dejen de escribir; cambiar de categoría es inmediato.
   useEffect(() => {

@@ -2,7 +2,8 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
 import { GestureResponderEvent, Image, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { imagenUrl } from '../api';
+import { getCatalogo, imagenUrl } from '../api';
+import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import ChipsEleccion from '../components/ChipsEleccion';
 import { useFlyToCart } from '../components/FlyToCart';
@@ -11,6 +12,7 @@ import { RootStackParamList } from '../navTypes';
 import { coloresDe, informacionDe, ingredientesDe, precioDe, tallasDe } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useAgregarAlCarrito } from '../useAgregarAlCarrito';
+import { REFRESCO_NEGOCIOS, usePolling } from '../usePolling';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Producto'>;
 
@@ -31,8 +33,17 @@ export default function ProductoScreen({ navigation, route }: Props) {
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { volar } = useFlyToCart();
-  const { negocioId, negocioNombre, abierto, producto } = route.params;
+  const { auth } = useAuth();
+  const { negocioId, negocioNombre, producto } = route.params;
   const agregar = useAgregarAlCarrito(negocioId, negocioNombre);
+  const [abierto, setAbierto] = useState(route.params.abierto);
+
+  // Si el negocio cierra mientras el cliente mira el producto, deja de poder agregarlo.
+  usePolling(() => {
+    getCatalogo(auth!.token, negocioId)
+      .then(({ negocio }) => setAbierto(negocio.activo !== false))
+      .catch(() => {});
+  }, REFRESCO_NEGOCIOS);
 
   const tallas = tallasDe(producto);
   const colores = coloresDe(producto);

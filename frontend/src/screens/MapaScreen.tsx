@@ -12,7 +12,7 @@ import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 import { miUbicacion, pedirPermisoUbicacion } from '../ubicacion';
-import { usePolling } from '../usePolling';
+import { REFRESCO_NEGOCIOS, usePolling } from '../usePolling';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Mapa'>;
 
@@ -49,6 +49,20 @@ export default function MapaScreen({ navigation, route }: Props) {
       .catch(e => toast.error('No se pudo cargar el mapa', e instanceof Error ? e.message : 'Error'))
       .finally(() => setCargando(false));
   }, [token, toast]);
+
+  // Si un negocio abre o cierra cambian su pin y su tarjeta, si está abierta.
+  usePolling(() => {
+    getNegociosMapa(token)
+      .then(lista => {
+        setNegocios(lista);
+        setSeleccion(s =>
+          s?.tipo === 'negocio'
+            ? { tipo: 'negocio', item: lista.find(n => n.id === s.item.id) ?? s.item }
+            : s,
+        );
+      })
+      .catch(() => {});
+  }, REFRESCO_NEGOCIOS);
 
   // Admin: los domiciliarios se mueven; se refrescan cada 15 s.
   const cargarDomiciliarios = useCallback(() => {
