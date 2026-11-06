@@ -386,8 +386,8 @@ test('el pedido guarda el tiempo de preparación que prometía el negocio', func
 
 test('el negocio que se pasa de su tiempo de preparación baja; el puntual sube', function () {
     $negocio = repNegocio(20);
-    $tarde = repPedido($negocio, repUsuario(), 'pendiente');
-    $puntual = repPedido($negocio, repUsuario(), 'pendiente');
+    $tarde = repPedido($negocio, repUsuario(), 'aceptado', null, ['aceptado_at' => now()]);
+    $puntual = repPedido($negocio, repUsuario(), 'aceptado', null, ['aceptado_at' => now()]);
     Sanctum::actingAs($negocio->user);
 
     $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$puntual->id}/listo")->assertOk();
@@ -414,8 +414,11 @@ test('el domiciliario que recoge después de lo que prometió baja, salvo noveda
         ->assertOk();
 
     $this->travel(30)->minutes();
-    $this->putJson("/api/domiciliario/pedidos/{$sinExcusa->id}/recogido")->assertOk();
-    $this->putJson("/api/domiciliario/pedidos/{$conExcusa->id}/recogido")->assertOk();
+    Sanctum::actingAs($negocio->user);
+    foreach ([$sinExcusa, $conExcusa] as $pedido) {
+        $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}/recogido", ['codigo' => $pedido->fresh()->codigo_recogida])
+            ->assertOk();
+    }
 
     expect(puntaje($domi))->toBe(77); // solo cuenta el que no avisó
     expect($sinExcusa->fresh()->recogido_at)->not->toBeNull();

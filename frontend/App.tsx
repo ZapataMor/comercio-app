@@ -5,8 +5,9 @@
 import { DarkTheme, DefaultTheme, NavigationContainer, Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
-import { ActivityIndicator, StatusBar, View } from 'react-native';
+import { ActivityIndicator, AppState, StatusBar, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useAlarmaPedidos } from './src/alarmaPedidos';
 import { Colores, font, makeStyles, ThemeProvider, useTheme } from './src/theme';
 import { AuthProvider, useAuth } from './src/AuthContext';
 import { CartProvider } from './src/CartContext';
@@ -18,7 +19,7 @@ import HeaderPerfil from './src/components/HeaderPerfil';
 import { CapaMenus } from './src/components/MenuDesplegable';
 import { VitrinaHeaderLogo } from './src/components/Logo';
 import SplashVitrina from './src/components/SplashVitrina';
-import { NegocioProvider } from './src/NegocioContext';
+import { NegocioProvider, useNegocio } from './src/NegocioContext';
 import { configurarMensajesForeground } from './src/pushNotifications';
 import { navigationRef, procesarNotificacionPendiente, rutaInicio } from './src/RootNavigation';
 import { ToastProvider } from './src/Toast';
@@ -238,18 +239,34 @@ function PushBridge() {
 
   React.useEffect(() => {
     return configurarMensajesForeground(auth?.user, message => {
-      const titulo = message.notification?.title ?? 'Nueva notificacion';
-      const cuerpo = message.notification?.body;
-      toast.info(titulo, cuerpo);
+      // Los avisos de datos traen su texto aparte, y los silenciosos no traen.
+      const titulo = message.notification?.title ?? message.data?.titulo;
+      const cuerpo = message.notification?.body ?? message.data?.cuerpo;
+      if (typeof titulo === 'string') {
+        toast.info(titulo, typeof cuerpo === 'string' ? cuerpo : undefined);
+      }
       // Algo cambió: las pantallas en vivo se refrescan ya, sin esperar.
       avisarCambioDesdePush();
     });
   }, [auth?.user, toast]);
 
+  // Con la app en segundo plano, tocar una notificación solo la deja pendiente.
   React.useEffect(() => {
     procesarNotificacionPendiente(auth?.user);
+    const sub = AppState.addEventListener('change', estado => {
+      if (estado === 'active') procesarNotificacionPendiente(auth?.user);
+    });
+    return () => sub.remove();
   }, [auth?.user]);
 
+  return null;
+}
+
+/** La alarma de pedidos sigue viva en toda la app, no solo en el Inicio. */
+function AlarmaBridge() {
+  const { auth } = useAuth();
+  const { negocios } = useNegocio();
+  useAlarmaPedidos(auth?.token ?? null, negocios.length > 0);
   return null;
 }
 
@@ -280,6 +297,7 @@ function AppContenido() {
               <ConfirmacionProvider>
                 <StatusBar barStyle="light-content" backgroundColor={c.header} />
                 <PushBridge />
+                <AlarmaBridge />
                 <View style={styles.raiz}>
                   <Navegacion />
                   {splashVisible && <SplashVitrina onFin={ocultarSplash} />}

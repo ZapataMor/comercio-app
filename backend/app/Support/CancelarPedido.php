@@ -4,15 +4,19 @@ namespace App\Support;
 
 use App\Models\Pedido;
 use App\Notifications\PedidoCancelado;
+use App\Notifications\PedidoYaAtendido;
 
 /**
  * Cancelar un pedido antes de que salga del negocio.
  *
- *  - El CLIENTE puede cancelar mientras el pedido está 'pendiente' (el
- *    negocio aún no lo marca listo).
- *  - El NEGOCIO puede rechazarlo mientras está 'pendiente' (se agotó algo,
- *    va a cerrar…) o cancelarlo si está 'listo' y ningún domiciliario lo ha
+ *  - El CLIENTE puede cancelar mientras el negocio no lo tenga listo
+ *    ('pendiente' o 'aceptado').
+ *  - El NEGOCIO puede rechazarlo mientras está 'pendiente', cancelarlo
+ *    después de aceptarlo (sin consecuencias los primeros minutos, ver
+ *    penaliza()) o cancelarlo si está 'listo' y ningún domiciliario lo ha
  *    tomado (nadie disponible).
+ *  - El SISTEMA lo cancela si nadie del negocio respondió a tiempo
+ *    (comando `pedidos:vencer`).
  *
  * Después de que un domiciliario lo toma ya no se cancela desde la app.
  * El cambio es un update condicional: si en el mismo instante un domiciliario
@@ -23,6 +27,8 @@ class CancelarPedido
     public const POR_CLIENTE = 'cliente';
 
     public const POR_NEGOCIO = 'negocio';
+
+    public const POR_SISTEMA = 'sistema';
 
     /** Motivos sugeridos en la app (el texto es libre). */
     public const MOTIVOS_NEGOCIO = [
@@ -41,7 +47,22 @@ class CancelarPedido
     /** Estados desde los que cada quien puede cancelar. */
     public static function estadosPermitidos(string $quien): array
     {
-        return $quien === self::POR_NEGOCIO ? ['pendiente', 'listo'] : ['pendiente'];
+        return match ($quien) {
+            self::POR_NEGOCIO => ['pendiente', 'aceptado', 'listo'],
+            self::POR_SISTEMA => ['pendiente'],
+            default => ['pendiente', 'aceptado'],
+        };
+    }
+
+    /**
+     * ¿Si el negocio cancela ahora, baja su confiabilidad? Solo si lo aceptó
+     * hace más de `reputacion.minutos_cancelacion_libre`. Un pedido listo que
+     * nadie toma no cuenta: ahí la falta no es del negocio.
+     */
+    public static function penaliza(Pedido $pedido): bool
+    {
+        return $pedido->estado === 'aceptado'
+            && $pedido->aceptado_at?->lt(now()->subMinutes((int) config('reputacion.minutos_cancelacion_libre')));
     }
 
     public static function puede(Pedido $pedido, string $quien): bool
@@ -53,6 +74,8 @@ class CancelarPedido
     /** Cancela y avisa a la otra parte. Devuelve false si ya no se podía. */
     public static function ejecutar(Pedido $pedido, string $quien, ?string $motivo): bool
     {
+        $penalizar = $quien === self::POR_NEGOCIO && self::penaliza($pedido);
+
         $afectados = Pedido::whereKey($pedido->id)
             ->whereIn('estado', self::estadosPermitidos($quien))
             ->whereNull('domiciliario_id')
@@ -69,15 +92,29 @@ class CancelarPedido
 
         $pedido->refresh();
 
-        if ($quien === self::POR_CLIENTE) {
-            $equipo = $pedido->negocio?->miembrosActivos()->get();
-            if ($equipo && $equipo->isNotEmpty()) {
-                Push::enviar($equipo, new PedidoCancelado($pedido));
-            }
-        } elseif ($pedido->cliente) {
+        if ($penalizar && $pedido->negocio) {
+            Reputacion::registrar(Reputacion::NEGOCIO, $pedido->negocio, 'cancelo_tras_aceptar', $pedido);
+        }
+
+        self::avisar($pedido, $quien);
+
+        return true;
+    }
+
+    /**
+     * El cliente se entera si no fue él quien canceló. Al equipo se le avisa
+     * si no fue uno de ellos; si fue, un aviso silencioso calla la alarma en
+     * los demás teléfonos.
+     */
+    private static function avisar(Pedido $pedido, string $quien): void
+    {
+        if ($quien !== self::POR_CLIENTE && $pedido->cliente) {
             Push::enviar($pedido->cliente, new PedidoCancelado($pedido));
         }
 
-        return true;
+        $equipo = $pedido->negocio?->miembrosActivos()->get();
+        if ($equipo && $equipo->isNotEmpty()) {
+            Push::enviar($equipo, $quien === self::POR_NEGOCIO ? new PedidoYaAtendido($pedido) : new PedidoCancelado($pedido));
+        }
     }
 }

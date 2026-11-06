@@ -20,6 +20,12 @@ export function avisarCambioDesdePush() {
   oyentes.forEach(o => o());
 }
 
+/** Para lo que no es una pantalla (la alarma de pedidos). Devuelve cómo quitarse. */
+export function alCambiarDesdePush(oyente: Oyente): () => void {
+  oyentes.add(oyente);
+  return () => oyentes.delete(oyente);
+}
+
 export function usePolling(cargar: () => void, ms = 15000) {
   const ref = useRef(cargar);
   ref.current = cargar;

@@ -15,17 +15,18 @@ class Pedido extends Model
      * Estados del pedido, EN ORDEN (sirve también para el "stepper" de avance).
      * 'cancelado' queda fuera: es un final alternativo (ver CancelarPedido).
      */
-    public const ESTADOS = ['pendiente', 'listo', 'tomado', 'recogido', 'en_camino', 'entregado'];
+    public const ESTADOS = ['pendiente', 'aceptado', 'listo', 'tomado', 'recogido', 'en_camino', 'entregado'];
 
     /** Estados con un domiciliario llevando el pedido. */
     public const EN_RUTA = ['tomado', 'recogido', 'en_camino'];
 
     /** Estados en los que el pedido sigue vivo (ni entregado ni cancelado). */
-    public const EN_CURSO = ['pendiente', 'listo', 'tomado', 'recogido', 'en_camino'];
+    public const EN_CURSO = ['pendiente', 'aceptado', 'listo', 'tomado', 'recogido', 'en_camino'];
 
     /** Etiquetas legibles de cada estado. */
     public const ESTADO_LABEL = [
         'pendiente' => 'Pendiente',
+        'aceptado' => 'En preparación',
         'listo' => 'Listo para recoger',
         'tomado' => 'Domiciliario asignado',
         'recogido' => 'Recogido',
@@ -50,6 +51,9 @@ class Pedido extends Model
         'telefono_contacto',
         'minutos_recogida',
         'minutos_preparacion',
+        'aceptado_at',
+        'codigo_recogida',
+        'codigo_entrega',
         'listo_at',
         'tomado_at',
         'recogido_at',
@@ -76,6 +80,7 @@ class Pedido extends Model
             'cancelado_at' => 'datetime',
             'minutos_recogida' => 'integer',
             'minutos_preparacion' => 'integer',
+            'aceptado_at' => 'datetime',
             'listo_at' => 'datetime',
             'tomado_at' => 'datetime',
             'recogido_at' => 'datetime',
@@ -84,6 +89,20 @@ class Pedido extends Model
             'novedad_at' => 'datetime',
             'dinero_confirmado_at' => 'datetime',
         ];
+    }
+
+    /** Código de 4 dígitos para confirmar la recogida o la entrega. */
+    public static function generarCodigo(): string
+    {
+        return str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+    }
+
+    /** Segundos que le quedan al negocio para aceptar antes de que venza. */
+    public function segundosParaAceptar(): int
+    {
+        $limite = $this->created_at->copy()->addMinutes((int) config('reputacion.minutos_para_aceptar'));
+
+        return (int) max(0, now()->diffInSeconds($limite, false));
     }
 
     /** Posición del estado actual dentro del flujo (para el stepper). */

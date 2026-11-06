@@ -123,6 +123,7 @@ type ColorEstado = { fg: string; bg: string };
 const estados: Record<ModoVitrina, Record<string, ColorEstado>> = {
   dia: {
     pendiente: { fg: '#B5740A', bg: '#FBEED4' },
+    aceptado: { fg: '#8A6D00', bg: '#FFF4C7' },
     listo: { fg: '#2F6FB0', bg: '#E2EDF8' },
     tomado: { fg: '#6D54E0', bg: '#EBE7FE' },
     recogido: { fg: '#0E7C8C', bg: '#D9F1F2' },
@@ -132,6 +133,7 @@ const estados: Record<ModoVitrina, Record<string, ColorEstado>> = {
   },
   noche: {
     pendiente: { fg: '#F2A93B', bg: '#3B3236' },
+    aceptado: { fg: '#E9C46A', bg: '#3A3424' },
     listo: { fg: '#7FB2F0', bg: '#233256' },
     tomado: { fg: '#A797FF', bg: '#2D2A5E' },
     recogido: { fg: '#4FC9D6', bg: '#1B3A4A' },

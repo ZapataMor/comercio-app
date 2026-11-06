@@ -7,6 +7,7 @@ import { useAuth } from '../AuthContext';
 import { FadeInView } from '../components/anim';
 import BotonesContacto from '../components/BotonesContacto';
 import CalificarPedido, { ResumenCalificacion } from '../components/CalificarPedido';
+import { VerCodigo } from '../components/CodigoPedido';
 import Icon from '../components/Icon';
 import { haceCuanto, MapaSeguimiento, NotaEnVivo } from '../components/Mapa';
 import MotivoCancelacion from '../components/MotivoCancelacion';
@@ -21,6 +22,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'PedidoDetalle'>;
 
 const LABEL: Record<string, string> = {
   pendiente: 'Pendiente',
+  aceptado: 'En preparación',
   listo: 'Listo para recoger',
   tomado: 'Domiciliario asignado',
   recogido: 'Recogido',
@@ -160,7 +162,11 @@ export default function PedidoDetalleScreen({ route }: Props) {
             <Text style={styles.canceladoTitulo}>Pedido cancelado</Text>
           </View>
           <Text style={styles.canceladoTxt}>
-            {pedido.cancelado_por === 'negocio' ? `${pedido.negocio ?? 'El negocio'} no pudo atenderlo` : 'Lo cancelaste tú'}
+            {pedido.cancelado_por === 'sistema'
+              ? `${pedido.negocio ?? 'El negocio'} no recibió tu pedido`
+              : pedido.cancelado_por === 'negocio'
+                ? `${pedido.negocio ?? 'El negocio'} no pudo atenderlo`
+                : 'Lo cancelaste tú'}
             {pedido.motivo_cancelacion ? `: ${pedido.motivo_cancelacion}` : '.'}
           </Text>
           <Text style={styles.canceladoNota}>No se te cobra nada.</Text>
@@ -187,6 +193,13 @@ export default function PedidoDetalleScreen({ route }: Props) {
             <Text style={[styles.nota, styles.notaInline]}>Domiciliario: {pedido.domiciliario}</Text>
             <NivelBadge reputacion={pedido.domiciliario_reputacion} />
           </View>
+        )}
+        {!!pedido.codigo_entrega && (
+          <VerCodigo
+            titulo="Tu código de entrega"
+            codigo={pedido.codigo_entrega}
+            ayuda="Dáselo al domiciliario solo cuando recibas tu pedido."
+          />
         )}
         {/* Mientras lo lleva: llamar o escribirle al domiciliario. */}
         <BotonesContacto

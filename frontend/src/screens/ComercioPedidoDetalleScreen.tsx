@@ -1,17 +1,22 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { detenerAlarma } from '../alarmaPedidos';
 import {
+  aceptarPedido,
   cancelarPedidoNegocio,
   ComercioPedido,
   confirmarDinero,
+  confirmarRecogida,
   DineroEstado,
   getPedidoNegocio,
   marcarPedidoListo,
+  textoCancelacion,
 } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import BotonesContacto from '../components/BotonesContacto';
+import { PedirCodigo } from '../components/CodigoPedido';
 import { useConfirmar } from '../components/Confirmacion';
 import Icon from '../components/Icon';
 import { haceCuanto, MapaSeguimiento, NotaEnVivo } from '../components/Mapa';
@@ -42,29 +47,29 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
   const [pedido, setPedido] = useState<ComercioPedido | null>(route.params.pedido ?? null);
   const [cargando, setCargando] = useState(!route.params.pedido);
   const [enviando, setEnviando] = useState(false);
+  const pedidoId = route.params.pedido?.id ?? route.params.pedidoId ?? null;
 
-  useEffect(() => {
-    if (pedido || !route.params.pedidoId || !negocioId) {
-      setCargando(false);
-      return;
+  const recargar = useCallback(async () => {
+    if (pedidoId && negocioId) {
+      setPedido(await getPedidoNegocio(token, negocioId, pedidoId));
     }
+  }, [negocioId, pedidoId, token]);
 
-    getPedidoNegocio(token, negocioId, route.params.pedidoId)
-      .then(setPedido)
+  // Puede venir de una lista vieja o de un push: se trae el estado real.
+  useEffect(() => {
+    recargar()
       .catch(e => toast.error('No se pudo cargar', e instanceof Error ? e.message : 'Error'))
       .finally(() => setCargando(false));
-  }, [pedido, route.params.pedidoId, negocioId, toast, token]);
+  }, [recargar, toast]);
 
-  // Mientras el domiciliario viene a recoger, el pedido (y su posición en el
-  // mapa) se refresca cada 10 s.
+  // Mientras siga en curso se refresca cada 10 s: otro del equipo pudo
+  // atenderlo, el cliente cancelarlo, y se ve dónde viene el domiciliario.
   usePolling(() => {
-    if (pedido?.estado !== 'tomado' || !negocioId) return;
-    getPedidoNegocio(token, negocioId, pedido.id)
-      .then(setPedido)
-      .catch(() => {});
+    if (pedido?.estado === 'entregado' || pedido?.estado === 'cancelado') return;
+    recargar().catch(() => {});
   }, 10000);
 
-  // Rechazar (pendiente) o cancelar (listo y nadie lo tomó), con motivo.
+  // Rechazar (pendiente) o cancelar (aceptado, o listo y nadie lo tomó), con motivo.
   const [cancelando, setCancelando] = useState(false);
   const [enviandoCancelacion, setEnviandoCancelacion] = useState(false);
 
@@ -73,6 +78,7 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
     setEnviandoCancelacion(true);
     try {
       await cancelarPedidoNegocio(token, negocioId, pedido.id, motivo);
+      await detenerAlarma(pedido.id);
       setCancelando(false);
       toast.exito('Pedido cancelado', 'Le avisamos al cliente.');
       navigation.goBack();
@@ -82,6 +88,34 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
     } finally {
       setEnviandoCancelacion(false);
     }
+  }
+
+  async function onAceptar() {
+    if (!pedido || !negocioId) {
+      return;
+    }
+    setEnviando(true);
+    try {
+      await aceptarPedido(token, negocioId, pedido.id);
+      await detenerAlarma(pedido.id);
+      await recargar();
+      toast.exito('Pedido aceptado', 'Ya le avisamos al cliente.');
+    } catch (e) {
+      toast.error('No se pudo aceptar', e instanceof Error ? e.message : 'Error');
+      recargar().catch(() => {});
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  /** Si el código no es correcto, el error lo muestra el mismo campo. */
+  async function onRecogido(codigo: string) {
+    if (!pedido || !negocioId) {
+      return;
+    }
+    await confirmarRecogida(token, negocioId, pedido.id, codigo);
+    await recargar();
+    toast.exito('Pedido entregado', 'El domiciliario ya lo lleva.');
   }
 
   async function onListo() {
@@ -151,7 +185,7 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
   const ec = estadoColor(pedido.estado);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
+    <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
       <FadeInView style={styles.card}>
         <View style={styles.head}>
           <Text style={styles.pid}>Pedido #{pedido.id}</Text>
@@ -219,10 +253,7 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
           {pedido.estado === 'cancelado' && (
             <View style={styles.novedad}>
               <Icon name="cerrar" size={15} color={c.danger} />
-              <Text style={[styles.novedadTxt, { color: c.danger }]}>
-                {pedido.cancelado_por === 'cliente' ? 'El cliente lo canceló' : 'Lo cancelaron ustedes'}
-                {pedido.motivo_cancelacion ? `: ${pedido.motivo_cancelacion}` : '.'}
-              </Text>
+              <Text style={[styles.novedadTxt, { color: c.danger }]}>{textoCancelacion(pedido)}</Text>
             </View>
           )}
           {!!pedido.novedad && pedido.estado !== 'entregado' && (
@@ -261,7 +292,11 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
       <MotivoCancelacion
         visible={cancelando}
         titulo={pedido.estado === 'pendiente' ? 'Rechazar pedido' : 'Cancelar pedido'}
-        explicacion="El cliente verá el motivo y recibirá un aviso. No se le cobra nada."
+        explicacion={
+          pedido.cancelar_penaliza
+            ? 'Ya pasaron más de 5 minutos desde que lo aceptaste: cancelarlo baja tu confiabilidad. El cliente verá el motivo.'
+            : 'El cliente verá el motivo y recibirá un aviso. No se le cobra nada.'
+        }
         motivos={pedido.motivos_cancelacion ?? []}
         textoBoton={pedido.estado === 'pendiente' ? 'Rechazar pedido' : 'Cancelar pedido'}
         enviando={enviandoCancelacion}
@@ -310,6 +345,14 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
       ) : null}
 
       {pedido.estado === 'pendiente' ? (
+        <PressableScale style={styles.btn} onPress={onAceptar} disabled={enviando}>
+          {enviando ? (
+            <ActivityIndicator color={c.onBrand} />
+          ) : (
+            <Text style={styles.btnTxt}>Aceptar pedido</Text>
+          )}
+        </PressableScale>
+      ) : pedido.estado === 'aceptado' ? (
         <PressableScale style={styles.btn} onPress={onListo} disabled={enviando}>
           {enviando ? (
             <ActivityIndicator color={c.onBrand} />
@@ -322,6 +365,13 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
           <Icon name="reloj" size={16} color={c.muted} />
           <Text style={[styles.nota, styles.notaInline]}>Esperando que un domiciliario lo tome…</Text>
         </View>
+      ) : pedido.estado === 'tomado' ? (
+        <PedirCodigo
+          titulo="Entregar al domiciliario"
+          ayuda="Pídele su código y escríbelo aquí para confirmar que es quien debe llevarse el pedido."
+          textoBoton="Confirmar recogida"
+          onConfirmar={onRecogido}
+        />
       ) : pedido.estado === 'entregado' ? (
         <View style={styles.filaNota}>
           <Icon name="check" size={16} color={c.success} />
@@ -337,7 +387,11 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
       {pedido.puede_cancelar && (
         <PressableScale style={styles.btnRechazar} onPress={() => setCancelando(true)}>
           <Text style={styles.btnRechazarTxt}>
-            {pedido.estado === 'pendiente' ? 'Rechazar pedido' : 'Cancelar (nadie lo ha tomado)'}
+            {pedido.estado === 'pendiente'
+              ? 'Rechazar pedido'
+              : pedido.estado === 'aceptado'
+                ? 'Cancelar pedido'
+                : 'Cancelar (nadie lo ha tomado)'}
           </Text>
         </PressableScale>
       )}

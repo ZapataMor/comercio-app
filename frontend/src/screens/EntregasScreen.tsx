@@ -46,6 +46,8 @@ export default function EntregasScreen({ navigation }: Props) {
   return (
     <ScrollView
       ref={scroll}
+      // El código de entrega se escribe aquí: el primer toque debe llegar al botón.
+      keyboardShouldPersistTaps="handled"
       style={styles.container}
       // El cliente lleva la barra flotante abajo: dejamos aire para no taparla.
       contentContainerStyle={[styles.content, esCliente && styles.contentCliente]}

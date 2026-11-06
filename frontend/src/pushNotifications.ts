@@ -11,6 +11,7 @@ import {
   setBackgroundMessageHandler,
 } from '@react-native-firebase/messaging';
 import { PermissionsAndroid, Platform } from 'react-native';
+import { detenerAlarma, sonarAlarma } from './alarmaPedidos';
 import { eliminarDeviceToken, registrarDeviceToken, Usuario } from './api';
 import { abrirNotificacion } from './RootNavigation';
 
@@ -49,6 +50,33 @@ async function canalPedidos() {
     sound: 'default',
     vibration: true,
   });
+}
+
+/**
+ * Los avisos de la alarma de pedidos: cuando llega uno nuevo suena, y cuando
+ * alguien del equipo lo atiende (o lo cancelan, o vence) se calla.
+ */
+async function atenderAlarma(data: Record<string, string>) {
+  const pedidoId = Number(data.pedido_id);
+  if (!Number.isFinite(pedidoId)) {
+    return;
+  }
+
+  try {
+    if (data.tipo === 'nuevo_pedido') {
+      await sonarAlarma({
+        pedidoId,
+        negocioId: Number(data.negocio_id),
+        titulo: data.titulo ?? '¡Nuevo pedido! 🛒',
+        cuerpo: data.cuerpo ?? 'Acéptalo antes de que venza.',
+        segundos: Number(data.segundos),
+      });
+    } else if (data.tipo === 'pedido_atendido' || data.tipo === 'pedido_cancelado') {
+      await detenerAlarma(pedidoId);
+    }
+  } catch (error) {
+    console.warn('No se pudo actualizar la alarma de pedidos.', error);
+  }
 }
 
 async function mostrarNotificacionForeground(message: FirebaseMessagingTypes.RemoteMessage) {
@@ -118,7 +146,11 @@ export function configurarMensajesForeground(
   onMensaje: (message: FirebaseMessagingTypes.RemoteMessage) => void,
 ) {
   const unsubscribeMessage = onMessage(fcm, message => {
-    mostrarNotificacionForeground(message);
+    atenderAlarma(dataPlano(message.data));
+    // Los de datos (la alarma) no traen notificación que mostrar.
+    if (message.notification) {
+      mostrarNotificacionForeground(message);
+    }
     onMensaje(message);
   });
 
@@ -129,6 +161,13 @@ export function configurarMensajesForeground(
   getInitialNotification(fcm).then(message => {
     if (message?.data) {
       abrirNotificacion(dataPlano(message.data), user);
+    }
+  });
+
+  // La alarma la muestra Notifee: si se tocó con la app cerrada, se sabe aquí.
+  notifee.getInitialNotification().then(inicial => {
+    if (inicial?.notification.data) {
+      abrirNotificacion(dataPlano(inicial.notification.data), user);
     }
   });
 
@@ -146,10 +185,15 @@ export function configurarMensajesForeground(
 }
 
 export function configurarMensajesBackground() {
-  setBackgroundMessageHandler(fcm, async () => {});
-  notifee.onBackgroundEvent(async ({ type }) => {
-    if (type === EventType.PRESS) {
-      // Android abre la app; la navegacion se resuelve cuando React Navigation esta listo.
+  // Con la app cerrada o en segundo plano, solo este código puede arrancar o
+  // callar la alarma de pedidos.
+  setBackgroundMessageHandler(fcm, async message => {
+    await atenderAlarma(dataPlano(message.data));
+  });
+  notifee.onBackgroundEvent(async ({ type, detail }) => {
+    if (type === EventType.PRESS && detail.notification?.data) {
+      // Android abre la app; queda pendiente hasta que la navegación esté lista.
+      abrirNotificacion(dataPlano(detail.notification.data));
     }
   });
 }

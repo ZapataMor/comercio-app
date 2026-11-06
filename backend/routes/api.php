@@ -73,6 +73,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // (negocio_user) del {negocio} de la ruta.
     // Va ANTES de /negocios/{id} para que "mios" no se tome como un id.
     Route::get('/negocios/mios', [NegocioController::class, 'index']);
+    // Pedidos sin aceptar de todos mis negocios: de aquí sale la alarma con la app abierta.
+    Route::get('/negocios/mios/por-aceptar', [ComercioPedidoController::class, 'porAceptar']);
     Route::get('/negocios/mios/{negocio}', [NegocioController::class, 'show'])->whereNumber('negocio');
     Route::post('/negocios', [NegocioController::class, 'store']);
 
@@ -100,8 +102,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/pedidos', [ComercioPedidoController::class, 'index']);
         Route::get('/pedidos/resumen', [ComercioPedidoController::class, 'resumen']);
         Route::get('/pedidos/{id}', [ComercioPedidoController::class, 'show'])->whereNumber('id');
+        // Aceptar un pedido: si nadie lo hace a tiempo, se cancela solo.
+        Route::put('/pedidos/{id}/aceptar', [ComercioPedidoController::class, 'aceptar']);
         Route::put('/pedidos/{id}/listo', [ComercioPedidoController::class, 'marcarListo']);
-        // Rechazar (pendiente) o cancelar (listo sin domiciliario), con motivo.
+        // El negocio confirma con el código que le dicta el domiciliario.
+        Route::put('/pedidos/{id}/recogido', [ComercioPedidoController::class, 'recogido'])->middleware('throttle:codigo-pedido');
+        // Rechazar (pendiente), cancelar lo aceptado o lo listo sin domiciliario, con motivo.
         Route::put('/pedidos/{id}/cancelar', [ComercioPedidoController::class, 'cancelar']);
         // Efectivo: ¿el domiciliario entregó el dinero? (afecta su confiabilidad).
         Route::put('/pedidos/{id}/dinero', [ComercioPedidoController::class, 'confirmarDinero']);
@@ -179,8 +185,10 @@ Route::middleware('auth:sanctum')->group(function () {
         // Justificar una demora (lluvia, tráfico...) de una entrega en curso.
         Route::put('/pedidos/{id}/novedad', [ApiDomiciliarioController::class, 'novedad']);
         Route::put('/pedidos/{id}/tomar', [ApiDomiciliarioController::class, 'tomar']);
-        Route::put('/pedidos/{id}/recogido', [ApiDomiciliarioController::class, 'recogido']);
+        // Devolver un pedido tomado: solo antes de recogerlo.
+        Route::put('/pedidos/{id}/soltar', [ApiDomiciliarioController::class, 'soltar']);
         Route::put('/pedidos/{id}/en-camino', [ApiDomiciliarioController::class, 'enCamino']);
-        Route::put('/pedidos/{id}/entregado', [ApiDomiciliarioController::class, 'entregado']);
+        // Se confirma con el código que le da el cliente.
+        Route::put('/pedidos/{id}/entregado', [ApiDomiciliarioController::class, 'entregado'])->middleware('throttle:codigo-pedido');
     });
 });

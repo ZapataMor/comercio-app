@@ -46,6 +46,7 @@ class Reputacion
             'preparacion_a_tiempo' => [1, 'Tuvo el pedido listo a tiempo', false],
             'cliente_conforme' => [2, 'El cliente quedó conforme', false],
             'preparacion_tarde' => [-3, 'Se pasó de su tiempo de preparación', false],
+            'cancelo_tras_aceptar' => [-8, 'Canceló un pedido que ya llevaba rato aceptado', false],
             'mala_atencion' => [-3, 'Mala atención al cliente', false],
             'mala_calidad' => [-5, 'Productos en mal estado o de mala calidad', false],
             'pedido_incompleto' => [-8, 'Faltaron productos en el pedido', false],

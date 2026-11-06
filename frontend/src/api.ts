@@ -700,10 +700,12 @@ export type ComercioPedido = {
   /** Solo mientras el domiciliario lleva el pedido. */
   domiciliario_telefono?: string | null;
   domiciliario_reputacion?: Reputacion | null;
-  cancelado_por?: 'cliente' | 'negocio' | null;
+  cancelado_por?: CanceladoPor | null;
   motivo_cancelacion?: string | null;
-  /** Se puede rechazar (pendiente) o cancelar (listo sin domiciliario). */
+  /** Se puede rechazar (pendiente) o cancelar (aceptado, o listo sin domiciliario). */
   puede_cancelar?: boolean;
+  /** Ya pasó el tiempo libre: cancelarlo le baja la confiabilidad al negocio. */
+  cancelar_penaliza?: boolean;
   motivos_cancelacion?: string[];
   minutos_preparacion?: number | null;
   /** Dónde va el domiciliario mientras viene a recoger (estado "tomado"). */
@@ -718,13 +720,52 @@ export type ComercioPedido = {
 
 export type DineroEstado = 'recibido' | 'incompleto' | 'no_recibido';
 
+/** Quién canceló un pedido; 'sistema': nadie del negocio respondió a tiempo. */
+export type CanceladoPor = 'cliente' | 'negocio' | 'sistema';
+
+/** Qué pasó con un pedido cancelado, contado al equipo del negocio. */
+export function textoCancelacion(p: { cancelado_por?: CanceladoPor | null; motivo_cancelacion?: string | null }): string {
+  const quien = {
+    cliente: 'El cliente lo canceló',
+    sistema: 'Venció: nadie lo aceptó a tiempo',
+    negocio: 'Lo cancelaron ustedes',
+  }[p.cancelado_por ?? 'negocio'];
+  return p.motivo_cancelacion ? `${quien}: ${p.motivo_cancelacion}` : `${quien}.`;
+}
+
+/** Pedido que nadie ha aceptado: de aquí sale la alarma con la app abierta. */
+export type PedidoPorAceptar = {
+  id: number;
+  negocio_id: number;
+  negocio: string | null;
+  total: number;
+  /** Lo que le queda antes de vencer. */
+  segundos: number;
+};
+
+/** Pedidos sin aceptar de todos mis negocios. */
+export async function getPedidosPorAceptar(token: string): Promise<PedidoPorAceptar[]> {
+  const d = await authGet('/api/negocios/mios/por-aceptar', token);
+  return (d.pedidos ?? []) as PedidoPorAceptar[];
+}
+
 export async function getPedidosComercio(token: string, negocioId: number): Promise<ComercioPedido[]> {
   const d = await authGet(`/api/negocios/${negocioId}/pedidos`, token);
   return (d.pedidos ?? []) as ComercioPedido[];
 }
 
+/** Aceptar un pedido en espera: el negocio se compromete a prepararlo. */
+export async function aceptarPedido(token: string, negocioId: number, id: number): Promise<void> {
+  await authSend('PUT', `/api/negocios/${negocioId}/pedidos/${id}/aceptar`, token);
+}
+
 export async function marcarPedidoListo(token: string, negocioId: number, id: number): Promise<void> {
   await authSend('PUT', `/api/negocios/${negocioId}/pedidos/${id}/listo`, token);
+}
+
+/** Entregarle el pedido al domiciliario, con el código que él dicta. */
+export async function confirmarRecogida(token: string, negocioId: number, id: number, codigo: string): Promise<void> {
+  await authSend('PUT', `/api/negocios/${negocioId}/pedidos/${id}/recogido`, token, { codigo });
 }
 
 /** Pestañas del historial de pedidos del negocio. */
@@ -765,7 +806,7 @@ export function getResumenNegocio(token: string, negocioId: number): Promise<Res
   return authGet(`/api/negocios/${negocioId}/pedidos/resumen`, token);
 }
 
-/** Rechazar (pendiente) o cancelar (listo sin domiciliario) un pedido. */
+/** Rechazar (pendiente) o cancelar (aceptado, o listo sin domiciliario) un pedido. */
 export async function cancelarPedidoNegocio(token: string, negocioId: number, id: number, motivo?: string): Promise<void> {
   await authSend('PUT', `/api/negocios/${negocioId}/pedidos/${id}/cancelar`, token, { motivo: motivo || null });
 }
@@ -1159,6 +1200,8 @@ export type Pedido = {
   cobrar: number;
   metodo_pago: string;
   minutos_recogida: number | null;
+  /** Lo dicto al negocio para que me entregue el pedido (solo si lo tomé y no lo he recogido). */
+  codigo_recogida?: string | null;
   /** "dd/mm/aaaa hh:mm" en que lo entregué (solo los entregados). */
   fecha_entrega?: string | null;
   direccion_entrega: string;
@@ -1232,9 +1275,18 @@ export async function tomarPedido(token: string, id: number, minutos: number): P
   await authSend('PUT', `/api/domiciliario/pedidos/${id}/tomar`, token, { minutos_recogida: minutos });
 }
 
-/** accion: 'recogido' | 'en-camino' | 'entregado' */
-export async function avanzarPedido(token: string, id: number, accion: string): Promise<void> {
-  await authSend('PUT', `/api/domiciliario/pedidos/${id}/${accion}`, token);
+/** Devolver un pedido tomado: solo antes de recogerlo. */
+export async function soltarPedido(token: string, id: number): Promise<void> {
+  await authSend('PUT', `/api/domiciliario/pedidos/${id}/soltar`, token);
+}
+
+export async function marcarEnCamino(token: string, id: number): Promise<void> {
+  await authSend('PUT', `/api/domiciliario/pedidos/${id}/en-camino`, token);
+}
+
+/** Confirmar la entrega con el código que da el cliente. */
+export async function confirmarEntrega(token: string, id: number, codigo: string): Promise<void> {
+  await authSend('PUT', `/api/domiciliario/pedidos/${id}/entregado`, token, { codigo });
 }
 
 // ---------- Cliente: pedidos (carrito → confirmar → seguimiento) ----------
@@ -1246,7 +1298,7 @@ export type MiPedido = {
   total: number;
   negocio: string | null;
   fecha: string;
-  cancelado_por?: 'cliente' | 'negocio' | null;
+  cancelado_por?: CanceladoPor | null;
   /** Entregado y aún sin calificar (dentro del plazo). */
   por_calificar?: boolean;
 };
@@ -1316,7 +1368,9 @@ export type SeguimientoPedido = {
   domiciliario: string | null;
   /** Solo mientras el domiciliario lleva el pedido. */
   domiciliario_telefono?: string | null;
-  cancelado_por?: 'cliente' | 'negocio' | null;
+  /** Se lo doy al domiciliario al recibir el pedido (solo mientras me lo llevan). */
+  codigo_entrega?: string | null;
+  cancelado_por?: CanceladoPor | null;
   motivo_cancelacion?: string | null;
   /** El negocio aún no lo tiene listo: el cliente puede cancelarlo. */
   puede_cancelar?: boolean;

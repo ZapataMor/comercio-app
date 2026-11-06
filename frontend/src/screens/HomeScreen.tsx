@@ -1,16 +1,18 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Animated, Easing, ScrollView, Text, View } from 'react-native';
-import { ComercioPedido, getPedidosComercio } from '../api';
+import { ActivityIndicator, Animated, Easing, ScrollView, Text, View } from 'react-native';
+import { detenerAlarma } from '../alarmaPedidos';
+import { aceptarPedido, ComercioPedido, getPedidosComercio } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import BotonMantener from '../components/BotonMantener';
 import HeaderNegocios from '../components/HeaderNegocios';
 import HeaderPerfil from '../components/HeaderPerfil';
-import Icon from '../components/Icon';
+import Icon, { IconName } from '../components/Icon';
 import { NivelBadge } from '../components/Reputacion';
 import { IrAExplorar, Saludo } from '../components/SaludoInicio';
+import { messageFromError } from '../formErrors';
 import { useNegocio } from '../NegocioContext';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
@@ -149,10 +151,44 @@ function HeaderEstadoNegocio() {
   );
 }
 
+/** Pedido del Inicio: número, total, con quién hay que tratar y qué sigue. */
+function TarjetaPedido({
+  pedido,
+  icono,
+  nombre,
+  pie,
+  destacada,
+  onPress,
+}: {
+  pedido: ComercioPedido;
+  icono: IconName;
+  nombre: string;
+  pie: string;
+  destacada?: boolean;
+  onPress: () => void;
+}) {
+  const { c } = useTheme();
+  const styles = useStyles();
+  return (
+    <PressableScale style={[styles.pedidoCard, destacada && styles.pedidoCardDinero]} onPress={onPress}>
+      <View style={styles.pedidoHead}>
+        <Text style={styles.pedidoId}>Pedido #{pedido.id}</Text>
+        <Text style={styles.pedidoTotal}>{cop(pedido.total)}</Text>
+      </View>
+      <View style={[styles.pedidoCliente, styles.fila]}>
+        <Icon name={icono} size={14} color={c.text} />
+        <Text style={styles.pedidoCliente}>{nombre}</Text>
+      </View>
+      <Text style={styles.pedidoVer}>{pie}</Text>
+    </PressableScale>
+  );
+}
+
 export default function HomeScreen({ navigation }: Props) {
   const { c } = useTheme();
   const styles = useStyles();
   const { auth } = useAuth();
+  const toast = useToast();
   const user = auth!.user;
   const token = auth!.token;
   const esCliente = user.roles.includes('usuario');
@@ -165,6 +201,8 @@ export default function HomeScreen({ navigation }: Props) {
   // de "comerciante"; los negocios se crean desde Mis negocios).
   const tienePanel = negocios.length > 0;
   const [pedidos, setPedidos] = useState<ComercioPedido[]>([]);
+  // Pedido que se está aceptando: su botón muestra que va en curso.
+  const [aceptando, setAceptando] = useState<number | null>(null);
 
   // Topbar: con negocio, el switch Abierto/Cerrado y la lista de mis
   // negocios van junto a "Mi perfil". (Sin negocio no se muestran.)
@@ -206,7 +244,26 @@ export default function HomeScreen({ navigation }: Props) {
   );
   usePolling(cargarPedidos);
 
+  /** Al aceptarlo se calla la alarma y pasa a "En preparación". */
+  async function aceptar(pedido: ComercioPedido) {
+    if (!negocioId) return;
+    setAceptando(pedido.id);
+    try {
+      await aceptarPedido(token, negocioId, pedido.id);
+      await detenerAlarma(pedido.id);
+      toast.exito('Pedido aceptado', 'Ya le avisamos al cliente.');
+    } catch (e) {
+      toast.error('No se pudo aceptar', messageFromError(e));
+    } finally {
+      setAceptando(null);
+      cargarPedidos();
+    }
+  }
+
   const enEspera = pedidos.filter(p => p.estado === 'pendiente');
+  const enPreparacion = pedidos.filter(p => p.estado === 'aceptado');
+  // Ya tiene domiciliario: viene por él y el negocio le pide su código.
+  const porRecoger = pedidos.filter(p => p.estado === 'tomado');
   // Efectivo: falta decir si el domiciliario entregó el dinero.
   const porConfirmar = pedidos.filter(p => p.puede_confirmar_dinero);
 
@@ -327,10 +384,54 @@ export default function HomeScreen({ navigation }: Props) {
                           {p.direccion_entrega}
                         </Text>
                       </View>
-                      <Text style={styles.pedidoVer}>Ver y marcar listo ›</Text>
+                      <Text style={styles.pedidoVer}>Ver detalle ›</Text>
+                      <PressableScale
+                        style={styles.aceptarBtn}
+                        disabled={aceptando === p.id}
+                        onPress={() => aceptar(p)}>
+                        {aceptando === p.id ? (
+                          <ActivityIndicator color={c.onBrand} />
+                        ) : (
+                          <Text style={styles.aceptarTxt}>Aceptar pedido</Text>
+                        )}
+                      </PressableScale>
                     </PressableScale>
                   </FadeInView>
                 ))
+              )}
+
+              {enPreparacion.length > 0 && (
+                <>
+                  <Text style={styles.seccion}>En preparación ({enPreparacion.length})</Text>
+                  {enPreparacion.map((p, i) => (
+                    <FadeInView key={p.id} delay={i * 60}>
+                      <TarjetaPedido
+                        pedido={p}
+                        icono="usuario"
+                        nombre={p.cliente ?? 'Cliente'}
+                        pie="Ver y marcar listo ›"
+                        onPress={() => navigation.navigate('ComercioPedidoDetalle', { pedido: p })}
+                      />
+                    </FadeInView>
+                  ))}
+                </>
+              )}
+
+              {porRecoger.length > 0 && (
+                <>
+                  <Text style={styles.seccion}>Por entregar al domiciliario ({porRecoger.length})</Text>
+                  {porRecoger.map((p, i) => (
+                    <FadeInView key={p.id} delay={i * 60}>
+                      <TarjetaPedido
+                        pedido={p}
+                        icono="moto"
+                        nombre={p.domiciliario ?? 'Domiciliario'}
+                        pie="Pídele su código ›"
+                        onPress={() => navigation.navigate('ComercioPedidoDetalle', { pedido: p })}
+                      />
+                    </FadeInView>
+                  ))}
+                </>
               )}
 
               {porConfirmar.length > 0 && (
@@ -338,19 +439,14 @@ export default function HomeScreen({ navigation }: Props) {
                   <Text style={styles.seccion}>Dinero por confirmar ({porConfirmar.length})</Text>
                   {porConfirmar.map((p, i) => (
                     <FadeInView key={p.id} delay={i * 60}>
-                      <PressableScale
-                        style={[styles.pedidoCard, styles.pedidoCardDinero]}
-                        onPress={() => navigation.navigate('ComercioPedidoDetalle', { pedido: p })}>
-                        <View style={styles.pedidoHead}>
-                          <Text style={styles.pedidoId}>Pedido #{p.id}</Text>
-                          <Text style={styles.pedidoTotal}>{cop(p.total)}</Text>
-                        </View>
-                        <View style={[styles.pedidoCliente, styles.fila]}>
-                          <Icon name="moto" size={14} color={c.text} />
-                          <Text style={styles.pedidoCliente}>{p.domiciliario ?? 'Domiciliario'}</Text>
-                        </View>
-                        <Text style={styles.pedidoVer}>¿Te entregó el dinero? ›</Text>
-                      </PressableScale>
+                      <TarjetaPedido
+                        pedido={p}
+                        icono="moto"
+                        nombre={p.domiciliario ?? 'Domiciliario'}
+                        pie="¿Te entregó el dinero? ›"
+                        destacada
+                        onPress={() => navigation.navigate('ComercioPedidoDetalle', { pedido: p })}
+                      />
                     </FadeInView>
                   ))}
                 </>
@@ -417,5 +513,7 @@ const useStyles = makeStyles((c, shadow) => ({
   pedidoItems: { color: c.muted, fontSize: 13, marginTop: 2, fontFamily: font.regular },
   pedidoVer: { color: c.goldText, fontFamily: font.bold, fontSize: 13, marginTop: 8 },
   pedidoCardDinero: { borderLeftColor: c.success },
+  aceptarBtn: { backgroundColor: c.brand, borderRadius: radius.md, paddingVertical: 12, alignItems: 'center', marginTop: 10 },
+  aceptarTxt: { color: c.onBrand, fontFamily: font.bold, fontSize: 15 },
   itemBadge: { marginTop: 6 },
 }));

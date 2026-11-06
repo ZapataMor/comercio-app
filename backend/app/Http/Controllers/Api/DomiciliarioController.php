@@ -5,15 +5,19 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Pedido;
 use App\Notifications\EstadoPedidoActualizado;
+use App\Support\OfrecerPedido;
 use App\Support\Push;
 use App\Support\Reputacion;
 use App\Support\UbicacionDomiciliario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 /**
  * API del DOMICILIARIO: ver pedidos listos, tomarlos y avanzar su estado.
- * Flujo: listo -> tomado -> recogido -> en_camino -> entregado.
+ * Flujo: listo -> tomado -> (el negocio confirma con el código de recogida)
+ * -> recogido -> en_camino -> (el cliente da el código de entrega) -> entregado.
+ * Antes de recogerlo puede soltarlo; después no hay vuelta atrás.
  *
  * Un domiciliario VETADO por baja confiabilidad no ve ni toma pedidos nuevos,
  * pero sí puede terminar las entregas que ya llevaba.
@@ -167,6 +171,8 @@ class DomiciliarioController extends Controller
                 'domiciliario_id' => $request->user()->id,
                 'minutos_recogida' => $datos['minutos_recogida'],
                 'tomado_at' => now(),
+                // Se lo dicta al negocio para que le entregue el pedido.
+                'codigo_recogida' => Pedido::generarCodigo(),
             ]);
 
         if (! $afectados) {
@@ -182,18 +188,45 @@ class DomiciliarioController extends Controller
         return response()->json(['message' => 'Pedido tomado. Pasa a recogerlo.']);
     }
 
-    public function recogido(Request $request, int $id): JsonResponse
+    /**
+     * Devolver un pedido tomado antes de recogerlo: vuelve a estar disponible
+     * para los demás. Una vez recogido no hay vuelta atrás.
+     */
+    public function soltar(Request $request, int $id): JsonResponse
     {
-        $pedido = $this->pedidoMio($request, $id, 'tomado');
-        $respuesta = $this->avanzar($pedido, 'recogido', 'Pedido recogido.');
+        $yo = $request->user();
 
-        // ¿Recogió en los minutos que prometió al tomarlo? (con margen; si
-        // reportó una novedad, la demora queda anotada pero no resta).
-        if ($pedido && Reputacion::excedeTiempo($pedido->tomado_at, $pedido->recogido_at, $pedido->minutos_recogida)) {
-            Reputacion::registrar(Reputacion::DOMICILIARIO, $request->user(), 'recogida_tarde', $pedido);
+        // Update condicional: si el negocio confirma la recogida a la vez, gana uno.
+        $afectados = Pedido::where('id', $id)
+            ->where('domiciliario_id', $yo->id)
+            ->where('estado', 'tomado')
+            ->update([
+                'estado' => 'listo',
+                'domiciliario_id' => null,
+                'minutos_recogida' => null,
+                'tomado_at' => null,
+                'codigo_recogida' => null,
+            ]);
+
+        if (! $afectados) {
+            return response()->json(['message' => 'Ya no puedes soltar este pedido: solo se puede antes de recogerlo.'], 409);
         }
 
-        return $respuesta;
+        $pedido = Pedido::find($id);
+        OfrecerPedido::aDomiciliarios($pedido, excepto: $yo->id);
+
+        if ($pedido->cliente) {
+            Push::enviar($pedido->cliente, new EstadoPedidoActualizado($pedido, [
+                'Cambio de domiciliario 🛵',
+                'Estamos buscando otro domiciliario para tu pedido.',
+            ]));
+        }
+
+        if (! UbicacionDomiciliario::debeCompartir($yo)) {
+            UbicacionDomiciliario::borrar($yo);
+        }
+
+        return response()->json(['message' => 'Soltaste el pedido. Ya está disponible para otros domiciliarios.']);
     }
 
     public function enCamino(Request $request, int $id): JsonResponse
@@ -201,9 +234,21 @@ class DomiciliarioController extends Controller
         return $this->avanzar($this->pedidoMio($request, $id, 'recogido'), 'en_camino', 'Pedido en camino.');
     }
 
+    /** Confirma la entrega con el código que le da el cliente (queda la hora exacta). */
     public function entregado(Request $request, int $id): JsonResponse
     {
-        return $this->avanzar($this->pedidoMio($request, $id, 'en_camino'), 'entregado', '¡Entrega completada!');
+        $datos = $request->validate(
+            ['codigo' => ['required', 'digits:4']],
+            ['codigo.required' => 'Pídele el código al cliente.', 'codigo.digits' => 'El código tiene 4 dígitos.'],
+        );
+
+        $pedido = $this->pedidoMio($request, $id, 'en_camino');
+
+        if ($pedido && ! hash_equals((string) $pedido->codigo_entrega, $datos['codigo'])) {
+            throw ValidationException::withMessages(['codigo' => ['Ese no es el código del cliente. Pídeselo de nuevo.']]);
+        }
+
+        return $this->avanzar($pedido, 'entregado', '¡Entrega completada!');
     }
 
     /**
@@ -247,10 +292,10 @@ class DomiciliarioController extends Controller
             return response()->json(['message' => 'No se puede actualizar ese pedido.'], 409);
         }
 
-        // Marca de tiempo del estado (recogido_at, en_camino_at, entregado_at).
+        // Marca de tiempo del estado (en_camino_at, entregado_at).
         $pedido->update(['estado' => $hacia, "{$hacia}_at" => now()]);
 
-        // Avisa al cliente del nuevo estado (recogido / en camino / entregado).
+        // Avisa al cliente del nuevo estado (en camino / entregado).
         if ($pedido->cliente) {
             Push::enviar($pedido->cliente, new EstadoPedidoActualizado($pedido));
         }
@@ -272,6 +317,8 @@ class DomiciliarioController extends Controller
             // Lo que el domiciliario le cobra al cliente al entregar.
             'cobrar' => $p->metodo_pago === 'efectivo' ? (float) $p->total : 0.0,
             'minutos_recogida' => $p->minutos_recogida,
+            // Se lo dicta al negocio al llegar por el pedido.
+            'codigo_recogida' => $p->estado === 'tomado' ? $p->codigo_recogida : null,
             'fecha_entrega' => $p->entregado_at?->format('d/m/Y H:i'),
             'direccion_entrega' => $p->direccion_entrega,
             // El teléfono del cliente solo lo ve quien lleva el pedido.

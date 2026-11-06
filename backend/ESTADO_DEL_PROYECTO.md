@@ -1,7 +1,7 @@
 # 📦 Estado del proyecto — comercio-api
 
 > Documento vivo de seguimiento. Refleja **qué hay hecho** y **qué falta** en la app.
-> Última actualización: **2026-10-28** (P1 y P2 de la revisión general)
+> Última actualización: **2026-11-05** (el negocio acepta los pedidos, alarma, vencimiento y códigos de recogida y entrega)
 
 ---
 
@@ -181,6 +181,24 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 - [x] **Paginación**: Mis pedidos (20, scroll infinito), historial del domiciliario (20, "Ver más"), usuarios y negocios del admin (30, con buscador)
 - [x] Tests: `P2OperacionTest` (horario, suspensión, paginación), turno en `NotificacionesTest`, `CartPersistencia.test.tsx` (Jest) → **145 Pest + 6 Jest en verde**
 
+### Aceptación de pedidos, alarma y códigos — 2026-11-05
+> Flujo: `pendiente → aceptado → listo → tomado → recogido → en_camino → entregado`. Migración `add_aceptacion_y_codigos_to_pedidos_table`: `aceptado_at`, `codigo_recogida`, `codigo_entrega`.
+- [x] **El negocio acepta cada pedido** (`PUT /api/negocios/{n}/pedidos/{id}/aceptar`, update condicional): estado `aceptado` ("En preparación"). Solo un pedido aceptado se puede marcar listo, y el tiempo de preparación se cuenta desde que se acepta.
+- [x] **Vencimiento**: el comando `pedidos:vencer` (cada 30 s) cancela los pedidos sin aceptar a los 5 min (`reputacion.minutos_para_aceptar`) con `cancelado_por = sistema`; el cliente recibe "Tu pedido no fue recibido" y el equipo del negocio también se entera.
+- [x] **Alarma** (`frontend/src/alarmaPedidos.ts`, `res/raw/alarma_pedido.wav`): notificación de Notifee con `loopSound` y un sonido de exactamente 10 s, así suena cada 10 s hasta que alguien acepta o rechaza, o vence (`timeoutAfter`), también con la app cerrada. `NuevoPedidoParaComercio` pasó a ser un mensaje de datos para que la arme la app; `PedidoYaAtendido` (silencioso) la calla en los demás teléfonos del equipo. Con la app abierta, `GET /api/negocios/mios/por-aceptar` la mantiene al día sin depender del push.
+- [x] **Cancelar después de aceptar**: libre durante 5 min (`reputacion.minutos_cancelacion_libre`); pasados, baja 8 puntos (`cancelo_tras_aceptar`). La app lo advierte antes. Un pedido listo que nadie toma se cancela sin consecuencias. El cliente puede cancelar hasta que el negocio lo marque listo.
+- [x] **Soltar pedido** (`PUT /api/domiciliario/pedidos/{id}/soltar`): solo en `tomado`. Vuelve a `listo` y se les ofrece a los demás domiciliarios (`App\Support\OfrecerPedido`). Después de recogerlo no hay vuelta atrás.
+- [x] **Código de recogida**: nace al tomar el pedido; lo ve solo el domiciliario y el negocio lo escribe (`PUT /api/negocios/{n}/pedidos/{id}/recogido`). Se eliminó el "Marcar recogido" del domiciliario.
+- [x] **Código de entrega**: nace al crear el pedido; lo ve solo el cliente mientras se lo llevan (y le llega en el aviso de "en camino"), y el domiciliario lo escribe para confirmar (`PUT /api/domiciliario/pedidos/{id}/entregado`). Queda la hora exacta en `entregado_at`.
+- [x] Límite de intentos `throttle:codigo-pedido`: 6 por minuto, por persona y pedido.
+- [x] App: botón "Aceptar pedido" y secciones "En preparación" y "Por entregar al domiciliario" en el Inicio; `CodigoPedido.tsx` (ver y pedir el código).
+- [x] Comportamientos de Android que condicionan la alarma (salieron probando en el emulador): publicar dos veces la misma notificación la deja muda ("recently noisy"), por eso cada pedido se publica una sola vez; solo suena una notificación a la vez, por eso al callar una se hace sonar otra de las que esperan; y bajar la cortina calla el sonido sin avisarle a la app, por eso se reanuda al volver a la app.
+- [x] Tests: `FlujoPedidoTest` (Pest) y `AlarmaPedidos.test.ts` (Jest) → **215 Pest + 56 Jest**. Verificado en el emulador con pushes reales: app abierta, en segundo plano y cerrada; dos pedidos a la vez; vencimiento por el programador; códigos; soltar; penalización.
+- [ ] **Consecuencia para el negocio cuando un pedido vence sin respuesta**: se definirá junto con la reputación de negocios (hoy no le baja puntos)
+- [ ] Alarma en iOS: el mensaje de datos no muestra nada allá (iOS va después de Android)
+- [ ] Probar la alarma en teléfonos reales: suena con el volumen de notificaciones, así que en silencio no se oye, y algunas marcas (Xiaomi, Oppo...) bloquean las apps cerradas si no se les permite el inicio automático
+- [ ] Qué hacer si el cliente no aparece o no da el código (hoy el pedido se queda `en_camino`)
+
 ### General
 - [x] `GET /api/dashboard` — panel adaptativo que responde distinto según el rol
 
@@ -288,6 +306,7 @@ C:\dev\comercio-app\           ← repo git (GitHub: ZapataMor/comercio-app)
 ---
 
 ## 📜 Historial de cambios
+- **2026-11-05** — **El negocio acepta los pedidos**. Estado `aceptado`, vencimiento a los 5 minutos (`pedidos:vencer`), alarma cada 10 segundos hasta aceptar, cancelar sin consecuencias 5 minutos después de aceptar (luego −8 de confiabilidad), soltar pedido antes de recogerlo, y códigos de 4 dígitos para confirmar la recogida (domiciliario → negocio) y la entrega (cliente → domiciliario). Pendiente por decisión del usuario: la consecuencia para el negocio que deja vencer un pedido.
 - **2026-10-28** — **P2 de la revisión general (operación del piloto)**. Carrito persistente por cuenta; turno del domiciliario (solo en turno reciben el push de pedido listo); suspender/reactivar cuentas desde el admin; horario semanal de los negocios con apertura/cierre automático (`negocios:aplicar-horario` cada minuto) que respeta los cambios manuales; refresco con `usePolling` (15 s, solo en primer plano, inmediato con push); paginación en Mis pedidos, historial del domiciliario y listas del admin (con buscador). Tests: `P2OperacionTest` → **145 en verde**.
 - **2026-10-28** — **P1 de la revisión general (listo para piloto)**. Decisiones del usuario: se elimina el rol global `comerciante` y la web Blade que no es del admin (un solo frontend); iOS va después de Android. Pedidos: estado `cancelado` (el cliente cancela mientras está pendiente; el negocio rechaza pendientes o cancela listos sin domiciliario, con motivo y push `PedidoCancelado`), **costo de domicilio** configurable por el admin (`ajustes`), historial del negocio por pestañas + ventas de hoy (`PedidosNegocioScreen`), botones Llamar/WhatsApp entre las tres partes (ADR-003). Cuentas: recuperar contraseña con código por correo, autorización de datos al registrarse, eliminar cuenta (app + `/eliminar-cuenta`) con anonimización, política de privacidad pública, bloqueo de cuentas suspendidas. Producción: push en cola, `API_URL` por build, firma release con `keystore.properties`, zona horaria de Colombia, límites de intentos con nombre (antes se compartían entre rutas), guía `DESPLIEGUE.md`. Seeders sin `WithoutModelEvents` (los usuarios demo no tenían código público ni los dueños su membresía). Tests: `CuentaTest`, `PedidosCicloTest` → **135 en verde**.
 - **2026-10-28** — **Nivel de confiabilidad de negocios y domiciliarios** (ver sección 6). Puntaje 0–100 desde un historial de eventos: tiempos medidos por la app (preparación del negocio, recogida del domiciliario), calificación del cliente al terminar cada pedido, confirmación del dinero en efectivo por el negocio y novedades que justifican demoras. Veto automático (< 30 o 2 faltas graves en 30 días), suspensión manual, anulación de eventos y segunda oportunidad desde el admin. App: calificación, badges de nivel, tiempo de preparación, dinero por confirmar, novedades y pantalla de admin "Confiabilidad". 24 tests Pest nuevos.

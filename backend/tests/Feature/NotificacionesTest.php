@@ -126,7 +126,6 @@ test('las notificaciones fcm usan canal android de alta prioridad', function () 
     $pedido = pedidoEnEstado($negocio, $cliente, 'en_camino');
 
     $mensajes = [
-        (new NuevoPedidoParaComercio($pedido))->toFcm($negocio->user)->toArray(),
         (new PedidoDisponibleParaDomiciliario($pedido))->toFcm(usuarioCon('domiciliario'))->toArray(),
         (new EstadoPedidoActualizado($pedido))->toFcm($cliente)->toArray(),
     ];
@@ -174,7 +173,7 @@ test('marcar un pedido listo notifica a los domiciliarios en turno y al cliente'
     $enTurno = usuarioCon('domiciliario');
     $enTurno->forceFill(['en_turno' => true])->save();
     $fueraDeTurno = usuarioCon('domiciliario');
-    $pedido = pedidoEnEstado($negocio, $cliente, 'pendiente');
+    $pedido = pedidoEnEstado($negocio, $cliente, 'aceptado');
 
     Sanctum::actingAs($negocio->user);
     $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}/listo")
@@ -219,9 +218,10 @@ test('avanzar el pedido a entregado notifica al cliente', function () {
     $domiciliario = usuarioCon('domiciliario');
     // Pedido ya en camino, tomado por este domiciliario.
     $pedido = pedidoEnEstado($negocio, $cliente, 'en_camino', $domiciliario);
+    $pedido->update(['codigo_entrega' => '4821']);
 
     Sanctum::actingAs($domiciliario);
-    $this->putJson("/api/domiciliario/pedidos/{$pedido->id}/entregado")->assertOk();
+    $this->putJson("/api/domiciliario/pedidos/{$pedido->id}/entregado", ['codigo' => '4821'])->assertOk();
 
     Notification::assertSentTo($cliente, EstadoPedidoActualizado::class,
         fn (EstadoPedidoActualizado $n) => $n->pedido->estado === 'entregado');

@@ -221,13 +221,14 @@ test('quien no es del equipo no ve el historial ni el resumen', function () {
 // Ciclo completo
 // ---------------------------------------------------------------------------
 
-test('ciclo completo: pedir, listo, tomar, recoger, en camino y entregar', function () {
+test('ciclo completo: pedir, aceptar, listo, tomar, recoger con código, en camino y entregar con código', function () {
     [$dueno, $negocio, $producto] = negocioConProducto();
     $cliente = conRol('usuario');
     $domi = conRol('domiciliario');
     $id = pedirComo($cliente, $negocio, $producto)->json('id');
 
     Sanctum::actingAs($dueno);
+    $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$id}/aceptar")->assertOk();
     $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$id}/listo")->assertOk();
 
     Sanctum::actingAs($domi);
@@ -235,9 +236,17 @@ test('ciclo completo: pedir, listo, tomar, recoger, en camino y entregar', funct
         ->assertJsonPath('pedidos.0.negocio.telefono', '3015556677')
         ->assertJsonPath('pedidos.0.costo_domicilio', 4000);
     $this->putJson("/api/domiciliario/pedidos/{$id}/tomar", ['minutos_recogida' => 10])->assertOk();
-    $this->putJson("/api/domiciliario/pedidos/{$id}/recogido")->assertOk();
+    $codigoRecogida = $this->getJson('/api/domiciliario/entregas')->json('pedidos.0.codigo_recogida');
+
+    Sanctum::actingAs($dueno);
+    $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$id}/recogido", ['codigo' => $codigoRecogida])->assertOk();
+
+    Sanctum::actingAs($cliente);
+    $codigoEntrega = $this->getJson("/api/pedidos/{$id}")->json('codigo_entrega');
+
+    Sanctum::actingAs($domi);
     $this->putJson("/api/domiciliario/pedidos/{$id}/en-camino")->assertOk();
-    $this->putJson("/api/domiciliario/pedidos/{$id}/entregado")->assertOk();
+    $this->putJson("/api/domiciliario/pedidos/{$id}/entregado", ['codigo' => $codigoEntrega])->assertOk();
 
     // Queda en "Pedidos entregados" del domiciliario, con fecha y cliente.
     $historial = $this->getJson('/api/domiciliario/historial')

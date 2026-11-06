@@ -121,7 +121,7 @@ test('el domiciliario no ve, no toma ni recibe el aviso de su propio pedido', fu
     $this->putJson("/api/domiciliario/pedidos/{$pedido->id}/tomar", ['minutos_recogida' => 5])->assertStatus(409);
 
     // Al marcarlo listo, el aviso le llega a los demás, no a él.
-    $pedido->update(['estado' => 'pendiente']);
+    $pedido->update(['estado' => 'aceptado']);
     Sanctum::actingAs($pedido->negocio->user);
     $this->putJson("/api/negocios/{$pedido->negocio_id}/pedidos/{$pedido->id}/listo")->assertOk();
 

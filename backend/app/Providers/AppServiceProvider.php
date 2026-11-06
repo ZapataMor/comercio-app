@@ -53,6 +53,12 @@ class AppServiceProvider extends ServiceProvider
         // Eliminar la cuenta desde la web pública.
         RateLimiter::for('eliminar-cuenta', fn (Request $r) => Limit::perMinute(5)->by('eliminar|'.$correo($r).'|'.$r->ip()));
 
+        // Códigos de recogida y entrega: 4 dígitos, así que se limitan los
+        // intentos por persona y pedido para que no se puedan adivinar.
+        RateLimiter::for('codigo-pedido', fn (Request $r) => Limit::perMinute(6)
+            ->by('codigo-pedido|'.$r->user()?->id.'|'.$r->route('id'))
+            ->response(fn () => response()->json(['message' => 'Demasiados intentos. Espera un minuto e inténtalo de nuevo.'], 429)));
+
         // Lecturas públicas sin sesión (lista de barrios).
         RateLimiter::for('publico', fn (Request $r) => Limit::perMinute(60)->by('publico|'.$r->ip()));
 

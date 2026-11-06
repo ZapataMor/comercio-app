@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\Pedido;
 use App\Notifications\Concerns\UsaCanalPedidosFcm;
+use App\Support\CancelarPedido;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -14,7 +15,8 @@ use NotificationChannels\Fcm\Resources\Notification as FcmNotification;
 /**
  * Avisa que un pedido se canceló:
  *  - al CLIENTE, si lo rechazó/canceló el negocio (abre el seguimiento);
- *  - al EQUIPO del negocio, si lo canceló el cliente (abre el pedido).
+ *  - al EQUIPO del negocio, si lo canceló el cliente (abre el pedido);
+ *  - a los dos, si venció porque nadie del negocio respondió a tiempo.
  */
 class PedidoCancelado extends Notification implements ShouldQueue
 {
@@ -35,9 +37,15 @@ class PedidoCancelado extends Notification implements ShouldQueue
         $paraCliente = $notifiable->getKey() === $this->pedido->user_id;
         $motivo = $this->pedido->motivo_cancelacion;
 
-        [$titulo, $cuerpo] = $paraCliente
-            ? ['Tu pedido fue cancelado', ($this->pedido->negocio?->nombre ?? 'El negocio').' no pudo atenderlo'.($motivo ? ": {$motivo}" : '.')]
-            : ["Pedido #{$this->pedido->id} cancelado", 'El cliente canceló el pedido'.($motivo ? ": {$motivo}" : '.')];
+        $negocio = $this->pedido->negocio?->nombre ?? 'El negocio';
+        $vencido = $this->pedido->cancelado_por === CancelarPedido::POR_SISTEMA;
+
+        [$titulo, $cuerpo] = match (true) {
+            $vencido && $paraCliente => ['Tu pedido no fue recibido', "{$negocio} no recibió tu pedido. No se te cobra nada."],
+            $vencido => ["Pedido #{$this->pedido->id} vencido", 'Nadie lo aceptó a tiempo y se le avisó al cliente.'],
+            $paraCliente => ['Tu pedido fue cancelado', "{$negocio} no pudo atenderlo".($motivo ? ": {$motivo}" : '.')],
+            default => ["Pedido #{$this->pedido->id} cancelado", 'El cliente canceló el pedido'.($motivo ? ": {$motivo}" : '.')],
+        };
 
         return (new FcmMessage(
             notification: new FcmNotification(title: $titulo, body: $cuerpo),

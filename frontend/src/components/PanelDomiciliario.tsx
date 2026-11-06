@@ -7,12 +7,14 @@ import {
   View,
 } from 'react-native';
 import {
-  avanzarPedido,
+  confirmarEntrega,
   getDisponibles,
   getMiReputacion,
   getMisEntregas,
+  marcarEnCamino,
   Pedido,
   reportarNovedad,
+  soltarPedido,
   tomarPedido,
 } from '../api';
 import { useAuth } from '../AuthContext';
@@ -23,6 +25,8 @@ import { useCompartirUbicacion } from '../ubicacion';
 import { usePolling } from '../usePolling';
 import { FadeInView, PressableScale } from './anim';
 import BotonesContacto from './BotonesContacto';
+import { PedirCodigo, VerCodigo } from './CodigoPedido';
+import { useConfirmar } from './Confirmacion';
 import { publicarMiReputacion } from './HeaderConfiabilidad';
 import { publicarTurno, useTurno } from './HeaderTurno';
 import Icon, { IconName } from './Icon';
@@ -54,6 +58,7 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
   const { auth } = useAuth();
   const token = auth!.token;
   const toast = useToast();
+  const confirmar = useConfirmar();
   const [disponibles, setDisponibles] = useState<Pedido[]>([]);
   const [entregas, setEntregas] = useState<Pedido[]>([]);
   // Vetado = no puedo tomar pedidos nuevos (baja confiabilidad).
@@ -152,19 +157,45 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
     toast.exito('Pedido tomado', `Pasa a recogerlo en ${minutos} min.`);
   }
 
-  async function onAvanzar(id: number, accion: string) {
+  async function onEnCamino(id: number) {
     setAvanzando(id);
     try {
-      await avanzarPedido(token, id, accion);
+      await marcarEnCamino(token, id);
       await actualizarAnimado();
-      if (accion === 'entregado') {
-        toast.exito('¡Entrega completada!', 'La encuentras en Pedidos entregados.');
-      }
     } catch (e) {
       toast.error('No se pudo actualizar', e instanceof Error ? e.message : 'Error');
     } finally {
       setAvanzando(null);
     }
+  }
+
+  /** Si el código no es correcto, el error lo muestra el mismo campo. */
+  async function onEntregar(id: number, codigo: string) {
+    await confirmarEntrega(token, id, codigo);
+    await actualizarAnimado();
+    toast.exito('¡Entrega completada!', 'La encuentras en Pedidos entregados.');
+  }
+
+  /** Solo se puede antes de recogerlo: por eso se confirma. */
+  function onSoltar(pedido: Pedido) {
+    confirmar({
+      icono: 'moto',
+      titulo: '¿Soltar este pedido?',
+      texto: 'Volverá a estar disponible para otros domiciliarios.',
+      textoBoton: 'Soltar pedido',
+      textoCancelar: 'Seguir con él',
+      peligro: true,
+      accion: async () => {
+        try {
+          await soltarPedido(token, pedido.id);
+          await actualizarAnimado();
+          toast.info('Soltaste el pedido', 'Ya está disponible para otros domiciliarios.');
+        } catch (e) {
+          toast.error('No se pudo soltar', e instanceof Error ? e.message : 'Error');
+          cargar();
+        }
+      },
+    });
   }
 
   if (cargando) {
@@ -247,29 +278,33 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
                     />
                   )}
                   <Novedad pedido={p} onReportada={() => cargar()} />
-                  {p.estado === 'tomado' && (
-                    <Boton
-                      icon="caja"
-                      texto="Marcar recogido"
-                      cargando={avanzando === p.id}
-                      onPress={() => onAvanzar(p.id, 'recogido')}
+                  {/* El negocio confirma la recogida escribiendo este código. */}
+                  {p.estado === 'tomado' && !!p.codigo_recogida && (
+                    <VerCodigo
+                      titulo="Código de recogida"
+                      codigo={p.codigo_recogida}
+                      ayuda="Dáselo al negocio para que te entregue el pedido."
                     />
+                  )}
+                  {p.estado === 'tomado' && (
+                    <PressableScale style={styles.soltar} onPress={() => onSoltar(p)}>
+                      <Text style={styles.soltarTxt}>Soltar pedido</Text>
+                    </PressableScale>
                   )}
                   {p.estado === 'recogido' && (
                     <Boton
                       icon="moto"
                       texto="Salir / En camino"
                       cargando={avanzando === p.id}
-                      onPress={() => onAvanzar(p.id, 'en-camino')}
+                      onPress={() => onEnCamino(p.id)}
                     />
                   )}
                   {p.estado === 'en_camino' && (
-                    <Boton
-                      icon="check"
-                      texto="Marcar entregado"
-                      color={c.success}
-                      cargando={avanzando === p.id}
-                      onPress={() => onAvanzar(p.id, 'entregado')}
+                    <PedirCodigo
+                      titulo="Código de entrega"
+                      ayuda="Pídeselo al cliente cuando le entregues el pedido."
+                      textoBoton="Confirmar entrega"
+                      onConfirmar={codigo => onEntregar(p.id, codigo)}
                     />
                   )}
                 </View>
@@ -478,6 +513,8 @@ const useStyles = makeStyles((c, shadow) => ({
   minLabel: { fontSize: 11, color: c.muted, marginBottom: 4, fontFamily: font.regular },
   tomarBtn: { backgroundColor: c.accent, borderRadius: radius.sm, paddingVertical: 13, marginTop: 12, ...shadow.gold },
   tomarTxt: { color: c.onAccent, fontFamily: font.bold },
+  soltar: { alignItems: 'center', paddingVertical: 10, marginTop: 4 },
+  soltarTxt: { color: c.danger, fontFamily: font.semibold, fontSize: 14 },
   btn: { borderRadius: radius.sm, paddingVertical: 13, alignItems: 'center', marginTop: 12 },
   btnFila: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
   fila: { flexDirection: 'row', alignItems: 'center', gap: 6 },

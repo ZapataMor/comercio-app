@@ -2,7 +2,7 @@
 title: Estado Actual
 tags: [inicio, estado, producto]
 estado: en-progreso
-actualizado: 2026-10-28
+actualizado: 2026-11-05
 ---
 
 # 📊 Estado Actual
@@ -148,14 +148,18 @@ pantalla de categorías: se asignan desde el formulario de producto (la pantalla
 `MisCategoriasScreen` se eliminó en el commit `64aac35`).
 
 ### 3.5 Pedidos recibidos ✅
-- El **Inicio** del comerciante lista los **pedidos en espera** y los refresca cada pocos
-  segundos; cada uno abre `ComercioPedidoDetalle` (cliente, dirección, teléfono, pago, ítems)
-  con el botón **"Marcar listo"**.
-- Marcar listo (`pendiente → listo`) avisa por push a los domiciliarios **en turno** y al
-  cliente; la respuesta dice cuántos domiciliarios había en turno.
-- Solo pedidos del propio negocio y solo si están pendientes (409 si no).
-- **Rechazar / cancelar** ✅ con motivo (chips sugeridos): pendiente = rechazar; listo sin
-  domiciliario = cancelar ("nadie lo tomó"). Push `PedidoCancelado` al cliente.
+- El **Inicio** del comerciante lista los **pedidos en espera** con su botón **"Aceptar pedido"**,
+  y las secciones **En preparación** y **Por entregar al domiciliario**; cada pedido abre
+  `ComercioPedidoDetalle` (cliente, dirección, teléfono, pago, ítems).
+- **Alarma** ✅ (2026-11-05): suena cada 10 segundos desde que llega el pedido hasta que alguien lo
+  acepta, también con la app cerrada. Si nadie lo acepta en 5 minutos se cancela solo.
+- Aceptar (`pendiente → aceptado`) avisa al cliente. Marcar listo (`aceptado → listo`) avisa por
+  push a los domiciliarios **en turno** y al cliente.
+- **Entregar al domiciliario** ✅: el negocio escribe el código que él le dicta (`tomado → recogido`).
+- Solo pedidos del propio negocio y solo desde el estado que corresponde (409 si no).
+- **Rechazar / cancelar** ✅ con motivo (chips sugeridos): pendiente = rechazar; aceptado = cancelar
+  (libre 5 minutos, después baja la confiabilidad); listo sin domiciliario = cancelar sin
+  consecuencias. Push `PedidoCancelado` al cliente.
 - **Pedidos y ventas** ✅ (`PedidosNegocioScreen`): pestañas En espera / En curso / Entregados /
   Cancelados (20 por página) y resumen de **hoy** (pedidos, entregados, cancelados y lo vendido =
   subtotal entregado, sin domicilios).
@@ -234,8 +238,11 @@ agrupa **por categoría** y muestra el botón **"Pedir"** en cada producto.
 `GET /api/pedidos` (mis pedidos) y `GET /api/pedidos/{id}` (detalle con `estados`,
 `estado_index`, ítems, domiciliario, minutos de recogida). `PedidoDetalleScreen` pinta la
 **línea de tiempo** de estados y se refresca al llegar un push y cada 15 s. Ver [[Lógica de Negocio]].
-- **Cancelar mi pedido** ✅ mientras esté pendiente (con motivo opcional; avisa al negocio). Si
-  se cancela (cualquiera de los dos), se ve "Pedido cancelado" con quién y por qué.
+- **Cancelar mi pedido** ✅ hasta que el negocio lo tenga listo (con motivo opcional; avisa al
+  negocio). Si se cancela, se ve "Pedido cancelado" con quién y por qué. Si el negocio no responde
+  en 5 minutos, se le avisa al cliente que no recibieron su pedido.
+- **Código de entrega** ✅: mientras se lo llevan lo ve en el seguimiento (y le llega en el aviso de
+  "en camino"); se lo da al domiciliario para confirmar la entrega.
 - **Contacto** ✅: Llamar / WhatsApp al negocio, y al domiciliario mientras lo lleva.
 - Mis pedidos: 20 por página con scroll infinito.
 
@@ -253,7 +260,9 @@ agrupa **por categoría** y muestra el botón **"Pedir"** en cada producto.
   `GET /historial` (entregados).
 - **Tomar** un pedido indicando **minutos de recogida** (`listo → tomado`; update condicional
   anti-choque: si dos lo toman a la vez, solo uno gana).
-- Avanzar: `recogido → en_camino → entregado`. Cada cambio avisa por push al cliente.
+- **Soltar** ✅ un pedido tomado antes de recogerlo: vuelve a los disponibles. Después no hay vuelta atrás.
+- **Código de recogida** ✅: se lo dicta al negocio, que confirma `tomado → recogido`. Luego marca
+  `en_camino` y confirma `entregado` con el **código del cliente**. Cada cambio avisa por push al cliente.
 - `DomiciliarioScreen` con las tres listas y pull-to-refresh; historial de 20 en 20 ("Ver más").
 - **Turno** ✅: switch En turno / Fuera de turno; solo en turno llegan los avisos de pedidos listos.
 - Ve **cuánto cobrar** (efectivo) y el domicilio; Llamar / WhatsApp al negocio antes de recoger
@@ -438,6 +447,11 @@ historial y ventas del negocio, llamar/WhatsApp ([[ADR-003 Botón llamar o Whats
 recuperar contraseña, eliminar cuenta + privacidad, push en cola, firma y URL de producción.
 P2: carrito persistente, turno del domiciliario, suspensión de cuentas, horario de los negocios,
 refresco eficiente, paginación.
+
+**Por decidir**
+- [ ] Qué consecuencia tiene para el negocio dejar vencer un pedido sin responder (se definirá con
+  su reputación).
+- [ ] Qué pasa si el cliente no aparece o no da el código de entrega.
 
 **Prioridad 1 — publicar el piloto (fuera del código)**
 - [ ] Elegir hosting y dominio; montar servidor, cola, cron, SMTP y HTTPS (`DESPLIEGUE.md`).

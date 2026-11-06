@@ -8,7 +8,14 @@ import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, Text, TouchableOpacity, View } from 'react-native';
-import { ComercioPedido, getPedidosNegocio, getResumenNegocio, GrupoPedidos, ResumenNegocio } from '../api';
+import {
+  ComercioPedido,
+  getPedidosNegocio,
+  getResumenNegocio,
+  GrupoPedidos,
+  ResumenNegocio,
+  textoCancelacion,
+} from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import Icon from '../components/Icon';
@@ -190,10 +197,7 @@ export default function PedidosNegocioScreen({ navigation }: Props) {
               </View>
             )}
             {p.estado === 'cancelado' && (
-              <Text style={styles.motivo}>
-                {p.cancelado_por === 'cliente' ? 'Lo canceló el cliente' : 'Lo cancelaron ustedes'}
-                {p.motivo_cancelacion ? `: ${p.motivo_cancelacion}` : ''}
-              </Text>
+              <Text style={styles.motivo}>{textoCancelacion(p)}</Text>
             )}
           </PressableScale>
         );

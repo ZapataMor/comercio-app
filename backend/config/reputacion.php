@@ -27,6 +27,14 @@ return [
     'graves_para_veto' => 2,
     'dias_graves' => 30,
 
+    // Minutos que tiene el negocio para aceptar un pedido: al pasar, se
+    // cancela solo y se le avisa al cliente (ver `pedidos:vencer`).
+    'minutos_para_aceptar' => 5,
+
+    // Minutos después de aceptar en los que el negocio puede cancelar sin
+    // consecuencias; pasados, cancelar le baja la confiabilidad.
+    'minutos_cancelacion_libre' => 5,
+
     // ¿Los negocios también se vetan solos? Si es false, solo bajan de nivel.
     'vetar_negocios' => true,
 

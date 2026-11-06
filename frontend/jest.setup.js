@@ -31,11 +31,16 @@ jest.mock('@notifee/react-native', () => ({
   default: {
     createChannel: jest.fn().mockResolvedValue('pedidos'),
     displayNotification: jest.fn().mockResolvedValue(undefined),
+    cancelNotification: jest.fn().mockResolvedValue(undefined),
+    getDisplayedNotifications: jest.fn().mockResolvedValue([]),
+    getInitialNotification: jest.fn().mockResolvedValue(null),
     requestPermission: jest.fn().mockResolvedValue({ authorizationStatus: 1 }),
     onForegroundEvent: jest.fn(() => jest.fn()),
     onBackgroundEvent: jest.fn(),
   },
+  AndroidCategory: { ALARM: 'alarm' },
   AndroidImportance: { HIGH: 4 },
+  AndroidVisibility: { PUBLIC: 1 },
   EventType: { PRESS: 1 },
 }));
 

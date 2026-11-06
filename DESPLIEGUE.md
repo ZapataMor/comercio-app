@@ -63,6 +63,7 @@ composer install --no-dev --optimize-autoloader
 php artisan migrate --force
 php artisan config:cache && php artisan route:cache && php artisan view:cache
 php artisan queue:restart
+php artisan schedule:interrupt
 ```
 
 ### Procesos que deben quedar corriendo
@@ -78,7 +79,7 @@ user=www-data
 stdout_logfile=/ruta/comercio-app/backend/storage/logs/cola.log
 ```
 
-**Tareas programadas** (horarios de los negocios y demás). En `crontab -e` del usuario web:
+**Tareas programadas** (horarios de los negocios y vencer los pedidos que nadie aceptó). En `crontab -e` del usuario web:
 
 ```
 * * * * * cd /ruta/comercio-app/backend && php artisan schedule:run >> /dev/null 2>&1

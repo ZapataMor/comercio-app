@@ -6,32 +6,57 @@ use App\Http\Controllers\Controller;
 use App\Models\Negocio;
 use App\Models\Pedido;
 use App\Models\ReputacionEvento;
-use App\Models\User;
 use App\Notifications\EstadoPedidoActualizado;
-use App\Notifications\PedidoDisponibleParaDomiciliario;
+use App\Notifications\PedidoYaAtendido;
 use App\Support\CancelarPedido;
+use App\Support\OfrecerPedido;
 use App\Support\Push;
 use App\Support\Reputacion;
 use App\Support\UbicacionDomiciliario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * API de pedidos del lado del NEGOCIO (app móvil): ver los pedidos que
- * recibe un negocio (por grupos, con resumen del día), marcarlos como "listos
- * para recoger" o rechazarlos. Puede hacerlo cualquier miembro activo
- * (propietario o trabajador).
+ * recibe un negocio (por grupos, con resumen del día), aceptarlos, marcarlos
+ * como "listos para recoger", entregárselos al domiciliario con su código o
+ * rechazarlos. Puede hacerlo cualquier miembro activo (propietario o trabajador).
  */
 class ComercioPedidoController extends Controller
 {
     /** Qué estados entran en cada pestaña del historial. */
     private const GRUPOS = [
         'en_espera' => ['pendiente'],
-        'en_curso' => ['listo', 'tomado', 'recogido', 'en_camino'],
+        'en_curso' => ['aceptado', 'listo', 'tomado', 'recogido', 'en_camino'],
         'entregados' => ['entregado'],
         'cancelados' => ['cancelado'],
     ];
+
+    /**
+     * Pedidos sin aceptar de todos mis negocios: la app hace sonar la alarma
+     * mientras haya alguno, sin importar qué negocio tenga abierto.
+     */
+    public function porAceptar(Request $request): JsonResponse
+    {
+        $negocios = $request->user()->negociosActivos()->pluck('negocios.id');
+
+        $pedidos = Pedido::whereIn('negocio_id', $negocios)
+            ->where('estado', 'pendiente')
+            ->with('negocio:id,nombre')
+            ->oldest()
+            ->get()
+            ->map(fn (Pedido $p) => [
+                'id' => $p->id,
+                'negocio_id' => $p->negocio_id,
+                'negocio' => $p->negocio?->nombre,
+                'total' => (float) $p->total,
+                'segundos' => $p->segundosParaAceptar(),
+            ]);
+
+        return response()->json(['pedidos' => $pedidos]);
+    }
 
     /**
      * Pedidos recibidos por el negocio.
@@ -164,12 +189,16 @@ class ComercioPedidoController extends Controller
             // Mapa: el negocio ve al domiciliario mientras viene a recoger.
             'domiciliario_ubicacion' => $p->estado === 'tomado' ? UbicacionDomiciliario::de($p->domiciliario) : null,
             'minutos_preparacion' => $p->minutos_preparacion,
+            // Sin aceptar: segundos que quedan antes de que venza.
+            'segundos_para_aceptar' => $p->estado === 'pendiente' ? $p->segundosParaAceptar() : null,
             'novedad' => $p->novedad,
             'dinero_estado' => $p->dinero_estado,
             'puede_confirmar_dinero' => $p->puedeConfirmarDinero(),
             'cancelado_por' => $p->cancelado_por,
             'motivo_cancelacion' => $p->motivo_cancelacion,
             'puede_cancelar' => CancelarPedido::puede($p, CancelarPedido::POR_NEGOCIO),
+            // Cancelarlo ahora le bajaría la confiabilidad al negocio.
+            'cancelar_penaliza' => CancelarPedido::penaliza($p),
             'motivos_cancelacion' => CancelarPedido::MOTIVOS_NEGOCIO,
             'items' => $p->items->map(fn ($i) => [
                 'nombre' => $i->nombre,
@@ -180,37 +209,59 @@ class ComercioPedidoController extends Controller
         ];
     }
 
-    /** Marcar un pedido pendiente como "listo" (lo verán los domiciliarios). */
+    /**
+     * Aceptar un pedido: el negocio se compromete a prepararlo y la alarma se
+     * calla en todos los teléfonos del equipo. Update condicional: si dos lo
+     * aceptan a la vez, o justo vence o lo cancela el cliente, gana uno solo.
+     */
+    public function aceptar(Request $request, Negocio $negocio, int $id): JsonResponse
+    {
+        if (! $negocio->esMiembroActivo($request->user())) {
+            return $this->sinAcceso();
+        }
+
+        $afectados = $negocio->pedidos()
+            ->where('id', $id)
+            ->where('estado', 'pendiente')
+            ->update(['estado' => 'aceptado', 'aceptado_at' => now()]);
+
+        if (! $afectados) {
+            return response()->json(['message' => 'Ese pedido ya no está en espera.'], 409);
+        }
+
+        $pedido = $negocio->pedidos()->find($id);
+
+        Push::enviar($negocio->miembrosActivos()->get(), new PedidoYaAtendido($pedido));
+        if ($pedido->cliente) {
+            Push::enviar($pedido->cliente, new EstadoPedidoActualizado($pedido));
+        }
+
+        return response()->json(['message' => 'Pedido aceptado. El cliente ya lo sabe.']);
+    }
+
+    /** Marcar un pedido aceptado como "listo" (lo verán los domiciliarios). */
     public function marcarListo(Request $request, Negocio $negocio, int $id): JsonResponse
     {
         if (! $negocio->esMiembroActivo($request->user())) {
             return $this->sinAcceso();
         }
 
-        // Solo pedidos de ESTE negocio y que estén pendientes.
-        $pedido = $negocio->pedidos()->where('id', $id)->where('estado', 'pendiente')->first();
+        // Solo pedidos de ESTE negocio y que ya estén aceptados.
+        $pedido = $negocio->pedidos()->where('id', $id)->where('estado', 'aceptado')->first();
         if (! $pedido) {
             return response()->json(['message' => 'No se puede marcar listo ese pedido.'], 409);
         }
 
         $pedido->update(['estado' => 'listo', 'listo_at' => now()]);
 
-        // ¿Cumplió el tiempo de preparación que promete el negocio?
+        // ¿Cumplió el tiempo de preparación que promete? Cuenta desde que lo aceptó.
         if ($pedido->minutos_preparacion) {
-            $tarde = Reputacion::excedeTiempo($pedido->created_at, $pedido->listo_at, $pedido->minutos_preparacion);
+            $tarde = Reputacion::excedeTiempo($pedido->aceptado_at ?? $pedido->created_at, $pedido->listo_at, $pedido->minutos_preparacion);
             Reputacion::registrar(Reputacion::NEGOCIO, $negocio, $tarde ? 'preparacion_tarde' : 'preparacion_a_tiempo', $pedido);
         }
 
         // Avisa a los domiciliarios habilitados que hay un pedido para tomar.
-        // Solo a los que están en turno (y no vetados), y no al cliente del
-        // pedido si también es domiciliario.
-        $domiciliarios = User::role('domiciliario')
-            ->whereNull('domiciliario_vetado_at')
-            ->whereNull('suspendido_at')
-            ->where('en_turno', true)
-            ->whereKeyNot($pedido->user_id)
-            ->get();
-        Push::enviar($domiciliarios, new PedidoDisponibleParaDomiciliario($pedido));
+        $domiciliarios = OfrecerPedido::aDomiciliarios($pedido);
 
         // Y avisa al cliente que su pedido ya está listo.
         if ($pedido->cliente) {
@@ -223,6 +274,45 @@ class ComercioPedidoController extends Controller
                 : 'Pedido listo. Avisamos a '.$domiciliarios->count().' domiciliario(s) en turno.',
             'domiciliarios_en_turno' => $domiciliarios->count(),
         ]);
+    }
+
+    /**
+     * El negocio le entrega el pedido al domiciliario: confirma con el código
+     * que él le dicta que es quien debía recogerlo. Desde aquí no hay vuelta atrás.
+     */
+    public function recogido(Request $request, Negocio $negocio, int $id): JsonResponse
+    {
+        if (! $negocio->esMiembroActivo($request->user())) {
+            return $this->sinAcceso();
+        }
+
+        $datos = $request->validate(
+            ['codigo' => ['required', 'digits:4']],
+            ['codigo.required' => 'Pídele el código al domiciliario.', 'codigo.digits' => 'El código tiene 4 dígitos.'],
+        );
+
+        $pedido = $negocio->pedidos()->with(['domiciliario', 'cliente'])->where('id', $id)->where('estado', 'tomado')->first();
+        if (! $pedido) {
+            return response()->json(['message' => 'Ese pedido ya no está esperando domiciliario.'], 409);
+        }
+
+        if (! hash_equals((string) $pedido->codigo_recogida, $datos['codigo'])) {
+            throw ValidationException::withMessages(['codigo' => ['Ese no es el código del domiciliario. Pídeselo de nuevo.']]);
+        }
+
+        $pedido->update(['estado' => 'recogido', 'recogido_at' => now()]);
+
+        // ¿Recogió en los minutos que prometió al tomarlo? (con margen; si
+        // reportó una novedad, la demora queda anotada pero no resta).
+        if ($pedido->domiciliario && Reputacion::excedeTiempo($pedido->tomado_at, $pedido->recogido_at, $pedido->minutos_recogida)) {
+            Reputacion::registrar(Reputacion::DOMICILIARIO, $pedido->domiciliario, 'recogida_tarde', $pedido);
+        }
+
+        if ($pedido->cliente) {
+            Push::enviar($pedido->cliente, new EstadoPedidoActualizado($pedido));
+        }
+
+        return response()->json(['message' => 'Listo: el domiciliario ya lleva el pedido.']);
     }
 
     /**
