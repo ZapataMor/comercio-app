@@ -5,7 +5,7 @@ import { imagenUrl } from '../api';
 import { CartItem, DURACION_RETIRO, useCart } from '../CartContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import Icon from '../components/Icon';
-import PersonalizarLinea from '../components/PersonalizarLinea';
+import PersonalizarLinea, { ModoHoja } from '../components/PersonalizarLinea';
 import { RootStackParamList } from '../navTypes';
 import { detalleOpciones } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
@@ -50,7 +50,14 @@ function RellenoRetiro({ saleEn }: { saleEn: number }) {
   return <Animated.View pointerEvents="none" style={[styles.relleno, { transform: [{ scaleX: escala }] }]} />;
 }
 
-function LineaCarrito({ item, onAjustar }: { item: CartItem; onAjustar: () => void }) {
+type LineaProps = {
+  item: CartItem;
+  onAjustar: () => void;
+  /** Pregunta cómo quiere la unidad nueva. */
+  onAgregarOtra: () => void;
+};
+
+function LineaCarrito({ item, onAjustar, onAgregarOtra }: LineaProps) {
   const { c } = useTheme();
   const styles = useStyles();
   const { cambiar, quitar } = useCart();
@@ -58,6 +65,9 @@ function LineaCarrito({ item, onAjustar }: { item: CartItem; onAjustar: () => vo
   const uri = imagenUrl(item.imagen);
   const detalle = detalleOpciones(item.opciones);
   const ajuste = textoAjuste(item);
+  // Si hay algo que elegir, la unidad nueva se pregunta. Conservar una línea que
+  // sale no suma nada: vuelve tal como estaba.
+  const preguntaAlSumar = !!ajuste && !saliendo;
 
   return (
     <View style={styles.item}>
@@ -114,7 +124,7 @@ function LineaCarrito({ item, onAjustar }: { item: CartItem; onAjustar: () => vo
               style={styles.qtyBtn}
               hitSlop={6}
               accessibilityLabel="Agregar una unidad"
-              onPress={() => cambiar(item.linea, 1)}>
+              onPress={() => (preguntaAlSumar ? onAgregarOtra() : cambiar(item.linea, 1))}>
               <Icon name="mas" size={15} color={c.textStrong} strokeWidth={2.2} />
             </PressableScale>
           </View>
@@ -127,10 +137,10 @@ function LineaCarrito({ item, onAjustar }: { item: CartItem; onAjustar: () => vo
 export default function CarritoScreen({ navigation }: Props) {
   const { c } = useTheme();
   const styles = useStyles();
-  const { items, lineas, negocioNombre, total, personalizar, vaciar } = useCart();
+  const { items, lineas, negocioNombre, total, personalizar, sumarUnidad, vaciar } = useCart();
   // Línea en la hoja de ajustes. Se guarda la clave y no la línea: así la hoja
   // se cierra sola si la línea sale mientras está abierta.
-  const [ajustando, setAjustando] = useState<string | null>(null);
+  const [hoja, setHoja] = useState<{ linea: string; modo: ModoHoja } | null>(null);
 
   if (lineas.length === 0) {
     return (
@@ -155,7 +165,11 @@ export default function CarritoScreen({ navigation }: Props) {
         )}
         {lineas.map((i, idx) => (
           <FadeInView key={i.linea} delay={idx * 45}>
-            <LineaCarrito item={i} onAjustar={() => setAjustando(i.linea)} />
+            <LineaCarrito
+              item={i}
+              onAjustar={() => setHoja({ linea: i.linea, modo: 'ajustar' })}
+              onAgregarOtra={() => setHoja({ linea: i.linea, modo: 'agregar' })}
+            />
           </FadeInView>
         ))}
         <TouchableOpacity onPress={vaciar} style={{ marginTop: 8 }}>
@@ -178,11 +192,16 @@ export default function CarritoScreen({ navigation }: Props) {
       </View>
 
       <PersonalizarLinea
-        item={items.find(i => i.linea === ajustando) ?? null}
-        onCerrar={() => setAjustando(null)}
+        item={items.find(i => i.linea === hoja?.linea) ?? null}
+        modo={hoja?.modo}
+        onCerrar={() => setHoja(null)}
         onGuardar={(linea, opciones, unidades) => {
-          personalizar(linea, opciones, unidades);
-          setAjustando(null);
+          if (hoja?.modo === 'agregar') {
+            sumarUnidad(linea, opciones);
+          } else {
+            personalizar(linea, opciones, unidades);
+          }
+          setHoja(null);
         }}
       />
     </View>

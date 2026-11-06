@@ -59,6 +59,11 @@ type CartContextType = {
    * son menos que todas, esas unidades pasan a su propia línea.
    */
   personalizar: (linea: string, opciones: OpcionesLinea, unidades?: number) => void;
+  /**
+   * Suma una unidad del producto de `linea` con estas opciones: si son las de la
+   * línea cae ahí y si son otras queda en su propia línea.
+   */
+  sumarUnidad: (linea: string, opciones: OpcionesLinea) => void;
   vaciar: () => void;
 };
 
@@ -258,6 +263,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
+  const sumarUnidad = (linea: string, opciones: OpcionesLinea) => {
+    setLineas(prev => {
+      const actual = prev.find(i => i.linea === linea);
+      if (!actual) return prev;
+
+      const limpias = limpiarOpciones(opciones);
+      const clave = claveLinea(actual.producto_id, limpias);
+      return sumarLinea(prev, { ...actual, linea: clave, opciones: limpias, cantidad: 1 });
+    });
+  };
+
   const vaciar = () => {
     setLineas([]);
     setNegocioId(null);
@@ -281,6 +297,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         cambiar,
         quitar,
         personalizar,
+        sumarUnidad,
         vaciar,
       }}>
       {children}

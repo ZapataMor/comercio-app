@@ -2,7 +2,8 @@
  * Hoja para ajustar una línea del carrito. En la comida, cada ingrediente que
  * trae el producto se deja normal, se quita o se pide con extra; en la ropa se
  * cambia la talla o el color. Si la línea tiene varias unidades se puede aplicar
- * solo a algunas: "de las 3 hamburguesas, 1 sin tomate".
+ * solo a algunas: "de las 3 hamburguesas, 1 sin tomate". También pregunta cómo
+ * quiere el cliente una unidad más, partiendo de lo que ya tiene la línea.
  */
 import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, Text, TouchableOpacity, View } from 'react-native';
@@ -22,25 +23,30 @@ const ESTADOS: { valor: Estado; texto: string }[] = [
   { valor: 'extra', texto: 'Extra' },
 ];
 
+/** `ajustar` cambia las unidades que ya están; `agregar` es para una unidad más. */
+export type ModoHoja = 'ajustar' | 'agregar';
+
 type Props = {
   /** La línea a ajustar; null = hoja cerrada. */
   item: CartItem | null;
+  modo?: ModoHoja;
   onCerrar: () => void;
   onGuardar: (linea: string, opciones: OpcionesLinea, unidades: number) => void;
 };
 
-export default function PersonalizarLinea({ item, onCerrar, onGuardar }: Props) {
+export default function PersonalizarLinea({ item, modo = 'ajustar', onCerrar, onGuardar }: Props) {
   return (
     <Modal visible={!!item} transparent animationType="slide" onRequestClose={onCerrar}>
-      {item && <Contenido key={item.linea} item={item} onCerrar={onCerrar} onGuardar={onGuardar} />}
+      {item && <Contenido key={item.linea} item={item} modo={modo} onCerrar={onCerrar} onGuardar={onGuardar} />}
     </Modal>
   );
 }
 
-function Contenido({ item, onCerrar, onGuardar }: { item: CartItem } & Omit<Props, 'item'>) {
+function Contenido({ item, modo, onCerrar, onGuardar }: { item: CartItem } & Omit<Props, 'item'>) {
   const { c } = useTheme();
   const styles = useStyles();
   const insets = useSafeAreaInsets();
+  const agregando = modo === 'agregar';
   const ingredientes = item.ingredientes ?? [];
   const tallas = item.tallas ?? [];
   const colores = item.colores ?? [];
@@ -73,6 +79,7 @@ function Contenido({ item, onCerrar, onGuardar }: { item: CartItem } & Omit<Prop
       <View style={[styles.hoja, { paddingBottom: insets.bottom + 16 }]}>
         <View style={styles.agarre} />
         <Text style={styles.titulo} numberOfLines={2}>{item.nombre}</Text>
+        {agregando && <Text style={styles.ayuda}>Agregas una unidad más: elige cómo la quieres.</Text>}
 
         <ScrollView style={styles.lista} showsVerticalScrollIndicator={false}>
           {ingredientes.length > 0 && (
@@ -130,7 +137,7 @@ function Contenido({ item, onCerrar, onGuardar }: { item: CartItem } & Omit<Prop
           )}
         </ScrollView>
 
-        {item.cantidad > 1 && (
+        {!agregando && item.cantidad > 1 && (
           <View style={styles.unidades}>
             <Text style={styles.unidadesTxt}>¿A cuántas se lo aplico?</Text>
             <View style={styles.contador}>
@@ -156,7 +163,7 @@ function Contenido({ item, onCerrar, onGuardar }: { item: CartItem } & Omit<Prop
         )}
 
         <PressableScale style={styles.boton} onPress={guardar}>
-          <Text style={styles.botonTxt}>Guardar</Text>
+          <Text style={styles.botonTxt}>{agregando ? 'Agregar' : 'Guardar'}</Text>
         </PressableScale>
         <TouchableOpacity onPress={onCerrar}>
           <Text style={styles.cancelar}>Cancelar</Text>

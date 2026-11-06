@@ -1,7 +1,8 @@
 /**
  * Pruebas de las opciones del carrito: cada combinación es su propia línea,
- * se pueden personalizar solo algunas unidades, y quitar deja la línea 3
- * segundos en cuenta regresiva antes de que desaparezca.
+ * se pueden personalizar solo algunas unidades, el + pregunta cómo quiere la
+ * unidad nueva si hay algo que elegir, y quitar deja la línea 3 segundos en
+ * cuenta regresiva antes de que desaparezca.
  * @format
  */
 
@@ -11,9 +12,14 @@ import ReactTestRenderer, { act } from 'react-test-renderer';
 import { Producto } from '../src/api';
 import { CartProvider, DURACION_RETIRO, useCart } from '../src/CartContext';
 import { detalleOpciones } from '../src/opcionesProducto';
+import CarritoScreen from '../src/screens/CarritoScreen';
 
 jest.mock('../src/AuthContext', () => ({
   useAuth: () => ({ auth: { token: 't', user: { id: 7 } } }),
+}));
+
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
 }));
 
 const hamburguesa: Producto = {
@@ -39,16 +45,19 @@ const camisa: Producto = {
   tipo_producto: { id: 4, nombre: 'Ropa y calzado', slug: 'ropa-y-calzado', atributo_label: 'Tallas disponibles' },
 };
 
-async function montar() {
+let raiz: ReactTestRenderer.ReactTestRenderer;
+
+async function montar(pantalla?: React.ReactNode) {
   const api: { current: ReturnType<typeof useCart> } = { current: null as any };
   function Sonda() {
     api.current = useCart();
     return null;
   }
   await act(async () => {
-    ReactTestRenderer.create(
+    raiz = ReactTestRenderer.create(
       <CartProvider>
         <Sonda />
+        {pantalla}
       </CartProvider>,
     );
   });
@@ -56,6 +65,23 @@ async function montar() {
 }
 
 const lineaDe = (cart: { current: ReturnType<typeof useCart> }, i = 0) => cart.current.lineas[i].linea;
+
+const montarCarrito = () =>
+  montar(<CarritoScreen navigation={{ navigate: jest.fn() } as any} route={{} as any} />);
+
+/** Toca el primer elemento con esa etiqueta o que contenga ese texto. */
+function tocar(buscar: { texto?: string; etiqueta?: string }) {
+  const nodo = raiz.root.findAll(n => {
+    if (typeof n.props.onPress !== 'function') return false;
+    if (buscar.etiqueta) return n.props.accessibilityLabel === buscar.etiqueta;
+    return n.findAll(h => h.children.includes(buscar.texto as string)).length > 0;
+  })[0];
+  act(() => {
+    nodo.props.onPress();
+  });
+}
+
+const hojaAbierta = () => raiz.root.findAll(n => n.children.includes('Agregar')).length > 0;
 
 beforeEach(async () => {
   jest.useFakeTimers();
@@ -143,6 +169,125 @@ test('al quedar igual a otra línea, se juntan', async () => {
 
   expect(cart.current.items).toHaveLength(1);
   expect(cart.current.items[0].cantidad).toBe(2);
+});
+
+test('sumar una unidad con las mismas opciones cae en su línea', async () => {
+  const cart = await montar();
+  act(() => {
+    cart.current.agregar(1, 'Tienda', camisa, { talla: 'M', color: 'Negro' });
+  });
+  act(() => {
+    cart.current.sumarUnidad(lineaDe(cart), { talla: 'M', color: 'Negro' });
+  });
+
+  expect(cart.current.items).toHaveLength(1);
+  expect(cart.current.items[0].cantidad).toBe(2);
+});
+
+test('sumar una unidad con otras opciones crea su línea y no toca la anterior', async () => {
+  const cart = await montar();
+  act(() => {
+    cart.current.agregar(1, 'Tienda', camisa, { talla: 'M', color: 'Negro' });
+  });
+  act(() => {
+    cart.current.sumarUnidad(lineaDe(cart), { talla: 'S', color: 'Blanco' });
+  });
+
+  expect(cart.current.items.map(i => i.cantidad)).toEqual([1, 1]);
+  expect(cart.current.items[1].opciones).toEqual({ talla: 'S', color: 'Blanco' });
+  expect(cart.current.items[1].tallas).toEqual(['S', 'M']);
+  expect(cart.current.count).toBe(2);
+  expect(cart.current.total).toBe(80000);
+});
+
+test('sumar una unidad igual a otra línea se junta con ella', async () => {
+  const cart = await montar();
+  act(() => {
+    cart.current.agregar(1, 'Tienda', camisa, { talla: 'M', color: 'Negro' });
+  });
+  act(() => {
+    cart.current.agregar(1, 'Tienda', camisa, { talla: 'S', color: 'Negro' });
+  });
+  act(() => {
+    cart.current.sumarUnidad(lineaDe(cart), { talla: 'S', color: 'Negro' });
+  });
+
+  expect(cart.current.items.map(i => i.cantidad)).toEqual([1, 2]);
+});
+
+test('el + de una línea con talla o color pregunta antes de sumar', async () => {
+  const cart = await montarCarrito();
+  act(() => {
+    cart.current.agregar(1, 'Tienda', camisa, { talla: 'M', color: 'Negro' });
+  });
+
+  tocar({ etiqueta: 'Agregar una unidad' });
+  expect(hojaAbierta()).toBe(true);
+  expect(cart.current.count).toBe(1);
+
+  tocar({ texto: 'S' });
+  tocar({ texto: 'Agregar' });
+
+  expect(hojaAbierta()).toBe(false);
+  expect(cart.current.items.map(i => i.opciones?.talla)).toEqual(['M', 'S']);
+  expect(cart.current.count).toBe(2);
+});
+
+test('cancelar la pregunta del + no suma nada', async () => {
+  const cart = await montarCarrito();
+  act(() => {
+    cart.current.agregar(1, 'Tienda', camisa, { talla: 'M', color: 'Negro' });
+  });
+
+  tocar({ etiqueta: 'Agregar una unidad' });
+  tocar({ texto: 'Cancelar' });
+
+  expect(hojaAbierta()).toBe(false);
+  expect(cart.current.count).toBe(1);
+});
+
+test('el + de la comida también pregunta y parte de lo que trae la línea', async () => {
+  const cart = await montarCarrito();
+  act(() => {
+    cart.current.agregar(1, 'Tienda', hamburguesa, { sin: ['Tomate'] });
+  });
+
+  tocar({ etiqueta: 'Agregar una unidad' });
+  tocar({ texto: 'Agregar' });
+
+  expect(cart.current.items).toHaveLength(1);
+  expect(cart.current.items[0].cantidad).toBe(2);
+  expect(cart.current.items[0].opciones).toEqual({ sin: ['Tomate'] });
+});
+
+test('sin nada que elegir el + suma directo', async () => {
+  const unica: Producto = { ...camisa, id: 3, atributos: ['Única'], colores: ['Negro'] };
+  const cart = await montarCarrito();
+  act(() => {
+    cart.current.agregar(1, 'Tienda', unica, { talla: 'Única', color: 'Negro' });
+  });
+
+  tocar({ etiqueta: 'Agregar una unidad' });
+
+  expect(hojaAbierta()).toBe(false);
+  expect(cart.current.items).toHaveLength(1);
+  expect(cart.current.items[0].cantidad).toBe(2);
+});
+
+test('tocar + para conservar una línea que sale no pregunta', async () => {
+  const cart = await montarCarrito();
+  act(() => {
+    cart.current.agregar(1, 'Tienda', camisa, { talla: 'M', color: 'Negro' });
+  });
+  act(() => {
+    cart.current.cambiar(lineaDe(cart), -1);
+  });
+
+  tocar({ etiqueta: 'Agregar una unidad' });
+
+  expect(hojaAbierta()).toBe(false);
+  expect(cart.current.items).toHaveLength(1);
+  expect(cart.current.items[0].cantidad).toBe(1);
 });
 
 test('bajar de 1 no borra la línea: sale cuando acaba la cuenta regresiva', async () => {
