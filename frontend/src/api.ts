@@ -1037,6 +1037,13 @@ export async function getCatalogo(
   return { negocio: data.negocio as Negocio, productos: (data.productos ?? []) as Producto[] };
 }
 
+export type EstadoNegocio = Pick<Negocio, 'activo' | 'horario_hoy'>;
+
+/** Si la tienda sigue abierta, sin pedir todo el catálogo: es lo que se refresca seguido. */
+export async function getEstadoNegocio(token: string, id: number): Promise<EstadoNegocio> {
+  return (await authGet(`/api/negocios/${id}/estado`, token)) as EstadoNegocio;
+}
+
 /** Un plato que el cliente ya pidió varias veces con los mismos ajustes. */
 export type RecetaPreferida = {
   producto: Producto;

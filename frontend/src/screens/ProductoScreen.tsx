@@ -2,7 +2,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
 import { GestureResponderEvent, Image, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getCatalogo, imagenUrl } from '../api';
+import { getEstadoNegocio, imagenUrl } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import ChipsEleccion from '../components/ChipsEleccion';
@@ -41,8 +41,8 @@ export default function ProductoScreen({ navigation, route }: Props) {
 
   // Si el negocio cierra mientras el cliente mira el producto, deja de poder agregarlo.
   usePolling(() => {
-    getCatalogo(auth!.token, negocioId)
-      .then(({ negocio }) => setAbierto(negocio.activo !== false))
+    getEstadoNegocio(auth!.token, negocioId)
+      .then(({ activo }) => setAbierto(activo))
       .catch(() => {});
   }, REFRESCO_NEGOCIOS);
 

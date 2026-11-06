@@ -30,6 +30,28 @@ function crearNegocios(int $cantidad, bool $activo = true): void
     );
 }
 
+test('el estado de un negocio trae si está abierto, sin el catálogo', function () {
+    clienteCatalogo();
+    $negocio = User::factory()->create()->negocio()->create(['nombre' => 'La Espiga', 'activo' => true]);
+    $negocio->productos()->create(['nombre' => 'Pan', 'precio' => 2000]);
+
+    $this->getJson("/api/negocios/{$negocio->id}/estado")
+        ->assertOk()
+        ->assertExactJson(['activo' => true, 'horario_hoy' => null]);
+
+    $negocio->forceFill(['activo' => false])->save();
+
+    $this->getJson("/api/negocios/{$negocio->id}/estado")->assertJsonPath('activo', false);
+});
+
+test('el estado no muestra negocios vetados ni archivados', function (string $columna) {
+    clienteCatalogo();
+    $negocio = User::factory()->create()->negocio()->create(['nombre' => 'La Espiga', 'activo' => true]);
+    $negocio->forceFill([$columna => now()])->save();
+
+    $this->getJson("/api/negocios/{$negocio->id}/estado")->assertNotFound();
+})->with(['vetado_at', 'archivado_at']);
+
 test('el listado de negocios exige autenticacion', function () {
     $this->getJson('/api/negocios')->assertStatus(401);
 });

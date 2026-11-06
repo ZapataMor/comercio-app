@@ -86,6 +86,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Catálogo público de UN negocio (cliente).
     Route::get('/negocios/{id}', [CatalogoController::class, 'show'])->whereNumber('id');
+    // Solo si está abierto: lo que la app refresca cada pocos segundos.
+    Route::get('/negocios/{id}/estado', [CatalogoController::class, 'estado'])->whereNumber('id');
     // Lo que el cliente ya pidió varias veces con los mismos ajustes en esta tienda.
     Route::get('/negocios/{id}/recetas-preferidas', [RecetaPreferidaController::class, 'index'])->whereNumber('id');
     // Reseñas de la tienda o, con ?producto_id=, de uno de sus productos.

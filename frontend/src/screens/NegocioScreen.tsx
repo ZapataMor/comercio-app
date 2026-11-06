@@ -1,5 +1,5 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -11,6 +11,7 @@ import {
 import {
   direccionConBarrio,
   getCatalogo,
+  getEstadoNegocio,
   getRecetasPreferidas,
   imagenUrl,
   Negocio,
@@ -111,6 +112,7 @@ export default function NegocioScreen({ navigation, route }: Props) {
   const { auth } = useAuth();
   const { volar } = useFlyToCart();
   const toast = useToast();
+  const token = auth!.token;
   const { id, nombre, productoId } = route.params;
   const agregar = useAgregarAlCarrito(id, nombre);
   const [negocio, setNegocio] = useState<Negocio | null>(null);
@@ -122,28 +124,42 @@ export default function NegocioScreen({ navigation, route }: Props) {
   const listaRef = useRef<FlatList<CatalogoFila>>(null);
   const negocioAbierto = negocio?.activo !== false;
 
-  useEffect(() => {
-    getCatalogo(auth!.token, id)
-      .then(({ negocio: n, productos: p }) => {
+  const cargarCatalogo = useCallback(
+    () =>
+      getCatalogo(token, id).then(({ negocio: n, productos: p }) => {
         setNegocio(n);
         setProductos(p);
-      })
-      .catch(e => setError(e.message))
-      .finally(() => setCargando(false));
-  }, [auth, id]);
+        setError(null);
+      }),
+    [token, id],
+  );
 
   // Es una recomendación: si no carga, el catálogo sigue igual.
-  useEffect(() => {
-    getRecetasPreferidas(auth!.token, id)
+  const cargarRecetas = useCallback(() => {
+    getRecetasPreferidas(token, id)
       .then(setRecetas)
       .catch(() => {});
-  }, [auth, id]);
+  }, [token, id]);
 
-  // Si el negocio abre o cierra se nota aquí mismo. Solo cambia el negocio: tocar
-  // los productos volvería a llevar la lista al producto resaltado.
+  useEffect(() => {
+    cargarCatalogo()
+      .catch(e => setError(e.message))
+      .finally(() => setCargando(false));
+    cargarRecetas();
+  }, [cargarCatalogo, cargarRecetas]);
+
+  // Si el negocio abre o cierra se nota aquí mismo: solo se toca su estado, porque
+  // cambiar los productos volvería a llevar la lista al producto resaltado. Si la
+  // primera carga falló no hay nada que actualizar: se reintenta hasta lograrla.
   usePolling(() => {
-    getCatalogo(auth!.token, id)
-      .then(({ negocio: n }) => setNegocio(n))
+    if (!negocio) {
+      cargarCatalogo()
+        .then(cargarRecetas)
+        .catch(() => {});
+      return;
+    }
+    getEstadoNegocio(token, id)
+      .then(estado => setNegocio(n => n && { ...n, ...estado }))
       .catch(() => {});
   }, REFRESCO_NEGOCIOS);
 

@@ -218,6 +218,24 @@ class CatalogoController extends Controller
         ]);
     }
 
+    /**
+     * Lo que cambia solo con el tiempo. La app lo consulta cada pocos segundos
+     * mientras se mira una tienda, sin volver a pedir todo el catálogo.
+     */
+    public function estado(int $id): JsonResponse
+    {
+        $negocio = Negocio::whereNull('vetado_at')->whereNull('archivado_at')->find($id);
+
+        if (! $negocio) {
+            return response()->json(['message' => 'Negocio no encontrado.'], 404);
+        }
+
+        return response()->json([
+            'activo' => (bool) $negocio->activo,
+            'horario_hoy' => HorarioNegocio::textoHoyDe($negocio, now()),
+        ]);
+    }
+
     /** Detalle de un negocio + sus productos disponibles. */
     public function show(int $id): JsonResponse
     {
