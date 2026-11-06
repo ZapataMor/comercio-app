@@ -27,11 +27,14 @@ export function PedirCodigo({
   titulo,
   ayuda,
   textoBoton,
+  compacto,
   onConfirmar,
 }: {
   titulo: string;
-  ayuda: string;
+  ayuda?: string;
   textoBoton: string;
+  /** Campo y botón en una fila, para que quepa dentro de una tarjeta de lista. */
+  compacto?: boolean;
   /** Si el código no es correcto, debe lanzar el error para mostrarlo aquí. */
   onConfirmar: (codigo: string) => Promise<void>;
 }) {
@@ -57,28 +60,42 @@ export function PedirCodigo({
     }
   }
 
+  const campo = (
+    <TextInput
+      style={[styles.input, compacto && styles.inputCompacto]}
+      value={codigo}
+      onChangeText={v => {
+        setCodigo(v.replace(/\D/g, ''));
+        setError(undefined);
+      }}
+      keyboardType="number-pad"
+      maxLength={4}
+      placeholder="0000"
+      placeholderTextColor={c.mutedSoft}
+      editable={!enviando}
+      accessibilityLabel={titulo}
+    />
+  );
+  const boton = (
+    <PressableScale style={[styles.boton, compacto && styles.botonCompacto]} onPress={confirmar} disabled={enviando}>
+      {enviando ? <ActivityIndicator color={c.onBrand} /> : <Text style={styles.botonTxt}>{textoBoton}</Text>}
+    </PressableScale>
+  );
+
   return (
     <View style={styles.caja}>
       <Text style={styles.titulo}>{titulo}</Text>
-      <Text style={styles.ayuda}>{ayuda}</Text>
-      <TextInput
-        style={styles.input}
-        value={codigo}
-        onChangeText={v => {
-          setCodigo(v.replace(/\D/g, ''));
-          setError(undefined);
-        }}
-        keyboardType="number-pad"
-        maxLength={4}
-        placeholder="0000"
-        placeholderTextColor={c.mutedSoft}
-        editable={!enviando}
-        accessibilityLabel={titulo}
-      />
+      {!!ayuda && <Text style={styles.ayuda}>{ayuda}</Text>}
+      {compacto ? (
+        <View style={[styles.filaCompacta, !!error && styles.filaConError]}>
+          {campo}
+          {boton}
+        </View>
+      ) : (
+        campo
+      )}
       <FieldError mensaje={error} />
-      <PressableScale style={styles.boton} onPress={confirmar} disabled={enviando}>
-        {enviando ? <ActivityIndicator color={c.onBrand} /> : <Text style={styles.botonTxt}>{textoBoton}</Text>}
-      </PressableScale>
+      {!compacto && boton}
     </View>
   );
 }
@@ -103,6 +120,11 @@ const useStyles = makeStyles(c => ({
     letterSpacing: 8,
     textAlign: 'center',
   },
+  filaCompacta: { flexDirection: 'row', alignItems: 'stretch', gap: 8, marginTop: 8 },
+  // FieldError se apoya en el aire de abajo, como en el campo normal.
+  filaConError: { marginBottom: 12 },
+  inputCompacto: { flex: 1, marginTop: 0, marginBottom: 0, paddingVertical: 8, fontSize: 20 },
+  botonCompacto: { paddingHorizontal: 16, justifyContent: 'center' },
   boton: {
     backgroundColor: c.brand,
     borderRadius: radius.md,

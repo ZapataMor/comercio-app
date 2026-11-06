@@ -3,10 +3,11 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, ScrollView, Text, View } from 'react-native';
 import { detenerAlarma } from '../alarmaPedidos';
-import { aceptarPedido, ComercioPedido, getPedidosComercio } from '../api';
+import { aceptarPedido, ComercioPedido, confirmarRecogida, getPedidosComercio } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import BotonMantener from '../components/BotonMantener';
+import { PedirCodigo } from '../components/CodigoPedido';
 import HeaderNegocios from '../components/HeaderNegocios';
 import HeaderPerfil from '../components/HeaderPerfil';
 import Icon, { IconName } from '../components/Icon';
@@ -199,6 +200,7 @@ function TarjetaPedido({
   pie,
   destacada,
   onPress,
+  children,
 }: {
   pedido: ComercioPedido;
   icono: IconName;
@@ -206,6 +208,8 @@ function TarjetaPedido({
   pie: string;
   destacada?: boolean;
   onPress: () => void;
+  /** Va antes del pie. */
+  children?: React.ReactNode;
 }) {
   const { c } = useTheme();
   const styles = useStyles();
@@ -219,6 +223,7 @@ function TarjetaPedido({
         <Icon name={icono} size={14} color={c.text} />
         <Text style={styles.pedidoCliente}>{nombre}</Text>
       </View>
+      {children}
       <Text style={styles.pedidoVer}>{pie}</Text>
     </PressableScale>
   );
@@ -283,6 +288,14 @@ export default function HomeScreen({ navigation }: Props) {
   );
   usePolling(cargarPedidos);
 
+  /** Si el código no es correcto, el error lo muestra el mismo campo. */
+  async function entregarAlDomiciliario(pedido: ComercioPedido, codigo: string) {
+    if (!negocioId) return;
+    await confirmarRecogida(token, negocioId, pedido.id, codigo);
+    toast.exito('Pedido entregado', 'El domiciliario ya lo lleva.');
+    cargarPedidos();
+  }
+
   /** Al aceptarlo se calla la alarma y pasa a "En preparación". */
   async function aceptar(pedido: ComercioPedido) {
     if (!negocioId) return;
@@ -325,7 +338,9 @@ export default function HomeScreen({ navigation }: Props) {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={styles.content}>
+      contentContainerStyle={styles.content}
+      // Con el teclado abierto, el primer toque debe llegar a "Confirmar".
+      keyboardShouldPersistTaps="handled">
       <Saludo />
 
       {tienePanel && (
@@ -407,9 +422,15 @@ export default function HomeScreen({ navigation }: Props) {
                         pedido={p}
                         icono="moto"
                         nombre={p.domiciliario ?? 'Domiciliario'}
-                        pie="Pídele su código ›"
-                        onPress={() => navigation.navigate('ComercioPedidoDetalle', { pedido: p })}
-                      />
+                        pie="Ver pedido ›"
+                        onPress={() => navigation.navigate('ComercioPedidoDetalle', { pedido: p })}>
+                        <PedirCodigo
+                          compacto
+                          titulo="Código del domiciliario"
+                          textoBoton="Confirmar"
+                          onConfirmar={codigo => entregarAlDomiciliario(p, codigo)}
+                        />
+                      </TarjetaPedido>
                     </FadeInView>
                   ))}
                 </>

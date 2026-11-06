@@ -209,6 +209,16 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
           </Text>
         </View>
 
+        {/* Arriba de todo: es lo primero que se necesita cuando llega el domiciliario. */}
+        {pedido.estado === 'tomado' && (
+          <PedirCodigo
+            titulo="Entregar al domiciliario"
+            ayuda="Pídele su código y escríbelo aquí para confirmar que es quien debe llevarse el pedido."
+            textoBoton="Confirmar recogida"
+            onConfirmar={onRecogido}
+          />
+        )}
+
         <View style={styles.bloque}>
           <Text style={styles.bloqueTitulo}>Cliente</Text>
           <View style={styles.filaInfo}>
@@ -380,14 +390,7 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
           <Icon name="reloj" size={16} color={c.muted} />
           <Text style={[styles.nota, styles.notaInline]}>Esperando que un domiciliario lo tome…</Text>
         </View>
-      ) : pedido.estado === 'tomado' ? (
-        <PedirCodigo
-          titulo="Entregar al domiciliario"
-          ayuda="Pídele su código y escríbelo aquí para confirmar que es quien debe llevarse el pedido."
-          textoBoton="Confirmar recogida"
-          onConfirmar={onRecogido}
-        />
-      ) : pedido.estado === 'entregado' ? (
+      ) : pedido.estado === 'tomado' ? null : pedido.estado === 'entregado' ? (
         <View style={styles.filaNota}>
           <Icon name="check" size={16} color={c.success} />
           <Text style={[styles.nota, styles.notaInline, { color: c.success }]}>Entregado al cliente</Text>
