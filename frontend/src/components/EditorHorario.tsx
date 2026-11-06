@@ -63,13 +63,13 @@ export function errorHorario(h: HorarioSemana | null): string | null {
  * Mientras se escribe solo pone los dos puntos ("2030" → "20:30"); no rellena
  * con ceros, para que borrar con la tecla de retroceso no rehaga la hora.
  */
-function formatearHora(texto: string): string {
+export function formatearHora(texto: string): string {
   const d = texto.replace(/\D/g, '').slice(0, 4);
   return d.length <= 2 ? d : `${d.slice(0, 2)}:${d.slice(2)}`;
 }
 
 /** Al salir del campo completa la hora: "8" → "08:00", "730" → "07:30". */
-function completarHora(texto: string): string {
+export function completarHora(texto: string): string {
   const d = texto.replace(/\D/g, '');
   if (d.length === 0) return texto;
   if (d.length <= 2) return `${d.padStart(2, '0')}:00`;

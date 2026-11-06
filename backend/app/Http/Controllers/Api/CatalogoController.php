@@ -81,7 +81,7 @@ class CatalogoController extends Controller
             'imagen' => $n->imagen ? '/storage/'.$n->imagen : null,
             'productos' => $n->productos_count,
             'abierto' => (bool) $n->activo,
-            'horario_hoy' => HorarioNegocio::textoHoy($n->horario, now()),
+            'horario_hoy' => HorarioNegocio::textoHoyDe($n, now()),
             'tiempo_preparacion' => $n->tiempo_preparacion,
             'reputacion' => Reputacion::resumen(Reputacion::NEGOCIO, $n),
         ]);
@@ -118,7 +118,7 @@ class CatalogoController extends Controller
                 'barrio' => $n->barrio,
                 'imagen' => $n->imagen ? '/storage/'.$n->imagen : null,
                 'abierto' => (bool) $n->activo,
-                'horario_hoy' => HorarioNegocio::textoHoy($n->horario, now()),
+                'horario_hoy' => HorarioNegocio::textoHoyDe($n, now()),
                 'lat' => $n->lat,
                 'lng' => $n->lng,
             ]);
@@ -246,10 +246,10 @@ class CatalogoController extends Controller
                 'tiempo_preparacion' => $negocio->tiempo_preparacion,
                 // Horario semanal y el texto de hoy ("Hoy de 7:00 a. m. a 8:00 p. m.").
                 'horario' => HorarioNegocio::normalizar($negocio->horario),
-                'horario_hoy' => HorarioNegocio::textoHoy($negocio->horario, now()),
+                'horario_hoy' => HorarioNegocio::textoHoyDe($negocio, now()),
                 // Cierra pronto por horario: se le advierte al cliente antes de pedir.
                 'minutos_para_cerrar' => $negocio->activo
-                    ? HorarioNegocio::minutosParaCerrar($negocio->horario, now())
+                    ? HorarioNegocio::minutosParaCerrar($negocio->horario, now(), HorarioNegocio::ajusteDe($negocio))
                     : null,
                 'reputacion' => Reputacion::resumen(Reputacion::NEGOCIO, $negocio),
                 'lat' => $negocio->lat,

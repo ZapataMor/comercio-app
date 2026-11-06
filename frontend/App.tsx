@@ -14,6 +14,7 @@ import { CartProvider } from './src/CartContext';
 import AvisoPedidoNuevo from './src/components/AvisoPedidoNuevo';
 import BarraCliente from './src/components/BarraCliente';
 import { ConfirmacionProvider } from './src/components/Confirmacion';
+import ConfirmarCierre from './src/components/ConfirmarCierre';
 import OfertaPedido from './src/components/OfertaPedido';
 import { AppDesenfocable } from './src/components/Desenfoque';
 import { FlyToCartProvider } from './src/components/FlyToCart';
@@ -275,6 +276,13 @@ function AlarmaBridge({ mostrarAviso }: { mostrarAviso: boolean }) {
   return mostrarAviso ? <AvisoPedidoNuevo pedidos={enEspera} /> : null;
 }
 
+/** Antes del cierre automático se le pregunta al dueño, en cualquier pantalla. */
+function CierreBridge() {
+  const { auth } = useAuth();
+  const { negocios } = useNegocio();
+  return auth && negocios.length > 0 ? <ConfirmarCierre key={auth.user.id} /> : null;
+}
+
 /** Al domiciliario los pedidos se le ofrecen en cualquier pantalla. */
 function OfertaBridge() {
   const { auth } = useAuth();
@@ -310,6 +318,7 @@ function AppContenido() {
                 <PushBridge />
                 <AlarmaBridge mostrarAviso={!splashVisible} />
                 {!splashVisible && <OfertaBridge />}
+                {!splashVisible && <CierreBridge />}
                 <View style={styles.raiz}>
                   <Navegacion />
                   {splashVisible && <SplashVitrina onFin={ocultarSplash} />}

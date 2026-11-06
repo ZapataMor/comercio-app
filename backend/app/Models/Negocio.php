@@ -46,6 +46,8 @@ class Negocio extends Model
             'vetado_at' => 'datetime',
             'horario' => 'array',
             'activo_cambiado_at' => 'datetime',
+            'cierre_original' => 'datetime',
+            'cierre_ajustado' => 'datetime',
             'archivado_at' => 'datetime',
             'lat' => 'float',
             'lng' => 'float',

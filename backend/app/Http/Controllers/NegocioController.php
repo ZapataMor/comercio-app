@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Negocios del usuario autenticado (modelo unificado): cualquier persona
@@ -84,6 +85,75 @@ class NegocioController extends Controller
         return response()->json([
             'negocio' => $this->conRol($negocio, Negocio::ROL_PROPIETARIO),
         ], 201);
+    }
+
+    /**
+     * Cierres del horario automático que debo confirmar: los de mis negocios
+     * que cierran en menos de HorarioNegocio::PREGUNTA_CIERRE_MINUTOS. Solo el
+     * propietario abre y cierra el negocio, así que solo a él se le pregunta.
+     */
+    public function cierresPorConfirmar(Request $request): JsonResponse
+    {
+        $ahora = now();
+
+        $cierres = $request->user()->negociosActivos()
+            ->wherePivot('rol', Negocio::ROL_PROPIETARIO)
+            ->whereNotNull('negocios.horario')
+            ->get()
+            ->map(function (Negocio $negocio) use ($ahora) {
+                $cierre = HorarioNegocio::cierreSinConfirmar($negocio, $ahora);
+
+                return $cierre ? [
+                    'id' => $negocio->id,
+                    'nombre' => $negocio->nombre,
+                    'cierra_texto' => HorarioNegocio::hora($cierre->format('H:i')),
+                    'segundos' => (int) $ahora->diffInSeconds($cierre),
+                ] : null;
+            })
+            ->filter()
+            ->values();
+
+        return response()->json(['cierres' => $cierres]);
+    }
+
+    /**
+     * Responder si cierro a la hora del horario. Sin `hora`, sí; con `hora`
+     * (HH:mm), cierro a esa, solo por hoy: el horario semanal no cambia.
+     */
+    public function confirmarCierre(Request $request, Negocio $negocio): JsonResponse
+    {
+        if (! $negocio->esPropietario($request->user())) {
+            return response()->json(['message' => 'Solo el propietario abre y cierra el negocio.'], 403);
+        }
+
+        $datos = $request->validate(
+            ['hora' => ['nullable', 'date_format:H:i']],
+            ['hora.date_format' => 'Escribe la hora como 21:30.'],
+        );
+
+        $ahora = now();
+        $cierre = HorarioNegocio::cierreSinConfirmar($negocio, $ahora);
+        if (! $cierre) {
+            return response()->json(['message' => 'Ya no hay un cierre por confirmar.'], 409);
+        }
+
+        $nuevo = null;
+        if (! empty($datos['hora'])) {
+            // La próxima vez que el reloj marque esa hora.
+            $nuevo = $ahora->copy()->setTimeFromTimeString($datos['hora']);
+            if ($nuevo->lte($ahora)) {
+                $nuevo->addDay();
+            }
+            if ($nuevo->gt($cierre->copy()->addHours(HorarioNegocio::MAX_HORAS_AJUSTE))) {
+                throw ValidationException::withMessages([
+                    'hora' => ['Esa hora ya pasó o queda muy lejos. Escribe una hora cercana.'],
+                ]);
+            }
+        }
+
+        HorarioNegocio::responderCierre($negocio, $cierre, $nuevo);
+
+        return response()->json(['message' => 'Listo, quedó guardado.']);
     }
 
     /**

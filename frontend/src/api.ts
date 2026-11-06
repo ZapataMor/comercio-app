@@ -745,6 +745,25 @@ export type PedidoPorAceptar = {
   segundos: number;
 };
 
+/** Cierre del horario automático que el dueño debe confirmar. */
+export type CierrePorConfirmar = {
+  id: number;
+  nombre: string;
+  /** "8:00 p. m." */
+  cierra_texto: string;
+  segundos: number;
+};
+
+export async function getCierresPorConfirmar(token: string): Promise<CierrePorConfirmar[]> {
+  const d = await authGet('/api/negocios/mios/por-cerrar', token);
+  return (d.cierres ?? []) as CierrePorConfirmar[];
+}
+
+/** `hora` null: sí cierra a la hora del horario. "21:30": cierra a esa, solo hoy. */
+export async function confirmarCierre(token: string, negocioId: number, hora: string | null): Promise<void> {
+  await authSend('PUT', `/api/negocios/mios/${negocioId}/cierre`, token, { hora });
+}
+
 /** Pedidos sin aceptar de todos mis negocios. */
 export async function getPedidosPorAceptar(token: string): Promise<PedidoPorAceptar[]> {
   const d = await authGet('/api/negocios/mios/por-aceptar', token);

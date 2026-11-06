@@ -61,6 +61,124 @@ test('el aviso de cierre funciona pasando la medianoche y sin falsas alarmas', f
     expect(HorarioNegocio::minutosParaCerrar($seguido, Carbon::parse('2026-11-09 23:55:00')))->toBeNull();
 });
 
+function negocioConCierre(User $dueno): Negocio
+{
+    return Negocio::forceCreate([
+        'user_id' => $dueno->id,
+        'nombre' => 'Tienda',
+        'activo' => true,
+        'activo_cambiado_at' => '2026-11-09 07:00:00',
+        'horario' => ['lun' => ['abre' => '07:00', 'cierra' => '20:00']],
+    ]);
+}
+
+test('al dueño se le pregunta solo en los últimos 20 minutos y una vez', function () {
+    $dueno = usuarioRol('usuario');
+    $negocio = negocioConCierre($dueno);
+    Sanctum::actingAs($dueno);
+
+    Carbon::setTestNow('2026-11-09 19:39:00');
+    $this->getJson('/api/negocios/mios/por-cerrar')->assertOk()->assertJsonCount(0, 'cierres');
+
+    Carbon::setTestNow('2026-11-09 19:40:00');
+    $this->getJson('/api/negocios/mios/por-cerrar')
+        ->assertJsonPath('cierres.0.id', $negocio->id)
+        ->assertJsonPath('cierres.0.cierra_texto', '8:00 p. m.');
+
+    $this->putJson("/api/negocios/mios/{$negocio->id}/cierre", ['hora' => null])->assertOk();
+    $this->getJson('/api/negocios/mios/por-cerrar')->assertJsonCount(0, 'cierres');
+
+    // Decir que sí no cambia nada: cierra a su hora.
+    Carbon::setTestNow('2026-11-09 20:00:00');
+    expect(HorarioNegocio::aplicar($negocio->fresh(), now()))->toBeTrue()
+        ->and($negocio->fresh()->activo)->toBeFalse();
+
+    Carbon::setTestNow();
+});
+
+test('otra hora vale solo ese día y no toca el horario', function () {
+    $dueno = usuarioRol('usuario');
+    $negocio = negocioConCierre($dueno);
+    $horario = $negocio->fresh()->horario;
+    Sanctum::actingAs($dueno);
+
+    Carbon::setTestNow('2026-11-09 19:45:00');
+    $this->putJson("/api/negocios/mios/{$negocio->id}/cierre", ['hora' => '21:30'])->assertOk();
+    expect($negocio->fresh()->horario)->toBe($horario);
+
+    // A la hora del horario no cierra, y al cliente se le dice la hora nueva.
+    Carbon::setTestNow('2026-11-09 20:01:00');
+    expect(HorarioNegocio::aplicar($negocio->fresh(), now()))->toBeFalse();
+    $this->getJson("/api/negocios/{$negocio->id}")
+        ->assertJsonPath('negocio.horario_hoy', 'Hoy cierra a las 9:30 p. m.')
+        ->assertJsonPath('negocio.minutos_para_cerrar', null);
+
+    // El aviso al cliente sigue la hora nueva.
+    Carbon::setTestNow('2026-11-09 21:25:00');
+    $this->getJson("/api/negocios/{$negocio->id}")->assertJsonPath('negocio.minutos_para_cerrar', 5);
+
+    Carbon::setTestNow('2026-11-09 21:30:00');
+    expect(HorarioNegocio::aplicar($negocio->fresh(), now()))->toBeTrue()
+        ->and($negocio->fresh()->activo)->toBeFalse();
+
+    // Otro lunes vuelve a cerrar a las 8:00 y se pregunta otra vez.
+    $negocio->fresh()->update(['activo' => true]);
+    Carbon::setTestNow('2026-11-23 19:45:00');
+    $this->getJson('/api/negocios/mios/por-cerrar')->assertJsonPath('cierres.0.cierra_texto', '8:00 p. m.');
+    $this->getJson("/api/negocios/{$negocio->id}")->assertJsonPath('negocio.horario_hoy', 'Hoy de 7:00 a. m. a 8:00 p. m.');
+
+    Carbon::setTestNow('2026-11-23 20:00:00');
+    expect(HorarioNegocio::aplicar($negocio->fresh(), now()))->toBeTrue();
+
+    Carbon::setTestNow();
+});
+
+test('también se puede cerrar más temprano y pasar de medianoche', function () {
+    $dueno = usuarioRol('usuario');
+    $negocio = negocioConCierre($dueno);
+    Sanctum::actingAs($dueno);
+
+    Carbon::setTestNow('2026-11-09 19:45:00');
+    $this->putJson("/api/negocios/mios/{$negocio->id}/cierre", ['hora' => '19:50'])->assertOk();
+    Carbon::setTestNow('2026-11-09 19:50:00');
+    expect(HorarioNegocio::aplicar($negocio->fresh(), now()))->toBeTrue();
+
+    $negocio->fresh()->forceFill(['activo' => true, 'cierre_original' => null, 'cierre_ajustado' => null, 'activo_cambiado_at' => '2026-11-09 07:00:00'])->save();
+    Carbon::setTestNow('2026-11-09 19:45:00');
+    $this->putJson("/api/negocios/mios/{$negocio->id}/cierre", ['hora' => '01:00'])->assertOk();
+    expect($negocio->fresh()->cierre_ajustado->toDateTimeString())->toBe('2026-11-10 01:00:00');
+
+    Carbon::setTestNow();
+});
+
+test('una hora que ya pasó o muy lejana se rechaza', function () {
+    $dueno = usuarioRol('usuario');
+    $negocio = negocioConCierre($dueno);
+    Sanctum::actingAs($dueno);
+
+    Carbon::setTestNow('2026-11-09 19:45:00');
+    $this->putJson("/api/negocios/mios/{$negocio->id}/cierre", ['hora' => '19:00'])->assertUnprocessable();
+    $this->putJson("/api/negocios/mios/{$negocio->id}/cierre", ['hora' => '25:00'])->assertUnprocessable();
+
+    Carbon::setTestNow();
+});
+
+test('el cierre solo lo confirma el propietario y solo dentro de los 20 minutos', function () {
+    $dueno = usuarioRol('usuario');
+    $negocio = negocioConCierre($dueno);
+
+    Sanctum::actingAs(usuarioRol('usuario'));
+    Carbon::setTestNow('2026-11-09 19:45:00');
+    $this->putJson("/api/negocios/mios/{$negocio->id}/cierre", ['hora' => null])->assertForbidden();
+    $this->getJson('/api/negocios/mios/por-cerrar')->assertJsonCount(0, 'cierres');
+
+    Sanctum::actingAs($dueno);
+    Carbon::setTestNow('2026-11-09 15:00:00');
+    $this->putJson("/api/negocios/mios/{$negocio->id}/cierre", ['hora' => null])->assertStatus(409);
+
+    Carbon::setTestNow();
+});
+
 test('el catálogo dice cuánto falta para cerrar solo si está abierto', function () {
     Carbon::setTestNow('2026-11-09 19:55:00');
     $negocio = Negocio::forceCreate([

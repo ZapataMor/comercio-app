@@ -19,6 +19,9 @@ use Illuminate\Support\Carbon;
  *
  * El switch Abierto/Cerrado sigue mandando: si el dueño lo toca a mano, se
  * respeta hasta la siguiente hora de apertura o cierre del horario.
+ *
+ * Antes de cerrar se le pregunta al dueño si cierra a esa hora. Si da otra,
+ * vale solo para ese cierre (el "ajuste"): el horario semanal no cambia.
  */
 class HorarioNegocio
 {
@@ -27,6 +30,12 @@ class HorarioNegocio
 
     /** A cuántos minutos del cierre se le advierte al cliente antes de pedir. */
     public const AVISO_CIERRE_MINUTOS = 10;
+
+    /** Cuántos minutos antes del cierre se le pregunta al dueño si cierra a esa hora. */
+    public const PREGUNTA_CIERRE_MINUTOS = 20;
+
+    /** Lo más tarde que se puede correr un cierre, en horas. */
+    public const MAX_HORAS_AJUSTE = 12;
 
     /** Clave del horario de los días festivos. */
     public const FESTIVO = 'fes';
@@ -85,12 +94,25 @@ class HorarioNegocio
     }
 
     /**
+     * Cierre de hoy que el dueño cambió, o null.
+     *
+     * @return array{de: CarbonInterface, a: CarbonInterface}|null
+     */
+    public static function ajusteDe(Negocio $negocio): ?array
+    {
+        return $negocio->cierre_original && $negocio->cierre_ajustado
+            ? ['de' => $negocio->cierre_original, 'a' => $negocio->cierre_ajustado]
+            : null;
+    }
+
+    /**
      * Franjas abiertas [abre, cierra] de los días alrededor de $ahora (la
-     * semana anterior basta para saber el último cambio).
+     * semana anterior basta para saber el último cambio). Con `$ajuste`, la
+     * franja que cerraba a esa hora exacta cierra a la nueva.
      *
      * @return array<int, array{0: CarbonInterface, 1: CarbonInterface}>
      */
-    private static function franjas(array $horario, CarbonInterface $ahora): array
+    private static function franjas(array $horario, CarbonInterface $ahora, ?array $ajuste = null): array
     {
         $horario = self::normalizar($horario) ?? [];
         $franjas = [];
@@ -106,16 +128,16 @@ class HorarioNegocio
             if ($cierra->lte($abre)) {
                 $cierra->addDay();
             }
-            $franjas[] = [$abre, $cierra];
+            $franjas[] = [$abre, $ajuste && $cierra->eq($ajuste['de']) ? $ajuste['a'] : $cierra];
         }
 
         return $franjas;
     }
 
     /** ¿Según el horario debería estar abierto en este momento? */
-    public static function deberiaEstarAbierto(array $horario, CarbonInterface $ahora): bool
+    public static function deberiaEstarAbierto(array $horario, CarbonInterface $ahora, ?array $ajuste = null): bool
     {
-        foreach (self::franjas($horario, $ahora) as [$abre, $cierra]) {
+        foreach (self::franjas($horario, $ahora, $ajuste) as [$abre, $cierra]) {
             if ($ahora->gte($abre) && $ahora->lt($cierra)) {
                 return true;
             }
@@ -128,19 +150,19 @@ class HorarioNegocio
      * Minutos que faltan para que el horario cierre el negocio, si es dentro de
      * AVISO_CIERRE_MINUTOS; null si no cierra tan pronto o no tiene horario.
      */
-    public static function minutosParaCerrar(?array $horario, CarbonInterface $ahora): ?int
+    public static function minutosParaCerrar(?array $horario, CarbonInterface $ahora, ?array $ajuste = null): ?int
     {
         $horario = self::normalizar($horario);
         if (! $horario) {
             return null;
         }
 
-        foreach (self::franjas($horario, $ahora) as [$abre, $cierra]) {
+        foreach (self::franjas($horario, $ahora, $ajuste) as [$abre, $cierra]) {
             if ($ahora->lt($abre) || $ahora->gte($cierra)) {
                 continue;
             }
             // Si otra franja empieza justo ahí, sigue abierto.
-            if (self::deberiaEstarAbierto($horario, $cierra)) {
+            if (self::deberiaEstarAbierto($horario, $cierra, $ajuste)) {
                 continue;
             }
 
@@ -152,11 +174,42 @@ class HorarioNegocio
         return null;
     }
 
+    /**
+     * Cierre del horario que se le debe preguntar al dueño: el que viene en los
+     * próximos PREGUNTA_CIERRE_MINUTOS, si está abierto y aún no respondió.
+     */
+    public static function cierreSinConfirmar(Negocio $negocio, CarbonInterface $ahora): ?CarbonInterface
+    {
+        $horario = self::normalizar($negocio->horario);
+        if (! $horario || ! $negocio->activo) {
+            return null;
+        }
+
+        foreach (self::franjas($horario, $ahora) as [$abre, $cierra]) {
+            if ($ahora->lt($abre) || $ahora->gte($cierra) || self::deberiaEstarAbierto($horario, $cierra)) {
+                continue;
+            }
+
+            $faltan = $ahora->diffInSeconds($cierra);
+            $yaRespondio = $negocio->cierre_original?->eq($cierra);
+
+            return $faltan <= self::PREGUNTA_CIERRE_MINUTOS * 60 && ! $yaRespondio ? $cierra : null;
+        }
+
+        return null;
+    }
+
+    /** La respuesta del dueño: `$nuevo` null = sí cierra a la hora del horario. */
+    public static function responderCierre(Negocio $negocio, CarbonInterface $cierre, ?CarbonInterface $nuevo): void
+    {
+        $negocio->forceFill(['cierre_original' => $cierre, 'cierre_ajustado' => $nuevo])->save();
+    }
+
     /** La última hora de apertura o cierre que ya pasó. */
-    public static function ultimoCambio(array $horario, CarbonInterface $ahora): ?CarbonInterface
+    public static function ultimoCambio(array $horario, CarbonInterface $ahora, ?array $ajuste = null): ?CarbonInterface
     {
         $ultimo = null;
-        foreach (self::franjas($horario, $ahora) as $franja) {
+        foreach (self::franjas($horario, $ahora, $ajuste) as $franja) {
             foreach ($franja as $momento) {
                 if ($momento->lte($ahora) && (! $ultimo || $momento->gt($ultimo))) {
                     $ultimo = $momento;
@@ -179,12 +232,13 @@ class HorarioNegocio
             return false;
         }
 
-        $debe = self::deberiaEstarAbierto($horario, $ahora);
+        $ajuste = self::ajusteDe($negocio);
+        $debe = self::deberiaEstarAbierto($horario, $ahora, $ajuste);
         if ($negocio->activo === $debe) {
             return false;
         }
 
-        $ultimo = self::ultimoCambio($horario, $ahora);
+        $ultimo = self::ultimoCambio($horario, $ahora, $ajuste);
         if (! $ultimo || ($negocio->activo_cambiado_at && $negocio->activo_cambiado_at->gte($ultimo))) {
             return false;
         }
@@ -212,6 +266,17 @@ class HorarioNegocio
         }
 
         return ($festivo ? 'Hoy es festivo: de ' : 'Hoy de ').self::hora($hoy['abre']).' a '.self::hora($hoy['cierra']);
+    }
+
+    /** Como textoHoy, pero si hoy el dueño cambió el cierre dice la hora nueva. */
+    public static function textoHoyDe(Negocio $negocio, CarbonInterface $ahora): ?string
+    {
+        $ajuste = self::ajusteDe($negocio);
+        if ($ajuste && $ahora->lt($ajuste['a']) && $ajuste['de']->diffInHours($ahora, true) <= self::MAX_HORAS_AJUSTE) {
+            return 'Hoy cierra a las '.self::hora($ajuste['a']->copy()->setTimezone($ahora->getTimezone())->format('H:i'));
+        }
+
+        return self::textoHoy($negocio->horario, $ahora);
     }
 
     /** "07:00" → "7:00 a. m."; "20:30" → "8:30 p. m." */

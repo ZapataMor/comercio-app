@@ -75,6 +75,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/negocios/mios', [NegocioController::class, 'index']);
     // Pedidos sin aceptar de todos mis negocios: de aquí sale la alarma con la app abierta.
     Route::get('/negocios/mios/por-aceptar', [ComercioPedidoController::class, 'porAceptar']);
+    // Cierres del horario automático que el dueño debe confirmar (20 min antes).
+    Route::get('/negocios/mios/por-cerrar', [NegocioController::class, 'cierresPorConfirmar']);
+    Route::put('/negocios/mios/{negocio}/cierre', [NegocioController::class, 'confirmarCierre'])->whereNumber('negocio');
     Route::get('/negocios/mios/{negocio}', [NegocioController::class, 'show'])->whereNumber('negocio');
     Route::post('/negocios', [NegocioController::class, 'store']);
 
