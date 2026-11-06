@@ -191,7 +191,6 @@ export default function HomeScreen({ navigation }: Props) {
   const toast = useToast();
   const user = auth!.user;
   const token = auth!.token;
-  const esCliente = user.roles.includes('usuario');
   const esAdmin = user.roles.includes('administrador');
   const esDomiciliario = user.roles.includes('domiciliario');
 
@@ -270,8 +269,7 @@ export default function HomeScreen({ navigation }: Props) {
   return (
     <ScrollView
       style={styles.container}
-      // El cliente lleva la barra flotante abajo: dejamos aire para no taparla.
-      contentContainerStyle={[styles.content, esCliente && styles.contentCliente]}>
+      contentContainerStyle={styles.content}>
       <Saludo />
 
       {tienePanel && (
@@ -478,7 +476,6 @@ export default function HomeScreen({ navigation }: Props) {
 const useStyles = makeStyles((c, shadow) => ({
   container: { flex: 1, backgroundColor: c.bg },
   content: { padding: 20 },
-  contentCliente: { paddingBottom: 110 },
   headerDerecha: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   item: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: c.surface,

@@ -3,7 +3,9 @@
  * "Mis pedidos") con ícono + nombre, fijos en todas las vistas del cliente.
  *
  * Reglas:
- *  - Solo aparece para usuarios con rol 'usuario' y en rutas del cliente.
+ *  - Solo aparece para usuarios con rol 'usuario' y en rutas del cliente. El
+ *    Inicio del comerciante (Home) y "Mis entregas" no lo son: quien también es
+ *    cliente la ve al pasar a Explorar.
  *  - En "Carrito", "Confirmar pedido" (Checkout) y "Mis pedidos" la barra no
  *    se muestra: son pasos de compra/consulta y sobraría un botón flotante.
  *  - El botón Carrito es, además, el DESTINO de la animación del paquete:
@@ -22,8 +24,6 @@ import Icon from './Icon';
 
 /** Rutas del flujo cliente donde la barra queda fija. */
 const RUTAS_CLIENTE = new Set([
-  'Home',
-  'Entregas',
   'Explorar',
   'Mapa',
   'Negocio',

@@ -1,7 +1,6 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
-import { useAuth } from '../AuthContext';
 import HeaderNegocios from '../components/HeaderNegocios';
 import HeaderPerfil from '../components/HeaderPerfil';
 import PanelDomiciliario, { PanelDomiciliarioRef } from '../components/PanelDomiciliario';
@@ -19,8 +18,6 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Entregas'>;
 export default function EntregasScreen({ navigation }: Props) {
   const { c } = useTheme();
   const styles = useStyles();
-  const { auth } = useAuth();
-  const esCliente = auth!.user.roles.includes('usuario');
   const scroll = useRef<ScrollView>(null);
   const panel = useRef<PanelDomiciliarioRef>(null);
   const panelY = useRef(0);
@@ -49,8 +46,7 @@ export default function EntregasScreen({ navigation }: Props) {
       // El código de entrega se escribe aquí: el primer toque debe llegar al botón.
       keyboardShouldPersistTaps="handled"
       style={styles.container}
-      // El cliente lleva la barra flotante abajo: dejamos aire para no taparla.
-      contentContainerStyle={[styles.content, esCliente && styles.contentCliente]}
+      contentContainerStyle={styles.content}
       refreshControl={
         <RefreshControl refreshing={refrescando} onRefresh={refrescar} colors={[c.accent]} tintColor={c.accent} />
       }>
@@ -70,6 +66,5 @@ export default function EntregasScreen({ navigation }: Props) {
 const useStyles = makeStyles(c => ({
   container: { flex: 1, backgroundColor: c.bg },
   content: { padding: 20 },
-  contentCliente: { paddingBottom: 110 },
   headerDerecha: { flexDirection: 'row', alignItems: 'center', gap: 12 },
 }));
