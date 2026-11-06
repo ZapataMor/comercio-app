@@ -465,6 +465,9 @@ refresco eficiente, paginación.
 - [ ] Tiempo real dentro de la app ([[ADR-002 Notificaciones en tiempo real]]); hoy push + 15 s.
 - [ ] Tarifa de domicilio por barrio/zona; definir el modelo de ingresos ([[Modelo de Negocio]]).
 - [ ] Reclamo cuando un pedido queda "en camino" y nunca se entrega.
+- [ ] Enviar los códigos de recogida y de entrega también por WhatsApp, automáticamente, con la API
+      oficial de Meta (WhatsApp Cloud API). Hace falta cuenta de Meta Business, número dedicado y
+      plantilla aprobada; confirmar la tarifa en Colombia y si Meta exige verificar la empresa.
 
 **Prioridad 3 — siguiente fase (ideas)**
 - [ ] Mapa / ubicación en tiempo real ([[Idea - Mapa en tiempo real]], [[Idea - Seguimiento del domiciliario]]).
