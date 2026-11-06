@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Negocio;
 use App\Models\Producto;
 use App\Models\Pedido;
+use App\Models\Resena;
 use App\Models\User;
 use App\Support\UbicacionDomiciliario;
 use Illuminate\Http\JsonResponse;
@@ -32,6 +33,8 @@ class AdminController extends Controller
             // Vetados por baja confiabilidad (revisar en Reputación).
             'domiciliarios_vetados' => User::whereNotNull('domiciliario_vetado_at')->count(),
             'negocios_vetados' => Negocio::whereNotNull('vetado_at')->count(),
+            // Reseñas con reportes sin atender (revisar en Reseñas).
+            'resenas_reportadas' => Resena::reportadas()->count(),
         ]);
     }
 

@@ -56,8 +56,8 @@ class Resenas
     public static function recalcular(Negocio|Producto $sujeto): void
     {
         $resenas = $sujeto instanceof Producto
-            ? Resena::where('producto_id', $sujeto->id)
-            : Resena::where('negocio_id', $sujeto->id)->whereNull('producto_id');
+            ? Resena::visibles()->where('producto_id', $sujeto->id)
+            : Resena::visibles()->where('negocio_id', $sujeto->id)->whereNull('producto_id');
 
         $promedio = (clone $resenas)->avg('estrellas');
 
@@ -68,8 +68,14 @@ class Resenas
         ]);
     }
 
-    /** Lo que se ve en público de una reseña. */
-    public static function publica(Resena $resena): array
+    /**
+     * Lo que se ve en público de una reseña, más lo que quien mira puede hacer
+     * con ella.
+     *
+     * @param  bool  $reportada  quien mira ya la reportó
+     * @param  bool  $esPropietario  quien mira es dueño de la tienda reseñada
+     */
+    public static function publica(Resena $resena, User $yo, bool $reportada, bool $esPropietario): array
     {
         return [
             'id' => $resena->id,
@@ -77,6 +83,19 @@ class Resenas
             'estrellas' => $resena->estrellas,
             'comentario' => $resena->comentario,
             'fecha' => $resena->created_at->format('d/m/Y'),
+            'respuesta' => self::respuesta($resena),
+            'propia' => $resena->user_id === $yo->id,
+            'reportada' => $reportada,
+            'puede_responder' => $esPropietario && $resena->respuesta === null,
+        ];
+    }
+
+    /** @return array{texto: string, fecha: string}|null */
+    public static function respuesta(Resena $resena): ?array
+    {
+        return $resena->respuesta === null ? null : [
+            'texto' => $resena->respuesta,
+            'fecha' => $resena->respondida_at->format('d/m/Y'),
         ];
     }
 

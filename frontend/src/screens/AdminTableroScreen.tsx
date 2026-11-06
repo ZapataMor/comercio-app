@@ -87,6 +87,11 @@ export default function AdminTableroScreen({ navigation }: Props) {
             etiqueta="Negocios vetados"
             color={stats.negocios_vetados ? c.danger : c.muted}
           />
+          <Tarjeta
+            valor={stats.resenas_reportadas ?? 0}
+            etiqueta="Reseñas reportadas"
+            color={stats.resenas_reportadas ? c.danger : c.muted}
+          />
         </FadeInView>
       ) : null}
 
@@ -129,6 +134,14 @@ export default function AdminTableroScreen({ navigation }: Props) {
         <PressableScale style={styles.item} onPress={() => navigation.navigate('AdminReputacion')}>
           <Icon name="escudo" size={24} color={c.accent} style={styles.itemEmoji} />
           <Text style={styles.itemTitulo}>Confiabilidad</Text>
+          <Icon name="chevron" size={20} color={c.chevron} />
+        </PressableScale>
+      </FadeInView>
+
+      <FadeInView delay={60}>
+        <PressableScale style={styles.item} onPress={() => navigation.navigate('AdminResenas')}>
+          <Icon name="estrella" size={24} color={c.accent} style={styles.itemEmoji} />
+          <Text style={styles.itemTitulo}>Reseñas</Text>
           <Icon name="chevron" size={20} color={c.chevron} />
         </PressableScale>
       </FadeInView>

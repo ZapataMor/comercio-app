@@ -8,6 +8,7 @@ use App\Http\Controllers\ProductoController;
 use App\Http\Controllers\Api\CatalogoController;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\AdminReputacionController;
+use App\Http\Controllers\Api\AdminResenaController;
 use App\Http\Controllers\Api\DomiciliarioController as ApiDomiciliarioController;
 use App\Http\Controllers\Api\PedidoController as ApiPedidoController;
 use App\Http\Controllers\Api\ComercioPedidoController;
@@ -152,6 +153,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/pedidos/{id}/calificacion', [ApiPedidoController::class, 'calificar']);
     // Estrellas y comentario públicos de la tienda y de lo que compró.
     Route::post('/pedidos/{id}/resenas', [ResenaController::class, 'guardar']);
+    // Cualquier usuario reporta una reseña; el propietario responde una vez.
+    Route::post('/resenas/{id}/reporte', [ResenaController::class, 'reportar'])->whereNumber('id');
+    Route::post('/resenas/{id}/respuesta', [ResenaController::class, 'responder'])->whereNumber('id');
 
     // --- Zona del ADMINISTRADOR ---
     Route::middleware('role:administrador')->prefix('admin')->group(function () {
@@ -172,6 +176,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/barrios/{id}/aprobar', [BarrioController::class, 'aprobar']);
         Route::delete('/barrios/{id}', [BarrioController::class, 'rechazar']);
         // Confiabilidad de domiciliarios y negocios: vetados, en riesgo, eventos.
+        Route::get('/resenas', [AdminResenaController::class, 'index']);
+        Route::put('/resenas/{id}/ocultar', [AdminResenaController::class, 'ocultar'])->whereNumber('id');
+        Route::put('/resenas/{id}/restaurar', [AdminResenaController::class, 'restaurar'])->whereNumber('id');
+        Route::put('/resenas/{id}/descartar-reportes', [AdminResenaController::class, 'descartarReportes'])->whereNumber('id');
         Route::get('/reputacion', [AdminReputacionController::class, 'index']);
         Route::get('/reputacion/{tipo}/{id}', [AdminReputacionController::class, 'show'])
             ->whereIn('tipo', ['negocio', 'domiciliario'])->whereNumber('id');

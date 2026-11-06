@@ -3,18 +3,30 @@
  *
  *   <PuntajeResenas resenas={r} />                ← "★ 4,6 (23)", para listados
  *   <SelectorEstrellas valor={n} onChange={…} />  ← para escribir una reseña
- *   <TarjetaResena resena={r} />                  ← una reseña publicada
+ *   <TarjetaResena resena={r} />                  ← una reseña publicada, con su
+ *                                                   respuesta y el botón de reportar
+ *   <ResponderResena … />                         ← el propietario contesta una vez
  *   <ResenasDeProducto … />                       ← bloque del detalle del producto
  *
  * No confundir con el nivel de confiabilidad (Reputacion.tsx): ese mide si
  * cumplieron con el pedido; las reseñas, si le gustó al cliente.
  */
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleProp, Text, View, ViewStyle } from 'react-native';
+import { ActivityIndicator, StyleProp, Text, TextInput, View, ViewStyle } from 'react-native';
 import { Path, Svg } from 'react-native-svg';
-import { getResenas, PaginaResenas, ResenaPublica, ResumenResenas } from '../api';
+import {
+  getResenas,
+  MotivoReporte,
+  PaginaResenas,
+  reportarResena,
+  ResenaPublica,
+  responderResena,
+  RespuestaResena,
+  ResumenResenas,
+} from '../api';
 import { useAuth } from '../AuthContext';
 import { font, makeStyles, radius, useTheme } from '../theme';
+import { useToast } from '../Toast';
 import { PressableScale } from './anim';
 import Icon from './Icon';
 
@@ -131,6 +143,143 @@ export function TarjetaResena({ resena }: { resena: ResenaPublica }) {
       </View>
       <Estrellas nota={resena.estrellas} />
       {!!resena.comentario && <Text style={styles.comentario}>{resena.comentario}</Text>}
+      {!!resena.respuesta && (
+        <View style={styles.respuesta}>
+          <Text style={styles.respuestaTitulo}>{`Respuesta de la tienda · ${resena.respuesta.fecha}`}</Text>
+          <Text style={styles.comentario}>{resena.respuesta.texto}</Text>
+        </View>
+      )}
+      {!resena.propia && <ReportarResena resenaId={resena.id} yaReportada={resena.reportada} />}
+    </View>
+  );
+}
+
+const MOTIVOS_REPORTE: { motivo: MotivoReporte; label: string }[] = [
+  { motivo: 'ofensiva', label: 'Ofensiva' },
+  { motivo: 'falsa', label: 'Falsa' },
+  { motivo: 'spam', label: 'Publicidad' },
+  { motivo: 'otro', label: 'Otro' },
+];
+
+/** "Reportar" abre los motivos; al tocar uno se envía al admin. */
+function ReportarResena({ resenaId, yaReportada }: { resenaId: number; yaReportada: boolean }) {
+  const styles = useStyles();
+  const { auth } = useAuth();
+  const toast = useToast();
+  const [abierto, setAbierto] = useState(false);
+  const [enviando, setEnviando] = useState(false);
+  const [reportada, setReportada] = useState(yaReportada);
+
+  async function enviar(motivo: MotivoReporte) {
+    setEnviando(true);
+    try {
+      toast.exito(await reportarResena(auth!.token, resenaId, motivo));
+      setReportada(true);
+      setAbierto(false);
+    } catch (e) {
+      toast.error('No se pudo reportar', e instanceof Error ? e.message : 'Error');
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  if (reportada) {
+    return <Text style={styles.reportada}>Reportada</Text>;
+  }
+  if (!abierto) {
+    return (
+      <PressableScale
+        style={styles.accion}
+        hitSlop={8}
+        onPress={() => setAbierto(true)}
+        accessibilityRole="button"
+        accessibilityLabel="Reportar esta reseña">
+        <Text style={styles.accionTxt}>Reportar</Text>
+      </PressableScale>
+    );
+  }
+  return (
+    <View style={styles.motivos}>
+      <Text style={styles.motivosTitulo}>¿Qué tiene de malo esta reseña?</Text>
+      <View style={styles.chips}>
+        {MOTIVOS_REPORTE.map(m => (
+          <PressableScale
+            key={m.motivo}
+            style={styles.chip}
+            disabled={enviando}
+            onPress={() => enviar(m.motivo)}
+            accessibilityRole="button"
+            accessibilityLabel={`Reportar: ${m.label}`}>
+            <Text style={styles.chipTxt}>{m.label}</Text>
+          </PressableScale>
+        ))}
+        <PressableScale style={styles.accion} hitSlop={8} onPress={() => setAbierto(false)} accessibilityRole="button">
+          <Text style={styles.accionTxt}>Cancelar</Text>
+        </PressableScale>
+      </View>
+    </View>
+  );
+}
+
+/** El propietario contesta una reseña. Solo una vez: lo publicado no se cambia. */
+export function ResponderResena({
+  resenaId,
+  onRespondida,
+}: {
+  resenaId: number;
+  onRespondida: (respuesta: RespuestaResena) => void;
+}) {
+  const { c } = useTheme();
+  const styles = useStyles();
+  const { auth } = useAuth();
+  const toast = useToast();
+  const [abierto, setAbierto] = useState(false);
+  const [texto, setTexto] = useState('');
+  const [enviando, setEnviando] = useState(false);
+
+  async function publicar() {
+    setEnviando(true);
+    try {
+      onRespondida(await responderResena(auth!.token, resenaId, texto.trim()));
+      toast.exito('Respuesta publicada');
+    } catch (e) {
+      toast.error('No se pudo responder', e instanceof Error ? e.message : 'Error');
+      setEnviando(false);
+    }
+  }
+
+  if (!abierto) {
+    return (
+      <PressableScale style={styles.accion} hitSlop={8} onPress={() => setAbierto(true)} accessibilityRole="button">
+        <Text style={styles.responderTxt}>Responder</Text>
+      </PressableScale>
+    );
+  }
+  return (
+    <View style={styles.responder}>
+      <TextInput
+        style={styles.input}
+        value={texto}
+        onChangeText={setTexto}
+        placeholder="Tu respuesta es pública…"
+        placeholderTextColor={c.mutedSoft}
+        maxLength={500}
+        multiline
+        autoFocus
+      />
+      <Text style={styles.responderNota}>Solo puedes responder una vez, y luego no se puede cambiar.</Text>
+      <View style={styles.responderBotones}>
+        <PressableScale style={styles.accion} hitSlop={8} onPress={() => setAbierto(false)} accessibilityRole="button">
+          <Text style={styles.accionTxt}>Cancelar</Text>
+        </PressableScale>
+        <PressableScale
+          style={[styles.publicar, (!texto.trim() || enviando) && styles.publicarOff]}
+          disabled={!texto.trim() || enviando}
+          onPress={publicar}
+          accessibilityRole="button">
+          <Text style={styles.publicarTxt}>Publicar respuesta</Text>
+        </PressableScale>
+      </View>
     </View>
   );
 }
@@ -200,6 +349,32 @@ const useStyles = makeStyles(c => ({
   autor: { flex: 1, color: c.textStrong, fontFamily: font.semibold, fontSize: 14 },
   fecha: { color: c.mutedSoft, fontFamily: font.regular, fontSize: 12 },
   comentario: { color: c.text, fontFamily: font.regular, fontSize: 14, lineHeight: 20 },
+  respuesta: {
+    marginTop: 4, paddingLeft: 12, gap: 2, borderLeftWidth: 2, borderLeftColor: c.accent,
+  },
+  respuestaTitulo: { color: c.muted, fontFamily: font.semibold, fontSize: 12 },
+  accion: { alignSelf: 'flex-start', paddingVertical: 4 },
+  accionTxt: { color: c.muted, fontFamily: font.medium, fontSize: 12 },
+  reportada: { color: c.mutedSoft, fontFamily: font.regular, fontSize: 12, paddingVertical: 4 },
+  motivos: { gap: 6, marginTop: 2 },
+  motivosTitulo: { color: c.muted, fontFamily: font.medium, fontSize: 12 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  chip: {
+    borderWidth: 1, borderColor: c.borderStrong, borderRadius: radius.pill,
+    paddingHorizontal: 12, paddingVertical: 6,
+  },
+  chipTxt: { color: c.text, fontFamily: font.medium, fontSize: 13 },
+  responderTxt: { color: c.goldText, fontFamily: font.semibold, fontSize: 13 },
+  responder: { gap: 6, paddingBottom: 12 },
+  input: {
+    borderWidth: 1, borderColor: c.borderStrong, borderRadius: radius.sm, paddingHorizontal: 12,
+    paddingVertical: 10, minHeight: 72, textAlignVertical: 'top', color: c.textStrong, fontFamily: font.regular,
+  },
+  responderNota: { color: c.muted, fontFamily: font.regular, fontSize: 12 },
+  responderBotones: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  publicar: { backgroundColor: c.brand, borderRadius: radius.sm, paddingHorizontal: 14, paddingVertical: 10 },
+  publicarOff: { opacity: 0.5 },
+  publicarTxt: { color: c.onBrand, fontFamily: font.bold, fontSize: 13 },
   bloque: { marginTop: 22, gap: 10 },
   bloqueTitulo: { color: c.textStrong, fontFamily: font.semibold, fontSize: 14 },
   bloqueCarga: { alignSelf: 'flex-start' },

@@ -4,7 +4,7 @@ import { ActivityIndicator, FlatList, RefreshControl, Text, View } from 'react-n
 import { getResenas, ResenaPublica, ResumenResenas } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView } from '../components/anim';
-import { Estrellas, promedioTexto, TarjetaResena } from '../components/Resenas';
+import { Estrellas, promedioTexto, ResponderResena, TarjetaResena } from '../components/Resenas';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
 
@@ -92,7 +92,22 @@ export default function ResenasScreen({ route }: Props) {
         </FadeInView>
       }
       ListEmptyComponent={<Text style={styles.vacio}>Todavía no hay reseñas.</Text>}
-      renderItem={({ item }) => <TarjetaResena resena={item} />}
+      keyboardShouldPersistTaps="handled"
+      renderItem={({ item }) => (
+        <>
+          <TarjetaResena resena={item} />
+          {item.puede_responder && (
+            <ResponderResena
+              resenaId={item.id}
+              onRespondida={respuesta =>
+                setResenas(prev =>
+                  prev.map(r => (r.id === item.id ? { ...r, respuesta, puede_responder: false } : r)),
+                )
+              }
+            />
+          )}
+        </>
+      )}
       onEndReached={cargarMas}
       onEndReachedThreshold={0.4}
       ListFooterComponent={cargandoMas ? <ActivityIndicator color={c.accent} style={{ marginVertical: 16 }} /> : null}

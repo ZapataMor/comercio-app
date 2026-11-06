@@ -1060,6 +1060,7 @@ export type AdminStats = {
   productos: number;
   domiciliarios_vetados?: number;
   negocios_vetados?: number;
+  resenas_reportadas?: number;
 };
 
 export type AdminUsuario = {
@@ -1184,6 +1185,52 @@ export type AdminReputacionResp = {
   vetados: number;
   en_riesgo: number;
 };
+
+export type FiltroResenas = 'reportadas' | 'ocultas' | 'todas';
+
+/** Una reseña tal como la revisa el admin. */
+export type ResenaAdmin = {
+  id: number;
+  autor: string;
+  estrellas: number;
+  comentario: string | null;
+  fecha: string;
+  negocio: string | null;
+  /** Null si la reseña es de la tienda. */
+  producto: string | null;
+  oculta: boolean;
+  respuesta: string | null;
+  /** Reportes sin atender, por motivo. */
+  reportes: { motivo: string; cantidad: number }[];
+  /** Lo que han hecho los admins, de lo más reciente a lo más antiguo. */
+  historial: { accion: 'ocultar' | 'restaurar' | 'descartar'; motivo: string | null; admin: string | null; fecha: string }[];
+};
+
+export type PaginaResenasAdmin = {
+  resenas: ResenaAdmin[];
+  reportadas: number;
+  ocultas: number;
+  pagina: number;
+  ultima_pagina: number;
+};
+
+export function getAdminResenas(token: string, filtro: FiltroResenas, pagina = 1): Promise<PaginaResenasAdmin> {
+  return authGet(`/api/admin/resenas?filtro=${filtro}&page=${pagina}`, token);
+}
+
+/** Quita la reseña de lo público y del promedio. */
+export async function ocultarResena(token: string, id: number, motivo: string): Promise<void> {
+  await authSend('PUT', `/api/admin/resenas/${id}/ocultar`, token, { motivo });
+}
+
+export async function restaurarResena(token: string, id: number, motivo: string): Promise<void> {
+  await authSend('PUT', `/api/admin/resenas/${id}/restaurar`, token, { motivo });
+}
+
+/** La reseña se queda publicada y sale de las reportadas. */
+export async function descartarReportesResena(token: string, id: number): Promise<void> {
+  await authSend('PUT', `/api/admin/resenas/${id}/descartar-reportes`, token);
+}
 
 /** Vetados primero, luego del peor al mejor puntaje. */
 export function getAdminReputacion(token: string, tipo: TipoReputacion): Promise<AdminReputacionResp> {
@@ -1401,7 +1448,19 @@ export type ResenaPublica = {
   estrellas: number;
   comentario: string | null;
   fecha: string;
+  /** Lo que contestó el propietario de la tienda. */
+  respuesta: RespuestaResena | null;
+  /** La escribió quien la está viendo. */
+  propia: boolean;
+  /** Quien la está viendo ya la reportó. */
+  reportada: boolean;
+  /** Quien la está viendo es propietario y aún no ha respondido. */
+  puede_responder: boolean;
 };
+
+export type RespuestaResena = { texto: string; fecha: string };
+
+export type MotivoReporte = 'ofensiva' | 'falsa' | 'spam' | 'otro';
 
 export type PaginaResenas = {
   resumen: ResumenResenas;
@@ -1544,6 +1603,18 @@ export async function getResenas(
   const producto = productoId ? `&producto_id=${productoId}` : '';
   const d = await authGet(`/api/negocios/${negocioId}/resenas?page=${pagina}${producto}`, token);
   return { resumen: d.resumen, items: d.resenas, pagina: d.pagina, ultima_pagina: d.ultima_pagina };
+}
+
+/** Avisar al admin que una reseña no debería estar publicada. */
+export async function reportarResena(token: string, id: number, motivo: MotivoReporte): Promise<string> {
+  const d = await authSend('POST', `/api/resenas/${id}/reporte`, token, { motivo });
+  return d.message as string;
+}
+
+/** El propietario responde una reseña; solo se puede una vez. */
+export async function responderResena(token: string, id: number, respuesta: string): Promise<RespuestaResena> {
+  const d = await authSend('POST', `/api/resenas/${id}/respuesta`, token, { respuesta });
+  return d.respuesta as RespuestaResena;
 }
 
 /** Publicar o corregir las reseñas de un pedido entregado. */

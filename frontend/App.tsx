@@ -48,6 +48,7 @@ import AdminUsuariosScreen from './src/screens/AdminUsuariosScreen';
 import AdminNegociosScreen from './src/screens/AdminNegociosScreen';
 import AdminBarriosScreen from './src/screens/AdminBarriosScreen';
 import AdminReputacionScreen from './src/screens/AdminReputacionScreen';
+import AdminResenasScreen from './src/screens/AdminResenasScreen';
 import EntregasScreen from './src/screens/EntregasScreen';
 import PedidosEntregadosScreen from './src/screens/PedidosEntregadosScreen';
 import CarritoScreen from './src/screens/CarritoScreen';
@@ -217,6 +218,7 @@ function Navegacion() {
                   component={AdminReputacionScreen}
                   options={{ title: 'Confiabilidad' }}
                 />
+                <Stack.Screen name="AdminResenas" component={AdminResenasScreen} options={{ title: 'Reseñas' }} />
               </>
             )}
 
