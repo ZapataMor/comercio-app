@@ -75,6 +75,7 @@ class CancelarPedido
     public static function ejecutar(Pedido $pedido, string $quien, ?string $motivo): bool
     {
         $penalizar = $quien === self::POR_NEGOCIO && self::penaliza($pedido);
+        $estabaOfrecido = $pedido->estado === 'listo';
 
         $afectados = Pedido::whereKey($pedido->id)
             ->whereIn('estado', self::estadosPermitidos($quien))
@@ -97,6 +98,10 @@ class CancelarPedido
         }
 
         self::avisar($pedido, $quien);
+
+        if ($estabaOfrecido) {
+            OfrecerPedido::retirar($pedido);
+        }
 
         return true;
     }

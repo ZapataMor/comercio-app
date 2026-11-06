@@ -41,7 +41,7 @@ jest.mock('@notifee/react-native', () => ({
   AndroidCategory: { ALARM: 'alarm' },
   AndroidImportance: { HIGH: 4 },
   AndroidVisibility: { PUBLIC: 1 },
-  EventType: { PRESS: 1 },
+  EventType: { PRESS: 1, ACTION_PRESS: 2 },
 }));
 
 jest.mock('@react-native-documents/picker', () => ({

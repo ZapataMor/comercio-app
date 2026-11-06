@@ -14,6 +14,7 @@ import { CartProvider } from './src/CartContext';
 import AvisoPedidoNuevo from './src/components/AvisoPedidoNuevo';
 import BarraCliente from './src/components/BarraCliente';
 import { ConfirmacionProvider } from './src/components/Confirmacion';
+import OfertaPedido from './src/components/OfertaPedido';
 import { AppDesenfocable } from './src/components/Desenfoque';
 import { FlyToCartProvider } from './src/components/FlyToCart';
 import HeaderPerfil from './src/components/HeaderPerfil';
@@ -274,6 +275,12 @@ function AlarmaBridge({ mostrarAviso }: { mostrarAviso: boolean }) {
   return mostrarAviso ? <AvisoPedidoNuevo pedidos={enEspera} /> : null;
 }
 
+/** Al domiciliario los pedidos se le ofrecen en cualquier pantalla. */
+function OfertaBridge() {
+  const { auth } = useAuth();
+  return auth?.user.roles.includes('domiciliario') ? <OfertaPedido key={auth.user.id} /> : null;
+}
+
 function App() {
   // Toda la app toma los colores del modo vigente (día/noche según la hora).
   return (
@@ -302,6 +309,7 @@ function AppContenido() {
                 <StatusBar barStyle="light-content" backgroundColor={c.header} />
                 <PushBridge />
                 <AlarmaBridge mostrarAviso={!splashVisible} />
+                {!splashVisible && <OfertaBridge />}
                 <View style={styles.raiz}>
                   <Navegacion />
                   {splashVisible && <SplashVitrina onFin={ocultarSplash} />}

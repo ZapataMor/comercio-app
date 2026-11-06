@@ -6,6 +6,8 @@ use App\Models\User;
 use App\Notifications\EstadoPedidoActualizado;
 use App\Notifications\NuevoPedidoParaComercio;
 use App\Notifications\PedidoDisponibleParaDomiciliario;
+use App\Notifications\PedidoYaNoDisponible;
+use App\Support\CancelarPedido;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
@@ -126,7 +128,6 @@ test('las notificaciones fcm usan canal android de alta prioridad', function () 
     $pedido = pedidoEnEstado($negocio, $cliente, 'en_camino');
 
     $mensajes = [
-        (new PedidoDisponibleParaDomiciliario($pedido))->toFcm(usuarioCon('domiciliario'))->toArray(),
         (new EstadoPedidoActualizado($pedido))->toFcm($cliente)->toArray(),
     ];
 
@@ -137,6 +138,73 @@ test('las notificaciones fcm usan canal android de alta prioridad', function () 
             ->and($mensaje['android']['notification']['default_sound'])->toBeTrue()
             ->and($mensaje['android']['notification']['default_vibrate_timings'])->toBeTrue();
     }
+});
+
+test('el pedido disponible es un mensaje de datos: la app le pone los botones', function () {
+    $negocio = negocioAbierto();
+    $pedido = pedidoEnEstado($negocio, usuarioCon('usuario'), 'listo');
+
+    $mensaje = (new PedidoDisponibleParaDomiciliario($pedido))->toFcm(usuarioCon('domiciliario'))->toArray();
+
+    expect($mensaje)->not->toHaveKey('notification')
+        ->and($mensaje['android']['priority'])->toBe('high')
+        ->and($mensaje['data']['tipo'])->toBe('pedido_disponible')
+        ->and($mensaje['data']['pedido_id'])->toBe((string) $pedido->id)
+        ->and($mensaje['data']['titulo'])->toBeString()
+        ->and($mensaje['data']['cuerpo'])->toContain($negocio->nombre);
+});
+
+test('la oferta retirada es un mensaje silencioso', function () {
+    $pedido = pedidoEnEstado(negocioAbierto(), usuarioCon('usuario'), 'listo');
+
+    $mensaje = (new PedidoYaNoDisponible($pedido))->toFcm(usuarioCon('domiciliario'))->toArray();
+
+    expect($mensaje)->not->toHaveKey('notification')
+        ->and($mensaje['android']['priority'])->toBe('high')
+        ->and($mensaje['data'])->toBe(['tipo' => 'pedido_no_disponible', 'pedido_id' => (string) $pedido->id]);
+});
+
+test('al tomar un pedido se retira la oferta de los demás domiciliarios', function () {
+    Notification::fake();
+
+    $pedido = pedidoEnEstado(negocioAbierto(), usuarioCon('usuario'), 'listo');
+    $yo = usuarioCon('domiciliario');
+    $otro = usuarioCon('domiciliario');
+    $fueraDeTurno = usuarioCon('domiciliario');
+
+    Sanctum::actingAs($yo);
+    $this->putJson("/api/domiciliario/pedidos/{$pedido->id}/tomar", ['minutos_recogida' => 5])->assertOk();
+
+    Notification::assertSentTo($otro, PedidoYaNoDisponible::class);
+    Notification::assertSentTo($fueraDeTurno, PedidoYaNoDisponible::class);
+    Notification::assertNotSentTo($yo, PedidoYaNoDisponible::class);
+});
+
+test('si otro ganó el pedido no se vuelve a retirar la oferta', function () {
+    Notification::fake();
+
+    $pedido = pedidoEnEstado(negocioAbierto(), usuarioCon('usuario'), 'tomado');
+    $otro = usuarioCon('domiciliario');
+
+    Sanctum::actingAs(usuarioCon('domiciliario'));
+    $this->putJson("/api/domiciliario/pedidos/{$pedido->id}/tomar", ['minutos_recogida' => 5])->assertStatus(409);
+
+    Notification::assertNotSentTo($otro, PedidoYaNoDisponible::class);
+});
+
+test('cancelar un pedido listo retira la oferta; uno sin ofrecer no avisa', function () {
+    Notification::fake();
+
+    $negocio = negocioAbierto();
+    $domiciliario = usuarioCon('domiciliario');
+    $listo = pedidoEnEstado($negocio, usuarioCon('usuario'), 'listo');
+    $aceptado = pedidoEnEstado($negocio, usuarioCon('usuario'), 'aceptado');
+
+    CancelarPedido::ejecutar($aceptado, CancelarPedido::POR_NEGOCIO, null);
+    Notification::assertNotSentTo($domiciliario, PedidoYaNoDisponible::class);
+
+    CancelarPedido::ejecutar($listo, CancelarPedido::POR_NEGOCIO, null);
+    Notification::assertSentTo($domiciliario, PedidoYaNoDisponible::class);
 });
 
 // ===========================================================================

@@ -1,4 +1,4 @@
-import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
+import notifee, { AndroidImportance, Event, EventType } from '@notifee/react-native';
 import {
   FirebaseMessagingTypes,
   getInitialNotification,
@@ -13,6 +13,14 @@ import {
 import { PermissionsAndroid, Platform } from 'react-native';
 import { detenerAlarma, sonarAlarma } from './alarmaPedidos';
 import { eliminarDeviceToken, registrarDeviceToken, Usuario } from './api';
+import {
+  ACCION_ACEPTAR,
+  ACCION_RECHAZAR,
+  aceptarOferta,
+  mostrarOferta,
+  quitarOferta,
+  rechazarOferta,
+} from './ofertasPedidos';
 import { abrirNotificacion } from './RootNavigation';
 
 const fcm = getMessaging();
@@ -76,6 +84,59 @@ async function atenderAlarma(data: Record<string, string>) {
     }
   } catch (error) {
     console.warn('No se pudo actualizar la alarma de pedidos.', error);
+  }
+}
+
+/** Otro tomó el pedido o se canceló: su notificación ya no sirve para nada. */
+async function retirarOferta(data: Record<string, string>) {
+  const pedidoId = Number(data.pedido_id);
+  if (data.tipo !== 'pedido_no_disponible' || !Number.isFinite(pedidoId)) {
+    return;
+  }
+
+  try {
+    await quitarOferta(pedidoId);
+  } catch (error) {
+    console.warn('No se pudo retirar el pedido disponible.', error);
+  }
+}
+
+/**
+ * Con la app abierta el pedido disponible se ve en el modal OfertaPedido; aquí
+ * solo se publica la notificación, y solo la llama el código de segundo plano.
+ */
+async function ofrecerPedido(data: Record<string, string>) {
+  const pedidoId = Number(data.pedido_id);
+  if (data.tipo !== 'pedido_disponible' || !Number.isFinite(pedidoId)) {
+    return;
+  }
+
+  try {
+    await mostrarOferta(pedidoId, data.titulo ?? 'Pedido listo para recoger 🛵', data.cuerpo ?? '');
+  } catch (error) {
+    console.warn('No se pudo mostrar el pedido disponible.', error);
+  }
+}
+
+/** Aceptar: pasa a Mis entregas y el modal pregunta en cuánto lo recoge. */
+function aceptarDesdeNotificacion(data: Record<string, string>, user?: Usuario) {
+  const pedidoId = Number(data.pedido_id);
+  quitarOferta(pedidoId).catch(() => {});
+  aceptarOferta(pedidoId);
+  abrirNotificacion(data, user);
+}
+
+/** Toques en una notificación de Notifee, con la app abierta o en segundo plano. */
+async function atenderToque({ type, detail }: Event, user?: Usuario) {
+  const data = dataPlano(detail.notification?.data);
+  if (type === EventType.PRESS && detail.notification?.data) {
+    // En segundo plano Android abre la app y queda pendiente hasta que la
+    // navegación esté lista.
+    abrirNotificacion(data, user);
+  } else if (type === EventType.ACTION_PRESS && detail.pressAction?.id === ACCION_ACEPTAR) {
+    aceptarDesdeNotificacion(data, user);
+  } else if (type === EventType.ACTION_PRESS && detail.pressAction?.id === ACCION_RECHAZAR) {
+    await rechazarOferta(Number(data.pedido_id));
   }
 }
 
@@ -147,6 +208,7 @@ export function configurarMensajesForeground(
 ) {
   const unsubscribeMessage = onMessage(fcm, message => {
     atenderAlarma(dataPlano(message.data));
+    retirarOferta(dataPlano(message.data));
     // Los de datos (la alarma) no traen notificación que mostrar.
     if (message.notification) {
       mostrarNotificacionForeground(message);
@@ -166,15 +228,19 @@ export function configurarMensajesForeground(
 
   // La alarma la muestra Notifee: si se tocó con la app cerrada, se sabe aquí.
   notifee.getInitialNotification().then(inicial => {
-    if (inicial?.notification.data) {
-      abrirNotificacion(dataPlano(inicial.notification.data), user);
+    if (!inicial?.notification.data) {
+      return;
+    }
+    const data = dataPlano(inicial.notification.data);
+    if (inicial.pressAction?.id === ACCION_ACEPTAR) {
+      aceptarDesdeNotificacion(data, user);
+    } else {
+      abrirNotificacion(data, user);
     }
   });
 
-  const unsubscribeNotifee = notifee.onForegroundEvent(({ type, detail }) => {
-    if (type === EventType.PRESS && detail.notification?.data) {
-      abrirNotificacion(dataPlano(detail.notification.data), user);
-    }
+  const unsubscribeNotifee = notifee.onForegroundEvent(evento => {
+    atenderToque(evento, user);
   });
 
   return () => {
@@ -186,14 +252,12 @@ export function configurarMensajesForeground(
 
 export function configurarMensajesBackground() {
   // Con la app cerrada o en segundo plano, solo este código puede arrancar o
-  // callar la alarma de pedidos.
+  // callar la alarma de pedidos y ofrecerle pedidos al domiciliario.
   setBackgroundMessageHandler(fcm, async message => {
-    await atenderAlarma(dataPlano(message.data));
+    const data = dataPlano(message.data);
+    await atenderAlarma(data);
+    await ofrecerPedido(data);
+    await retirarOferta(data);
   });
-  notifee.onBackgroundEvent(async ({ type, detail }) => {
-    if (type === EventType.PRESS && detail.notification?.data) {
-      // Android abre la app; queda pendiente hasta que la navegación esté lista.
-      abrirNotificacion(dataPlano(detail.notification.data));
-    }
-  });
+  notifee.onBackgroundEvent(evento => atenderToque(evento));
 }

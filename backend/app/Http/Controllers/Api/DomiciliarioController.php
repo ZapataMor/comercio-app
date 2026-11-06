@@ -185,6 +185,11 @@ class DomiciliarioController extends Controller
             Push::enviar($pedido->cliente, new EstadoPedidoActualizado($pedido));
         }
 
+        // A los demás se les quita la oferta: ya no pueden tomarlo.
+        if ($pedido) {
+            OfrecerPedido::retirar($pedido, excepto: $request->user()->id);
+        }
+
         return response()->json(['message' => 'Pedido tomado. Pasa a recogerlo.']);
     }
 
