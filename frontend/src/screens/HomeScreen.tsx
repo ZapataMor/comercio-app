@@ -500,7 +500,10 @@ const useStyles = makeStyles((c, shadow) => ({
   capa: { position: 'absolute', top: 0, right: 0, left: -40, textAlign: 'right', transformOrigin: 'right center' },
   // Pedidos en espera
   seccion: { fontSize: 16, fontFamily: font.displaySemi, color: c.textStrong, marginTop: 14, marginBottom: 10 },
-  vacioBox: { backgroundColor: c.surface, borderRadius: radius.md, padding: 18, alignItems: 'center', ...shadow.low },
+  vacioBox: {
+    backgroundColor: c.surface, borderRadius: radius.md, padding: 18, marginBottom: 12,
+    alignItems: 'center', ...shadow.low,
+  },
   vacioTxt: { color: c.muted, fontSize: 14, fontFamily: font.regular },
   pedidoCard: {
     backgroundColor: c.surface, borderRadius: radius.md, padding: 16, marginBottom: 10,
