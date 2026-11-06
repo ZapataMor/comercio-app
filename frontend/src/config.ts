@@ -15,3 +15,7 @@ export const API_URL = __DEV__ ? API_URL_DESARROLLO : API_URL_PRODUCCION;
 
 // Páginas públicas del servidor (política de privacidad, eliminar cuenta).
 export const WEB_URL = API_URL;
+
+// Reporte de errores de la versión final (ver src/errores.ts y DESPLIEGUE.md §6).
+// Vacío = no se envía nada. Esta dirección no es secreta: solo permite enviar errores.
+export const SENTRY_DSN = '';

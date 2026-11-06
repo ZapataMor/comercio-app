@@ -458,7 +458,9 @@ refresco eficiente, paginación.
 - [ ] Poner el dominio real en `API_URL_PRODUCCION` y llenar `VITRINA_*` (política de privacidad).
 - [ ] Decidir el `applicationId` definitivo antes de subir a Play Store (hoy `com.comercioapp`).
 - [ ] Crear la llave de subida y la cuenta de Google Play; ficha con privacidad y borrado de cuenta.
+- [ ] Crear la cuenta de Sentry y activar el reporte de errores, ya listo en el código (`DESPLIEGUE.md` §6).
 - [ ] Piloto cerrado con 3–5 negocios de Maicao y 2–3 domiciliarios.
+- [ ] Ya en producción: copias de seguridad automáticas de la base de datos y de las fotos (`DESPLIEGUE.md` §7).
 
 **Prioridad 2 — después del piloto**
 - [ ] iOS (decisión: después de Android): `GoogleService-Info.plist`, firma, prueba en iPhone.

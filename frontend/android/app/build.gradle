@@ -3,6 +3,12 @@ apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 apply plugin: "com.google.gms.google-services"
 
+// Sube a Sentry los mapas del código de la versión final, para leer los errores.
+// Solo con android/sentry.properties (lleva un token: ver DESPLIEGUE.md §6).
+if (rootProject.file("sentry.properties").exists()) {
+    apply from: "../../node_modules/@sentry/react-native/sentry.gradle"
+}
+
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.

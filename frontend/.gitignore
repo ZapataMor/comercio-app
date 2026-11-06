@@ -76,3 +76,6 @@ yarn-error.log
 
 # Firma de la versión final (Play Store): nunca al repo
 android/keystore.properties
+
+# Token para subir los mapas del código a Sentry: nunca al repo
+android/sentry.properties

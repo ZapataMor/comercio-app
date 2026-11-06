@@ -22,6 +22,7 @@ Play Store". Complementa a `ENTORNO.md`, que cubre el entorno de desarrollo.
 | 9 | Política de privacidad y página para eliminar cuenta | `https://TU-DOMINIO/privacidad` y `/eliminar-cuenta` | ✅ |
 | 10 | Datos del responsable y correo de contacto | `.env` (`VITRINA_*`) | ⏳ |
 | 11 | `applicationId` definitivo (no se puede cambiar después de publicar) | `android/app/build.gradle` | ⏳ hoy `com.comercioapp` |
+| 12 | Reporte de errores (Sentry, ver §6) | `.env`, `frontend/src/config.ts` y `frontend/android/sentry.properties` | ✅ listo en el código, falta la cuenta |
 
 ---
 
@@ -115,6 +116,9 @@ MAIL_FROM_NAME="Vitrina"
 # Firebase (push): el JSON de la cuenta de servicio, fuera de git
 FIREBASE_CREDENTIALS=/ruta/comercio-app/backend/storage/app/firebase/service-account.json
 
+# Reporte de errores (ver §6)
+SENTRY_LARAVEL_DSN=...
+
 # Datos que salen en la política de privacidad y en los correos
 VITRINA_RESPONSABLE="Nombre de la persona o empresa responsable"
 VITRINA_CORREO_CONTACTO=soporte@tudominio.co
@@ -163,7 +167,11 @@ sube `versionCode` (y `versionName`) en `android/app/build.gradle`.
 - **Política de privacidad**: `https://api.tudominio.co/privacidad`
 - **Eliminación de cuenta** (obligatoria para apps con registro): `https://api.tudominio.co/eliminar-cuenta`
 - Formulario de **Seguridad de los datos**: la app recoge nombre, correo, teléfono, dirección,
-  historial de pedidos e identificadores del dispositivo (push); no recoge pagos ni ubicación GPS.
+  historial de pedidos, identificadores del dispositivo (push), **ubicación precisa** e informes
+  de errores (diagnóstico, enviados a Sentry); no recoge pagos.
+  - La ubicación del domiciliario se envía al servidor solo con la app en primer plano, y la ven
+    el cliente y el negocio del pedido (no hay permiso de ubicación en segundo plano).
+  - Los informes de errores no llevan nombre, correo, teléfono ni el contenido de las peticiones.
 
 ---
 
@@ -175,4 +183,33 @@ sube `versionCode` (y `versionName`) en `android/app/build.gradle`.
       hay que registrar la app de nuevo en Firebase y reemplazar `android/app/google-services.json`.
 - [ ] Crear la llave de subida (§4.2) y la cuenta de desarrollador de Google Play.
 - [ ] Ajustar la tarifa de domicilio desde la app del admin.
+- [ ] Activar el reporte de errores (§6).
 - [ ] Prueba completa en un teléfono real con la versión final contra el servidor.
+
+---
+
+## 6. Reporte de errores (Sentry)
+
+Ya está en el código, pero apagado hasta poner las direcciones. Avisa de los errores del servidor
+y de los cierres inesperados de la app, en un mismo panel.
+
+1. Crea una cuenta gratis en [sentry.io](https://sentry.io) y dos proyectos: `vitrina-api`
+   (Laravel) y `vitrina-app` (React Native). Cada uno da una dirección llamada **DSN**.
+2. **Servidor**: pon el DSN de `vitrina-api` en `.env` (`SENTRY_LARAVEL_DSN=...`), corre
+   `php artisan config:cache` y luego `php artisan sentry:test`. El error de prueba debe salir
+   en el panel.
+3. **App**: pon el DSN de `vitrina-app` en `SENTRY_DSN`, en `frontend/src/config.ts`. No es secreto.
+4. **Errores legibles**: copia `frontend/android/sentry.properties.example` como
+   `sentry.properties` y llena la organización y un token de Sentry. Ese archivo **sí** es secreto
+   y no se sube a git. Sin él la versión final compila, pero los errores de la app salen ilegibles.
+
+> 🧪 La app solo envía errores en la versión final, no en desarrollo. Compruébalo una vez con
+> esa versión antes del piloto.
+
+---
+
+## 7. Después de publicar
+
+- [ ] **Copias de seguridad automáticas** de la base de datos y de las fotos, fuera del servidor.
+      Las fotos de negocios y productos viven en `backend/storage/app/public`: si el servidor se
+      pierde sin copia, se pierden con él.

@@ -1,0 +1,6 @@
+# Copia este archivo como sentry.properties y llénalo (ver DESPLIEGUE.md §6).
+# Con él, cada versión final sube a Sentry lo necesario para leer los errores.
+defaults.url=https://sentry.io/
+defaults.org=TU-ORGANIZACION
+defaults.project=vitrina-app
+auth.token=TU-TOKEN
