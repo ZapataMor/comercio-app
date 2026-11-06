@@ -286,7 +286,7 @@ test('avanzar el pedido a entregado notifica al cliente', function () {
     $domiciliario = usuarioCon('domiciliario');
     // Pedido ya en camino, tomado por este domiciliario.
     $pedido = pedidoEnEstado($negocio, $cliente, 'en_camino', $domiciliario);
-    $pedido->update(['codigo_entrega' => '4821']);
+    $pedido->update(['codigo_confirmacion' => '4821']);
 
     Sanctum::actingAs($domiciliario);
     $this->putJson("/api/domiciliario/pedidos/{$pedido->id}/entregado", ['codigo' => '4821'])->assertOk();
@@ -298,7 +298,7 @@ test('avanzar el pedido a entregado notifica al cliente', function () {
 
 test('el push de recogido le trae el código de entrega al cliente', function () {
     $pedido = pedidoEnEstado(negocioAbierto(), usuarioCon('usuario'), 'recogido');
-    $pedido->update(['codigo_entrega' => '4821']);
+    $pedido->update(['codigo_confirmacion' => '4821']);
 
     $mensaje = (new EstadoPedidoActualizado($pedido))->toFcm($pedido->cliente)->toArray();
 

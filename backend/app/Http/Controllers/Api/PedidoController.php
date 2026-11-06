@@ -144,6 +144,7 @@ class PedidoController extends Controller
         $pedidos = $pagina->getCollection()
             ->map(fn ($p) => [
                 'id' => $p->id,
+                'codigo' => $p->codigo,
                 'estado' => $p->estado,
                 'estado_label' => $p->estadoLabel(),
                 'total' => (float) $p->total,
@@ -177,6 +178,7 @@ class PedidoController extends Controller
 
         return response()->json([
             'id' => $pedido->id,
+            'codigo' => $pedido->codigo,
             'estado' => $pedido->estado,
             'estado_label' => $pedido->estadoLabel(),
             'estados' => Pedido::ESTADOS,
@@ -203,7 +205,7 @@ class PedidoController extends Controller
                 ? Reputacion::resumen(Reputacion::DOMICILIARIO, $pedido->domiciliario)
                 : null,
             // Se lo da al domiciliario al recibir el pedido; solo lo ve el cliente.
-            'codigo_entrega' => in_array($pedido->estado, Pedido::CON_CODIGO_ENTREGA, true) ? $pedido->codigo_entrega : null,
+            'codigo_entrega' => in_array($pedido->estado, Pedido::CON_CODIGO_ENTREGA, true) ? $pedido->codigo_confirmacion : null,
             // Justificación del domiciliario si se está demorando.
             'novedad' => $pedido->novedad,
             // Mapa: el cliente ve al domiciliario solo mientras le lleva el

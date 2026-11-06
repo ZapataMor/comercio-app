@@ -131,7 +131,7 @@ export default function AvisoPedidoNuevo({ pedidos }: { pedidos: PedidoEnEspera[
             </View>
             <Text style={styles.titulo}>¡Nuevo pedido!</Text>
             <Text style={styles.detalle}>
-              Pedido #{pedido.id}{pedido.negocio ? ` · ${pedido.negocio}` : ''}
+              Pedido #{pedido.codigo}{pedido.negocio ? ` · ${pedido.negocio}` : ''}
             </Text>
             <Text style={styles.total}>{cop(pedido.total)}</Text>
             <Text style={styles.vence}>

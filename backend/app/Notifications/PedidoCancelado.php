@@ -42,9 +42,9 @@ class PedidoCancelado extends Notification implements ShouldQueue
 
         [$titulo, $cuerpo] = match (true) {
             $vencido && $paraCliente => ['Tu pedido no fue recibido', "{$negocio} no recibió tu pedido. No se te cobra nada."],
-            $vencido => ["Pedido #{$this->pedido->id} vencido", 'Nadie lo aceptó a tiempo y se le avisó al cliente.'],
+            $vencido => ["Pedido #{$this->pedido->codigo} vencido", 'Nadie lo aceptó a tiempo y se le avisó al cliente.'],
             $paraCliente => ['Tu pedido fue cancelado', "{$negocio} no pudo atenderlo".($motivo ? ": {$motivo}" : '.')],
-            default => ["Pedido #{$this->pedido->id} cancelado", 'El cliente canceló el pedido'.($motivo ? ": {$motivo}" : '.')],
+            default => ["Pedido #{$this->pedido->codigo} cancelado", 'El cliente canceló el pedido'.($motivo ? ": {$motivo}" : '.')],
         };
 
         return (new FcmMessage(

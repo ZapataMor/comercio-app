@@ -9,6 +9,8 @@ use App\Notifications\NuevoPedidoParaComercio;
 use App\Notifications\PedidoCancelado;
 use App\Notifications\PedidoDisponibleParaDomiciliario;
 use App\Notifications\PedidoYaAtendido;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
@@ -50,7 +52,8 @@ function flujoPedido(Negocio $negocio, string $estado = 'pendiente', array $extr
         'direccion_entrega' => 'Calle 1 #2-3',
         'telefono_contacto' => '3001234567',
         'minutos_preparacion' => 20,
-        'codigo_entrega' => '1234',
+        // Un pedido ya recogido tiene vivo el código de entrega.
+        'codigo_confirmacion' => in_array($estado, Pedido::CON_CODIGO_ENTREGA, true) ? '1234' : null,
     ], $extra));
 }
 
@@ -293,7 +296,7 @@ test('el domiciliario puede soltar un pedido tomado y vuelve a estar disponible'
         ->domiciliario_id->toBeNull()
         ->minutos_recogida->toBeNull()
         ->tomado_at->toBeNull()
-        ->codigo_recogida->toBeNull();
+        ->codigo_confirmacion->toBeNull();
 
     Notification::assertSentTo($otro, PedidoDisponibleParaDomiciliario::class);
     Notification::assertNotSentTo($yo, PedidoDisponibleParaDomiciliario::class);
@@ -304,7 +307,7 @@ test('el domiciliario puede soltar un pedido tomado y vuelve a estar disponible'
     Sanctum::actingAs($otro);
     $this->getJson('/api/domiciliario/disponibles')->assertJsonPath('pedidos.0.id', $pedido->id);
     $this->putJson("/api/domiciliario/pedidos/{$pedido->id}/tomar", ['minutos_recogida' => 5])->assertOk();
-    expect($pedido->fresh()->codigo_recogida)->toMatch('/^\d{4}$/');
+    expect($pedido->fresh()->codigo_confirmacion)->toMatch('/^\d{4}$/');
 });
 
 test('después de recogido no se puede soltar, ni se puede soltar el pedido de otro', function () {
@@ -334,7 +337,7 @@ test('el domiciliario ve su código de recogida al tomar el pedido, y nadie más
     $this->putJson("/api/domiciliario/pedidos/{$pedido->id}/tomar", ['minutos_recogida' => 10])->assertOk();
 
     $codigo = $this->getJson('/api/domiciliario/entregas')->json('pedidos.0.codigo_recogida');
-    expect($codigo)->toMatch('/^\d{4}$/')->toBe($pedido->fresh()->codigo_recogida);
+    expect($codigo)->toMatch('/^\d{4}$/')->toBe($pedido->fresh()->codigo_confirmacion);
 
     Sanctum::actingAs($negocio->user);
     $this->getJson(flujoRutaPedido($pedido, ''))
@@ -349,7 +352,7 @@ test('el negocio confirma la recogida con el código del domiciliario', function
     $negocio = flujoNegocio();
     $domi = flujoUsuario('domiciliario');
     $pedido = flujoPedido($negocio, 'tomado', [
-        'domiciliario_id' => $domi->id, 'codigo_recogida' => '4821', 'tomado_at' => now(), 'minutos_recogida' => 10,
+        'domiciliario_id' => $domi->id, 'codigo_confirmacion' => '4821', 'tomado_at' => now(), 'minutos_recogida' => 10,
     ]);
 
     Sanctum::actingAs($negocio->user);
@@ -367,7 +370,7 @@ test('el negocio confirma la recogida con el código del domiciliario', function
 
 test('el domiciliario ya no puede marcarse recogido por su cuenta', function () {
     $domi = flujoUsuario('domiciliario');
-    $pedido = flujoPedido(flujoNegocio(), 'tomado', ['domiciliario_id' => $domi->id, 'codigo_recogida' => '4821']);
+    $pedido = flujoPedido(flujoNegocio(), 'tomado', ['domiciliario_id' => $domi->id, 'codigo_confirmacion' => '4821']);
 
     Sanctum::actingAs($domi);
     $this->putJson("/api/domiciliario/pedidos/{$pedido->id}/recogido", ['codigo' => '4821'])->assertNotFound();
@@ -378,7 +381,7 @@ test('el domiciliario ya no puede marcarse recogido por su cuenta', function () 
 test('el código de un pedido no sirve en otro negocio', function () {
     $negocio = flujoNegocio();
     $pedido = flujoPedido($negocio, 'tomado', [
-        'domiciliario_id' => flujoUsuario('domiciliario')->id, 'codigo_recogida' => '4821',
+        'domiciliario_id' => flujoUsuario('domiciliario')->id, 'codigo_confirmacion' => '4821',
     ]);
 
     Sanctum::actingAs(flujoNegocio()->user);
@@ -391,10 +394,11 @@ test('el cliente ve su código de entrega solo desde que recogen el pedido', fun
 
     $this->getJson("/api/pedidos/{$pedido->id}")->assertJsonPath('codigo_entrega', null);
 
-    $pedido->update(['estado' => 'tomado']);
+    // El código de recogida es del domiciliario: el cliente no lo ve.
+    $pedido->update(['estado' => 'tomado', 'codigo_confirmacion' => '4821']);
     $this->getJson("/api/pedidos/{$pedido->id}")->assertJsonPath('codigo_entrega', null);
 
-    $pedido->update(['estado' => 'recogido']);
+    $pedido->update(['estado' => 'recogido', 'codigo_confirmacion' => '1234']);
     $this->getJson("/api/pedidos/{$pedido->id}")->assertJsonPath('codigo_entrega', '1234');
 
     $pedido->update(['estado' => 'en_camino']);
@@ -420,17 +424,14 @@ test('el código de entrega nace al recoger y el domiciliario no puede verlo', f
     ])->assertCreated()->json('id');
 
     $pedido = Pedido::find($id);
-    expect($pedido->codigo_entrega)->toBeNull();
+    expect($pedido->codigo_confirmacion)->toBeNull();
 
     $domi = flujoUsuario('domiciliario');
-    $pedido->update(['estado' => 'tomado', 'domiciliario_id' => $domi->id, 'codigo_recogida' => '4821']);
-
-    // Aún sin código: si lo suelta, nadie tiene un código de un pedido sin recoger.
-    expect($pedido->fresh()->codigo_entrega)->toBeNull();
+    $pedido->update(['estado' => 'tomado', 'domiciliario_id' => $domi->id, 'codigo_confirmacion' => '4821']);
 
     Sanctum::actingAs($negocio->user);
     $this->putJson(flujoRutaPedido($pedido, 'recogido'), ['codigo' => '4821'])->assertOk();
-    expect($pedido->fresh()->codigo_entrega)->toMatch('/^\d{4}$/');
+    expect($pedido->fresh()->codigo_confirmacion)->toMatch('/^\d{4}$/');
 
     Sanctum::actingAs($domi);
     $this->getJson('/api/domiciliario/entregas')->assertJsonMissingPath('pedidos.0.codigo_entrega');
@@ -473,4 +474,95 @@ test('los intentos con un código están limitados', function () {
     $this->putJson("/api/domiciliario/pedidos/{$pedido->id}/entregado", ['codigo' => '1234'])
         ->assertStatus(429)
         ->assertJsonPath('message', 'Demasiados intentos. Espera un minuto e inténtalo de nuevo.');
+});
+
+// ---------------------------------------------------------------------------
+// Códigos del pedido
+// ---------------------------------------------------------------------------
+
+/** Deja vigentes todos los códigos de confirmación menos los indicados. */
+function flujoOcuparCodigos(Pedido $base, array $libres): void
+{
+    $fila = (array) DB::table('pedidos')->find($base->id);
+    unset($fila['id']);
+
+    collect(range(0, 9999))
+        ->map(fn (int $n) => sprintf('%04d', $n))
+        ->reject(fn (string $codigo) => in_array($codigo, $libres, true))
+        ->map(fn (string $codigo) => [...$fila, 'estado' => 'tomado', 'codigo' => "X{$codigo}", 'codigo_confirmacion' => $codigo])
+        ->chunk(200)
+        ->each(fn ($filas) => DB::table('pedidos')->insert($filas->values()->all()));
+}
+
+test('cada pedido nace con un código aleatorio de letras y números que la app recibe', function () {
+    $negocio = flujoNegocio();
+    $pedido = flujoPedido($negocio);
+
+    expect($pedido->codigo)->toMatch('/^[2-9A-HJKMNP-TV-Z]{8}$/');
+
+    $codigos = collect(range(1, 20))->map(fn () => flujoPedido($negocio)->codigo);
+    expect($codigos->unique())->toHaveCount(20);
+
+    Sanctum::actingAs($pedido->cliente);
+    $this->getJson("/api/pedidos/{$pedido->id}")->assertJsonPath('codigo', $pedido->codigo);
+});
+
+test('la base de datos no deja repetir ni el código del pedido ni uno de confirmación vigente', function () {
+    $negocio = flujoNegocio();
+    $uno = flujoPedido($negocio, 'tomado', ['codigo_confirmacion' => '4821']);
+    $otro = flujoPedido($negocio);
+
+    expect(fn () => $otro->update(['codigo_confirmacion' => '4821']))->toThrow(UniqueConstraintViolationException::class);
+
+    $otro->refresh();
+    $otro->codigo = $uno->codigo;
+    expect(fn () => $otro->save())->toThrow(UniqueConstraintViolationException::class);
+});
+
+test('los códigos de recogida y de entrega nunca coinciden con uno vigente, sea del tipo que sea', function () {
+    $negocio = flujoNegocio();
+    $domi = flujoUsuario('domiciliario', ['en_turno' => true]);
+    $pedido = flujoPedido($negocio, 'listo');
+    flujoOcuparCodigos($pedido, ['0007', '0008']);
+
+    Sanctum::actingAs($domi);
+    $this->putJson("/api/domiciliario/pedidos/{$pedido->id}/tomar", ['minutos_recogida' => 10])->assertOk();
+    $recogida = $pedido->fresh()->codigo_confirmacion;
+    expect($recogida)->toBeIn(['0007', '0008']);
+
+    // El de recogida sigue vivo mientras nace el de entrega: solo queda el otro.
+    Sanctum::actingAs($negocio->user);
+    $this->putJson(flujoRutaPedido($pedido, 'recogido'), ['codigo' => $recogida])->assertOk();
+    $entrega = $pedido->fresh()->codigo_confirmacion;
+    expect($entrega)->toBeIn(['0007', '0008'])->not->toBe($recogida);
+});
+
+test('si dos pedidos eligen el mismo código a la vez, el segundo reintenta con otro', function () {
+    $negocio = flujoNegocio();
+    flujoPedido($negocio, 'tomado', ['codigo_confirmacion' => '4821']);
+    $pedido = flujoPedido($negocio, 'listo');
+    $intentos = 0;
+
+    Pedido::conCodigoDeConfirmacion(function (string $codigo) use ($pedido, &$intentos) {
+        // El primer intento pierde la carrera: otro pedido ya se quedó con ese código.
+        return $pedido->update(['codigo_confirmacion' => ++$intentos === 1 ? '4821' : $codigo]);
+    });
+
+    expect($intentos)->toBe(2)
+        ->and($pedido->fresh()->codigo_confirmacion)->toMatch('/^\d{4}$/')->not->toBe('4821');
+});
+
+test('un código usado queda libre y otro pedido puede volver a recibirlo', function () {
+    $negocio = flujoNegocio();
+    $domi = flujoUsuario('domiciliario', ['en_turno' => true]);
+    $entregado = flujoPedido($negocio, 'en_camino', ['domiciliario_id' => $domi->id, 'codigo_confirmacion' => '0007']);
+    $nuevo = flujoPedido($negocio, 'listo');
+    flujoOcuparCodigos($nuevo, ['0007']);
+
+    Sanctum::actingAs($domi);
+    $this->putJson("/api/domiciliario/pedidos/{$entregado->id}/entregado", ['codigo' => '0007'])->assertOk();
+    expect($entregado->fresh()->codigo_confirmacion)->toBeNull();
+
+    $this->putJson("/api/domiciliario/pedidos/{$nuevo->id}/tomar", ['minutos_recogida' => 10])->assertOk();
+    expect($nuevo->fresh()->codigo_confirmacion)->toBe('0007');
 });

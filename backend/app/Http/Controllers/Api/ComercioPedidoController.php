@@ -49,6 +49,7 @@ class ComercioPedidoController extends Controller
             ->get()
             ->map(fn (Pedido $p) => [
                 'id' => $p->id,
+                'codigo' => $p->codigo,
                 'negocio_id' => $p->negocio_id,
                 'negocio' => $p->negocio?->nombre,
                 'total' => (float) $p->total,
@@ -170,6 +171,7 @@ class ComercioPedidoController extends Controller
     {
         return [
             'id' => $p->id,
+            'codigo' => $p->codigo,
             'estado' => $p->estado,
             'estado_label' => $p->estadoLabel(),
             'fecha' => $p->created_at->format('d/m/Y H:i'),
@@ -298,16 +300,16 @@ class ComercioPedidoController extends Controller
             return response()->json(['message' => 'Ese pedido ya no está esperando domiciliario.'], 409);
         }
 
-        if (! hash_equals((string) $pedido->codigo_recogida, $datos['codigo'])) {
+        if (! hash_equals((string) $pedido->codigo_confirmacion, $datos['codigo'])) {
             throw ValidationException::withMessages(['codigo' => ['Ese no es el código del domiciliario. Pídeselo de nuevo.']]);
         }
 
-        $pedido->update([
+        Pedido::conCodigoDeConfirmacion(fn (string $codigo) => $pedido->update([
             'estado' => 'recogido',
             'recogido_at' => now(),
             // Nace aquí: el cliente se lo da al domiciliario para confirmar la entrega.
-            'codigo_entrega' => Pedido::generarCodigo(),
-        ]);
+            'codigo_confirmacion' => $codigo,
+        ]));
 
         // ¿Recogió en los minutos que prometió al tomarlo? (con margen; si
         // reportó una novedad, la demora queda anotada pero no resta).

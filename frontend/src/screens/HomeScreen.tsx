@@ -216,7 +216,7 @@ function TarjetaPedido({
   return (
     <PressableScale style={[styles.pedidoCard, destacada && styles.pedidoCardDinero]} onPress={onPress}>
       <View style={styles.pedidoHead}>
-        <Text style={styles.pedidoId}>Pedido #{pedido.id}</Text>
+        <Text style={styles.pedidoId}>Pedido #{pedido.codigo}</Text>
         <Text style={styles.pedidoTotal}>{cop(pedido.total)}</Text>
       </View>
       <View style={[styles.pedidoCliente, styles.fila]}>
@@ -364,7 +364,7 @@ export default function HomeScreen({ navigation }: Props) {
                       style={styles.pedidoCard}
                       onPress={() => navigation.navigate('ComercioPedidoDetalle', { pedido: p })}>
                       <View style={styles.pedidoHead}>
-                        <Text style={styles.pedidoId}>Pedido #{p.id}</Text>
+                        <Text style={styles.pedidoId}>Pedido #{p.codigo}</Text>
                         <Text style={styles.pedidoTotal}>{cop(p.total)}</Text>
                       </View>
                       <View style={[styles.pedidoCliente, styles.fila]}>

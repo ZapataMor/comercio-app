@@ -169,7 +169,7 @@ class DomiciliarioController extends Controller
         ]);
 
         // Update condicional: evita choques si dos lo toman a la vez.
-        $afectados = Pedido::where('id', $id)
+        $afectados = Pedido::conCodigoDeConfirmacion(fn (string $codigo) => Pedido::where('id', $id)
             ->where('estado', 'listo')
             ->whereNull('domiciliario_id')
             ->where('user_id', '!=', $request->user()->id)
@@ -179,8 +179,8 @@ class DomiciliarioController extends Controller
                 'minutos_recogida' => $datos['minutos_recogida'],
                 'tomado_at' => now(),
                 // Se lo dicta al negocio para que le entregue el pedido.
-                'codigo_recogida' => Pedido::generarCodigo(),
-            ]);
+                'codigo_confirmacion' => $codigo,
+            ]));
 
         if (! $afectados) {
             return response()->json(['message' => 'Ese pedido ya no está disponible (lo tomó otro domiciliario o se canceló).'], 409);
@@ -217,7 +217,7 @@ class DomiciliarioController extends Controller
                 'domiciliario_id' => null,
                 'minutos_recogida' => null,
                 'tomado_at' => null,
-                'codigo_recogida' => null,
+                'codigo_confirmacion' => null,
             ]);
 
         if (! $afectados) {
@@ -256,11 +256,12 @@ class DomiciliarioController extends Controller
 
         $pedido = $this->pedidoMio($request, $id, 'en_camino');
 
-        if ($pedido && ! hash_equals((string) $pedido->codigo_entrega, $datos['codigo'])) {
+        if ($pedido && ! hash_equals((string) $pedido->codigo_confirmacion, $datos['codigo'])) {
             throw ValidationException::withMessages(['codigo' => ['Ese no es el código del cliente. Pídeselo de nuevo.']]);
         }
 
-        return $this->avanzar($pedido, 'entregado', '¡Entrega completada!');
+        // Ya se usó: queda libre para otro pedido.
+        return $this->avanzar($pedido, 'entregado', '¡Entrega completada!', ['codigo_confirmacion' => null]);
     }
 
     /**
@@ -298,14 +299,14 @@ class DomiciliarioController extends Controller
     }
 
     /** Avanza el pedido al estado siguiente y guarda cuándo pasó. */
-    private function avanzar(?Pedido $pedido, string $hacia, string $msg): JsonResponse
+    private function avanzar(?Pedido $pedido, string $hacia, string $msg, array $ademas = []): JsonResponse
     {
         if (! $pedido) {
             return response()->json(['message' => 'No se puede actualizar ese pedido.'], 409);
         }
 
         // Marca de tiempo del estado (en_camino_at, entregado_at).
-        $pedido->update(['estado' => $hacia, "{$hacia}_at" => now()]);
+        $pedido->update(['estado' => $hacia, "{$hacia}_at" => now(), ...$ademas]);
 
         // Avisa al cliente del nuevo estado (en camino / entregado).
         if ($pedido->cliente) {
@@ -320,6 +321,7 @@ class DomiciliarioController extends Controller
     {
         return [
             'id' => $p->id,
+            'codigo' => $p->codigo,
             'estado' => $p->estado,
             'estado_label' => $p->estadoLabel(),
             'subtotal' => (float) $p->subtotal,
@@ -330,7 +332,7 @@ class DomiciliarioController extends Controller
             'cobrar' => $p->metodo_pago === 'efectivo' ? (float) $p->total : 0.0,
             'minutos_recogida' => $p->minutos_recogida,
             // Se lo dicta al negocio al llegar por el pedido.
-            'codigo_recogida' => $p->estado === 'tomado' ? $p->codigo_recogida : null,
+            'codigo_recogida' => $p->estado === 'tomado' ? $p->codigo_confirmacion : null,
             'fecha_entrega' => $p->entregado_at?->format('d/m/Y H:i'),
             'direccion_entrega' => $p->direccion_entrega,
             // El teléfono del cliente solo lo ve quien lleva el pedido.

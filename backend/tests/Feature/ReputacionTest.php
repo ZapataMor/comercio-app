@@ -416,7 +416,7 @@ test('el domiciliario que recoge después de lo que prometió baja, salvo noveda
     $this->travel(30)->minutes();
     Sanctum::actingAs($negocio->user);
     foreach ([$sinExcusa, $conExcusa] as $pedido) {
-        $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}/recogido", ['codigo' => $pedido->fresh()->codigo_recogida])
+        $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}/recogido", ['codigo' => $pedido->fresh()->codigo_confirmacion])
             ->assertOk();
     }
 

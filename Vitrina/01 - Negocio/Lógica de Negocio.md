@@ -72,7 +72,9 @@ El detalle paso a paso está en [[CU-001 Realizar un pedido]] y [[CU-004 Entrega
     disponible para los demás. Después de recogerlo no hay vuelta atrás.
 16. **Códigos.** Dos códigos de 4 dígitos confirman que el pedido pasó a las manos correctas: el
     domiciliario le dicta el de recogida al negocio, y el cliente le dicta el de entrega al
-    domiciliario. Los intentos están limitados.
+    domiciliario. Los intentos están limitados. Dos códigos vigentes nunca coinciden, ni entre
+    pedidos ni entre tipos; un código ya usado puede volver a salir más adelante. Aparte, cada
+    pedido se identifica con un código aleatorio y único de 8 letras y números.
 
 ## 🔗 Relacionado
 - [[_MOC Negocio]] · [[Tipos de Venta]] · [[Reglas de Notificacion]] · [[Glosario]]

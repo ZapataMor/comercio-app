@@ -28,7 +28,7 @@ function sonando(pedidoId: number) {
 }
 
 function porAceptar(id: number, segundos = 200): PedidoPorAceptar {
-  return { id, negocio_id: 3, negocio: 'Tienda', total: 10000, segundos };
+  return { id, codigo: `K7M2X9Q${id}`, negocio_id: 3, negocio: 'Tienda', total: 10000, segundos };
 }
 
 // Cada test empieza mucho después del anterior: la espera entre avisos no se cruza.

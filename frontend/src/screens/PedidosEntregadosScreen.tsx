@@ -122,7 +122,7 @@ function Entregado({ pedido: p }: { pedido: Pedido }) {
   return (
     <View style={styles.card}>
       <View style={styles.cardHead}>
-        <Text style={styles.pedidoId}>Pedido #{p.id}</Text>
+        <Text style={styles.pedidoId}>Pedido #{p.codigo}</Text>
         <Text style={styles.total}>{cop(p.total)}</Text>
       </View>
       <View style={[styles.fila, styles.estadoFila]}>

@@ -37,6 +37,7 @@ const irA = navigationRef.dispatch as jest.Mock;
 
 const pedido = (id: number, segundos = 272): PedidoEnEspera => ({
   id,
+  codigo: `K7M2X9${id}`,
   negocio_id: 3,
   negocio: 'Arepas Ana',
   total: 25000,
@@ -91,7 +92,7 @@ test('muestra el pedido, su negocio, el total y lo que le queda', async () => {
 
   expect(avisoVisible()).toBe(true);
   expect(textos()).toEqual(
-    expect.arrayContaining(['¡Nuevo pedido!', 'Pedido #12 · Arepas Ana', '$25.000', 'Vence en 4:32']),
+    expect.arrayContaining(['¡Nuevo pedido!', 'Pedido #K7M2X912 · Arepas Ana', '$25.000', 'Vence en 4:32']),
   );
 });
 
@@ -163,7 +164,7 @@ test('al atender uno aparece el siguiente, y dice cuántos esperan', async () =>
   await tocar('Aceptar pedido');
 
   expect(avisoVisible()).toBe(true);
-  expect(textos()).toContain('Pedido #13 · Arepas Ana');
+  expect(textos()).toContain('Pedido #K7M2X913 · Arepas Ana');
   expect(textos()).not.toContain('Hay 1 pedido más esperando');
 });
 

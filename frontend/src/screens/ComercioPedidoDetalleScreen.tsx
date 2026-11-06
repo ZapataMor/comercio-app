@@ -203,7 +203,7 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
       <FadeInView style={styles.card}>
         <View style={styles.head}>
-          <Text style={styles.pid}>Pedido #{pedido.id}</Text>
+          <Text style={styles.pid}>Pedido #{pedido.codigo}</Text>
           <Text style={[styles.badge, { backgroundColor: ec.bg, color: ec.fg }]}>
             {pedido.estado_label}
           </Text>
@@ -238,7 +238,7 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
           {pedido.estado !== 'cancelado' && pedido.estado !== 'entregado' && (
             <BotonesContacto
               telefono={pedido.telefono_contacto}
-              mensaje={`Hola, te escribimos de ${negocio?.nombre ?? 'tu tienda'} por tu pedido #${pedido.id} de Vitrina.`}
+              mensaje={`Hola, te escribimos de ${negocio?.nombre ?? 'tu tienda'} por tu pedido #${pedido.codigo} de Vitrina.`}
               etiquetaLlamar="Llamar al cliente"
             />
           )}
@@ -255,7 +255,7 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
           )}
           <BotonesContacto
             telefono={pedido.domiciliario_telefono}
-            mensaje={`Hola, te escribimos de ${negocio?.nombre ?? 'la tienda'} por el pedido #${pedido.id}.`}
+            mensaje={`Hola, te escribimos de ${negocio?.nombre ?? 'la tienda'} por el pedido #${pedido.codigo}.`}
             etiquetaLlamar="Llamar al domiciliario"
           />
           {/* Dónde va, hasta recibir el dinero (o hasta la entrega si ya estaba pagado). */}

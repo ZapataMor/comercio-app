@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\UniqueConstraintViolationException;
+use RuntimeException;
 
 class Pedido extends Model
 {
@@ -22,6 +24,14 @@ class Pedido extends Model
 
     /** Desde que lo recogen el cliente tiene código de entrega. */
     public const CON_CODIGO_ENTREGA = ['recogido', 'en_camino'];
+
+    /** Letras y números que no se confunden entre sí (sin 0, 1, I, L, O ni U). */
+    private const ALFABETO_CODIGO = '23456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+    private const LARGO_CODIGO = 8;
+
+    /** Reintentos si dos pedidos eligen el mismo código en el mismo instante. */
+    private const INTENTOS_CODIGO = 5;
 
     /** Estados en los que el pedido sigue vivo (ni entregado ni cancelado). */
     public const EN_CURSO = ['pendiente', 'aceptado', 'listo', 'tomado', 'recogido', 'en_camino'];
@@ -55,8 +65,7 @@ class Pedido extends Model
         'minutos_recogida',
         'minutos_preparacion',
         'aceptado_at',
-        'codigo_recogida',
-        'codigo_entrega',
+        'codigo_confirmacion',
         'listo_at',
         'tomado_at',
         'recogido_at',
@@ -94,10 +103,57 @@ class Pedido extends Model
         ];
     }
 
-    /** Código de 4 dígitos para confirmar la recogida o la entrega. */
-    public static function generarCodigo(): string
+    protected static function booted(): void
     {
-        return str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+        static::creating(function (Pedido $pedido) {
+            $pedido->codigo ??= self::generarCodigoPedido();
+        });
+    }
+
+    /** Código con el que las personas identifican el pedido: aleatorio y único. */
+    public static function generarCodigoPedido(): string
+    {
+        do {
+            $codigo = '';
+            for ($i = 0; $i < self::LARGO_CODIGO; $i++) {
+                $codigo .= self::ALFABETO_CODIGO[random_int(0, strlen(self::ALFABETO_CODIGO) - 1)];
+            }
+        } while (self::where('codigo', $codigo)->exists());
+
+        return $codigo;
+    }
+
+    /**
+     * Guarda un código de confirmación que ningún otro pedido esté usando.
+     * $guardar recibe el código y lo escribe en `codigo_confirmacion`: si otro
+     * pedido se quedó con el mismo en ese instante, el índice único lo rechaza
+     * y se intenta con otro.
+     */
+    public static function conCodigoDeConfirmacion(callable $guardar): mixed
+    {
+        for ($intento = 1; ; $intento++) {
+            try {
+                return $guardar(self::codigoDeConfirmacionLibre());
+            } catch (UniqueConstraintViolationException $e) {
+                if ($intento === self::INTENTOS_CODIGO) {
+                    throw $e;
+                }
+            }
+        }
+    }
+
+    /** Un código de 4 dígitos al azar entre los que nadie tiene vigente. */
+    private static function codigoDeConfirmacionLibre(): string
+    {
+        $vigentes = self::whereNotNull('codigo_confirmacion')->pluck('codigo_confirmacion')->all();
+        $todos = array_map(fn (int $n) => sprintf('%04d', $n), range(0, 9999));
+        $libres = array_values(array_diff($todos, $vigentes));
+
+        if ($libres === []) {
+            throw new RuntimeException('No quedan códigos de confirmación libres.');
+        }
+
+        return $libres[random_int(0, count($libres) - 1)];
     }
 
     /** Segundos que le quedan al negocio para aceptar antes de que venza. */

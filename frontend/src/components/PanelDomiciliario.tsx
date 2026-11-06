@@ -203,7 +203,7 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
               <FadeInView key={p.id} delay={i * 50}>
                 <View style={[styles.card, styles.bordeAzul]}>
                   <View style={styles.cardHead}>
-                    <Text style={styles.pedidoId}>Pedido #{p.id}</Text>
+                    <Text style={styles.pedidoId}>Pedido #{p.codigo}</Text>
                     <Text style={[styles.badge, { backgroundColor: ec.bg, color: ec.fg }]}>{p.estado_label}</Text>
                   </View>
                   {p.estado === 'tomado' && !!p.minutos_recogida && (
@@ -256,13 +256,13 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
                   {p.estado === 'tomado' ? (
                     <BotonesContacto
                       telefono={p.negocio?.telefono}
-                      mensaje={`Hola, soy el domiciliario de Vitrina que va por el pedido #${p.id}.`}
+                      mensaje={`Hola, soy el domiciliario de Vitrina que va por el pedido #${p.codigo}.`}
                       etiquetaLlamar="Llamar al negocio"
                     />
                   ) : (
                     <BotonesContacto
                       telefono={p.telefono_contacto}
-                      mensaje={`Hola, soy tu domiciliario de Vitrina con el pedido #${p.id}.`}
+                      mensaje={`Hola, soy tu domiciliario de Vitrina con el pedido #${p.codigo}.`}
                       etiquetaLlamar="Llamar al cliente"
                     />
                   )}
@@ -460,7 +460,7 @@ function DisponibleCard({ pedido, onTomar }: { pedido: Pedido; onTomar: () => vo
   return (
     <View style={[styles.card, styles.bordeAmbar]}>
       <View style={styles.cardHead}>
-        <Text style={styles.pedidoId}>Pedido #{pedido.id}</Text>
+        <Text style={styles.pedidoId}>Pedido #{pedido.codigo}</Text>
         <Text style={styles.total}>{cop(pedido.total)}</Text>
       </View>
       <View style={[styles.linea, styles.fila]}>

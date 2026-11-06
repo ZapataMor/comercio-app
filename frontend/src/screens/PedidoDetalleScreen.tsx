@@ -140,7 +140,7 @@ export default function PedidoDetalleScreen({ route }: Props) {
       style={styles.container}
       // Aire abajo para la barra flotante fija (Carrito / Mis pedidos).
       contentContainerStyle={{ padding: 16, paddingBottom: 110 }}>
-      <Text style={styles.titulo}>Pedido #{pedido.id}</Text>
+      <Text style={styles.titulo}>Pedido #{pedido.codigo}</Text>
       <View style={[styles.sub, styles.fila]}>
         <Icon name="tienda" size={14} color={c.muted} />
         <Text style={styles.sub}>{pedido.negocio}</Text>
@@ -208,7 +208,7 @@ export default function PedidoDetalleScreen({ route }: Props) {
         {/* Mientras lo lleva: llamar o escribirle al domiciliario. */}
         <BotonesContacto
           telefono={pedido.domiciliario_telefono}
-          mensaje={`Hola, soy el cliente del pedido #${pedido.id} de Vitrina.`}
+          mensaje={`Hola, soy el cliente del pedido #${pedido.codigo} de Vitrina.`}
           etiquetaLlamar="Llamar al domiciliario"
         />
         {!!pedido.novedad && pedido.estado !== 'entregado' && (
@@ -259,7 +259,7 @@ export default function PedidoDetalleScreen({ route }: Props) {
           <Text style={styles.lineaTxt}>Comunícate con {pedido.negocio ?? 'el negocio'}.</Text>
           <BotonesContacto
             telefono={pedido.negocio_telefono}
-            mensaje={`Hola, tengo una pregunta sobre mi pedido #${pedido.id} en Vitrina.`}
+            mensaje={`Hola, tengo una pregunta sobre mi pedido #${pedido.codigo} en Vitrina.`}
           />
         </FadeInView>
       )}

@@ -179,7 +179,7 @@ export default function PedidosNegocioScreen({ navigation }: Props) {
             style={[styles.card, { borderLeftColor: ec.fg }]}
             onPress={() => navigation.navigate('ComercioPedidoDetalle', { pedido: p, negocioId })}>
             <View style={styles.cardHead}>
-              <Text style={styles.cardId}>Pedido #{p.id}</Text>
+              <Text style={styles.cardId}>Pedido #{p.codigo}</Text>
               <Text style={styles.cardTotal}>{cop(p.total)}</Text>
             </View>
             <View style={styles.fila}>

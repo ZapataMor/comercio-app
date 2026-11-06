@@ -159,7 +159,7 @@ export async function sincronizarAlarmas(pedidos: PedidoPorAceptar[], reanudar =
       pedidoId: p.id,
       negocioId: p.negocio_id,
       titulo: '¡Nuevo pedido! 🛒',
-      cuerpo: `Pedido #${p.id}${p.negocio ? ` en ${p.negocio}` : ''}. Acéptalo antes de que venza.`,
+      cuerpo: `Pedido #${p.codigo}${p.negocio ? ` en ${p.negocio}` : ''}. Acéptalo antes de que venza.`,
       segundos: p.segundos,
     });
   }

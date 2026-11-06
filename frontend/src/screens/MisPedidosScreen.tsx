@@ -99,7 +99,7 @@ export default function MisPedidosScreen({ navigation }: Props) {
           <FadeInView delay={Math.min(index, 8) * 45}>
             <PressableScale style={styles.card} onPress={() => navigation.navigate('PedidoDetalle', { id: item.id })}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.nombre}>Pedido #{item.id} · {item.negocio}</Text>
+                <Text style={styles.nombre}>Pedido #{item.codigo} · {item.negocio}</Text>
                 <Text style={styles.fecha}>{item.fecha}</Text>
               </View>
               <View style={{ alignItems: 'flex-end' }}>

@@ -70,7 +70,7 @@ export default function MinutosRecogida({ pedido, enviando, onCerrar, onAceptar 
           </View>
           {!!p && (
             <Text style={styles.sub}>
-              Pedido #{p.id} · {p.negocio?.nombre ?? 'Negocio'}
+              Pedido #{p.codigo} · {p.negocio?.nombre ?? 'Negocio'}
               {p.negocio?.direccion ? `\n${p.negocio.direccion}` : ''}
             </Text>
           )}

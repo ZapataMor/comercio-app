@@ -45,6 +45,7 @@ const mockTomar = tomarPedido as jest.Mock;
 const pedido = (id: number): Pedido =>
   ({
     id,
+    codigo: `K7M2X9Q${id}`,
     estado: 'listo',
     estado_label: 'Listo',
     subtotal: 20000,

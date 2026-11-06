@@ -687,6 +687,8 @@ export async function eliminarProducto(token: string, negocioId: number, id: num
 /** Pedidos recibidos por un negocio mío. */
 export type ComercioPedido = {
   id: number;
+  /** Lo que ven las personas; el id solo sirve para las rutas. */
+  codigo: string;
   estado: string;
   estado_label: string;
   fecha?: string;
@@ -738,6 +740,8 @@ export function textoCancelacion(p: { cancelado_por?: CanceladoPor | null; motiv
 /** Pedido que nadie ha aceptado: de aquí sale la alarma con la app abierta. */
 export type PedidoPorAceptar = {
   id: number;
+  /** Lo que ven las personas; el id solo sirve para las rutas. */
+  codigo: string;
   negocio_id: number;
   negocio: string | null;
   total: number;
@@ -1212,6 +1216,8 @@ export type PedidoItem = {
 
 export type Pedido = {
   id: number;
+  /** Lo que ven las personas; el id solo sirve para las rutas. */
+  codigo: string;
   estado: string;
   estado_label: string;
   subtotal: number;
@@ -1319,6 +1325,8 @@ export async function confirmarEntrega(token: string, id: number, codigo: string
 
 export type MiPedido = {
   id: number;
+  /** Lo que ven las personas; el id solo sirve para las rutas. */
+  codigo: string;
   estado: string;
   estado_label: string;
   total: number;
@@ -1376,6 +1384,8 @@ export type CaritasPromedio = {
 
 export type SeguimientoPedido = {
   id: number;
+  /** Lo que ven las personas; el id solo sirve para las rutas. */
+  codigo: string;
   estado: string;
   estado_label: string;
   estados: string[];
