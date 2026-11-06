@@ -11,6 +11,7 @@ import { useAlarmaPedidos } from './src/alarmaPedidos';
 import { Colores, font, makeStyles, ThemeProvider, useTheme } from './src/theme';
 import { AuthProvider, useAuth } from './src/AuthContext';
 import { CartProvider } from './src/CartContext';
+import AvisoPedidoNuevo from './src/components/AvisoPedidoNuevo';
 import BarraCliente from './src/components/BarraCliente';
 import { ConfirmacionProvider } from './src/components/Confirmacion';
 import { AppDesenfocable } from './src/components/Desenfoque';
@@ -262,12 +263,15 @@ function PushBridge() {
   return null;
 }
 
-/** La alarma de pedidos sigue viva en toda la app, no solo en el Inicio. */
-function AlarmaBridge() {
+/**
+ * La alarma de pedidos y su aviso siguen vivos en toda la app, no solo en el
+ * Inicio. `mostrarAviso`: el aviso espera a que termine el splash.
+ */
+function AlarmaBridge({ mostrarAviso }: { mostrarAviso: boolean }) {
   const { auth } = useAuth();
   const { negocios } = useNegocio();
-  useAlarmaPedidos(auth?.token ?? null, negocios.length > 0);
-  return null;
+  const enEspera = useAlarmaPedidos(auth?.token ?? null, negocios.length > 0);
+  return mostrarAviso ? <AvisoPedidoNuevo pedidos={enEspera} /> : null;
 }
 
 function App() {
@@ -297,7 +301,7 @@ function AppContenido() {
               <ConfirmacionProvider>
                 <StatusBar barStyle="light-content" backgroundColor={c.header} />
                 <PushBridge />
-                <AlarmaBridge />
+                <AlarmaBridge mostrarAviso={!splashVisible} />
                 <View style={styles.raiz}>
                   <Navegacion />
                   {splashVisible && <SplashVitrina onFin={ocultarSplash} />}

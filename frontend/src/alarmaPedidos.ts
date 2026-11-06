@@ -24,7 +24,7 @@ import notifee, {
   AndroidVisibility,
   DisplayedNotification,
 } from '@notifee/react-native';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { getPedidosPorAceptar, PedidoPorAceptar } from './api';
 import { alCambiarDesdePush } from './usePolling';
@@ -44,6 +44,9 @@ const VIBRACION = [300, 300, 300, 9100];
  */
 const ESPERA_MISMA_ALARMA_MS = 15000;
 const ultimoAviso = new Map<number, number>();
+
+/** Pedido por aceptar con la hora en que vence, para contar lo que le queda. */
+export type PedidoEnEspera = PedidoPorAceptar & { vence: number };
 
 export type DatosAlarma = {
   pedidoId: number;
@@ -170,10 +173,14 @@ export async function sincronizarAlarmas(pedidos: PedidoPorAceptar[], reanudar =
 /**
  * Con la app abierta, mantiene las alarmas al día con lo que dice el servidor.
  * `activa`: la persona tiene algún negocio (si cierra sesión, todo se calla).
+ * Devuelve lo que falta por aceptar, para mostrarlo en pantalla.
  */
-export function useAlarmaPedidos(token: string | null, activa: boolean) {
+export function useAlarmaPedidos(token: string | null, activa: boolean): PedidoEnEspera[] {
+  const [enEspera, setEnEspera] = useState<PedidoEnEspera[]>([]);
+
   useEffect(() => {
     if (!token || !activa) {
+      setEnEspera([]);
       detenerTodasLasAlarmas().catch(() => {});
       return;
     }
@@ -184,7 +191,12 @@ export function useAlarmaPedidos(token: string | null, activa: boolean) {
     // Sin red no se toca nada: lo que estaba sonando sigue sonando.
     const revisar = (reanudar = false) => {
       getPedidosPorAceptar(token)
-        .then(pedidos => (vigente ? sincronizarAlarmas(pedidos, reanudar) : undefined))
+        .then(pedidos => {
+          if (!vigente) return undefined;
+          const recibido = Date.now();
+          setEnEspera(pedidos.map(p => ({ ...p, vence: recibido + p.segundos * 1000 })));
+          return sincronizarAlarmas(pedidos, reanudar);
+        })
         .catch(() => {});
     };
     const iniciar = () => {
@@ -207,4 +219,6 @@ export function useAlarmaPedidos(token: string | null, activa: boolean) {
       quitarOyente();
     };
   }, [token, activa]);
+
+  return enEspera;
 }
