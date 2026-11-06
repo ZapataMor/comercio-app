@@ -44,6 +44,11 @@ type PushData = {
 let pendingData: PushData | null = null;
 
 function navigateFromData(data: PushData, user: Usuario) {
+  // La pregunta del cierre es un modal encima de cualquier pantalla: no se navega.
+  if (data.tipo === 'confirmar_cierre') {
+    return;
+  }
+
   const roles = user.roles ?? [];
   const pedidoId = Number(data.pedido_id);
 

@@ -245,7 +245,7 @@ function PushBridge() {
       // Los avisos de datos traen su texto aparte, y los silenciosos no traen.
       const titulo = message.notification?.title ?? message.data?.titulo;
       const cuerpo = message.notification?.body ?? message.data?.cuerpo;
-      if (typeof titulo === 'string') {
+      if (typeof titulo === 'string' && message.data?.tipo !== 'confirmar_cierre') {
         toast.info(titulo, typeof cuerpo === 'string' ? cuerpo : undefined);
       }
       // Algo cambió: las pantallas en vivo se refrescan ya, sin esperar.

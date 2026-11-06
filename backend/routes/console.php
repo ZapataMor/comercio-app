@@ -2,8 +2,10 @@
 
 use App\Models\Negocio;
 use App\Models\Pedido;
+use App\Notifications\PreguntaCierreNegocio;
 use App\Support\CancelarPedido;
 use App\Support\HorarioNegocio;
+use App\Support\Push;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -28,6 +30,29 @@ Artisan::command('negocios:aplicar-horario', function () {
     $this->info("Negocios abiertos/cerrados por horario: {$cambiados}");
 })->purpose('Abre y cierra los negocios según su horario');
 
+// A los dueños cuyo negocio cierra pronto: ¿cierras a esa hora? Una vez por cierre.
+Artisan::command('negocios:preguntar-cierre', function () {
+    $ahora = now();
+    $preguntados = 0;
+
+    Negocio::whereNotNull('horario')
+        ->whereNull('archivado_at')
+        ->where('activo', true)
+        ->each(function (Negocio $negocio) use ($ahora, &$preguntados) {
+            $cierre = HorarioNegocio::cierreSinConfirmar($negocio, $ahora);
+            if (! $cierre || $negocio->cierre_preguntado?->eq($cierre)) {
+                return;
+            }
+
+            $negocio->forceFill(['cierre_preguntado' => $cierre])->save();
+            $duenos = $negocio->miembrosActivos()->wherePivot('rol', Negocio::ROL_PROPIETARIO)->get();
+            Push::enviar($duenos, new PreguntaCierreNegocio($negocio, HorarioNegocio::hora($cierre->format('H:i'))));
+            $preguntados++;
+        });
+
+    $this->info("Dueños preguntados por el cierre: {$preguntados}");
+})->purpose('Pregunta a los dueños si cierran a la hora del horario');
+
 // Cancela los pedidos que nadie del negocio aceptó a tiempo y le avisa al cliente.
 Artisan::command('pedidos:vencer', function () {
     $limite = now()->subMinutes((int) config('reputacion.minutos_para_aceptar'));
@@ -43,4 +68,5 @@ Artisan::command('pedidos:vencer', function () {
 // En desarrollo corre con `php artisan schedule:work`; en el servidor, con el
 // cron de `schedule:run` cada minuto (ver DESPLIEGUE.md).
 Schedule::command('negocios:aplicar-horario')->everyMinute()->withoutOverlapping();
+Schedule::command('negocios:preguntar-cierre')->everyMinute()->withoutOverlapping();
 Schedule::command('pedidos:vencer')->everyThirtySeconds()->withoutOverlapping();

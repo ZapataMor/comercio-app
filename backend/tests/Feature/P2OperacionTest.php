@@ -2,9 +2,11 @@
 
 use App\Models\Negocio;
 use App\Models\User;
+use App\Notifications\PreguntaCierreNegocio;
 use App\Support\Festivos;
 use App\Support\HorarioNegocio;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Notification;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
 
@@ -149,6 +151,57 @@ test('también se puede cerrar más temprano y pasar de medianoche', function ()
     expect($negocio->fresh()->cierre_ajustado->toDateTimeString())->toBe('2026-11-10 01:00:00');
 
     Carbon::setTestNow();
+});
+
+test('el push de la pregunta sale 20 minutos antes, una vez y solo al dueño', function () {
+    Notification::fake();
+    $dueno = usuarioRol('usuario');
+    $negocio = negocioConCierre($dueno);
+    $trabajador = usuarioRol('usuario');
+    $negocio->miembros()->attach($trabajador->id, ['rol' => 'trabajador', 'activo' => true]);
+
+    Carbon::setTestNow('2026-11-09 19:39:00');
+    $this->artisan('negocios:preguntar-cierre')->assertSuccessful();
+    Notification::assertNothingSent();
+
+    Carbon::setTestNow('2026-11-09 19:40:00');
+    $this->artisan('negocios:preguntar-cierre')->assertSuccessful();
+    Notification::assertSentToTimes($dueno, PreguntaCierreNegocio::class, 1);
+    Notification::assertNotSentTo($trabajador, PreguntaCierreNegocio::class);
+
+    Carbon::setTestNow('2026-11-09 19:41:00');
+    $this->artisan('negocios:preguntar-cierre')->assertSuccessful();
+    Notification::assertSentToTimes($dueno, PreguntaCierreNegocio::class, 1);
+
+    Carbon::setTestNow();
+});
+
+test('no se pregunta por push si ya respondió o el negocio está cerrado', function () {
+    Notification::fake();
+    $dueno = usuarioRol('usuario');
+    $negocio = negocioConCierre($dueno);
+    Sanctum::actingAs($dueno);
+
+    Carbon::setTestNow('2026-11-09 19:45:00');
+    $this->putJson("/api/negocios/mios/{$negocio->id}/cierre", ['hora' => null])->assertOk();
+    $this->artisan('negocios:preguntar-cierre')->assertSuccessful();
+    Notification::assertNothingSent();
+
+    $cerrado = negocioConCierre($dueno);
+    $cerrado->update(['activo' => false]);
+    $this->artisan('negocios:preguntar-cierre')->assertSuccessful();
+    Notification::assertNothingSent();
+
+    Carbon::setTestNow();
+});
+
+test('el push de la pregunta dice la hora y lleva a confirmar', function () {
+    $negocio = negocioConCierre(usuarioRol('usuario'));
+
+    $mensaje = (new PreguntaCierreNegocio($negocio, '8:00 p. m.'))->toFcm($negocio->user ?? usuarioRol('usuario'))->toArray();
+
+    expect($mensaje['notification']['title'])->toBe('¿Cierras a las 8:00 p. m.?')
+        ->and($mensaje['data'])->toBe(['tipo' => 'confirmar_cierre', 'negocio_id' => (string) $negocio->id]);
 });
 
 test('una hora que ya pasó o muy lejana se rechaza', function () {

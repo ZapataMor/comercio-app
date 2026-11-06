@@ -209,8 +209,9 @@ export function configurarMensajesForeground(
   const unsubscribeMessage = onMessage(fcm, message => {
     atenderAlarma(dataPlano(message.data));
     retirarOferta(dataPlano(message.data));
-    // Los de datos (la alarma) no traen notificación que mostrar.
-    if (message.notification) {
+    // Los de datos (la alarma) no traen notificación que mostrar, y la pregunta
+    // del cierre ya se ve en su modal.
+    if (message.notification && message.data?.tipo !== 'confirmar_cierre') {
       mostrarNotificacionForeground(message);
     }
     onMensaje(message);

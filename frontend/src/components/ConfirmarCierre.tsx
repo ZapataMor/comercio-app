@@ -3,8 +3,9 @@
  * verdad cierra a esa hora. Si no, escribe la hora aproximada en el mismo modal:
  * vale solo para este cierre, el horario automático no cambia.
  *
- * Va encima de cualquier pantalla con la app abierta. Si no responde, el negocio
- * cierra a la hora del horario.
+ * Va encima de cualquier pantalla con la app abierta. Con la app cerrada le
+ * llega un push (PreguntaCierreNegocio), y al abrirla aparece este modal. Si no
+ * responde, el negocio cierra a la hora del horario.
  *
  * Mientras se ve, los Toast quedan detrás del Modal: los errores van en la tarjeta.
  */
@@ -14,6 +15,7 @@ import { CierrePorConfirmar, confirmarCierre, getCierresPorConfirmar } from '../
 import { useAuth } from '../AuthContext';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
+import { alCambiarDesdePush } from '../usePolling';
 import { PressableScale } from './anim';
 import { completarHora, formatearHora, hora12 } from './EditorHorario';
 import Icon from './Icon';
@@ -58,11 +60,13 @@ export default function ConfirmarCierre() {
 
     if (AppState.currentState === 'active') iniciar();
     const sub = AppState.addEventListener('change', estado => (estado === 'active' ? iniciar() : detener()));
+    const quitarOyente = alCambiarDesdePush(consultar);
 
     return () => {
       vigente = false;
       detener();
       sub.remove();
+      quitarOyente();
     };
   }, [token]);
 

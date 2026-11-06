@@ -9,6 +9,7 @@ import { AppState, Modal, Text, TextInput } from 'react-native';
 import ReactTestRenderer, { act } from 'react-test-renderer';
 import { confirmarCierre, getCierresPorConfirmar } from '../src/api';
 import ConfirmarCierre from '../src/components/ConfirmarCierre';
+import { avisarCambioDesdePush } from '../src/usePolling';
 
 jest.mock('../src/AuthContext', () => ({ useAuth: () => ({ auth: { token: 't', user: { id: 7 } } }) }));
 
@@ -67,6 +68,19 @@ test('sin cierres por confirmar no se ve nada', async () => {
   mockLista.mockResolvedValue([]);
   await montar();
   expect(visible()).toBe(false);
+});
+
+test('un push con la app abierta muestra la pregunta sin esperar', async () => {
+  mockLista.mockResolvedValue([]);
+  await montar();
+  expect(visible()).toBe(false);
+
+  mockLista.mockResolvedValue([cierre]);
+  await act(async () => {
+    avisarCambioDesdePush();
+  });
+
+  expect(visible()).toBe(true);
 });
 
 test('pregunta por la hora del horario y el botón atrás no lo cierra', async () => {
