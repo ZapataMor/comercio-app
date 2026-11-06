@@ -10,7 +10,6 @@ import BotonMantener from '../components/BotonMantener';
 import HeaderNegocios from '../components/HeaderNegocios';
 import HeaderPerfil from '../components/HeaderPerfil';
 import Icon, { IconName } from '../components/Icon';
-import { NivelBadge } from '../components/Reputacion';
 import { IrAExplorar, Saludo } from '../components/SaludoInicio';
 import { messageFromError } from '../formErrors';
 import { useNegocio } from '../NegocioContext';
@@ -151,6 +150,47 @@ function HeaderEstadoNegocio() {
   );
 }
 
+type Acceso = { icono: IconName; titulo: string; abrir: () => void };
+
+/** Cuántos cuadros de acceso van por fila. */
+const COLUMNAS = 3;
+
+/**
+ * Accesos del negocio en cuadros iguales, para que los pedidos queden a la vista.
+ * Una fila incompleta conserva sus huecos: así ningún cuadro se estira.
+ */
+function CuadrosAcceso({ accesos }: { accesos: Acceso[] }) {
+  const { c } = useTheme();
+  const styles = useStyles();
+  const filas = Array.from({ length: Math.ceil(accesos.length / COLUMNAS) }, (_, i) =>
+    accesos.slice(i * COLUMNAS, (i + 1) * COLUMNAS),
+  );
+
+  return (
+    <View style={styles.cuadros}>
+      {filas.map((fila, f) => (
+        <View key={fila[0].titulo} style={styles.cuadrosFila}>
+          {fila.map(({ icono, titulo, abrir }, i) => (
+            <FadeInView key={titulo} delay={60 + (f * COLUMNAS + i) * 25} style={styles.celda}>
+              <PressableScale
+                style={styles.cuadro}
+                accessibilityRole="button"
+                accessibilityLabel={titulo}
+                onPress={abrir}>
+                <Icon name={icono} size={26} color={c.accent} />
+                <Text style={styles.cuadroTxt} numberOfLines={2}>{titulo}</Text>
+              </PressableScale>
+            </FadeInView>
+          ))}
+          {Array.from({ length: COLUMNAS - fila.length }, (_, i) => (
+            <View key={i} style={styles.celda} />
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 /** Pedido del Inicio: número, total, con quién hay que tratar y qué sigue. */
 function TarjetaPedido({
   pedido,
@@ -194,7 +234,7 @@ export default function HomeScreen({ navigation }: Props) {
   const esAdmin = user.roles.includes('administrador');
   const esDomiciliario = user.roles.includes('domiciliario');
 
-  const { negocio, negocios, esPropietario } = useNegocio();
+  const { negocio, negocios } = useNegocio();
   const negocioId = negocio?.id ?? null;
   // Panel de negocio: quien es miembro de algún negocio (no hay rol global
   // de "comerciante"; los negocios se crean desde Mis negocios).
@@ -266,6 +306,22 @@ export default function HomeScreen({ navigation }: Props) {
   // Efectivo: falta decir si el domiciliario entregó el dinero.
   const porConfirmar = pedidos.filter(p => p.puede_confirmar_dinero);
 
+  const accesos: Acceso[] = [
+    { icono: 'tienda', titulo: 'Mi negocio', abrir: () => navigation.navigate('MiTienda') },
+    // Cambiar de negocio, crear otro y responder invitaciones.
+    { icono: 'negocios', titulo: 'Mis negocios', abrir: () => navigation.navigate('MisNegocios') },
+    ...(negocio
+      ? ([
+          { icono: 'caja', titulo: 'Productos', abrir: () => navigation.navigate('MisProductos') },
+          { icono: 'lista', titulo: 'Pedidos y ventas', abrir: () => navigation.navigate('PedidosNegocio') },
+          { icono: 'usuarios', titulo: 'Equipo', abrir: () => navigation.navigate('Equipo') },
+        ] satisfies Acceso[])
+      : []),
+    ...(user.roles.includes('usuario')
+      ? ([{ icono: 'bolsa', titulo: 'Explorar negocios', abrir: () => navigation.navigate('Explorar') }] satisfies Acceso[])
+      : []),
+  ];
+
   return (
     <ScrollView
       style={styles.container}
@@ -274,80 +330,7 @@ export default function HomeScreen({ navigation }: Props) {
 
       {tienePanel && (
         <>
-          <FadeInView delay={60}>
-            <PressableScale style={styles.item} onPress={() => navigation.navigate('MiTienda')}>
-              <Icon name="tienda" size={26} color={c.accent} style={styles.itemEmoji} />
-              <View style={styles.itemTexto}>
-                <Text style={styles.itemTitulo}>Mi negocio</Text>
-                <Text style={styles.itemSub}>
-                  {negocio
-                    ? `${negocio.nombre} · ${negocio.activo ? 'Abierto' : 'Cerrado'}${esPropietario ? '' : ' · Trabajador'}`
-                    : 'Crea tu negocio'}
-                </Text>
-                {!!negocio?.reputacion && (
-                  <View style={styles.itemBadge}>
-                    <NivelBadge reputacion={negocio.reputacion} />
-                  </View>
-                )}
-              </View>
-              <Icon name="chevron" size={20} color={c.chevron} />
-            </PressableScale>
-          </FadeInView>
-
-          {/* Cambiar de negocio, crear otro y responder invitaciones. */}
-          <FadeInView delay={90}>
-            <PressableScale style={styles.item} onPress={() => navigation.navigate('MisNegocios')}>
-              <Icon name="lista" size={26} color={c.accent} style={styles.itemEmoji} />
-              <View style={styles.itemTexto}>
-                <Text style={styles.itemTitulo}>Mis negocios</Text>
-                <Text style={styles.itemSub}>
-                  {negocios.length > 1
-                    ? `${negocios.length} negocios · toca para cambiar`
-                    : 'Crea otro negocio o únete a uno'}
-                </Text>
-              </View>
-              <Icon name="chevron" size={20} color={c.chevron} />
-            </PressableScale>
-          </FadeInView>
-
-          {negocio && (
-            <>
-              <FadeInView delay={120}>
-                <PressableScale style={styles.item} onPress={() => navigation.navigate('MisProductos')}>
-                  <Icon name="caja" size={26} color={c.accent} style={styles.itemEmoji} />
-                  <View style={styles.itemTexto}>
-                    <Text style={styles.itemTitulo}>Productos</Text>
-                    <Text style={styles.itemSub}>Tu catálogo: añade y edita productos</Text>
-                  </View>
-                  <Icon name="chevron" size={20} color={c.chevron} />
-                </PressableScale>
-              </FadeInView>
-
-              <FadeInView delay={135}>
-                <PressableScale style={styles.item} onPress={() => navigation.navigate('PedidosNegocio')}>
-                  <Icon name="lista" size={26} color={c.accent} style={styles.itemEmoji} />
-                  <View style={styles.itemTexto}>
-                    <Text style={styles.itemTitulo}>Pedidos y ventas</Text>
-                    <Text style={styles.itemSub}>En curso, entregados, cancelados y lo vendido hoy</Text>
-                  </View>
-                  <Icon name="chevron" size={20} color={c.chevron} />
-                </PressableScale>
-              </FadeInView>
-
-              <FadeInView delay={150}>
-                <PressableScale style={styles.item} onPress={() => navigation.navigate('Equipo')}>
-                  <Icon name="usuarios" size={26} color={c.accent} style={styles.itemEmoji} />
-                  <View style={styles.itemTexto}>
-                    <Text style={styles.itemTitulo}>Equipo</Text>
-                    <Text style={styles.itemSub}>
-                      {esPropietario ? 'Invita trabajadores con su código' : 'Personas que trabajan aquí'}
-                    </Text>
-                  </View>
-                  <Icon name="chevron" size={20} color={c.chevron} />
-                </PressableScale>
-              </FadeInView>
-            </>
-          )}
+          <CuadrosAcceso accesos={accesos} />
 
           {/* Pedidos en espera del negocio activo, directamente en el Inicio. */}
           {negocio && (
@@ -454,7 +437,8 @@ export default function HomeScreen({ navigation }: Props) {
         </>
       )}
 
-      <IrAExplorar />
+      {/* Con panel de negocio, Explorar es uno de los cuadros. */}
+      {!tienePanel && <IrAExplorar />}
 
       {esAdmin && (
         <FadeInView delay={120}>
@@ -486,6 +470,21 @@ const useStyles = makeStyles((c, shadow) => ({
   fila: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   itemTitulo: { fontSize: 16, fontFamily: font.bold, color: c.textStrong },
   itemSub: { color: c.muted, fontSize: 13, marginTop: 2, fontFamily: font.regular },
+  // Accesos del negocio
+  cuadros: { gap: 10, marginBottom: 12 },
+  cuadrosFila: { flexDirection: 'row', gap: 10 },
+  celda: { flex: 1 },
+  cuadro: {
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 6,
+    backgroundColor: c.surface,
+    borderRadius: radius.lg,
+    ...shadow.soft,
+  },
+  cuadroTxt: { color: c.textStrong, fontFamily: font.semibold, fontSize: 13, lineHeight: 17, textAlign: 'center' },
   // Topbar: Abierto/Cerrado
   headerEstado: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerEstadoTxt: { fontFamily: font.bold, fontSize: 13 },
@@ -515,5 +514,4 @@ const useStyles = makeStyles((c, shadow) => ({
   pedidoCardDinero: { borderLeftColor: c.success },
   aceptarBtn: { backgroundColor: c.brand, borderRadius: radius.md, paddingVertical: 12, alignItems: 'center', marginTop: 10 },
   aceptarTxt: { color: c.onBrand, fontFamily: font.bold, fontSize: 15 },
-  itemBadge: { marginTop: 6 },
 }));
