@@ -42,6 +42,7 @@ class Producto extends Model
             'disponible' => 'boolean',
             'atributos' => 'array',
             'colores' => 'array',
+            'resenas_total' => 'integer',
         ];
     }
 

@@ -8,14 +8,24 @@ import {
   Text,
   View,
 } from 'react-native';
-import { direccionConBarrio, getCatalogo, imagenUrl, Negocio, Producto } from '../api';
+import {
+  direccionConBarrio,
+  getCatalogo,
+  getRecetasPreferidas,
+  imagenUrl,
+  Negocio,
+  Producto,
+  RecetaPreferida,
+} from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import { useFlyToCart } from '../components/FlyToCart';
 import Icon from '../components/Icon';
 import { NivelBadge } from '../components/Reputacion';
+import RecetasPreferidas from '../components/RecetasPreferidas';
+import { PuntajeResenas } from '../components/Resenas';
 import { RootStackParamList } from '../navTypes';
-import { pideEleccion, precioDe } from '../opcionesProducto';
+import { OpcionesLinea, pideEleccion, precioDe } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 import { useAgregarAlCarrito } from '../useAgregarAlCarrito';
@@ -90,6 +100,7 @@ function TarjetaProducto({ producto, destacado, abierto, onVer, onAgregar }: Tar
       </View>
       <Text style={styles.nombre} numberOfLines={2}>{producto.nombre}</Text>
       <Text style={styles.precio}>{precioDe(producto)}</Text>
+      <PuntajeResenas resenas={producto.resenas} size={12} style={styles.puntaje} />
     </PressableScale>
   );
 }
@@ -104,6 +115,7 @@ export default function NegocioScreen({ navigation, route }: Props) {
   const agregar = useAgregarAlCarrito(id, nombre);
   const [negocio, setNegocio] = useState<Negocio | null>(null);
   const [productos, setProductos] = useState<Producto[]>([]);
+  const [recetas, setRecetas] = useState<RecetaPreferida[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const catalogo = useMemo(() => construirCatalogo(productos), [productos]);
@@ -118,6 +130,13 @@ export default function NegocioScreen({ navigation, route }: Props) {
       })
       .catch(e => setError(e.message))
       .finally(() => setCargando(false));
+  }, [auth, id]);
+
+  // Es una recomendación: si no carga, el catálogo sigue igual.
+  useEffect(() => {
+    getRecetasPreferidas(auth!.token, id)
+      .then(setRecetas)
+      .catch(() => {});
   }, [auth, id]);
 
   // Si el negocio abre o cierra se nota aquí mismo. Solo cambia el negocio: tocar
@@ -151,7 +170,7 @@ export default function NegocioScreen({ navigation, route }: Props) {
     });
   }
 
-  function onAgregar(p: Producto, e: GestureResponderEvent) {
+  function onAgregar(p: Producto, e: GestureResponderEvent, opciones?: OpcionesLinea) {
     if (!negocioAbierto) {
       toast.info('Negocio cerrado', 'Puedes ver el catálogo, pero no hacer pedidos.');
       return;
@@ -165,7 +184,7 @@ export default function NegocioScreen({ navigation, route }: Props) {
     // Punto exacto del toque sobre "+": desde ahí salta el paquetito que vuela
     // hasta el botón flotante de Carrito.
     const desde = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
-    agregar(p, { alAgregar: () => volar(desde) });
+    agregar(p, { opciones, alAgregar: () => volar(desde) });
   }
 
   if (cargando) {
@@ -224,6 +243,14 @@ export default function NegocioScreen({ navigation, route }: Props) {
                 )}
                 <NivelBadge reputacion={negocio.reputacion} />
               </View>
+              <PressableScale
+                style={styles.resenas}
+                accessibilityRole="button"
+                accessibilityLabel="Ver las reseñas de la tienda"
+                onPress={() => navigation.navigate('Resenas', { negocioId: id, titulo: negocio.nombre })}>
+                <PuntajeResenas resenas={negocio.resenas} size={14} conVacio />
+                <Icon name="chevron" size={13} color={c.muted} />
+              </PressableScale>
               {!!negocio.horario_hoy && (
                 <Text style={styles.dato} numberOfLines={1}>{negocio.horario_hoy}</Text>
               )}
@@ -232,6 +259,11 @@ export default function NegocioScreen({ navigation, route }: Props) {
               )}
               {!!negocio.descripcion && <Text style={styles.descripcion}>{negocio.descripcion}</Text>}
             </View>
+            <RecetasPreferidas
+              recetas={recetas}
+              abierto={negocioAbierto}
+              onAgregar={(receta, e) => onAgregar(receta.producto, e, receta.opciones)}
+            />
           </View>
         ) : null
       }
@@ -283,6 +315,7 @@ const useStyles = makeStyles((c, shadow) => ({
   estado: { color: c.success, fontSize: 13, fontFamily: font.semibold },
   estadoCerrado: { color: c.danger },
   dato: { color: c.muted, fontSize: 13, lineHeight: 18, fontFamily: font.regular },
+  resenas: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 2, paddingVertical: 3 },
   descripcion: { color: c.text, fontSize: 14, lineHeight: 20, fontFamily: font.regular, marginTop: 8 },
   seccion: {
     flexDirection: 'row',
@@ -320,6 +353,7 @@ const useStyles = makeStyles((c, shadow) => ({
   },
   nombre: { color: c.textStrong, fontSize: 14, lineHeight: 19, fontFamily: font.medium, marginTop: 10 },
   precio: { color: c.text, fontSize: 14, fontFamily: font.bold, marginTop: 3 },
+  puntaje: { marginTop: 3 },
   vacio: { textAlign: 'center', color: c.muted, marginTop: 40, fontFamily: font.regular },
   error: { color: c.danger, backgroundColor: c.dangerSoft, padding: 12, borderRadius: radius.sm, margin: 16, fontFamily: font.medium },
 }));

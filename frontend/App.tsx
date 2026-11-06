@@ -34,6 +34,7 @@ import MiInformacionScreen from './src/screens/MiInformacionScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import MiTiendaScreen from './src/screens/MiTiendaScreen';
+import ResenasScreen from './src/screens/ResenasScreen';
 import MisNegociosScreen from './src/screens/MisNegociosScreen';
 import MisProductosScreen from './src/screens/MisProductosScreen';
 import EquipoScreen from './src/screens/EquipoScreen';
@@ -194,6 +195,8 @@ function Navegacion() {
                 otros (el acceso lo decide la membresía, no un rol global). */}
             <Stack.Screen name="MisNegocios" component={MisNegociosScreen} options={{ title: 'Mis negocios' }} />
             <Stack.Screen name="MiTienda" component={MiTiendaScreen} options={{ title: 'Mi Tienda' }} />
+            {/* Las lee el cliente y también el dueño, desde Mi Tienda. */}
+            <Stack.Screen name="Resenas" component={ResenasScreen} options={{ title: 'Reseñas' }} />
             <Stack.Screen name="MisProductos" component={MisProductosScreen} options={{ title: 'Productos' }} />
             <Stack.Screen name="Equipo" component={EquipoScreen} options={{ title: 'Equipo' }} />
             <Stack.Screen

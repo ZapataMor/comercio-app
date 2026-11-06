@@ -12,6 +12,7 @@ import Icon from '../components/Icon';
 import { haceCuanto, MapaSeguimiento, NotaEnVivo } from '../components/Mapa';
 import MotivoCancelacion from '../components/MotivoCancelacion';
 import { NivelBadge } from '../components/Reputacion';
+import ResenarPedido from '../components/ResenarPedido';
 import { messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
@@ -138,6 +139,8 @@ export default function PedidoDetalleScreen({ route }: Props) {
   return (
     <ScrollView
       style={styles.container}
+      // Con el teclado abierto, tocar una estrella cuenta al primer toque.
+      keyboardShouldPersistTaps="handled"
       // Aire abajo para la barra flotante fija (Carrito / Mis pedidos).
       contentContainerStyle={{ padding: 16, paddingBottom: 110 }}>
       <Text style={styles.titulo}>Pedido #{pedido.codigo}</Text>
@@ -157,6 +160,9 @@ export default function PedidoDetalleScreen({ route }: Props) {
           domiciliario={pedido.domiciliario}
         />
       ) : null}
+
+      {/* Estrellas y comentario públicos de la tienda y de lo que compró. */}
+      <ResenarPedido pedido={pedido} onGuardado={() => cargarPedido()} />
 
       {/* Cancelado: en vez de la línea de tiempo, quién y por qué. */}
       {pedido.estado === 'cancelado' ? (

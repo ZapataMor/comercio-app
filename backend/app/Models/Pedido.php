@@ -192,6 +192,25 @@ class Pedido extends Model
     }
 
     /**
+     * ¿El cliente puede reseñar lo que compró? Solo si el pedido le llegó, y
+     * dentro de `reputacion.dias_para_resenar`; hasta entonces puede corregirla.
+     */
+    public function puedeResenarse(): bool
+    {
+        if ($this->estado !== 'entregado') {
+            return false;
+        }
+
+        if (in_array('no_llego', $this->calificacion?->domiciliario_problemas ?? [], true)) {
+            return false;
+        }
+
+        $entregado = $this->entregado_at ?? $this->updated_at;
+
+        return $entregado->gte(now()->subDays((int) config('reputacion.dias_para_resenar')));
+    }
+
+    /**
      * ¿El negocio puede decir si recibió el dinero? Solo efectivo, con
      * domiciliario que ya recogió, una sola vez y dentro del plazo (así no se
      * acumulan pedidos viejos, ni los de antes de que existiera recogido_at).
@@ -252,5 +271,11 @@ class Pedido extends Model
     public function calificacion(): HasOne
     {
         return $this->hasOne(Calificacion::class);
+    }
+
+    /** Reseñas públicas que dejó el cliente de la tienda y los productos. */
+    public function resenas(): HasMany
+    {
+        return $this->hasMany(Resena::class);
     }
 }

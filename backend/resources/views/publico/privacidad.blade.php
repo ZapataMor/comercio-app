@@ -34,8 +34,10 @@
     <ul class="list-disc pl-5 space-y-1">
         <li>Crear y proteger tu cuenta.</li>
         <li>Llevar tu pedido: el negocio lo prepara y un domiciliario lo entrega en tu dirección.</li>
+        <li>Recomendarte en cada tienda los platos que ya pediste varias veces con los mismos ajustes.</li>
         <li>Avisarte del estado de tus pedidos, invitaciones y novedades de tu negocio.</li>
         <li>Medir la calidad del servicio (tiempos, calificaciones) y prevenir abusos o fraudes.</li>
+        <li>Publicar las reseñas que escribes de tiendas y productos, con tu nombre y la inicial de tu apellido. Si eliminas tu cuenta, se borra lo que escribiste.</li>
         <li>Mostrar en el mapa al domiciliario mientras lleva un pedido.</li>
         <li>Encontrar y corregir fallas de la app.</li>
         <li>Atender tus consultas y reclamos.</li>

@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Support\Resenas;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -28,6 +29,7 @@ class ProductoResource extends JsonResource
             // Ruta relativa (ej "/storage/productos/x.jpg") o null; la app le antepone la API_URL.
             'imagen' => $this->imagen ? '/storage/'.$this->imagen : null,
             'disponible' => $this->disponible,
+            'resenas' => Resenas::resumen($this->resource),
             // Ingredientes, usos, tallas... según el tipo de producto.
             'atributos' => $this->atributos ?? [],
             // Solo ropa y calzado: ahí `atributos` son las tallas.

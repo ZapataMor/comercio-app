@@ -5,6 +5,7 @@ namespace App\Http\Resources;
 use App\Support\Festivos;
 use App\Support\HorarioNegocio;
 use App\Support\Reputacion;
+use App\Support\Resenas;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -42,6 +43,7 @@ class NegocioResource extends JsonResource
             // Hoy rige el horario de festivos (la app lo resalta).
             'festivo_hoy' => Festivos::esFestivo(now()),
             'reputacion' => Reputacion::resumen(Reputacion::NEGOCIO, $this->resource),
+            'resenas' => Resenas::resumen($this->resource),
             // Pin en el mapa (null = aún no lo ha fijado).
             'lat' => $this->lat,
             'lng' => $this->lng,

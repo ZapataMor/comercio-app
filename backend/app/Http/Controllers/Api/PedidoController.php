@@ -12,6 +12,7 @@ use App\Support\CancelarPedido;
 use App\Support\OpcionesPedido;
 use App\Support\Push;
 use App\Support\Reputacion;
+use App\Support\Resenas;
 use App\Support\UbicacionDomiciliario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -137,6 +138,7 @@ class PedidoController extends Controller
     {
         $pagina = $request->user()->pedidos()
             ->with(['negocio', 'calificacion'])
+            ->withCount('resenas')
             ->latest()
             ->latest('id')
             ->paginate(20);
@@ -152,6 +154,7 @@ class PedidoController extends Controller
                 'fecha' => $p->created_at->format('d/m/Y H:i'),
                 'cancelado_por' => $p->cancelado_por,
                 'por_calificar' => $p->puedeCalificarse(),
+                'por_resenar' => $p->resenas_count === 0 && $p->puedeResenarse(),
             ])
             ->values();
 
@@ -166,7 +169,7 @@ class PedidoController extends Controller
     public function show(Request $request, int $id): JsonResponse
     {
         $pedido = $request->user()->pedidos()
-            ->with(['negocio', 'items', 'domiciliario', 'calificacion'])
+            ->with(['negocio', 'items.producto', 'domiciliario', 'calificacion', 'resenas'])
             ->find($id);
 
         if (! $pedido) {
@@ -244,6 +247,9 @@ class PedidoController extends Controller
                 'domiciliario_problemas' => $this->etiquetas(Reputacion::DOMICILIARIO, $calificacion->domiciliario_problemas),
                 'comentario' => $calificacion->comentario,
             ] : null,
+            // Estrellas y comentario públicos de la tienda y de lo que compró.
+            'puede_resenar' => $pedido->puedeResenarse(),
+            'resenas' => Resenas::dePedido($pedido),
         ]);
     }
 

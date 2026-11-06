@@ -19,12 +19,14 @@ import {
   imagenUrl,
   NegocioLista,
   ProductoConNegocio,
+  ResumenResenas,
   TipoNegocio,
 } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale, Skeleton } from '../components/anim';
 import Icon, { IconName } from '../components/Icon';
 import { NivelBadge } from '../components/Reputacion';
+import { PuntajeResenas } from '../components/Resenas';
 import { RootStackParamList } from '../navTypes';
 import { precioDe } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
@@ -361,6 +363,7 @@ export default function ExplorarScreen({ navigation }: Props) {
                 nombre={item.negocio.nombre}
                 linea={metaNegocio(item.negocio)}
                 detalle={item.negocio.abierto ? null : 'Cerrado'}
+                resenas={item.negocio.resenas}
                 index={index}
                 onPress={() => abrirNegocio(item.negocio)}
               />
@@ -375,6 +378,7 @@ export default function ExplorarScreen({ navigation }: Props) {
                 linea={precioDe(item.producto)}
                 lineaResaltada
                 detalle={negocio.abierto ? negocio.nombre : `${negocio.nombre} · Cerrado`}
+                resenas={item.producto.resenas}
                 index={index}
                 onPress={() =>
                   navigation.navigate('Negocio', {
@@ -449,6 +453,7 @@ const CardNegocio = React.memo(function CardNegocio({
           <Text style={styles.negocioNombre} numberOfLines={1}>{item.nombre}</Text>
           {conNivel && <NivelBadge reputacion={item.reputacion} sinPuntaje />}
         </View>
+        <PuntajeResenas resenas={item.resenas} style={styles.puntaje} />
         {!!meta && <Text style={styles.meta} numberOfLines={1}>{meta}</Text>}
         {/* Cerrado, lo que importa es cuándo vuelve a abrir. */}
         {!item.abierto && !!item.horario_hoy && (
@@ -467,6 +472,7 @@ function FilaResultado({
   linea,
   lineaResaltada,
   detalle,
+  resenas,
   index,
   onPress,
 }: {
@@ -476,6 +482,7 @@ function FilaResultado({
   linea: string;
   lineaResaltada?: boolean;
   detalle?: string | null;
+  resenas?: ResumenResenas;
   index: number;
   onPress: () => void;
 }) {
@@ -501,6 +508,7 @@ function FilaResultado({
             </Text>
           )}
           {!!detalle && <Text style={styles.meta} numberOfLines={1}>{detalle}</Text>}
+          <PuntajeResenas resenas={resenas} size={12} style={styles.puntaje} />
         </View>
       </PressableScale>
     </FadeInView>
@@ -629,6 +637,7 @@ const useStyles = makeStyles(c => ({
   negocioCabecera: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },
   negocioNombre: { flex: 1, color: c.textStrong, fontFamily: font.displaySemi, fontSize: 16, lineHeight: 22 },
   meta: { color: c.muted, fontFamily: font.regular, fontSize: 13, lineHeight: 19, marginTop: 1 },
+  puntaje: { marginTop: 3 },
   resultado: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, marginBottom: 16 },
   resultadoFoto: {
     width: 68,

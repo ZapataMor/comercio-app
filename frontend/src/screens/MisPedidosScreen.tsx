@@ -107,12 +107,17 @@ export default function MisPedidosScreen({ navigation }: Props) {
                   {item.estado_label}
                 </Text>
                 <Text style={styles.total}>{cop(item.total)}</Text>
-                {item.por_calificar && (
+                {item.por_calificar ? (
                   <View style={styles.calificar}>
                     <Icon name="escudo" size={12} color={c.onAccent} strokeWidth={2} />
                     <Text style={styles.calificarTxt}>Califica</Text>
                   </View>
-                )}
+                ) : item.por_resenar ? (
+                  <View style={styles.calificar}>
+                    <Icon name="estrella" size={12} color={c.onAccent} strokeWidth={2} />
+                    <Text style={styles.calificarTxt}>Reseña</Text>
+                  </View>
+                ) : null}
               </View>
             </PressableScale>
           </FadeInView>

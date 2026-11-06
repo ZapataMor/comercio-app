@@ -39,6 +39,7 @@ export type IconName =
   | 'calendario'
   | 'mapa'
   | 'escudo'
+  | 'estrella'
   | 'alerta'
   | 'salir';
 
@@ -179,6 +180,7 @@ const GLYPHS: Record<IconName, React.ReactNode> = {
     </>
   ),
   chevron: <Path d="M9 6l6 6-6 6" />,
+  estrella: <Path d="M12 2.8l2.84 5.76 6.36.92-4.6 4.49 1.09 6.33L12 17.31l-5.69 2.99 1.09-6.33-4.6-4.49 6.36-.92z" />,
   lista: (
     <>
       <Path d="M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2" />

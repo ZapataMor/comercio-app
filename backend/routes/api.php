@@ -11,6 +11,8 @@ use App\Http\Controllers\Api\AdminReputacionController;
 use App\Http\Controllers\Api\DomiciliarioController as ApiDomiciliarioController;
 use App\Http\Controllers\Api\PedidoController as ApiPedidoController;
 use App\Http\Controllers\Api\ComercioPedidoController;
+use App\Http\Controllers\Api\RecetaPreferidaController;
+use App\Http\Controllers\Api\ResenaController;
 use App\Http\Controllers\Api\InvitacionController;
 use App\Http\Controllers\Api\TrabajadorController;
 use App\Http\Controllers\Api\BarrioController;
@@ -83,6 +85,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Catálogo público de UN negocio (cliente).
     Route::get('/negocios/{id}', [CatalogoController::class, 'show'])->whereNumber('id');
+    // Lo que el cliente ya pidió varias veces con los mismos ajustes en esta tienda.
+    Route::get('/negocios/{id}/recetas-preferidas', [RecetaPreferidaController::class, 'index'])->whereNumber('id');
+    // Reseñas de la tienda o, con ?producto_id=, de uno de sus productos.
+    Route::get('/negocios/{id}/resenas', [ResenaController::class, 'index'])->whereNumber('id');
 
     Route::prefix('negocios/{negocio}')->whereNumber('negocio')->group(function () {
         // Datos del negocio: solo el propietario los edita.
@@ -144,6 +150,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/ajustes', [\App\Http\Controllers\Api\AjusteController::class, 'publicos']);
     // Al terminar: ¿el negocio y el domiciliario cumplieron? (reputación).
     Route::post('/pedidos/{id}/calificacion', [ApiPedidoController::class, 'calificar']);
+    // Estrellas y comentario públicos de la tienda y de lo que compró.
+    Route::post('/pedidos/{id}/resenas', [ResenaController::class, 'guardar']);
 
     // --- Zona del ADMINISTRADOR ---
     Route::middleware('role:administrador')->prefix('admin')->group(function () {

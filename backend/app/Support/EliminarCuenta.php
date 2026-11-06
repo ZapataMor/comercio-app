@@ -70,6 +70,9 @@ class EliminarCuenta
                 'telefono_contacto' => '',
             ]);
 
+            // Las estrellas siguen contando en el promedio, sin lo que escribió.
+            $user->resenas()->update(['comentario' => null]);
+
             $user->forceFill([
                 'name' => 'Usuario',
                 'apellidos' => 'eliminado',

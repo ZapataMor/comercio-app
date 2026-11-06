@@ -8,6 +8,7 @@ import { FadeInView, PressableScale } from '../components/anim';
 import ChipsEleccion from '../components/ChipsEleccion';
 import { useFlyToCart } from '../components/FlyToCart';
 import Icon from '../components/Icon';
+import { PuntajeResenas, ResenasDeProducto } from '../components/Resenas';
 import { RootStackParamList } from '../navTypes';
 import { coloresDe, informacionDe, ingredientesDe, precioDe, tallasDe } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
@@ -90,6 +91,7 @@ export default function ProductoScreen({ navigation, route }: Props) {
         <FadeInView style={styles.cuerpo}>
           <Text style={styles.nombre}>{producto.nombre}</Text>
           <Text style={styles.precio}>{precioDe(producto)}</Text>
+          <PuntajeResenas resenas={producto.resenas} size={14} style={styles.puntaje} />
           {!!producto.descripcion && <Text style={styles.descripcion}>{producto.descripcion}</Text>}
 
           {tallas.length > 0 && (
@@ -128,6 +130,14 @@ export default function ProductoScreen({ navigation, route }: Props) {
               <Text style={styles.lista}>{informacion.join(' · ')}</Text>
             </View>
           )}
+
+          <ResenasDeProducto
+            negocioId={negocioId}
+            productoId={producto.id}
+            onVerTodas={() =>
+              navigation.navigate('Resenas', { negocioId, productoId: producto.id, titulo: producto.nombre })
+            }
+          />
         </FadeInView>
       </ScrollView>
 
@@ -174,6 +184,7 @@ const useStyles = makeStyles((c, shadow) => ({
   cuerpo: { paddingHorizontal: 20, paddingTop: 20 },
   nombre: { color: c.textStrong, fontFamily: font.display, fontSize: 24, lineHeight: 30 },
   precio: { color: c.goldText, fontFamily: font.extra, fontSize: 20, marginTop: 6 },
+  puntaje: { marginTop: 6 },
   descripcion: { color: c.text, fontFamily: font.regular, fontSize: 15, lineHeight: 22, marginTop: 12 },
   seccion: { marginTop: 22 },
   seccionTitulo: { color: c.textStrong, fontFamily: font.semibold, fontSize: 14, marginBottom: 8 },

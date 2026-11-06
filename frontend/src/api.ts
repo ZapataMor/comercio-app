@@ -63,6 +63,14 @@ export type Reputacion = {
 };
 
 /** Algo que subió o bajó el puntaje (con su pedido y motivo). */
+/** Estrellas de una tienda o un producto (`promedio` es null sin reseñas). */
+export type ResumenResenas = {
+  promedio: number | null;
+  total: number;
+  /** Cuántas reseñas hay de cada nota (solo en la lista de reseñas). */
+  distribucion?: { estrellas: number; cantidad: number }[];
+};
+
 export type EventoReputacion = {
   id: number;
   motivo: string;
@@ -92,6 +100,7 @@ export type Negocio = {
   /** Minutos que el negocio promete tardar en tener listo un pedido. */
   tiempo_preparacion?: number;
   reputacion?: Reputacion;
+  resenas?: ResumenResenas;
   /** Horario semanal: abre y cierra solo a esas horas. */
   horario?: HorarioSemana | null;
   /** "Hoy de 7:00 a. m. a 8:00 p. m." / "Hoy no abre" (null sin horario). */
@@ -153,6 +162,7 @@ export type Producto = {
   precio_formateado?: string; // ej. "$3.200 c/u" o "$8.900 / kg"
   imagen?: string | null; // ruta relativa "/storage/productos/x.jpg"
   disponible: boolean;
+  resenas?: ResumenResenas;
   categoria: Categoria | null;
   /** Ingredientes, usos, tallas... según el tipo de producto. */
   atributos?: string[];
@@ -179,6 +189,7 @@ export type NegocioLista = {
   horario_hoy?: string | null;
   tiempo_preparacion?: number;
   reputacion?: Reputacion;
+  resenas?: ResumenResenas;
 };
 
 /**
@@ -1026,6 +1037,20 @@ export async function getCatalogo(
   return { negocio: data.negocio as Negocio, productos: (data.productos ?? []) as Producto[] };
 }
 
+/** Un plato que el cliente ya pidió varias veces con los mismos ajustes. */
+export type RecetaPreferida = {
+  producto: Producto;
+  opciones: Pick<OpcionesLinea, 'sin' | 'extra'>;
+  /** En cuántos pedidos entregados. */
+  veces: number;
+};
+
+/** Recetas preferidas del cliente en esta tienda. */
+export async function getRecetasPreferidas(token: string, negocioId: number): Promise<RecetaPreferida[]> {
+  const data = await authGet(`/api/negocios/${negocioId}/recetas-preferidas`, token);
+  return (data.recetas ?? []) as RecetaPreferida[];
+}
+
 // ---------- Admin ----------
 
 export type AdminStats = {
@@ -1335,6 +1360,8 @@ export type MiPedido = {
   cancelado_por?: CanceladoPor | null;
   /** Entregado y aún sin calificar (dentro del plazo). */
   por_calificar?: boolean;
+  /** Entregado y sin ninguna reseña (dentro del plazo). */
+  por_resenar?: boolean;
 };
 
 /** Problema que el cliente puede reportar al calificar. */
@@ -1364,6 +1391,46 @@ export type CalificacionPedido = {
   domiciliario_caritas?: CaritaDada[] | null;
   domiciliario_problemas: string[];
   comentario: string | null;
+};
+
+/** Reseña pública de una tienda o un producto. */
+export type ResenaPublica = {
+  id: number;
+  /** Nombre e inicial del apellido. */
+  autor: string;
+  estrellas: number;
+  comentario: string | null;
+  fecha: string;
+};
+
+export type PaginaResenas = {
+  resumen: ResumenResenas;
+  items: ResenaPublica[];
+  pagina: number;
+  ultima_pagina: number;
+};
+
+/** Lo que el cliente opinó en su pedido (`estrellas` null: aún no lo reseña). */
+export type OpinionPedido = { estrellas: number | null; comentario: string | null };
+
+export type ResenaDeProducto = OpinionPedido & {
+  producto_id: number;
+  nombre: string;
+  imagen: string | null;
+};
+
+export type ResenasPedido = {
+  tienda: OpinionPedido | null;
+  productos: ResenaDeProducto[];
+  /** Último día para reseñar o corregir (dd/mm/aaaa). */
+  hasta: string;
+};
+
+type NuevaOpinion = { estrellas: number; comentario: string | null };
+
+export type NuevaResena = {
+  tienda?: NuevaOpinion;
+  productos?: (NuevaOpinion & { producto_id: number })[];
 };
 
 export type NuevaCalificacion = {
@@ -1422,6 +1489,8 @@ export type SeguimientoPedido = {
   opciones_problemas?: { negocio: OpcionProblema[]; domiciliario: OpcionProblema[] } | null;
   aspectos_domiciliario?: AspectoCaritas[] | null;
   calificacion?: CalificacionPedido | null;
+  puede_resenar?: boolean;
+  resenas?: ResenasPedido | null;
 };
 
 export type NuevoPedido = {
@@ -1464,6 +1533,23 @@ export async function getTarifaDomicilio(token: string): Promise<number> {
 export async function actualizarTarifaDomicilio(token: string, tarifa: number): Promise<number> {
   const d = await authSend('PUT', '/api/admin/ajustes', token, { tarifa_domicilio: tarifa });
   return Number(d.tarifa_domicilio ?? tarifa);
+}
+
+/** Reseñas de una tienda o, con `productoId`, de uno de sus productos. */
+export async function getResenas(
+  token: string,
+  negocioId: number,
+  { productoId, pagina = 1 }: { productoId?: number; pagina?: number } = {},
+): Promise<PaginaResenas> {
+  const producto = productoId ? `&producto_id=${productoId}` : '';
+  const d = await authGet(`/api/negocios/${negocioId}/resenas?page=${pagina}${producto}`, token);
+  return { resumen: d.resumen, items: d.resenas, pagina: d.pagina, ultima_pagina: d.ultima_pagina };
+}
+
+/** Publicar o corregir las reseñas de un pedido entregado. */
+export async function resenarPedido(token: string, id: number, body: NuevaResena): Promise<string> {
+  const d = await authSend('POST', `/api/pedidos/${id}/resenas`, token, body);
+  return d.message as string;
 }
 
 /** Calificar un pedido entregado: ¿el negocio y el domiciliario cumplieron? */

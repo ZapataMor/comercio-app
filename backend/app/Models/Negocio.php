@@ -43,6 +43,7 @@ class Negocio extends Model
             'tiempo_preparacion' => 'integer',
             'reputacion' => 'integer',
             'reputacion_pedidos' => 'integer',
+            'resenas_total' => 'integer',
             'vetado_at' => 'datetime',
             'horario' => 'array',
             'activo_cambiado_at' => 'datetime',

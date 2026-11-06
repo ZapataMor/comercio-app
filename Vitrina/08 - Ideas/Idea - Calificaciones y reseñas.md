@@ -4,13 +4,17 @@ tags: [idea]
 estado: hecho
 impacto: medio
 esfuerzo: medio
-actualizado: 2026-10-28
+actualizado: 2026-11-06
 ---
 
 > ✅ **Hecho el 2026-10-28** como *nivel de confiabilidad* (más que estrellas): puntaje 0–100 para negocios
 > y domiciliarios, alimentado por la calificación del cliente, los tiempos que cada uno promete y la
 > confirmación del dinero en efectivo; con veto automático. Detalle técnico en
 > `backend/ESTADO_DEL_PROYECTO.md` (sección 6) y `backend/app/Support/Reputacion.php`.
+>
+> ✅ **Reseñas públicas el 2026-11-06**: estrellas y comentario de la tienda y de cada producto, hasta 30
+> días después de la entrega y separadas del nivel de confiabilidad. Ver `backend/app/Support/Resenas.php`.
+> Falta moderarlas y que el negocio pueda responder.
 
 # 💡 Calificaciones y reseñas
 

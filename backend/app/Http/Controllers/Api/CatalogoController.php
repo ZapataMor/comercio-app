@@ -10,6 +10,7 @@ use App\Models\TipoNegocio;
 use App\Models\TipoProducto;
 use App\Support\HorarioNegocio;
 use App\Support\Reputacion;
+use App\Support\Resenas;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -84,6 +85,7 @@ class CatalogoController extends Controller
             'horario_hoy' => HorarioNegocio::textoHoyDe($n, now()),
             'tiempo_preparacion' => $n->tiempo_preparacion,
             'reputacion' => Reputacion::resumen(Reputacion::NEGOCIO, $n),
+            'resenas' => Resenas::resumen($n),
         ]);
 
         return response()->json([
@@ -252,6 +254,7 @@ class CatalogoController extends Controller
                     ? HorarioNegocio::minutosParaCerrar($negocio->horario, now(), HorarioNegocio::ajusteDe($negocio))
                     : null,
                 'reputacion' => Reputacion::resumen(Reputacion::NEGOCIO, $negocio),
+                'resenas' => Resenas::resumen($negocio),
                 'lat' => $negocio->lat,
                 'lng' => $negocio->lng,
             ],

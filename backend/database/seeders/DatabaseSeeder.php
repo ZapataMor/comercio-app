@@ -28,5 +28,11 @@ class DatabaseSeeder extends Seeder
 
         // Tipo de cada producto e información: ingredientes, tallas, colores...
         $this->call(OpcionesDemoSeeder::class);
+
+        // Clientes de prueba con reseñas de tiendas y productos.
+        $this->call(ResenasDemoSeeder::class);
+
+        // Una receta preferida de cliente@demo.co para ver la recomendación.
+        $this->call(RecetasDemoSeeder::class);
     }
 }

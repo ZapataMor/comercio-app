@@ -114,6 +114,12 @@ class User extends Authenticatable
         return $this->hasMany(InvitacionTrabajo::class);
     }
 
+    /** Reseñas públicas que ha escrito de tiendas y productos. */
+    public function resenas(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Resena::class);
+    }
+
     /** Pedidos que ha hecho como cliente. */
     public function pedidos(): \Illuminate\Database\Eloquent\Relations\HasMany
     {

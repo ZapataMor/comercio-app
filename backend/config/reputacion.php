@@ -49,6 +49,9 @@ return [
     // Horas que tiene el cliente para calificar después de la entrega.
     'horas_para_calificar' => 72,
 
+    // Días para reseñar la tienda y los productos: hay que probarlos antes.
+    'dias_para_resenar' => 30,
+
     // Horas que tiene el negocio para decir si recibió el dinero (efectivo),
     // contadas desde que el domiciliario recogió el pedido.
     'horas_para_confirmar_dinero' => 72,

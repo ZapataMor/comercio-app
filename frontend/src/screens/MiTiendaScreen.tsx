@@ -28,6 +28,7 @@ import { DropdownMultiple } from '../components/Dropdown';
 import EditorHorario, { DIAS, errorHorario, hora12 } from '../components/EditorHorario';
 import FieldError from '../components/FieldError';
 import Icon, { IconName } from '../components/Icon';
+import { PuntajeResenas } from '../components/Resenas';
 import SelectorImagen from '../components/SelectorImagen';
 import SelectorUbicacion from '../components/SelectorUbicacion';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
@@ -287,6 +288,17 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
             }
             etiqueta={!negocio.horario ? 'Sin horario automático' : negocio.festivo_hoy ? 'Hoy (festivo)' : 'Hoy'}
           />
+        </FadeInView>
+
+        <FadeInView delay={100}>
+          <PressableScale
+            style={styles.resenas}
+            accessibilityRole="button"
+            onPress={() => navigation.navigate('Resenas', { negocioId: negocio.id, titulo: negocio.nombre })}>
+            <Text style={styles.resenasTxt}>Reseñas de tus clientes</Text>
+            <PuntajeResenas resenas={negocio.resenas} conVacio />
+            <Icon name="chevron" size={14} color={c.muted} />
+          </PressableScale>
         </FadeInView>
 
         <FadeInView delay={120} style={styles.seccion}>
@@ -638,6 +650,11 @@ const useStyles = makeStyles((c, shadow) => ({
   // Secciones (vista y formulario)
   seccion: { backgroundColor: c.surface, borderRadius: radius.lg, padding: 18, marginTop: 16, ...shadow.soft },
   seccionTitulo: { fontSize: 16, fontFamily: font.displaySemi, color: c.textStrong, marginBottom: 12 },
+  resenas: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: c.surface,
+    borderRadius: radius.lg, paddingHorizontal: 18, paddingVertical: 15, marginTop: 16, ...shadow.soft,
+  },
+  resenasTxt: { flex: 1, color: c.textStrong, fontFamily: font.semibold, fontSize: 14 },
   fila: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11 },
   filaBorde: { borderBottomWidth: 1, borderBottomColor: c.border },
   filaIcono: {
