@@ -37,6 +37,48 @@ function horarioSemana(): array
 // Horario
 // ---------------------------------------------------------------------------
 
+test('el horario avisa solo en los últimos 10 minutos antes de cerrar', function () {
+    $semana = ['lun' => ['abre' => '07:00', 'cierra' => '20:00']];
+    $lunes = Carbon::parse('2026-11-09 19:49:30'); // no festivo
+
+    expect(HorarioNegocio::minutosParaCerrar($semana, $lunes))->toBeNull()
+        ->and(HorarioNegocio::minutosParaCerrar($semana, $lunes->copy()->setTime(19, 50)))->toBe(10)
+        ->and(HorarioNegocio::minutosParaCerrar($semana, $lunes->copy()->setTime(19, 58, 30)))->toBe(2)
+        ->and(HorarioNegocio::minutosParaCerrar($semana, $lunes->copy()->setTime(20, 0)))->toBeNull()
+        ->and(HorarioNegocio::minutosParaCerrar(null, $lunes))->toBeNull();
+});
+
+test('el aviso de cierre funciona pasando la medianoche y sin falsas alarmas', function () {
+    $bar = ['lun' => ['abre' => '18:00', 'cierra' => '02:00']];
+    $martes = Carbon::parse('2026-11-10 01:55:00');
+    expect(HorarioNegocio::minutosParaCerrar($bar, $martes))->toBe(5);
+
+    // Sigue abierto al día siguiente: a medianoche no cierra de verdad.
+    $seguido = [
+        'lun' => ['abre' => '08:00', 'cierra' => '00:00'],
+        'mar' => ['abre' => '00:00', 'cierra' => '12:00'],
+    ];
+    expect(HorarioNegocio::minutosParaCerrar($seguido, Carbon::parse('2026-11-09 23:55:00')))->toBeNull();
+});
+
+test('el catálogo dice cuánto falta para cerrar solo si está abierto', function () {
+    Carbon::setTestNow('2026-11-09 19:55:00');
+    $negocio = Negocio::forceCreate([
+        'user_id' => usuarioRol('usuario')->id,
+        'nombre' => 'Tienda',
+        'activo' => true,
+        'horario' => ['lun' => ['abre' => '07:00', 'cierra' => '20:00']],
+    ]);
+
+    Sanctum::actingAs(User::factory()->create());
+    $this->getJson("/api/negocios/{$negocio->id}")->assertJsonPath('negocio.minutos_para_cerrar', 5);
+
+    $negocio->update(['activo' => false]);
+    $this->getJson("/api/negocios/{$negocio->id}")->assertJsonPath('negocio.minutos_para_cerrar', null);
+
+    Carbon::setTestNow();
+});
+
 test('el horario dice si debe estar abierto, incluso pasando la medianoche', function () {
     $semana = horarioSemana();
     $lunes = Carbon::parse('2026-11-09 10:00'); // lunes (no festivo)

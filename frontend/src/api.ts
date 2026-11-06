@@ -96,6 +96,8 @@ export type Negocio = {
   horario?: HorarioSemana | null;
   /** "Hoy de 7:00 a. m. a 8:00 p. m." / "Hoy no abre" (null sin horario). */
   horario_hoy?: string | null;
+  /** Lo que falta para que el horario lo cierre, solo si son 10 minutos o menos. */
+  minutos_para_cerrar?: number | null;
   /** Hoy es festivo: rige el horario de festivos ('fes'). */
   festivo_hoy?: boolean;
   /** Mi rol en este negocio (solo en las rutas de "mis negocios"). */

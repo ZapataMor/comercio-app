@@ -1,0 +1,125 @@
+/**
+ * Si la tienda está a punto de cerrar, se advierte antes de crear el pedido.
+ * @format
+ */
+
+import React from 'react';
+import { Text } from 'react-native';
+import ReactTestRenderer, { act } from 'react-test-renderer';
+import { crearPedido, getCatalogo } from '../src/api';
+import { ConfirmacionProvider } from '../src/components/Confirmacion';
+import CheckoutScreen from '../src/screens/CheckoutScreen';
+
+jest.mock('../src/AuthContext', () => ({
+  useAuth: () => ({ auth: { token: 't', user: { id: 7, telefono: '300' } }, actualizarUsuario: jest.fn() }),
+}));
+
+jest.mock('../src/CartContext', () => ({
+  useCart: () => ({
+    negocioId: 3,
+    negocioNombre: 'Arepas Ana',
+    total: 10000,
+    items: [{ linea: '1', producto_id: 1, nombre: 'Arepa', precio: 10000, cantidad: 1 }],
+    vaciar: jest.fn(),
+  }),
+}));
+
+const mockDireccion = { id: 1, direccion: 'Calle 1', barrio: 'Centro', es_principal: true };
+jest.mock('../src/api', () => ({
+  ...jest.requireActual('../src/api'),
+  crearPedido: jest.fn(),
+  getCatalogo: jest.fn(),
+  getClienteDirecciones: jest.fn(async () => [mockDireccion]),
+  getTarifaDomicilio: jest.fn(async () => 4000),
+}));
+
+const mockToast = { exito: jest.fn(), error: jest.fn(), info: jest.fn() };
+jest.mock('../src/Toast', () => ({ useToast: () => mockToast }));
+
+const mockCrear = crearPedido as jest.Mock;
+const mockCatalogo = getCatalogo as jest.Mock;
+
+let raiz: ReactTestRenderer.ReactTestRenderer;
+
+async function montar() {
+  const navigation = { dispatch: jest.fn() };
+  await act(async () => {
+    raiz = ReactTestRenderer.create(
+      <ConfirmacionProvider>
+        <CheckoutScreen navigation={navigation as any} route={{} as any} />
+      </ConfirmacionProvider>,
+    );
+  });
+  return navigation;
+}
+
+const textos = () => raiz.root.findAllByType(Text).map(t => [t.props.children].flat(Infinity).join(''));
+
+async function tocar(inicio: string) {
+  const nodo = raiz.root.findAll(
+    n =>
+      typeof n.props.onPress === 'function' &&
+      n.findAll(h => h.children.some(x => typeof x === 'string' && x.startsWith(inicio))).length > 0,
+  )[0];
+  await act(async () => {
+    await nodo.props.onPress();
+  });
+}
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockCrear.mockResolvedValue(undefined);
+});
+
+afterEach(() => {
+  act(() => raiz.unmount());
+});
+
+test('a punto de cerrar advierte y no crea el pedido hasta que el cliente acepte', async () => {
+  mockCatalogo.mockResolvedValue({ negocio: { nombre: 'Arepas Ana', minutos_para_cerrar: 8 }, productos: [] });
+  const navigation = await montar();
+
+  await tocar('Confirmar pedido');
+
+  expect(mockCrear).not.toHaveBeenCalled();
+  expect(textos()).toEqual(
+    expect.arrayContaining([
+      'La tienda cierra pronto',
+      'Arepas Ana cierra en 8 min. Es posible que tu pedido se cancele automáticamente porque la tienda cerrará pronto.',
+    ]),
+  );
+
+  await tocar('Pedir de todos modos');
+
+  expect(mockCrear).toHaveBeenCalledTimes(1);
+  expect(navigation.dispatch).toHaveBeenCalled();
+});
+
+test('volver no crea el pedido', async () => {
+  mockCatalogo.mockResolvedValue({ negocio: { nombre: 'Arepas Ana', minutos_para_cerrar: 3 }, productos: [] });
+  await montar();
+
+  await tocar('Confirmar pedido');
+  await tocar('Volver');
+
+  expect(mockCrear).not.toHaveBeenCalled();
+});
+
+test('sin cierre cercano no pregunta nada', async () => {
+  mockCatalogo.mockResolvedValue({ negocio: { nombre: 'Arepas Ana', minutos_para_cerrar: null }, productos: [] });
+  await montar();
+
+  await tocar('Confirmar pedido');
+
+  expect(mockCrear).toHaveBeenCalledTimes(1);
+  expect(textos()).not.toContain('La tienda cierra pronto');
+});
+
+test('si no se puede consultar la tienda, el pedido sigue', async () => {
+  mockCatalogo.mockRejectedValue(new Error('Sin conexión'));
+  await montar();
+
+  await tocar('Confirmar pedido');
+
+  expect(mockCrear).toHaveBeenCalledTimes(1);
+});

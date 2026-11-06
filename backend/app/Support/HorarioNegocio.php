@@ -25,6 +25,9 @@ class HorarioNegocio
     /** Días en orden ISO (lunes = 1 … domingo = 7). */
     public const DIAS = ['lun', 'mar', 'mie', 'jue', 'vie', 'sab', 'dom'];
 
+    /** A cuántos minutos del cierre se le advierte al cliente antes de pedir. */
+    public const AVISO_CIERRE_MINUTOS = 10;
+
     /** Clave del horario de los días festivos. */
     public const FESTIVO = 'fes';
 
@@ -119,6 +122,34 @@ class HorarioNegocio
         }
 
         return false;
+    }
+
+    /**
+     * Minutos que faltan para que el horario cierre el negocio, si es dentro de
+     * AVISO_CIERRE_MINUTOS; null si no cierra tan pronto o no tiene horario.
+     */
+    public static function minutosParaCerrar(?array $horario, CarbonInterface $ahora): ?int
+    {
+        $horario = self::normalizar($horario);
+        if (! $horario) {
+            return null;
+        }
+
+        foreach (self::franjas($horario, $ahora) as [$abre, $cierra]) {
+            if ($ahora->lt($abre) || $ahora->gte($cierra)) {
+                continue;
+            }
+            // Si otra franja empieza justo ahí, sigue abierto.
+            if (self::deberiaEstarAbierto($horario, $cierra)) {
+                continue;
+            }
+
+            $minutos = (int) ceil($ahora->diffInSeconds($cierra) / 60);
+
+            return $minutos <= self::AVISO_CIERRE_MINUTOS ? $minutos : null;
+        }
+
+        return null;
     }
 
     /** La última hora de apertura o cierre que ya pasó. */

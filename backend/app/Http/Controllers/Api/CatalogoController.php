@@ -247,6 +247,10 @@ class CatalogoController extends Controller
                 // Horario semanal y el texto de hoy ("Hoy de 7:00 a. m. a 8:00 p. m.").
                 'horario' => HorarioNegocio::normalizar($negocio->horario),
                 'horario_hoy' => HorarioNegocio::textoHoy($negocio->horario, now()),
+                // Cierra pronto por horario: se le advierte al cliente antes de pedir.
+                'minutos_para_cerrar' => $negocio->activo
+                    ? HorarioNegocio::minutosParaCerrar($negocio->horario, now())
+                    : null,
                 'reputacion' => Reputacion::resumen(Reputacion::NEGOCIO, $negocio),
                 'lat' => $negocio->lat,
                 'lng' => $negocio->lng,

@@ -13,6 +13,7 @@ import {
   ClienteDireccion,
   crearClienteDireccion,
   crearPedido,
+  getCatalogo,
   getClienteDirecciones,
   getTarifaDomicilio,
 } from '../api';
@@ -21,6 +22,7 @@ import { useCart } from '../CartContext';
 import { detalleOpciones } from '../opcionesProducto';
 import { FadeInView, PressableScale } from '../components/anim';
 import BarrioSelect from '../components/BarrioSelect';
+import { useConfirmar } from '../components/Confirmacion';
 import FieldError from '../components/FieldError';
 import Icon from '../components/Icon';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
@@ -45,6 +47,7 @@ export default function CheckoutScreen({ navigation }: Props) {
   const { auth, actualizarUsuario } = useAuth();
   const cart = useCart();
   const toast = useToast();
+  const pedirConfirmacion = useConfirmar();
   const [direcciones, setDirecciones] = useState<ClienteDireccion[]>([]);
   const [seleccion, setSeleccion] = useState<SeleccionUbicacion>(null);
   const [cargandoDirecciones, setCargandoDirecciones] = useState(true);
@@ -138,6 +141,30 @@ export default function CheckoutScreen({ navigation }: Props) {
       return;
     }
 
+    // Se pregunta en este momento: la pantalla pudo llevar un rato abierta. Sin
+    // red no se detiene el pedido: el servidor decide al crearlo.
+    setEnviando(true);
+    const negocio = await getCatalogo(auth!.token, cart.negocioId!)
+      .then(r => r.negocio)
+      .catch(() => null);
+    setEnviando(false);
+
+    if (negocio?.minutos_para_cerrar != null) {
+      pedirConfirmacion({
+        icono: 'reloj',
+        titulo: 'La tienda cierra pronto',
+        texto: `${negocio.nombre} cierra en ${negocio.minutos_para_cerrar} min. Es posible que tu pedido se cancele automáticamente porque la tienda cerrará pronto.`,
+        textoBoton: 'Pedir de todos modos',
+        textoCancelar: 'Volver',
+        accion: () => enviarPedido(direccionEntrega),
+      });
+      return;
+    }
+
+    await enviarPedido(direccionEntrega);
+  }
+
+  async function enviarPedido(direccionEntrega: string) {
     setEnviando(true);
     try {
       if (seleccion === 'nueva') {
