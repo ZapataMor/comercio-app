@@ -296,6 +296,15 @@ test('avanzar el pedido a entregado notifica al cliente', function () {
 });
 
 
+test('el push de recogido le trae el código de entrega al cliente', function () {
+    $pedido = pedidoEnEstado(negocioAbierto(), usuarioCon('usuario'), 'recogido');
+    $pedido->update(['codigo_entrega' => '4821']);
+
+    $mensaje = (new EstadoPedidoActualizado($pedido))->toFcm($pedido->cliente)->toArray();
+
+    expect($mensaje['notification']['body'])->toContain('4821');
+});
+
 test('los push salen en cola para no frenar el pedido', function () {
     $pedido = pedidoEnEstado(negocioAbierto(), usuarioCon('usuario'), 'pendiente');
 

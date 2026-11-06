@@ -88,8 +88,6 @@ class PedidoController extends Controller
                 'telefono_contacto' => $datos['telefono_contacto'],
                 // Lo que el negocio promete tardar HOY: con esto se mide si cumplió.
                 'minutos_preparacion' => $negocio->tiempo_preparacion,
-                // El cliente se lo da al domiciliario para confirmar la entrega.
-                'codigo_entrega' => Pedido::generarCodigo(),
             ]);
 
             $subtotal = 0;
@@ -205,7 +203,7 @@ class PedidoController extends Controller
                 ? Reputacion::resumen(Reputacion::DOMICILIARIO, $pedido->domiciliario)
                 : null,
             // Se lo da al domiciliario al recibir el pedido; solo lo ve el cliente.
-            'codigo_entrega' => in_array($pedido->estado, Pedido::EN_RUTA, true) ? $pedido->codigo_entrega : null,
+            'codigo_entrega' => in_array($pedido->estado, Pedido::CON_CODIGO_ENTREGA, true) ? $pedido->codigo_entrega : null,
             // Justificación del domiciliario si se está demorando.
             'novedad' => $pedido->novedad,
             // Mapa: el cliente ve al domiciliario solo mientras le lleva el

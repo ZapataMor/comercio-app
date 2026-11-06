@@ -51,7 +51,7 @@ class EstadoPedidoActualizado extends Notification implements ShouldQueue
             ?? ['Tu pedido se actualizó', $this->pedido->estadoLabel()];
 
         // Para no tener que abrir la app cuando llegue el domiciliario.
-        if ($this->pedido->estado === 'en_camino' && $this->pedido->codigo_entrega) {
+        if (in_array($this->pedido->estado, Pedido::CON_CODIGO_ENTREGA, true) && $this->pedido->codigo_entrega) {
             $cuerpo = "Tu código de entrega es {$this->pedido->codigo_entrega}. Dáselo al domiciliario al recibirlo.";
         }
 

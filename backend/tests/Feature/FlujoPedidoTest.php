@@ -385,11 +385,17 @@ test('el código de un pedido no sirve en otro negocio', function () {
     $this->putJson(flujoRutaPedido($pedido, 'recogido'), ['codigo' => '4821'])->assertForbidden();
 });
 
-test('el cliente ve su código de entrega solo mientras le llevan el pedido', function () {
+test('el cliente ve su código de entrega solo desde que recogen el pedido', function () {
     $pedido = flujoPedido(flujoNegocio(), 'aceptado');
     Sanctum::actingAs($pedido->cliente);
 
     $this->getJson("/api/pedidos/{$pedido->id}")->assertJsonPath('codigo_entrega', null);
+
+    $pedido->update(['estado' => 'tomado']);
+    $this->getJson("/api/pedidos/{$pedido->id}")->assertJsonPath('codigo_entrega', null);
+
+    $pedido->update(['estado' => 'recogido']);
+    $this->getJson("/api/pedidos/{$pedido->id}")->assertJsonPath('codigo_entrega', '1234');
 
     $pedido->update(['estado' => 'en_camino']);
     $this->getJson("/api/pedidos/{$pedido->id}")->assertJsonPath('codigo_entrega', '1234');
@@ -398,7 +404,7 @@ test('el cliente ve su código de entrega solo mientras le llevan el pedido', fu
     $this->getJson("/api/pedidos/{$pedido->id}")->assertJsonPath('codigo_entrega', null);
 });
 
-test('el pedido se crea con su código de entrega y el domiciliario no puede verlo', function () {
+test('el código de entrega nace al recoger y el domiciliario no puede verlo', function () {
     $negocio = flujoNegocio();
     $producto = $negocio->productos()->create([
         'nombre' => 'Arepa', 'precio' => 3000, 'tipo_venta' => 'cantidad', 'unidad_medida' => 'unidad', 'disponible' => true,
@@ -414,10 +420,17 @@ test('el pedido se crea con su código de entrega y el domiciliario no puede ver
     ])->assertCreated()->json('id');
 
     $pedido = Pedido::find($id);
-    expect($pedido->codigo_entrega)->toMatch('/^\d{4}$/');
+    expect($pedido->codigo_entrega)->toBeNull();
 
     $domi = flujoUsuario('domiciliario');
-    $pedido->update(['estado' => 'en_camino', 'domiciliario_id' => $domi->id]);
+    $pedido->update(['estado' => 'tomado', 'domiciliario_id' => $domi->id, 'codigo_recogida' => '4821']);
+
+    // Aún sin código: si lo suelta, nadie tiene un código de un pedido sin recoger.
+    expect($pedido->fresh()->codigo_entrega)->toBeNull();
+
+    Sanctum::actingAs($negocio->user);
+    $this->putJson(flujoRutaPedido($pedido, 'recogido'), ['codigo' => '4821'])->assertOk();
+    expect($pedido->fresh()->codigo_entrega)->toMatch('/^\d{4}$/');
 
     Sanctum::actingAs($domi);
     $this->getJson('/api/domiciliario/entregas')->assertJsonMissingPath('pedidos.0.codigo_entrega');

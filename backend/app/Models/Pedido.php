@@ -20,6 +20,9 @@ class Pedido extends Model
     /** Estados con un domiciliario llevando el pedido. */
     public const EN_RUTA = ['tomado', 'recogido', 'en_camino'];
 
+    /** Desde que lo recogen el cliente tiene código de entrega. */
+    public const CON_CODIGO_ENTREGA = ['recogido', 'en_camino'];
+
     /** Estados en los que el pedido sigue vivo (ni entregado ni cancelado). */
     public const EN_CURSO = ['pendiente', 'aceptado', 'listo', 'tomado', 'recogido', 'en_camino'];
 

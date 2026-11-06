@@ -300,7 +300,12 @@ class ComercioPedidoController extends Controller
             throw ValidationException::withMessages(['codigo' => ['Ese no es el código del domiciliario. Pídeselo de nuevo.']]);
         }
 
-        $pedido->update(['estado' => 'recogido', 'recogido_at' => now()]);
+        $pedido->update([
+            'estado' => 'recogido',
+            'recogido_at' => now(),
+            // Nace aquí: el cliente se lo da al domiciliario para confirmar la entrega.
+            'codigo_entrega' => Pedido::generarCodigo(),
+        ]);
 
         // ¿Recogió en los minutos que prometió al tomarlo? (con margen; si
         // reportó una novedad, la demora queda anotada pero no resta).
