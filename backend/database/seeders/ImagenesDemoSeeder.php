@@ -128,7 +128,7 @@ class ImagenesDemoSeeder extends Seeder
             $url = "https://loremflickr.com/{$ancho}/{$alto}/{$tags}?lock={$seed}";
 
             try {
-                $respuesta = Http::timeout(30)->retry(2, 700)->get($url);
+                $respuesta = Http::timeout(30)->retry(2, 700, throw: false)->get($url);
             } catch (ConnectionException) {
                 $this->command?->warn("No se pudo conectar para descargar {$url}");
                 array_pop($rutas);
@@ -178,6 +178,17 @@ class ImagenesDemoSeeder extends Seeder
         $texto = $this->normalizar($nombre.' '.($categoria ?? '').' '.($negocioCategoria ?? ''));
 
         return match (true) {
+            str_contains($texto, 'hamburguesa') => 'hamburger',
+            str_contains($texto, 'perro') => 'hotdog',
+            str_contains($texto, 'salchip') => 'french-fries',
+            str_contains($texto, 'picada') => 'barbecue',
+            str_contains($texto, 'pizza') => 'pizza',
+            str_contains($texto, 'costilla') => 'ribs',
+            str_contains($texto, 'alitas') => 'chicken-wings',
+            str_contains($texto, 'sandwich') => 'sandwich',
+            str_contains($texto, 'shawarma') => 'shawarma',
+            str_contains($texto, 'patacon') => 'fried-plantain',
+            str_contains($texto, 'arepa') => 'arepa',
             str_contains($texto, 'cafe') || str_contains($texto, 'capuchino') || str_contains($texto, 'latte') || str_contains($texto, 'tinto') => 'coffee',
             str_contains($texto, 'gaseosa') || str_contains($texto, 'jugo') || str_contains($texto, 'agua') || str_contains($texto, 'bebida') || str_contains($texto, 'limonada') => 'drink',
             str_contains($texto, 'cerveza') || str_contains($texto, 'ron') || str_contains($texto, 'whisky') || str_contains($texto, 'vino') || str_contains($texto, 'aguardiente') => 'liquor',
@@ -198,6 +209,17 @@ class ImagenesDemoSeeder extends Seeder
     private function tags(string $grupo): string
     {
         return match ($grupo) {
+            'hamburger' => 'hamburger',
+            'hotdog' => 'hotdog',
+            'french-fries' => 'frenchfries',
+            'barbecue' => 'barbecue,grill',
+            'pizza' => 'pizza',
+            'ribs' => 'ribs,barbecue',
+            'chicken-wings' => 'chickenwings',
+            'sandwich' => 'sandwich',
+            'shawarma' => 'shawarma',
+            'fried-plantain' => 'plantain',
+            'arepa' => 'arepa',
             'restaurant' => 'restaurant,food',
             'coffee-shop' => 'coffee,cafe',
             'bar' => 'bar,drinks',

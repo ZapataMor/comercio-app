@@ -12,8 +12,9 @@ use Illuminate\Support\Str;
  * tocarlos: ingredientes (comida), tallas y colores (ropa y calzado) o para
  * qué sirven (medicamentos y herramientas).
  *
- * Pensado para desarrollo. Solo toca productos que aún no tienen tipo, así que
- * se puede correr varias veces y respeta lo que un comerciante ya configuró.
+ * Pensado para desarrollo. Solo toca productos que aún no tienen tipo o comida
+ * sin ingredientes, así que se puede correr varias veces y respeta lo que un
+ * comerciante ya configuró.
  */
 class OpcionesDemoSeeder extends Seeder
 {
@@ -64,6 +65,21 @@ class OpcionesDemoSeeder extends Seeder
         'calentado-paisa' => ['Arroz', 'Frijoles', 'Huevo frito', 'Chorizo', 'Arepa'],
         'picada-personal' => ['Chicharrón', 'Chorizo', 'Papa criolla', 'Arepa', 'Guacamole'],
         'alitas-bbq-x8' => ['Alitas', 'Salsa BBQ', 'Papa a la francesa', 'Salsa ranch'],
+        'mondongo' => ['Callo de res', 'Cerdo', 'Papa', 'Yuca', 'Zanahoria', 'Cilantro', 'Arroz', 'Aguacate'],
+        'cazuela-de-mariscos' => ['Camarón', 'Calamar', 'Mejillones', 'Pescado', 'Crema de leche', 'Leche de coco', 'Patacón', 'Arroz con coco'],
+        'flan-de-caramelo' => ['Huevo', 'Leche', 'Caramelo'],
+        'torta-tres-leches' => ['Bizcocho', 'Leche condensada', 'Crema de leche', 'Leche evaporada', 'Canela'],
+        'limonada-natural' => ['Limón', 'Azúcar', 'Hielo'],
+        'jugo-de-mora' => ['Mora', 'Azúcar', 'Hielo'],
+        'combo-familiar' => ['Pollo entero asado', 'Papa a la francesa', 'Arroz', 'Arepas', 'Ensalada', 'Gaseosa 1.5 L'],
+        'combo-pareja' => ['Medio pollo asado', 'Papa a la francesa', 'Arepas', 'Ensalada', 'Gaseosa personal x2'],
+        'cuarto-de-pollo' => ['Pollo', 'Papa salada', 'Arepa', 'Ají'],
+        'papa-a-la-francesa' => ['Papa', 'Sal', 'Salsa de tomate', 'Mayonesa'],
+        'arepa-asada' => ['Maíz', 'Mantequilla', 'Queso'],
+        'yuca-frita' => ['Yuca', 'Sal', 'Suero costeño'],
+        'platano-maduro' => ['Plátano maduro', 'Queso costeño'],
+        'ensalada' => ['Lechuga', 'Tomate', 'Cebolla', 'Zanahoria'],
+        'picada-para-compartir' => ['Chicharrón', 'Chorizo', 'Carne de res', 'Morcilla', 'Papa criolla', 'Patacón', 'Arepa', 'Guacamole', 'Ají'],
     ];
 
     /** Ropa: tallas según la categoría del catálogo (sin entrada = sin talla). */
@@ -117,6 +133,25 @@ class OpcionesDemoSeeder extends Seeder
                             ? self::COLORES[$producto->categoria?->nombre] ?? []
                             : null,
                     ]);
+                }
+            });
+
+        $this->completarIngredientes($tipos['comida']);
+    }
+
+    /** Comida que quedó sin ingredientes porque su plato aún no estaba en la lista. */
+    private function completarIngredientes(int $comida): void
+    {
+        Producto::query()
+            ->where('tipo_producto_id', $comida)
+            ->where(fn ($q) => $q->whereNull('atributos')->orWhereJsonLength('atributos', 0))
+            ->chunkById(200, function ($productos) {
+                foreach ($productos as $producto) {
+                    $ingredientes = self::INGREDIENTES[Str::slug($producto->nombre)] ?? null;
+
+                    if ($ingredientes !== null) {
+                        $producto->update(['atributos' => $ingredientes]);
+                    }
                 }
             });
     }

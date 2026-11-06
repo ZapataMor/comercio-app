@@ -29,6 +29,9 @@ class DatabaseSeeder extends Seeder
         // Tipo de cada producto e información: ingredientes, tallas, colores...
         $this->call(OpcionesDemoSeeder::class);
 
+        // Carta propia de cada restaurante: hamburguesas, picadas, salchipapas...
+        $this->call(MenusRestaurantesDemoSeeder::class);
+
         // Clientes de prueba con reseñas de tiendas y productos.
         $this->call(ResenasDemoSeeder::class);
 
