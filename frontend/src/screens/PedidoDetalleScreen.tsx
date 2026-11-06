@@ -54,6 +54,10 @@ function Paso({ texto, hecho, actual }: { texto: string; hecho: boolean; actual:
   return (
     <View style={styles.paso}>
       <Animated.View
+        // La key crea otra vista cuando el paso deja de ser el actual: quitarle
+        // el transform animado a la misma vista cierra la app en Android
+        // (AssertionError de overridePropsReadableMap, RN 0.86).
+        key={actual ? 'actual' : 'fija'}
         style={[
           styles.bolita,
           hecho || actual ? styles.bolitaOn : styles.bolitaOff,
