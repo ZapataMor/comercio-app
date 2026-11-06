@@ -8,7 +8,7 @@ actualizado: 2026-11-05
 # 🔄 Lógica de Negocio
 
 Reglas núcleo del dominio. Derivadas del código (`Pedido`, `CancelarPedido`, controladores) y de
-`ESTADO_DEL_PROYECTO.md`.
+[[Estado Actual]].
 
 ## Ciclo de vida del pedido (máquina de estados)
 ```

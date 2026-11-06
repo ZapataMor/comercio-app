@@ -33,5 +33,5 @@ Cada nota enlaza hacia su MOC (arriba) y a sus notas relacionadas (a los lados).
 un MOC y sigue los `[[enlaces]]`. Para crear notas nuevas usa las plantillas en `_templates`.
 
 > [!info] Verdad base
-> El contenido se deriva del código real y de `backend/ESTADO_DEL_PROYECTO.md`. Cuando algo
+> El contenido se deriva del código real y de [[Estado Actual]]. Cuando algo
 > no esté confirmado en el código, está marcado con `> [!todo]`.

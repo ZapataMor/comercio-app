@@ -371,7 +371,7 @@ Sin clave la app compila y abre igual, pero el mapa sale en gris.
 Abre Obsidian → **Open folder as vault** → selecciona `C:\dev\comercio-app\Vitrina`.
 Ahí están historias de usuario, casos de uso, casos de prueba y el sistema visual.
 
-El estado del proyecto se lleva en `backend/ESTADO_DEL_PROYECTO.md`.
+El estado del proyecto se lleva en `Vitrina/00 - Inicio/Estado Actual.md`.
 
 ---
 
