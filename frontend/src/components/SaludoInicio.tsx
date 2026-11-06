@@ -1,10 +1,9 @@
 /**
  * Lo que comparten las dos pantallas de arranque, el Inicio y "Mis entregas":
- * el saludo con los tipos de cuenta y el acceso a Explorar.
+ * el saludo y el acceso a Explorar.
  */
 import React from 'react';
 import { Text, View } from 'react-native';
-import { nombreTipoCuenta } from '../api';
 import { useAuth } from '../AuthContext';
 import { navigationRef } from '../RootNavigation';
 import { font, makeStyles, radius, useTheme } from '../theme';
@@ -19,11 +18,6 @@ export function Saludo() {
   return (
     <FadeInView>
       <Text style={styles.saludo}>¡Hola, {user.name}!</Text>
-      <View style={styles.rolesRow}>
-        {user.roles.map(r => (
-          <Text key={r} style={styles.rol}>{nombreTipoCuenta(r)}</Text>
-        ))}
-      </View>
     </FadeInView>
   );
 }
@@ -53,12 +47,7 @@ export function IrAExplorar() {
 }
 
 const useStyles = makeStyles((c, shadow) => ({
-  saludo: { fontSize: 24, fontFamily: font.display, color: c.textStrong, marginTop: 8 },
-  rolesRow: { flexDirection: 'row', gap: 8, marginTop: 8, marginBottom: 24 },
-  rol: {
-    backgroundColor: c.accentSoft, color: c.goldText, fontFamily: font.bold, fontSize: 12,
-    paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, overflow: 'hidden',
-  },
+  saludo: { fontSize: 24, fontFamily: font.display, color: c.textStrong, marginTop: 8, marginBottom: 24 },
   item: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: c.surface,
     borderRadius: radius.lg, padding: 16, marginBottom: 12, ...shadow.soft,
