@@ -12,15 +12,6 @@ $apk = "$Root\frontend\android\app\build\outputs\apk\staging\app-staging.apk"
 New-Item -ItemType Directory -Force "$Root\artifacts" | Out-Null
 Copy-Item $apk "$Root\artifacts\vitrina-preproduccion.apk" -Force
 if ($Install) {
-    $adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
-    if ($env:ANDROID_HOME) { $adb = "$env:ANDROID_HOME\platform-tools\adb.exe" }
-    $deviceArgs = @()
-    if ($Device) { $deviceArgs = @('-s', $Device) }
-    & $adb @deviceArgs reverse tcp:8443 tcp:8443
-    if ($LASTEXITCODE -ne 0) { throw 'Conecta un dispositivo o inicia un emulador. Usa -Device si hay varios.' }
-    & $adb @deviceArgs install -r "$Root\artifacts\vitrina-preproduccion.apk"
-    if ($LASTEXITCODE -ne 0) { throw 'Fallo la instalacion de la APK.' }
-    & $adb @deviceArgs shell am start -n com.comercioapp/.MainActivity
-    if ($LASTEXITCODE -ne 0) { throw 'No se pudo abrir la app.' }
+    & "$Root\instalar-app-pruebas.ps1" -Device $Device
 }
 Write-Host "APK: $Root\artifacts\vitrina-preproduccion.apk"
