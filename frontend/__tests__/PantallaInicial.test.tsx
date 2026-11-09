@@ -30,6 +30,8 @@ jest.mock('react-native-safe-area-context', () => require('react-native-safe-are
 jest.mock('../src/api', () => ({
   ...jest.requireActual('../src/api'),
   getMisNegocios: jest.fn(() => new Promise(() => {})),
+  registrarDeviceToken: jest.fn().mockResolvedValue(undefined),
+  eliminarDeviceToken: jest.fn().mockResolvedValue(undefined),
 }));
 
 const NEGOCIO = { id: 3, nombre: 'Zapatería', rol: 'propietario' as const };
