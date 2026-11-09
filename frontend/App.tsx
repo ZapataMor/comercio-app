@@ -153,10 +153,7 @@ function Navegacion() {
                 <Stack.Screen
                   name="Negocio"
                   component={NegocioScreen}
-                  options={({ route, navigation }) => ({
-                    title: route.params.nombre,
-                    headerRight: () => <HeaderCatalogo seccion={route.params.seccion ?? 'productos'} onCambiar={() => navigation.navigate('Explorar', { seccion: route.params.seccion === 'servicios' ? 'productos' : 'servicios' })} />,
-                  })}
+                  options={({ route }) => ({ title: route.params.nombre })}
                 />
                 <Stack.Screen
                   name="Producto"
