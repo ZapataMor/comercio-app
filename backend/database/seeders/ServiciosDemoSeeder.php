@@ -44,6 +44,7 @@ class ServiciosDemoSeeder extends Seeder
                 }
             }
         });
+        $this->call(ImagenesServiciosDemoSeeder::class);
     }
 
     private function catalogo(): array
