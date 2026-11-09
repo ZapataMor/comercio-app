@@ -257,7 +257,7 @@ export async function login(email: string, password: string): Promise<LoginRespo
       },
       body: JSON.stringify({ email, password }),
     });
-  } catch (e) {
+  } catch {
     // Falla de red: el server no responde / URL mal / sin conexión.
     throw new Error('No se pudo conectar con el servidor. ¿Está corriendo la API?');
   }
@@ -300,7 +300,7 @@ export async function register(body: {
         password_confirmation: body.password,
       }),
     });
-  } catch (e) {
+  } catch {
     throw new Error('No se pudo conectar con el servidor. ¿Está corriendo la API?');
   }
 
@@ -326,7 +326,7 @@ async function publicPost(path: string, body: any, porDefecto: string): Promise<
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(body),
     });
-  } catch (e) {
+  } catch {
     throw new Error('No se pudo conectar con el servidor.');
   }
   const data = await res.json().catch(() => ({} as any));
@@ -366,7 +366,7 @@ export async function getBarrios(): Promise<Barrio[]> {
     res = await fetch(`${API_URL}/api/barrios`, {
       headers: { Accept: 'application/json' },
     });
-  } catch (e) {
+  } catch {
     throw new Error('No se pudo conectar con el servidor.');
   }
   const data = await res.json().catch(() => ({} as any));
@@ -383,7 +383,7 @@ async function authGet(path: string, token: string): Promise<any> {
     res = await fetch(`${API_URL}${path}`, {
       headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
     });
-  } catch (e) {
+  } catch {
     throw new Error('No se pudo conectar con el servidor.');
   }
   const data = await res.json().catch(() => ({} as any));
@@ -408,7 +408,7 @@ async function authSend(method: 'POST' | 'PUT' | 'DELETE', path: string, token: 
       },
       body: body ? JSON.stringify(body) : undefined,
     });
-  } catch (e) {
+  } catch {
     throw new Error('No se pudo conectar con el servidor.');
   }
   const data = await res.json().catch(() => ({} as any));
@@ -466,7 +466,7 @@ async function authUpload(
       headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
       body: form,
     });
-  } catch (e) {
+  } catch {
     throw new Error('No se pudo conectar con el servidor.');
   }
   const data = await res.json().catch(() => ({} as any));
@@ -874,11 +874,6 @@ export type ReputacionDetalle = {
   /** Solo domiciliarios: promedio de caritas (null si nadie lo ha calificado). */
   caritas?: CaritasPromedio | null;
 };
-
-/** Nivel de confiabilidad de un negocio mío y sus últimos eventos. */
-export function getReputacionNegocio(token: string, negocioId: number): Promise<ReputacionDetalle> {
-  return authGet(`/api/negocios/${negocioId}/reputacion`, token);
-}
 
 // ---------- Equipo del negocio (miembros e invitaciones enviadas) ----------
 

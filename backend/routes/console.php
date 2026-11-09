@@ -7,13 +7,8 @@ use App\Support\CancelarPedido;
 use App\Support\AgendaCitas;
 use App\Support\HorarioNegocio;
 use App\Support\Push;
-use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
-
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
 
 // Abre y cierra los negocios según su horario semanal (ver HorarioNegocio).
 Artisan::command('negocios:aplicar-horario', function () {

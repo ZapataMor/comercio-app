@@ -12,9 +12,6 @@ import React from 'react';
 import { Circle, Path, Svg } from 'react-native-svg';
 import { NotaCarita } from '../api';
 
-/** Texto general de cada carita (accesibilidad y respaldo). */
-export const TEXTO_CARITA = ['Muy mal', 'Mal', 'Regular', 'Bien', 'Excelente'];
-
 /** [casco, cara] de cada nota. */
 const TONOS: Record<NotaCarita, [string, string]> = {
   1: ['#D64541', '#FFDCD6'],

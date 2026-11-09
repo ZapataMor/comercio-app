@@ -43,11 +43,6 @@ class HorarioNegocio
     /** Todas las claves del horario: los 7 días y el festivo. */
     public const CLAVES = [...self::DIAS, self::FESTIVO];
 
-    private const NOMBRES = [
-        'lun' => 'lunes', 'mar' => 'martes', 'mie' => 'miércoles', 'jue' => 'jueves',
-        'vie' => 'viernes', 'sab' => 'sábado', 'dom' => 'domingo', 'fes' => 'festivos',
-    ];
-
     /** Reglas de validación para `horario` en el formulario del negocio. */
     public static function reglas(): array
     {
@@ -366,11 +361,5 @@ class HorarioNegocio
         $h12 = $h % 12 === 0 ? 12 : $h % 12;
 
         return sprintf('%d:%02d %s', $h12, $m, $sufijo);
-    }
-
-    /** Nombre del día para mostrar ("lun" → "lunes"). */
-    public static function nombreDia(string $dia): string
-    {
-        return self::NOMBRES[$dia] ?? $dia;
     }
 }
