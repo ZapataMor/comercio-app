@@ -58,7 +58,7 @@ class CatalogoController extends Controller
                         $p->where('disponible', true)
                             ->where(function ($pp) use ($texto) {
                                 $pp->where('nombre', 'like', "%{$texto}%")
-                                    ->orWhere('atributos', 'like', "%{$texto}%")
+                                    ->orWhereRaw('LOWER(CAST(atributos AS CHAR)) LIKE ?', ['%'.mb_strtolower($texto).'%'])
                                     ->orWhereHas('categoria', fn ($c) => $c->where('nombre', 'like', "%{$texto}%"));
                             });
                     });
@@ -187,9 +187,9 @@ class CatalogoController extends Controller
                 $q->where(function ($qq) use ($like) {
                     $qq->where('nombre', 'like', $like)
                         ->orWhere('descripcion', 'like', $like)
-                        // Atributos (ingredientes, usos...): el JSON se guarda
-                        // como texto, así que LIKE encuentra "gripa" o "pollo".
-                        ->orWhere('atributos', 'like', $like)
+                        // MySQL compara JSON con colacion binaria: normalizamos
+                        // el texto para encontrar "Gripa" al buscar "gripa".
+                        ->orWhereRaw('LOWER(CAST(atributos AS CHAR)) LIKE ?', [mb_strtolower($like)])
                         ->orWhereHas('categoria', fn ($c) => $c->where('nombre', 'like', $like));
                 });
             })

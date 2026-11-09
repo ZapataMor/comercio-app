@@ -72,6 +72,10 @@ test('la busqueda encuentra productos por sus atributos (ingredientes, usos...)'
 
     expect($productos->pluck('nombre')->all())->toBe(['Acetaminofén 500mg']);
     expect($productos[0]['atributos'])->toContain('Gripa');
+
+    // La misma coincidencia debe permitir encontrar el negocio, tambien en MySQL.
+    $negocios = $this->getJson('/api/negocios?buscar=GRIPA')->assertOk();
+    expect(collect($negocios->json('negocios'))->pluck('nombre')->all())->toBe(['Droguería Salud']);
 });
 
 test('la busqueda incluye cerrados despues de abiertos e ignora productos no disponibles', function () {
