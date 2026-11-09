@@ -115,12 +115,20 @@ class ImagenesDemoSeeder extends Seeder
     {
         $rutas = [];
         $tags = $this->tags($grupo);
+        // Preproduccion puede reutilizar las fotos publicas locales sin depender
+        // de un proveedor externo. getenv funciona tambien con config:cache.
+        $soloLocales = getenv('IMAGENES_DEMO_SOLO_LOCALES') === '1';
 
         for ($i = 1; $i <= $cantidad; $i++) {
             $ruta = "{$carpeta}/tematico-{$grupo}-".str_pad((string) $i, 2, '0', STR_PAD_LEFT).'.jpg';
             $rutas[] = $ruta;
 
             if (Storage::disk('public')->exists($ruta)) {
+                continue;
+            }
+
+            if ($soloLocales) {
+                array_pop($rutas);
                 continue;
             }
 
@@ -144,6 +152,15 @@ class ImagenesDemoSeeder extends Seeder
             }
 
             Storage::disk('public')->put($ruta, $respuesta->body());
+        }
+
+        // Los platos especificos pueden usar el pool demo general de comida.
+        // No se usa una foto de otra familia para ropa, medicamentos, etc.
+        if ($rutas === [] && $soloLocales && $carpeta === 'productos' && in_array($grupo, [
+            'hamburger', 'hotdog', 'french-fries', 'barbecue', 'pizza', 'ribs',
+            'chicken-wings', 'sandwich', 'shawarma', 'fried-plantain', 'arepa',
+        ], true)) {
+            return $this->crearPool($carpeta, 'food', $cantidad, $ancho, $alto);
         }
 
         return array_values(array_filter(

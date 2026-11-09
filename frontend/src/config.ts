@@ -8,10 +8,15 @@
 // • Versión final (release, la que va a Play Store): API_URL_PRODUCCION.
 //     Debe ser HTTPS: Android bloquea http en release. Cámbiala por el dominio
 //     real del servidor antes de compilar (ver DESPLIEGUE.md en la raíz del repo).
+import { NativeModules } from 'react-native';
+
 const API_URL_DESARROLLO = 'http://10.0.2.2:8000';
 const API_URL_PRODUCCION = 'https://api.vitrina.example';
 
-export const API_URL = __DEV__ ? API_URL_DESARROLLO : API_URL_PRODUCCION;
+// La variante Android staging lleva su propia URL y CA local. Release conserva
+// exclusivamente la URL de produccion y las autoridades del sistema.
+const stagingUrl: string | undefined = NativeModules.EnvironmentConfig?.apiUrl;
+export const API_URL = stagingUrl || (__DEV__ ? API_URL_DESARROLLO : API_URL_PRODUCCION);
 
 // Páginas públicas del servidor (política de privacidad, eliminar cuenta).
 export const WEB_URL = API_URL;

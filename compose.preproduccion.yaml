@@ -1,0 +1,180 @@
+name: vitrina-preproduccion
+
+x-app: &app
+  image: vitrina-backend:preproduccion
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+    target: runtime
+  environment: &environment
+    APP_NAME: Vitrina Preproduccion
+    APP_ENV: staging
+    APP_KEY: ${APP_KEY:?Ejecuta iniciar-preproduccion.ps1}
+    APP_DEBUG: "false"
+    APP_URL: ${APP_URL:-https://localhost:8443}
+    APP_LOCALE: es
+    APP_FALLBACK_LOCALE: es
+    APP_TIMEZONE: America/Bogota
+    LOG_CHANNEL: stderr
+    LOG_LEVEL: info
+    DB_CONNECTION: mysql
+    DB_HOST: db
+    DB_DATABASE: vitrina_staging
+    DB_USERNAME: vitrina
+    DB_PASSWORD: ${DB_PASSWORD:?Ejecuta iniciar-preproduccion.ps1}
+    CACHE_STORE: database
+    SESSION_DRIVER: database
+    SESSION_SECURE_COOKIE: "true"
+    QUEUE_CONNECTION: database
+    FILESYSTEM_DISK: public
+    MAIL_MAILER: smtp
+    MAIL_HOST: mailpit
+    MAIL_PORT: "1025"
+    MAIL_FROM_ADDRESS: pruebas@vitrina.example
+    MAIL_FROM_NAME: Vitrina Preproduccion
+    FIREBASE_CREDENTIALS: ${FIREBASE_CREDENTIALS:-}
+    SENTRY_LARAVEL_DSN: ""
+  volumes:
+    - storage:/var/www/html/storage
+    - ./backend/storage/app/firebase:/run/firebase:ro
+  restart: unless-stopped
+  init: true
+
+services:
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: vitrina_staging
+      MYSQL_USER: vitrina
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Ejecuta iniciar-preproduccion.ps1}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Ejecuta iniciar-preproduccion.ps1}
+    volumes:
+      - mysql:/var/lib/mysql
+    healthcheck:
+      test: [CMD-SHELL, 'MYSQL_PWD="$$MYSQL_PASSWORD" mysql -h 127.0.0.1 -u vitrina -D vitrina_staging -e "SELECT 1"']
+      interval: 5s
+      timeout: 5s
+      retries: 40
+    restart: unless-stopped
+
+  migrate:
+    <<: *app
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: [sh, -ec, 'php artisan migrate --force && php artisan db:seed --class=RoleSeeder --force && php artisan db:seed --class=BarriosSeeder --force']
+
+  app:
+    <<: *app
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      mailpit:
+        condition: service_started
+    healthcheck:
+      test: [CMD, php, -r, "exit(@fsockopen('127.0.0.1', 9000) ? 0 : 1);"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  queue:
+    <<: *app
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: [php, artisan, "queue:work", "--tries=3", "--timeout=60", "--max-time=3600"]
+    stop_grace_period: 100s
+
+  scheduler:
+    <<: *app
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: [php, artisan, "schedule:work"]
+
+  web:
+    image: vitrina-web:preproduccion
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: web
+    volumes:
+      - storage:/var/www/html/storage:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, "http://127.0.0.1/up"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  https:
+    image: caddy:2.10-alpine
+    ports:
+      - "127.0.0.1:${HTTPS_PORT:-8443}:443"
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, "https://localhost/up"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports:
+      - "127.0.0.1:${MAIL_UI_PORT:-8025}:8025"
+    restart: unless-stopped
+
+  tests:
+    profiles: [test]
+    image: vitrina-tests:preproduccion
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: test
+    network_mode: none
+
+  db-tests:
+    profiles: [test]
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: vitrina_tests
+      MYSQL_USER: tests
+      MYSQL_PASSWORD: tests-local-only
+      MYSQL_ROOT_PASSWORD: root-tests-local-only
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: [CMD-SHELL, 'MYSQL_PWD="$$MYSQL_PASSWORD" mysql -h 127.0.0.1 -u tests -D vitrina_tests -e "SELECT 1"']
+      interval: 5s
+      timeout: 5s
+      retries: 40
+
+  tests-mysql:
+    profiles: [test]
+    image: vitrina-tests:preproduccion
+    environment:
+      DB_CONNECTION: mysql
+      DB_HOST: db-tests
+      DB_DATABASE: vitrina_tests
+      DB_USERNAME: tests
+      DB_PASSWORD: tests-local-only
+    depends_on:
+      db-tests:
+        condition: service_healthy
+
+volumes:
+  mysql:
+  storage:
+  caddy:
+  caddy_config:

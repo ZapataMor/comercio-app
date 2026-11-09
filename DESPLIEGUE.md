@@ -1,5 +1,8 @@
 # 🚀 Despliegue a producción (piloto)
 
+Para ensayar localmente con Docker, HTTPS y una APK sin Metro, consulta
+[PREPRODUCCION.md](PREPRODUCCION.md).
+
 Qué hay que hacer para pasar de "corre en mi PC" a "la gente de Maicao la instala desde
 Play Store". Complementa a `ENTORNO.md`, que cubre el entorno de desarrollo.
 

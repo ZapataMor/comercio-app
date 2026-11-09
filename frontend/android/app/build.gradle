@@ -100,6 +100,13 @@ if (localPropertiesFile.exists()) {
     localPropertiesFile.withInputStream { localProperties.load(it) }
 }
 def mapsApiKey = localProperties['MAPS_API_KEY'] ?: System.getenv('MAPS_API_KEY') ?: ''
+def stagingApiUrl = project.findProperty('stagingApiUrl') ?: 'https://localhost:8443'
+if (!stagingApiUrl.startsWith('https://')) {
+    throw new GradleException('stagingApiUrl debe usar HTTPS')
+}
+if (stagingApiUrl.contains('"') || stagingApiUrl.contains('\\') || stagingApiUrl.contains('\n')) {
+    throw new GradleException('stagingApiUrl contiene caracteres no validos')
+}
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -114,6 +121,7 @@ android {
         versionCode 1
         versionName "1.0"
         manifestPlaceholders += [MAPS_API_KEY: mapsApiKey]
+        buildConfigField 'String', 'STAGING_API_URL', '""'
     }
     signingConfigs {
         debug {
@@ -144,6 +152,13 @@ android {
             signingConfig keystoreProperties['storeFile'] ? signingConfigs.release : signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+        }
+        staging {
+            initWith release
+            matchingFallbacks = ['release']
+            signingConfig signingConfigs.debug
+            manifestPlaceholders += [usesCleartextTraffic: 'false']
+            buildConfigField 'String', 'STAGING_API_URL', '"' + stagingApiUrl + '"'
         }
     }
 }
