@@ -1,0 +1,51 @@
+# Se usa sobre compose.preproduccion.yaml con el proyecto vitrina-carga.
+# Volumenes y BD independientes; Firebase deshabilitado durante la carga.
+x-load-env: &load-env
+  APP_URL: https://localhost:9443
+  DB_DATABASE: vitrina_load
+  FIREBASE_CREDENTIALS: ""
+
+services:
+  db:
+    cpus: 2
+    mem_limit: 1g
+    environment:
+      MYSQL_DATABASE: vitrina_load
+    healthcheck:
+      test: [CMD-SHELL, 'MYSQL_PWD="$$MYSQL_PASSWORD" mysql -h 127.0.0.1 -u vitrina -D vitrina_load -e "SELECT 1"']
+  migrate:
+    environment: *load-env
+    volumes: !override
+      - storage:/var/www/html/storage
+  app:
+    cpus: 2
+    mem_limit: 512m
+    environment: *load-env
+    volumes: !override
+      - storage:/var/www/html/storage
+      - ./load:/load:ro
+      - ./artifacts/carga:/results
+  queue:
+    cpus: 0.5
+    mem_limit: 256m
+    environment: *load-env
+    volumes: !override
+      - storage:/var/www/html/storage
+  scheduler:
+    cpus: 0.25
+    mem_limit: 256m
+    environment: *load-env
+    volumes: !override
+      - storage:/var/www/html/storage
+  web:
+    cpus: 0.5
+    mem_limit: 256m
+  https:
+    cpus: 0.5
+    mem_limit: 128m
+    ports: !override
+      - "127.0.0.1:9443:443"
+  mailpit:
+    mem_limit: 128m
+    ports: !override
+      - "127.0.0.1:8125:8025"
