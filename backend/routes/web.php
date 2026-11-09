@@ -5,9 +5,8 @@ use App\Http\Controllers\Web\AuthWebController;
 use App\Http\Controllers\Web\PublicoController;
 use Illuminate\Support\Facades\Route;
 
-// La web es SOLO el panel del administrador. Clientes, negocios y
-// domiciliarios usan la app móvil Vitrina.
-Route::get('/', fn () => redirect()->route('admin.panel'));
+// La web es exclusiva del administrador.
+Route::redirect('/', '/admin');
 
 // --- Páginas públicas que exige Play Store (sin sesión) ---
 Route::get('/privacidad', [PublicoController::class, 'privacidad'])->name('privacidad');

@@ -7,6 +7,7 @@ use App\Models\Negocio;
 use App\Models\Producto;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -56,22 +57,28 @@ class AdminController extends Controller
     }
 
     /** Crear un nuevo usuario con un rol asignado. */
-    public function storeUsuario(Request $request): RedirectResponse
+    public function storeUsuario(Request $request): RedirectResponse|JsonResponse
     {
+        if (is_string($request->input('username'))) {
+            $request->merge(['username' => strtolower(trim($request->input('username')))]);
+        }
         $datos = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            'username' => ['required', 'string', 'min:3', 'max:50', 'regex:/\A[a-z0-9][a-z0-9_.-]*\z/', 'unique:users,username'],
             'password' => ['required', 'string', 'min:8'],
             'rol' => ['required', Rule::in(self::ROLES)],
         ]);
 
         $user = User::create([
-            'name' => $datos['name'],
-            'email' => $datos['email'],
+            'name' => $datos['username'],
+            'username' => $datos['username'],
             'password' => $datos['password'], // se hashea solo (cast 'hashed')
         ]);
 
         $user->syncRoles(User::rolesDelTipo($datos['rol']));
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => 'Usuario creado.', 'user' => $user->only(['id', 'username', 'name'])], 201);
+        }
 
         // Vuelve a la pestaña del tipo recién creado.
         return redirect()
@@ -80,7 +87,7 @@ class AdminController extends Controller
     }
 
     /** Cambiar el rol de un usuario. */
-    public function updateRol(Request $request, User $usuario): RedirectResponse
+    public function updateRol(Request $request, User $usuario): RedirectResponse|JsonResponse
     {
         $datos = $request->validate([
             'rol' => ['required', Rule::in(self::ROLES)],
@@ -89,10 +96,18 @@ class AdminController extends Controller
         // Salvaguarda: un admin no puede quitarse a sí mismo el rol de admin
         // (evita quedarse sin ningún administrador por accidente).
         if ($usuario->id === $request->user()->id && $datos['rol'] !== 'administrador') {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'No puedes quitarte tu propio rol de administrador.'], 422);
+            }
+
             return back()->with('error', 'No puedes quitarte tu propio rol de administrador.');
         }
 
         $usuario->syncRoles(User::rolesDelTipo($datos['rol']));
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => 'Rol actualizado.']);
+        }
 
         return back()->with('ok', "{$usuario->name} ahora es ".User::TIPOS[$datos['rol']].'.');
     }

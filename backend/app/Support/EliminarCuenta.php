@@ -75,6 +75,7 @@ class EliminarCuenta
 
             $user->forceFill([
                 'name' => 'Usuario',
+                'username' => null,
                 'apellidos' => 'eliminado',
                 'email' => "eliminado-{$user->id}@vitrina.invalid",
                 'password' => Str::random(64),

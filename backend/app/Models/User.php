@@ -14,7 +14,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
-#[Fillable(['name', 'apellidos', 'email', 'password', 'direccion', 'barrio', 'telefono'])]
+#[Fillable(['name', 'apellidos', 'username', 'email', 'password', 'direccion', 'barrio', 'telefono'])]
 // La ubicación del domiciliario solo sale por UbicacionDomiciliario::de(), a quien le toca verla.
 #[Hidden(['password', 'remember_token', 'ubicacion_lat', 'ubicacion_lng', 'ubicacion_at'])]
 class User extends Authenticatable

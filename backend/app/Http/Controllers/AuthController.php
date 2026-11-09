@@ -118,6 +118,11 @@ class AuthController extends Controller
      */
     public function actualizarPerfil(Request $request): JsonResponse
     {
+        return $this->guardarPerfil($request);
+    }
+
+    private function guardarPerfil(Request $request): JsonResponse
+    {
         $user = $request->user();
         // Los clientes necesitan sus datos de contacto para los pedidos; las
         // cuentas creadas por un admin (domiciliario, admin) pueden no tenerlos.
@@ -129,7 +134,7 @@ class AuthController extends Controller
             'apellidos' => ['sometimes', 'nullable', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'password' => ['sometimes', 'nullable', 'string', 'min:8', 'confirmed'],
-            'password_actual' => ['required_with:password', 'string'],
+            'password_actual' => ['required_with:password', 'nullable', 'string'],
             // Datos de contacto: obligatorios para clientes, opcionales para el resto.
             'direccion' => [$esCliente ? 'required' : 'sometimes', 'nullable', 'string', 'max:255'],
             'barrio' => [$esCliente ? 'required' : 'sometimes', 'nullable', 'string', 'max:120'],
@@ -149,7 +154,7 @@ class AuthController extends Controller
         if (array_key_exists('apellidos', $data)) {
             $user->apellidos = $data['apellidos'];
         }
-        $user->email = $data['email'];
+        $user->email = $data['email'] ?? null;
         if (array_key_exists('direccion', $data)) {
             $user->direccion = $data['direccion'];
         }
@@ -258,6 +263,7 @@ class AuthController extends Controller
     {
         return [
             'id' => $user->id,
+            'username' => $user->username,
             'name' => $user->name,
             'apellidos' => $user->apellidos,
             'email' => $user->email,

@@ -1,10 +1,14 @@
 <?php
 
+use App\Http\Middleware\CuentaActiva;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Sentry\Laravel\Integration;
+use Spatie\Permission\Middleware\PermissionMiddleware;
+use Spatie\Permission\Middleware\RoleMiddleware;
+use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -17,14 +21,14 @@ return Application::configure(basePath: dirname(__DIR__))
         // Alias del middleware de roles/permisos de Spatie,
         // para poder usar ->middleware('role:comerciante') en las rutas.
         $middleware->alias([
-            'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
-            'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
-            'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
+            'role' => RoleMiddleware::class,
+            'permission' => PermissionMiddleware::class,
+            'role_or_permission' => RoleOrPermissionMiddleware::class,
         ]);
 
         // Una cuenta suspendida por el admin pierde el acceso a la API al instante.
         $middleware->api(append: [
-            \App\Http\Middleware\CuentaActiva::class,
+            CuentaActiva::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

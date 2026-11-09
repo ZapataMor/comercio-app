@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\CuentaActiva;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -23,26 +24,35 @@ class AuthWebController extends Controller
     /** Procesa el login web. */
     public function login(Request $request): RedirectResponse
     {
+        $campo = $request->has('username') ? 'username' : 'email';
         $datos = $request->validate([
-            'email' => ['required', 'email'],
+            $campo => ['required', 'string', 'max:255'],
             'password' => ['required'],
         ]);
 
-        if (! Auth::attempt($datos, $request->boolean('remember'))) {
+        $identificador = trim($datos[$campo]);
+        $credenciales = [
+            str_contains($identificador, '@') ? 'email' : 'username' => strtolower($identificador),
+            'password' => $datos['password'],
+        ];
+        if (! Auth::attempt($credenciales, $request->boolean('remember'))) {
             return back()
-                ->withInput($request->only('email'))
-                ->withErrors(['email' => 'Las credenciales no son correctas.']);
+                ->withInput($request->only($campo))
+                ->withErrors([$campo => 'Las credenciales no son correctas.']);
         }
 
-        // La web es solo para administradores: los demás usan la app.
-        if (! Auth::user()->hasRole('administrador')) {
+        $user = Auth::user();
+        if ($user->suspendido_at !== null || ! $user->hasRole('administrador')) {
+            $mensaje = $user->suspendido_at !== null
+                ? CuentaActiva::mensajeSuspension($user)
+                : 'El panel web es solo para administradores. Usa la app Vitrina.';
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 
             return back()
-                ->withInput($request->only('email'))
-                ->withErrors(['email' => 'El panel web es solo para administradores. Usa la app Vitrina.']);
+                ->withInput($request->only($campo))
+                ->withErrors([$campo => $mensaje]);
         }
 
         // Evita "session fixation": nueva sesión tras autenticar.

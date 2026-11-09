@@ -58,6 +58,12 @@ php artisan config:cache && php artisan route:cache && php artisan view:cache
 
 ### Cada actualización
 
+La web es exclusiva del administrador. El registro público y las rutas `/pruebas`
+se retiraron; `WEB_PRUEBAS_HABILITADAS` ya no tiene efecto y puede eliminarse del
+`.env` del servidor. La API móvil, privacidad y eliminación de cuenta continúan
+disponibles. Al desplegar esta actualización es necesario regenerar la caché de
+rutas y vistas con los comandos siguientes para retirar también las rutas antiguas.
+
 ```bash
 git pull
 composer install --no-dev --optimize-autoloader

@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Negocio;
-use App\Models\Producto;
 use App\Models\Pedido;
+use App\Models\Producto;
 use App\Models\Resena;
 use App\Models\User;
 use App\Support\UbicacionDomiciliario;
@@ -59,6 +59,7 @@ class AdminController extends Controller
             ->when($buscar !== '', fn ($q) => $q->where(fn ($qq) => $qq
                 ->where('name', 'like', "%{$buscar}%")
                 ->orWhere('apellidos', 'like', "%{$buscar}%")
+                ->orWhere('username', 'like', "%{$buscar}%")
                 ->orWhere('email', 'like', "%{$buscar}%")))
             ->orderBy('name')
             ->paginate(30);
@@ -67,6 +68,7 @@ class AdminController extends Controller
             'id' => $u->id,
             'name' => $u->nombre_completo,
             'email' => $u->email,
+            'username' => $u->username,
             'rol' => $u->tipoCuenta(),
             'suspendido' => $u->suspendido_at !== null,
             'motivo_suspension' => $u->motivo_suspension,

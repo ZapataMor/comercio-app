@@ -21,15 +21,13 @@
         <form method="POST" action="{{ route('admin.usuarios.store') }}" class="space-y-3 mt-3">
             @csrf
             <div class="grid sm:grid-cols-2 gap-3">
-                <input name="name" value="{{ old('name') }}" required placeholder="Nombre"
+                <input name="username" value="{{ old('username') }}" required placeholder="Usuario" aria-label="Usuario" autocomplete="off" minlength="3" maxlength="50" pattern="[A-Za-z0-9][A-Za-z0-9_.-]*"
                        class="rounded-lg border border-slate-300 px-3 py-2">
-                <input name="email" type="email" value="{{ old('email') }}" required placeholder="Correo"
-                       class="rounded-lg border border-slate-300 px-3 py-2">
-                <input name="password" type="text" required placeholder="Contraseña (mín. 8)"
+                <input name="password" type="password" required placeholder="Contraseña (mín. 8)" aria-label="Contraseña" autocomplete="new-password" minlength="8"
                        class="rounded-lg border border-slate-300 px-3 py-2">
                 <select name="rol" class="rounded-lg border border-slate-300 px-3 py-2">
                     @foreach ($roles as $rol)
-                        <option value="{{ $rol }}" @selected(old('rol', $rolActual) === $rol)>{{ $tipos[$rol] }}</option>
+                        <option value="{{ $rol }}" @selected(old('rol', 'usuario') === $rol)>{{ $tipos[$rol] }}</option>
                     @endforeach
                 </select>
             </div>
@@ -57,7 +55,7 @@
         <div class="flex items-center justify-between p-4 gap-3">
             <div class="min-w-0">
                 <p class="font-medium truncate">{{ $u->name }}</p>
-                <p class="text-slate-500 text-sm truncate">{{ $u->email }}</p>
+                <p class="text-slate-500 text-sm truncate">{{ $u->username ?? $u->email }}</p>
             </div>
             <form method="POST" action="{{ route('admin.usuarios.rol', $u->id) }}" class="flex items-center gap-2 shrink-0">
                 @csrf

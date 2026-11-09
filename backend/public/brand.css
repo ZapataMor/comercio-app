@@ -1,0 +1,16 @@
+@font-face {
+    font-family: VitrinaSora;
+    src: url('./fonts/Sora_700Bold.ttf') format('truetype');
+    font-style: normal;
+    font-weight: 700;
+    font-display: block;
+}
+
+.vitrina-logo { display: block; max-width: 100%; height: auto; flex-shrink: 0; }
+.vitrina-login-brand { display: flex; justify-content: center; margin: 0 0 12px; }
+.vitrina-header-brand { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.vitrina-header-label { color: #64748b; font-size: 12px; font-weight: 500; }
+@media (max-width: 520px) {
+    .vitrina-header-brand .vitrina-logo { width: 112px; }
+    .vitrina-header-label { display: none; }
+}

@@ -39,7 +39,7 @@ class AppServiceProvider extends ServiceProvider
         $correo = fn (Request $r) => mb_strtolower((string) $r->input('email'));
 
         // Login y registro (API y web): 6 por minuto por correo e IP.
-        RateLimiter::for('acceso', fn (Request $r) => Limit::perMinute(6)->by('acceso|'.$correo($r).'|'.$r->ip()));
+        RateLimiter::for('acceso', fn (Request $r) => Limit::perMinute(6)->by('acceso|'.mb_strtolower(trim((string) $r->input('username', $r->input('email')))).'|'.$r->ip()));
 
         // Pedir código de recuperación: 3 por minuto y 10 por hora por correo.
         RateLimiter::for('codigo-clave', fn (Request $r) => [

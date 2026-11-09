@@ -7,6 +7,8 @@
 
 <h2 class="text-xl font-bold mb-4">Todos los negocios ({{ $negocios->count() }})</h2>
 
+<p class="text-slate-500 text-sm mb-4">Cada usuario crea su propio negocio desde Mis negocios en la app.</p>
+
 <div class="bg-white rounded-2xl shadow divide-y">
     @forelse ($negocios as $n)
         <div class="flex items-center justify-between p-4 gap-3">
