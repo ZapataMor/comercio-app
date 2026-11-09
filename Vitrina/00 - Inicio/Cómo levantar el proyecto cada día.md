@@ -26,11 +26,14 @@ set "TELEFONO=192.168.1.5:5555"
 
 Para probar la app solo en el PC, con el **emulador de Android**, usa **`iniciar-emulador.bat`**
 (también en la raíz). Enciende el primer emulador creado en Android Studio, levanta la API y
-Metro, espera a que Android arranque y abre la app (si no está instalada, lanza `npm run android`).
+Metro, aplica las migraciones pendientes y conecta todos los emuladores abiertos a la API local.
+Si un emulador tiene la versión de preproducción o no tiene la app, instala la versión debug
+sin borrar sus datos. Así puedes probar cliente, comerciante y domiciliario en emuladores distintos.
 
 Requisitos: haber creado un emulador una vez (*Device Manager → Create Device*) y tener
-`config.ts` con `http://10.0.2.2:8000`. Si tienes varios emuladores, pon el nombre en la línea
-`set "AVD="` del archivo.
+`config.ts` con `http://localhost:8000`. El lanzador configura `adb reverse` para los puertos
+8000 (API) y 8081 (Metro) en cada emulador. La línea `set "AVD="` permite elegir cuál encender
+si todavía no hay ninguno abierto.
 
 ## 🧩 Las tres piezas (y por qué son tres)
 
