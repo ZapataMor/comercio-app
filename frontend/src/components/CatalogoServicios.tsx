@@ -33,11 +33,9 @@ import SelectorImagen from './SelectorImagen';
 export default function CatalogoServicios({
   token,
   negocioId,
-  onProducto,
 }: {
   token: string;
   negocioId: number;
-  onProducto: () => void;
 }) {
   const { c } = useTheme();
   const styles = useStyles();
@@ -139,9 +137,6 @@ export default function CatalogoServicios({
   return (
     <View>
       <View style={styles.botones}>
-        <TouchableOpacity style={styles.boton} onPress={onProducto}>
-          <Text style={styles.botonTexto}>+ Añadir productos</Text>
-        </TouchableOpacity>
         <TouchableOpacity style={styles.boton} onPress={() => abrir(null)}>
           <Text style={styles.botonTexto}>+ Añadir servicios</Text>
         </TouchableOpacity>
@@ -165,7 +160,10 @@ export default function CatalogoServicios({
               accessibilityLabel={`Editar ${servicio.nombre}`}
               onPress={() => abrir(servicio)}
             >
+              {!!servicio.galeria?.[0] && <Image source={{ uri: imagenUrl(servicio.galeria[0])! }} style={styles.fotoServicio} resizeMode="cover" />}
               <Text style={styles.nombre}>{servicio.nombre}</Text>
+              <Text style={styles.nombre}>{servicio.precio == null ? 'Consultar precio' : `$${servicio.precio.toLocaleString('es-CO')}`}</Text>
+              <Text style={styles.detalle}>{servicio.duracion_minutos ?? 30} min</Text>
               <Text style={styles.detalle}>{servicio.descripcion}</Text>
               <Text style={styles.detalle}>
                 {servicio.disponible ? 'Visible para clientes' : 'Oculto'} ·
@@ -181,7 +179,6 @@ export default function CatalogoServicios({
           </View>
         ))
       )}
-      <Text style={styles.titulo}>Productos</Text>
       <Modal
         visible={modal}
         transparent
@@ -310,6 +307,7 @@ const useStyles = makeStyles(c => ({
     marginBottom: 10,
     gap: 8,
   },
+  fotoServicio: { width: '100%', aspectRatio: 2, borderRadius: radius.md, marginBottom: 10 },
   error: { color: c.danger, paddingVertical: 8 },
   fondo: {
     flex: 1,

@@ -350,7 +350,8 @@ export default function HomeScreen({ navigation }: Props) {
     { icono: 'negocios', titulo: 'Mis negocios', abrir: () => navigation.navigate('MisNegocios') },
     ...(negocio
       ? ([
-          { icono: 'caja', titulo: 'Catálogo', abrir: () => navigation.navigate('MisProductos') },
+          { icono: 'caja', titulo: 'Mis productos', abrir: () => navigation.navigate('MisProductos') },
+          { icono: 'calendario', titulo: 'Mis servicios', abrir: () => navigation.navigate('MisServicios') },
           { icono: 'lista', titulo: 'Pedidos y ventas', abrir: () => navigation.navigate('PedidosNegocio') },
           { icono: 'usuarios', titulo: 'Equipo', abrir: () => navigation.navigate('Equipo') },
           ...(tieneServicios ? [{ icono: 'calendario', titulo: 'Agenda de citas', abrir: () => navigation.navigate('AgendaNegocio', { negocioId: negocio.id }) } satisfies Acceso] : []),

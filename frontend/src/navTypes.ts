@@ -15,6 +15,7 @@ export type RootStackParamList = {
   MiTienda: { nuevo?: boolean } | undefined;
   // Catálogo del negocio activo: lista de productos + "Añadir producto".
   MisProductos: undefined;
+  MisServicios: undefined;
   // Miembros e invitaciones del negocio activo.
   Equipo: undefined;
   AgendarCita: { negocioId: number; negocioNombre: string; servicio: Servicio; presencial?: boolean };

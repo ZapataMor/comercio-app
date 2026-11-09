@@ -88,7 +88,15 @@ test('con la lista cargada se ven sus accesos, sin indicador', async () => {
   await montar([NEGOCIO]);
 
   expect(cargando()).toBe(false);
-  expect(textos()).toEqual(expect.arrayContaining(['Mi negocio', 'Catálogo', 'Pedidos y ventas', 'Equipo']));
+  expect(textos()).toEqual(expect.arrayContaining(['Mi negocio', 'Mis productos', 'Mis servicios', 'Pedidos y ventas', 'Equipo']));
+  expect(textos()).not.toContain('Catálogo');
+  const productos = raiz.root.findAll(n => n.props.accessibilityLabel === 'Mis productos' && !!n.props.onPress)[0];
+  const servicios = raiz.root.findAll(n => n.props.accessibilityLabel === 'Mis servicios' && !!n.props.onPress)[0];
+  const navigation = raiz.root.findByType(HomeScreen).props.navigation;
+  act(() => productos.props.onPress());
+  expect(navigation.navigate).toHaveBeenLastCalledWith('MisProductos');
+  act(() => servicios.props.onPress());
+  expect(navigation.navigate).toHaveBeenLastCalledWith('MisServicios');
 });
 
 test('quien no tiene negocios sigue viendo Explorar, sin esperar nada', async () => {

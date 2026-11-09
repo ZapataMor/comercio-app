@@ -38,6 +38,7 @@ import MiTiendaScreen from './src/screens/MiTiendaScreen';
 import ResenasScreen from './src/screens/ResenasScreen';
 import MisNegociosScreen from './src/screens/MisNegociosScreen';
 import MisProductosScreen from './src/screens/MisProductosScreen';
+import MisServiciosScreen from './src/screens/MisServiciosScreen';
 import EquipoScreen from './src/screens/EquipoScreen';
 import AgendarCitaScreen from './src/screens/AgendarCitaScreen';
 import CitasScreen from './src/screens/CitasScreen';
@@ -204,7 +205,8 @@ function Navegacion() {
             <Stack.Screen name="MiTienda" component={MiTiendaScreen} options={{ title: 'Mi Tienda' }} />
             {/* Las lee el cliente y también el dueño, desde Mi Tienda. */}
             <Stack.Screen name="Resenas" component={ResenasScreen} options={{ title: 'Reseñas' }} />
-            <Stack.Screen name="MisProductos" component={MisProductosScreen} options={{ title: 'Productos y servicios' }} />
+            <Stack.Screen name="MisProductos" component={MisProductosScreen} options={{ title: 'Mis productos' }} />
+            <Stack.Screen name="MisServicios" component={MisServiciosScreen} options={{ title: 'Mis servicios' }} />
             <Stack.Screen name="Equipo" component={EquipoScreen} options={{ title: 'Equipo' }} />
             <Stack.Screen name="AgendarCita" component={AgendarCitaScreen} options={{ title: 'Agendar cita' }} />
             <Stack.Screen name="MisCitas" component={CitasScreen} options={{ title: 'Mis citas' }} />

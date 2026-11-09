@@ -35,7 +35,6 @@ import { useConfirmar } from '../components/Confirmacion';
 import { Dropdown } from '../components/Dropdown';
 import FieldError from '../components/FieldError';
 import Icon from '../components/Icon';
-import CatalogoServicios from '../components/CatalogoServicios';
 import ListaAtributos from '../components/ListaAtributos';
 import SelectorImagen from '../components/SelectorImagen';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
@@ -347,7 +346,9 @@ export default function MisProductosScreen({ navigation }: Props) {
           <RefreshControl refreshing={refrescando} onRefresh={() => cargar('refresco')} colors={[c.accent]} tintColor={c.accent} />
         }
         ListHeaderComponent={
-          <CatalogoServicios key={negocio.id} token={token} negocioId={negocio.id} onProducto={abrirNuevo} />
+          <PressableScale style={styles.nuevoBtn} onPress={abrirNuevo}>
+            <Text style={styles.nuevoTxt}>+ Añadir producto</Text>
+          </PressableScale>
         }
         ListEmptyComponent={
           <Text style={styles.vacio}>
