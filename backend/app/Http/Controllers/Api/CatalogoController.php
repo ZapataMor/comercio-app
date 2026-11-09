@@ -139,10 +139,16 @@ class CatalogoController extends Controller
     }
 
     /** Tipos de negocio disponibles para filtrar la exploracion del cliente. */
-    public function tiposNegocio(): JsonResponse
+    public function tiposNegocio(Request $request): JsonResponse
     {
+        $seccion = $request->validate(['seccion' => ['sometimes', 'in:productos,servicios']])['seccion'] ?? null;
         $tipos = TipoNegocio::query()
-            ->whereHas('negocios')
+            ->whereHas('negocios', function ($q) use ($seccion) {
+                $q->whereNull('vetado_at')->whereNull('archivado_at');
+                if ($seccion) {
+                    $q->whereHas($seccion, fn ($items) => $items->where('disponible', true));
+                }
+            })
             ->orderBy('nombre')
             ->get(['id', 'nombre', 'slug']);
 

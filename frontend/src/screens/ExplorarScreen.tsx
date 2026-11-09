@@ -129,10 +129,13 @@ export default function ExplorarScreen({ navigation, route }: Props) {
 
   useEffect(() => {
     if (!auth?.token) return;
-    getTiposNegocio(auth.token)
-      .then(setTiposNegocio)
+    let vigente = true;
+    setTiposNegocio([]);
+    getTiposNegocio(auth.token, seccion)
+      .then(tipos => { if (vigente) setTiposNegocio(tipos); })
       .catch(() => {});
-  }, [auth]);
+    return () => { vigente = false; };
+  }, [auth, seccion]);
 
   const cargar = useCallback(
     (texto: string, refresco = false) => {
@@ -170,7 +173,7 @@ export default function ExplorarScreen({ navigation, route }: Props) {
 
   // Carga la siguiente página de negocios al llegar al final de la lista.
   const cargarMas = useCallback(() => {
-    if (consulta || cargando || refrescando) return;
+    if ((seccion === 'productos' && consulta) || cargando || refrescando) return;
     if (cargandoMasRef.current || pagina >= ultimaPagina) return;
     cargandoMasRef.current = true;
     setCargandoMas(true);

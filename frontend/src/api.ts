@@ -1015,8 +1015,8 @@ export type ProductoConNegocio = Producto & {
   negocio: { id: number; nombre: string; abierto: boolean; estado_texto?: string };
 };
 
-export async function getTiposNegocio(token: string): Promise<TipoNegocio[]> {
-  const data = await authGet('/api/tipos-negocio', token);
+export async function getTiposNegocio(token: string, seccion?: 'productos' | 'servicios'): Promise<TipoNegocio[]> {
+  const data = await authGet(`/api/tipos-negocio${seccion ? `?seccion=${seccion}` : ''}`, token);
   return (data.categorias ?? []) as TipoNegocio[];
 }
 
