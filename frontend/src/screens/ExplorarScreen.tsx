@@ -90,7 +90,8 @@ function filasBusqueda(negocios: NegocioLista[], productos: ProductoConNegocio[]
   ];
 }
 
-export default function ExplorarScreen({ navigation }: Props) {
+export default function ExplorarScreen({ navigation, route }: Props) {
+  const seccion = route.params?.seccion ?? 'productos';
   const { c } = useTheme();
   const styles = useStyles();
   const { auth } = useAuth();
@@ -119,8 +120,8 @@ export default function ExplorarScreen({ navigation }: Props) {
 
   const tipoSeleccionado = tiposNegocio.find(tipo => tipo.id === tipoSeleccionadoId) ?? null;
   const filas = useMemo(
-    () => (consulta ? filasBusqueda(negocios, productos, consulta) : filasListado(negocios)),
-    [negocios, productos, consulta],
+    () => (seccion === 'productos' && consulta ? filasBusqueda(negocios, productos, consulta) : filasListado(negocios)),
+    [negocios, productos, consulta, seccion],
   );
 
   useEffect(() => {
@@ -138,10 +139,10 @@ export default function ExplorarScreen({ navigation }: Props) {
       const t = texto.trim();
       // Con una categoría elegida el texto filtra sus negocios; sin ella se
       // buscan negocios y productos a la vez.
-      const conProductos = !!t && tipoSeleccionadoId == null;
+      const conProductos = seccion === 'productos' && !!t && tipoSeleccionadoId == null;
 
       Promise.all([
-        getNegocios(auth!.token, t || undefined, 1, tipoSeleccionadoId),
+        getNegocios(auth!.token, t || undefined, 1, tipoSeleccionadoId, seccion),
         conProductos ? buscarProductos(auth!.token, t) : Promise.resolve([]),
       ])
         .then(([p, hallados]) => {
@@ -161,7 +162,7 @@ export default function ExplorarScreen({ navigation }: Props) {
           setRefrescando(false);
         });
     },
-    [auth, tipoSeleccionadoId],
+    [auth, tipoSeleccionadoId, seccion],
   );
 
   // Carga la siguiente página de negocios al llegar al final de la lista.
@@ -171,7 +172,7 @@ export default function ExplorarScreen({ navigation }: Props) {
     cargandoMasRef.current = true;
     setCargandoMas(true);
     const turno = ultimaPeticion.current;
-    getNegocios(auth!.token, busqueda.trim() || undefined, pagina + 1, tipoSeleccionadoId)
+    getNegocios(auth!.token, busqueda.trim() || undefined, pagina + 1, tipoSeleccionadoId, seccion)
       .then(p => {
         if (turno !== ultimaPeticion.current) return;
         setNegocios(prev => {
@@ -187,7 +188,7 @@ export default function ExplorarScreen({ navigation }: Props) {
         cargandoMasRef.current = false;
         setCargandoMas(false);
       });
-  }, [auth, consulta, cargando, refrescando, pagina, ultimaPagina, tipoSeleccionadoId, busqueda]);
+  }, [auth, consulta, cargando, refrescando, pagina, ultimaPagina, tipoSeleccionadoId, busqueda, seccion]);
 
   // Trae de nuevo lo que hay en pantalla, sin indicadores ni avisos de error, para
   // que un negocio que abre o cierra cambie solo. Son todas las páginas cargadas:
@@ -197,11 +198,11 @@ export default function ExplorarScreen({ navigation }: Props) {
     const turno = ultimaPeticion.current;
     const paginaVista = pagina;
     const t = busqueda.trim();
-    const conProductos = !!t && tipoSeleccionadoId == null;
+    const conProductos = seccion === 'productos' && !!t && tipoSeleccionadoId == null;
     const paginas = Array.from({ length: paginaVista }, (_, i) => i + 1);
 
     Promise.all([
-      Promise.all(paginas.map(n => getNegocios(auth!.token, t || undefined, n, tipoSeleccionadoId))),
+      Promise.all(paginas.map(n => getNegocios(auth!.token, t || undefined, n, tipoSeleccionadoId, seccion))),
       conProductos ? buscarProductos(auth!.token, t) : Promise.resolve([]),
     ])
       .then(([respuestas, hallados]) => {
@@ -222,6 +223,12 @@ export default function ExplorarScreen({ navigation }: Props) {
       .catch(() => {});
   }, REFRESCO_NEGOCIOS);
 
+  useEffect(() => {
+    ++ultimaPeticion.current;
+    setNegocios([]); setProductos([]); setConsulta(''); setPagina(1); setCargando(true);
+    setTipoSeleccionadoId(null); setBusqueda('');
+  }, [seccion]);
+
   // Solo el teclado espera a que dejen de escribir; cambiar de categoría es inmediato.
   useEffect(() => {
     const espera = busqueda === ultimaBusqueda.current ? 0 : ESPERA_BUSQUEDA;
@@ -240,8 +247,8 @@ export default function ExplorarScreen({ navigation }: Props) {
   }
 
   const abrirNegocio = useCallback(
-    (n: NegocioLista) => navigation.navigate('Negocio', { id: n.id, nombre: n.nombre }),
-    [navigation],
+    (n: NegocioLista) => navigation.navigate('Negocio', { id: n.id, nombre: n.nombre, seccion }),
+    [navigation, seccion],
   );
 
   const texto = busqueda.trim();
@@ -278,7 +285,7 @@ export default function ExplorarScreen({ navigation }: Props) {
                   style={styles.buscadorTexto}
                   value={busqueda}
                   onChangeText={setBusqueda}
-                  placeholder="Busca negocios o productos"
+                  placeholder={seccion === 'servicios' ? 'Busca negocios o servicios' : 'Busca negocios o productos'}
                   placeholderTextColor={c.mutedSoft}
                   autoCapitalize="none"
                   returnKeyType="search"
@@ -385,6 +392,7 @@ export default function ExplorarScreen({ navigation }: Props) {
                     id: negocio.id,
                     nombre: negocio.nombre,
                     productoId: item.producto.id,
+                    seccion,
                   })
                 }
               />

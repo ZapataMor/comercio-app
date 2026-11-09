@@ -1,24 +1,28 @@
 <?php
 
+use App\Http\Controllers\Api\AdminController;
+use App\Http\Controllers\Api\AdminReputacionController;
+use App\Http\Controllers\Api\AdminResenaController;
+use App\Http\Controllers\Api\AjusteController;
+use App\Http\Controllers\Api\BarrioController;
+use App\Http\Controllers\Api\CatalogoController;
+use App\Http\Controllers\Api\ClienteDireccionController;
+use App\Http\Controllers\Api\ComercioPedidoController;
+use App\Http\Controllers\Api\CuentaController;
+use App\Http\Controllers\Api\DeviceTokenController;
+use App\Http\Controllers\Api\DomiciliarioController as ApiDomiciliarioController;
+use App\Http\Controllers\Api\InvitacionController;
+use App\Http\Controllers\Api\PedidoController as ApiPedidoController;
+use App\Http\Controllers\Api\RecetaPreferidaController;
+use App\Http\Controllers\Api\RecuperarClaveController;
+use App\Http\Controllers\Api\ResenaController;
+use App\Http\Controllers\Api\TrabajadorController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoriaController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\NegocioController;
 use App\Http\Controllers\ProductoController;
-use App\Http\Controllers\Api\CatalogoController;
-use App\Http\Controllers\Api\AdminController;
-use App\Http\Controllers\Api\AdminReputacionController;
-use App\Http\Controllers\Api\AdminResenaController;
-use App\Http\Controllers\Api\DomiciliarioController as ApiDomiciliarioController;
-use App\Http\Controllers\Api\PedidoController as ApiPedidoController;
-use App\Http\Controllers\Api\ComercioPedidoController;
-use App\Http\Controllers\Api\RecetaPreferidaController;
-use App\Http\Controllers\Api\ResenaController;
-use App\Http\Controllers\Api\InvitacionController;
-use App\Http\Controllers\Api\TrabajadorController;
-use App\Http\Controllers\Api\BarrioController;
-use App\Http\Controllers\Api\ClienteDireccionController;
-use App\Http\Controllers\Api\DeviceTokenController;
+use App\Http\Controllers\ServicioController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -29,8 +33,8 @@ Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:ac
 
 // "Olvidé mi contraseña": se envía un código de 6 dígitos al correo y con él
 // se pone una contraseña nueva.
-Route::post('/password/codigo', [\App\Http\Controllers\Api\RecuperarClaveController::class, 'enviarCodigo'])->middleware('throttle:codigo-clave');
-Route::post('/password/restablecer', [\App\Http\Controllers\Api\RecuperarClaveController::class, 'restablecer'])->middleware('throttle:restablecer-clave');
+Route::post('/password/codigo', [RecuperarClaveController::class, 'enviarCodigo'])->middleware('throttle:codigo-clave');
+Route::post('/password/restablecer', [RecuperarClaveController::class, 'restablecer'])->middleware('throttle:restablecer-clave');
 
 // Barrios aprobados de Maicao. Pública: el registro la necesita sin token.
 Route::get('/barrios', [BarrioController::class, 'index'])->middleware('throttle:publico');
@@ -49,7 +53,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/perfil/domiciliario', [AuthController::class, 'hacerseDomiciliario']);
     Route::delete('/perfil/domiciliario', [AuthController::class, 'dejarDeSerDomiciliario']);
     // Eliminar mi cuenta (anonimiza; exige la contraseña).
-    Route::delete('/cuenta', [\App\Http\Controllers\Api\CuentaController::class, 'destroy']);
+    Route::delete('/cuenta', [CuentaController::class, 'destroy']);
 
     // Panel adaptativo: responde distinto según el rol del usuario logueado.
     // El frontend llama siempre aquí y pinta lo que reciba.
@@ -96,6 +100,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('negocios/{negocio}')->whereNumber('negocio')->group(function () {
         // Datos del negocio: solo el propietario los edita.
         Route::put('/', [NegocioController::class, 'update']);
+
+        Route::get('/servicios', [ServicioController::class, 'index']);
+        Route::post('/servicios', [ServicioController::class, 'store']);
+        Route::put('/servicios/{id}', [ServicioController::class, 'update'])->whereNumber('id');
+        Route::delete('/servicios/{id}', [ServicioController::class, 'destroy'])->whereNumber('id');
 
         // Catálogo de productos del negocio.
         Route::get('/productos', [ProductoController::class, 'index']);
@@ -150,7 +159,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Cancelar mientras el negocio no lo tenga listo.
     Route::post('/pedidos/{id}/cancelar', [ApiPedidoController::class, 'cancelar']);
     // Tarifa de domicilio vigente (para mostrar el total en el checkout).
-    Route::get('/ajustes', [\App\Http\Controllers\Api\AjusteController::class, 'publicos']);
+    Route::get('/ajustes', [AjusteController::class, 'publicos']);
     // Al terminar: ¿el negocio y el domiciliario cumplieron? (reputación).
     Route::post('/pedidos/{id}/calificacion', [ApiPedidoController::class, 'calificar']);
     // Estrellas y comentario públicos de la tienda y de lo que compró.
@@ -172,7 +181,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // Mapa: dónde están los domiciliarios que reportaron su posición hace poco.
         Route::get('/mapa/domiciliarios', [AdminController::class, 'mapaDomiciliarios']);
         // Tarifa de domicilio (aplica a los pedidos nuevos).
-        Route::put('/ajustes', [\App\Http\Controllers\Api\AjusteController::class, 'actualizar']);
+        Route::put('/ajustes', [AjusteController::class, 'actualizar']);
         // Barrios sugeridos por clientes (aprobar → entra a la lista pública).
         Route::get('/barrios/pendientes', [BarrioController::class, 'pendientes']);
         Route::put('/barrios/{id}/aprobar', [BarrioController::class, 'aprobar']);

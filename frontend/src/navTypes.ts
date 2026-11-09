@@ -22,16 +22,16 @@ export type RootStackParamList = {
   // Historial de pedidos del negocio activo (pestañas) y ventas de hoy.
   PedidosNegocio: undefined;
   // Cliente
-  Explorar: undefined;
+  Explorar: { seccion?: 'productos' | 'servicios' } | undefined;
   // Mapa de negocios; `admin` suma a los domiciliarios en vivo.
   Mapa: { admin?: boolean } | undefined;
   // `productoId` opcional: al entrar desde una búsqueda de producto, el catálogo
   // resalta y hace scroll hasta ese producto.
-  Negocio: { id: number; nombre: string; productoId?: number };
+  Negocio: { id: number; nombre: string; productoId?: number; seccion?: 'productos' | 'servicios' };
   // Detalle de un producto del catálogo; `abierto`: si el negocio recibe pedidos.
   Producto: { negocioId: number; negocioNombre: string; abierto: boolean; producto: Producto };
   // Reseñas de una tienda o, con `productoId`, de uno de sus productos.
-  Resenas: { negocioId: number; titulo: string; productoId?: number };
+  Resenas: { negocioId: number; titulo: string; productoId?: number; seccion?: 'productos' | 'servicios' };
   Carrito: undefined;
   Checkout: undefined;
   MisPedidos: undefined;

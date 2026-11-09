@@ -334,7 +334,7 @@ export default function HomeScreen({ navigation }: Props) {
     { icono: 'negocios', titulo: 'Mis negocios', abrir: () => navigation.navigate('MisNegocios') },
     ...(negocio
       ? ([
-          { icono: 'caja', titulo: 'Productos', abrir: () => navigation.navigate('MisProductos') },
+          { icono: 'caja', titulo: 'Catálogo', abrir: () => navigation.navigate('MisProductos') },
           { icono: 'lista', titulo: 'Pedidos y ventas', abrir: () => navigation.navigate('PedidosNegocio') },
           { icono: 'usuarios', titulo: 'Equipo', abrir: () => navigation.navigate('Equipo') },
         ] satisfies Acceso[])

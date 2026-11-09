@@ -17,11 +17,13 @@ import {
   Negocio,
   Producto,
   RecetaPreferida,
+  Servicio,
 } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import { useFlyToCart } from '../components/FlyToCart';
 import Icon from '../components/Icon';
+import BotonesContacto from '../components/BotonesContacto';
 import { NivelBadge } from '../components/Reputacion';
 import RecetasPreferidas from '../components/RecetasPreferidas';
 import { PuntajeResenas } from '../components/Resenas';
@@ -38,7 +40,8 @@ const COLUMNAS = 2;
 
 type CatalogoFila =
   | { tipo: 'categoria'; key: string; nombre: string; cantidad: number }
-  | { tipo: 'productos'; key: string; productos: Producto[] };
+  | { tipo: 'productos'; key: string; productos: Producto[] }
+  | { tipo: 'servicio'; key: string; servicio: Servicio };
 
 function categoriasNegocio(negocio: Negocio) {
   return negocio.categorias?.length ? negocio.categorias : negocio.categoria ? [negocio.categoria] : [];
@@ -113,20 +116,24 @@ export default function NegocioScreen({ navigation, route }: Props) {
   const { volar } = useFlyToCart();
   const toast = useToast();
   const token = auth!.token;
-  const { id, nombre, productoId } = route.params;
+  const { id, nombre, productoId, seccion = 'productos' } = route.params;
   const agregar = useAgregarAlCarrito(id, nombre);
   const [negocio, setNegocio] = useState<Negocio | null>(null);
   const [productos, setProductos] = useState<Producto[]>([]);
+  const [servicios, setServicios] = useState<Servicio[]>([]);
   const [recetas, setRecetas] = useState<RecetaPreferida[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const catalogo = useMemo(() => construirCatalogo(productos), [productos]);
+  const catalogo = useMemo<CatalogoFila[]>(() => seccion === 'servicios'
+    ? servicios.map(servicio => ({ tipo: 'servicio', key: `servicio-${servicio.id}`, servicio }))
+    : construirCatalogo(productos), [productos, servicios, seccion]);
   const listaRef = useRef<FlatList<CatalogoFila>>(null);
   const negocioAbierto = negocio?.activo !== false;
 
   const cargarCatalogo = useCallback(
     () =>
-      getCatalogo(token, id).then(({ negocio: n, productos: p }) => {
+      getCatalogo(token, id).then(({ negocio: n, productos: p, servicios: s }) => {
+        setServicios(s ?? []);
         setNegocio(n);
         setProductos(p);
         setError(null);
@@ -136,10 +143,11 @@ export default function NegocioScreen({ navigation, route }: Props) {
 
   // Es una recomendación: si no carga, el catálogo sigue igual.
   const cargarRecetas = useCallback(() => {
+    if (seccion === 'servicios') { setRecetas([]); return; }
     getRecetasPreferidas(token, id)
       .then(setRecetas)
       .catch(() => {});
-  }, [token, id]);
+  }, [token, id, seccion]);
 
   useEffect(() => {
     cargarCatalogo()
@@ -275,17 +283,23 @@ export default function NegocioScreen({ navigation, route }: Props) {
               )}
               {!!negocio.descripcion && <Text style={styles.descripcion}>{negocio.descripcion}</Text>}
             </View>
-            <RecetasPreferidas
+            {seccion === 'productos' && <RecetasPreferidas
               recetas={recetas}
               abierto={negocioAbierto}
               onAgregar={(receta, e) => onAgregar(receta.producto, e, receta.opciones)}
-            />
+            />}
           </View>
         ) : null
       }
-      ListEmptyComponent={<Text style={styles.vacio}>Este negocio no tiene productos disponibles.</Text>}
+      ListEmptyComponent={<Text style={styles.vacio}>{seccion === 'servicios' ? 'Este negocio no tiene servicios disponibles.' : 'Este negocio no tiene productos disponibles.'}</Text>}
       renderItem={({ item, index }) =>
-        item.tipo === 'categoria' ? (
+        item.tipo === 'servicio' ? (
+          <View style={styles.servicio}>
+            <Text style={styles.seccionTitulo}>{item.servicio.nombre}</Text>
+            <Text style={styles.descripcion}>{item.servicio.descripcion}</Text>
+            <BotonesContacto telefono={negocio?.telefono} mensaje={`Hola, quisiera información sobre ${item.servicio.nombre}.`} />
+          </View>
+        ) : item.tipo === 'categoria' ? (
           <View style={styles.seccion}>
             <Text style={styles.seccionTitulo}>{item.nombre}</Text>
             <Text style={styles.seccionConteo}>{item.cantidad}</Text>
@@ -314,6 +328,7 @@ export default function NegocioScreen({ navigation, route }: Props) {
 const useStyles = makeStyles((c, shadow) => ({
   container: { flex: 1, backgroundColor: c.bg },
   contenido: { paddingBottom: 110 },
+  servicio: { marginHorizontal: 20, marginVertical: 8, padding: 16, borderRadius: radius.md, backgroundColor: c.surface2 },
   portada: {
     height: 176,
     alignItems: 'center',

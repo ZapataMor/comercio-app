@@ -85,7 +85,7 @@ test('con la lista cargada se ven sus accesos, sin indicador', async () => {
   await montar([NEGOCIO]);
 
   expect(cargando()).toBe(false);
-  expect(textos()).toEqual(expect.arrayContaining(['Mi negocio', 'Productos', 'Pedidos y ventas', 'Equipo']));
+  expect(textos()).toEqual(expect.arrayContaining(['Mi negocio', 'Catálogo', 'Pedidos y ventas', 'Equipo']));
 });
 
 test('quien no tiene negocios sigue viendo Explorar, sin esperar nada', async () => {

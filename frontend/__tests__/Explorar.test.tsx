@@ -71,12 +71,12 @@ async function esperar(ms = 420) {
 
 let desmontar = () => {};
 
-async function montar() {
+async function montar(seccion: 'productos' | 'servicios' = 'productos') {
   const navigation = { navigate: jest.fn() };
   let raiz: ReactTestRenderer.ReactTestRenderer;
   await act(async () => {
     raiz = ReactTestRenderer.create(
-      <ExplorarScreen navigation={navigation as any} route={{ key: 'e', name: 'Explorar' } as any} />,
+      <ExplorarScreen navigation={navigation as any} route={{ key: 'e', name: 'Explorar', params: { seccion } } as any} />,
     );
   });
   desmontar = () => act(() => raiz.unmount());
@@ -191,10 +191,10 @@ test('un toque abre el catálogo, también si el negocio está cerrado', async (
   const { navigation, tocar } = await montar();
 
   await tocar('El Rincón');
-  expect(navigation.navigate).toHaveBeenLastCalledWith('Negocio', { id: 1, nombre: 'El Rincón' });
+  expect(navigation.navigate).toHaveBeenLastCalledWith('Negocio', { id: 1, nombre: 'El Rincón', seccion: 'productos' });
 
   await tocar('La Fonda, cerrado');
-  expect(navigation.navigate).toHaveBeenLastCalledWith('Negocio', { id: 2, nombre: 'La Fonda' });
+  expect(navigation.navigate).toHaveBeenLastCalledWith('Negocio', { id: 2, nombre: 'La Fonda', seccion: 'productos' });
 });
 
 test('la búsqueda encuentra negocios por su nombre, sin importar las tildes', async () => {
@@ -246,4 +246,22 @@ test('una búsqueda vieja que responde tarde no pisa la nueva', async () => {
 
   expect(textos()).toContain('Pizza Nostra');
   expect(textos()).not.toContain('Pollo Express');
+});
+
+test('el catálogo inicial lista tiendas y no consulta todos los productos', async () => {
+  mockNegocios.mockResolvedValue(pagina([negocio(1, 'Mi tienda')]));
+  const { textos } = await montar();
+  expect(textos()).toContain('Mi tienda');
+  expect(mockProductos).not.toHaveBeenCalled();
+  expect(mockNegocios).toHaveBeenLastCalledWith('t', undefined, 1, null, 'productos');
+});
+
+test('Servicios mantiene las tarjetas de negocios y abre su catálogo de servicios', async () => {
+  mockNegocios.mockResolvedValue(pagina([negocio(1, 'Taller mixto')]));
+  const { textos, tocar, navigation } = await montar('servicios');
+  expect(textos()).toContain('Taller mixto');
+  expect(mockProductos).not.toHaveBeenCalled();
+  expect(mockNegocios).toHaveBeenLastCalledWith('t', undefined, 1, null, 'servicios');
+  await tocar('Taller mixto');
+  expect(navigation.navigate).toHaveBeenLastCalledWith('Negocio', { id: 1, nombre: 'Taller mixto', seccion: 'servicios' });
 });

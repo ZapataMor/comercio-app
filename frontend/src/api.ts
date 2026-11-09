@@ -184,6 +184,7 @@ export type NegocioLista = {
   barrio?: string | null;
   imagen?: string | null;
   productos: number;
+  servicios?: number;
   abierto: boolean;
   /** "Hoy de 7:00 a. m. a 8:00 p. m." si el negocio tiene horario. */
   horario_hoy?: string | null;
@@ -966,13 +967,14 @@ export async function getNegocios(
   buscar?: string,
   pagina = 1,
   tipoNegocioId?: number | null,
+  seccion?: 'productos' | 'servicios',
 ): Promise<NegociosPagina> {
   const params = new URLSearchParams();
   if (buscar && buscar.trim()) params.set('buscar', buscar.trim());
   if (pagina > 1) params.set('page', String(pagina));
   if (tipoNegocioId != null) params.set('tipo_negocio_id', String(tipoNegocioId));
   const q = params.toString() ? `?${params.toString()}` : '';
-  const data = await authGet(`/api/negocios${q}`, token);
+  const data = await authGet(`/api/negocios${q}${seccion ? `${q ? '&' : '?'}seccion=${seccion}` : ''}`, token);
   const negocios = (data.negocios ?? []) as NegocioLista[];
   return {
     negocios,
@@ -1018,11 +1020,13 @@ export async function buscarProductos(
   token: string,
   buscar: string,
   tipoNegocioId?: number | null,
+  todos = false,
 ): Promise<ProductoConNegocio[]> {
   const texto = buscar.trim();
-  if (!texto && tipoNegocioId == null) return [];
+  if (!texto && tipoNegocioId == null && !todos) return [];
   const params = new URLSearchParams();
   if (texto) params.set('buscar', texto);
+  if (todos) params.set('todos', '1');
   if (tipoNegocioId != null) params.set('tipo_negocio_id', String(tipoNegocioId));
   const data = await authGet(`/api/productos?${params.toString()}`, token);
   return (data.productos ?? []) as ProductoConNegocio[];
@@ -1032,9 +1036,9 @@ export async function buscarProductos(
 export async function getCatalogo(
   token: string,
   id: number,
-): Promise<{ negocio: Negocio; productos: Producto[] }> {
+): Promise<{ negocio: Negocio; productos: Producto[]; servicios: Servicio[] }> {
   const data = await authGet(`/api/negocios/${id}`, token);
-  return { negocio: data.negocio as Negocio, productos: (data.productos ?? []) as Producto[] };
+  return { negocio: data.negocio as Negocio, productos: (data.productos ?? []) as Producto[], servicios: data.servicios ?? [] };
 }
 
 export type EstadoNegocio = Pick<Negocio, 'activo' | 'horario_hoy'>;
@@ -1065,6 +1069,7 @@ export type AdminStats = {
   negocios: number;
   negocios_activos: number;
   productos: number;
+  servicios?: number;
   domiciliarios_vetados?: number;
   negocios_vetados?: number;
   resenas_reportadas?: number;
@@ -1094,6 +1099,7 @@ export type AdminNegocio = {
   nombre: string;
   dueno: string | null;
   productos: number;
+  servicios?: number;
   activo: boolean;
   vetado?: boolean;
   /** Su único dueño eliminó la cuenta: ya no se ve en la app. */
@@ -1634,4 +1640,15 @@ export async function resenarPedido(token: string, id: number, body: NuevaResena
 export async function calificarPedido(token: string, id: number, body: NuevaCalificacion): Promise<string> {
   const d = await authSend('POST', `/api/pedidos/${id}/calificacion`, token, body);
   return d.message as string;
+}
+
+export type Servicio = { id: number; nombre: string; descripcion: string; disponible?: boolean };
+export async function getServicios(token: string, negocioId: number): Promise<Servicio[]> {
+  return (await authGet(`/api/negocios/${negocioId}/servicios`, token)).servicios;
+}
+export async function guardarServicio(token: string, negocioId: number, datos: Omit<Servicio, 'id'>, id?: number): Promise<Servicio> {
+  return (await authSend(id ? 'PUT' : 'POST', `/api/negocios/${negocioId}/servicios${id ? `/${id}` : ''}`, token, datos)).servicio;
+}
+export async function eliminarServicio(token: string, negocioId: number, id: number): Promise<void> {
+  await authSend('DELETE', `/api/negocios/${negocioId}/servicios/${id}`, token);
 }

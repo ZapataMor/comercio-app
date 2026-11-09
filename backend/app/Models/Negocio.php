@@ -120,7 +120,7 @@ class Negocio extends Model
     }
 
     /** Invitaciones de trabajo enviadas por este negocio. */
-    public function invitaciones(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function invitaciones(): HasMany
     {
         return $this->hasMany(InvitacionTrabajo::class);
     }
@@ -128,6 +128,11 @@ class Negocio extends Model
     /**
      * Los productos del catálogo de este negocio.
      */
+    public function servicios(): HasMany
+    {
+        return $this->hasMany(Servicio::class);
+    }
+
     public function productos(): HasMany
     {
         return $this->hasMany(Producto::class);

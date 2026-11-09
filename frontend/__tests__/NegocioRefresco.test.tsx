@@ -42,8 +42,8 @@ const productos = [{ id: 1, nombre: 'Pollo asado', precio: 20000, categoria: nul
 
 let raiz: ReactTestRenderer.ReactTestRenderer;
 
-async function montar() {
-  const props = { navigation: { navigate: jest.fn() }, route: { params: { id: 3, nombre: 'Asadero' } } };
+async function montar(seccion: 'productos' | 'servicios' = 'productos') {
+  const props = { navigation: { navigate: jest.fn() }, route: { params: { id: 3, nombre: 'Asadero', seccion } } };
   await act(async () => {
     raiz = ReactTestRenderer.create(<NegocioScreen {...(props as any)} />);
   });
@@ -106,4 +106,19 @@ test('si el estado falla, lo que se ve no cambia', async () => {
 
   expect(textos()).toContain('Abierto');
   expect(textos()).toContain('Pollo asado');
+});
+
+test('desde Servicios muestra solo servicios con su descripción', async () => {
+  mockCatalogo.mockResolvedValueOnce({ negocio, productos, servicios: [{ id: 8, nombre: 'Instalación de internet', descripcion: 'Instalación y soporte técnico a domicilio.' }] });
+  await montar('servicios');
+  expect(textos()).toEqual(expect.arrayContaining(['Instalación de internet', 'Instalación y soporte técnico a domicilio.']));
+  expect(textos()).not.toContain('Pollo asado');
+  expect(mockRecetas).not.toHaveBeenCalled();
+});
+
+test('desde Productos no muestra los servicios de una tienda mixta', async () => {
+  mockCatalogo.mockResolvedValueOnce({ negocio, productos, servicios: [{ id: 8, nombre: 'Instalación de internet', descripcion: 'Soporte técnico' }] });
+  await montar();
+  expect(textos()).toContain('Pollo asado');
+  expect(textos()).not.toContain('Instalación de internet');
 });

@@ -19,6 +19,7 @@ import OfertaPedido from './src/components/OfertaPedido';
 import { AppDesenfocable } from './src/components/Desenfoque';
 import { FlyToCartProvider } from './src/components/FlyToCart';
 import HeaderPerfil from './src/components/HeaderPerfil';
+import HeaderCatalogo from './src/components/HeaderCatalogo';
 import { CapaMenus } from './src/components/MenuDesplegable';
 import { VitrinaHeaderLogo } from './src/components/Logo';
 import SplashVitrina from './src/components/SplashVitrina';
@@ -144,12 +145,18 @@ function Navegacion() {
                 <Stack.Screen
                   name="Explorar"
                   component={ExplorarScreen}
-                  options={{ title: 'Vitrina', headerTitle: tituloVitrina }}
+                  options={({ route, navigation }) => ({
+                    title: 'Vitrina', headerTitle: tituloVitrina,
+                    headerRight: () => <HeaderCatalogo seccion={route.params?.seccion ?? 'productos'} onCambiar={() => navigation.setParams({ seccion: route.params?.seccion === 'servicios' ? 'productos' : 'servicios' })} />,
+                  })}
                 />
                 <Stack.Screen
                   name="Negocio"
                   component={NegocioScreen}
-                  options={({ route }) => ({ title: route.params.nombre })}
+                  options={({ route, navigation }) => ({
+                    title: route.params.nombre,
+                    headerRight: () => <HeaderCatalogo seccion={route.params.seccion ?? 'productos'} onCambiar={() => navigation.navigate('Explorar', { seccion: route.params.seccion === 'servicios' ? 'productos' : 'servicios' })} />,
+                  })}
                 />
                 <Stack.Screen
                   name="Producto"
@@ -198,7 +205,7 @@ function Navegacion() {
             <Stack.Screen name="MiTienda" component={MiTiendaScreen} options={{ title: 'Mi Tienda' }} />
             {/* Las lee el cliente y también el dueño, desde Mi Tienda. */}
             <Stack.Screen name="Resenas" component={ResenasScreen} options={{ title: 'Reseñas' }} />
-            <Stack.Screen name="MisProductos" component={MisProductosScreen} options={{ title: 'Productos' }} />
+            <Stack.Screen name="MisProductos" component={MisProductosScreen} options={{ title: 'Productos y servicios' }} />
             <Stack.Screen name="Equipo" component={EquipoScreen} options={{ title: 'Equipo' }} />
             <Stack.Screen
               name="ComercioPedidoDetalle"

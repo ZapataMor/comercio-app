@@ -38,7 +38,11 @@ class CatalogoController extends Controller
             ->whereNull('vetado_at')
             ->whereNull('archivado_at')
             ->with('tiposNegocio')
-            ->withCount(['productos' => fn ($q) => $q->where('disponible', true)]);
+            ->withCount(['productos' => fn ($q) => $q->where('disponible', true), 'servicios' => fn ($q) => $q->where('disponible', true)]);
+        $seccion = $request->validate(['seccion' => ['sometimes', 'in:productos,servicios']])['seccion'] ?? null;
+        if ($seccion) {
+            $query->whereHas($seccion, fn ($q) => $q->where('disponible', true));
+        }
 
         if ($request->filled('tipo_negocio_id')) {
             $tipoId = $request->integer('tipo_negocio_id');
@@ -48,20 +52,23 @@ class CatalogoController extends Controller
         if ($request->filled('buscar')) {
             $texto = trim((string) $request->string('buscar'));
 
-            $query->where(function ($q) use ($texto) {
+            $query->where(function ($q) use ($texto, $seccion) {
                 $q->where('nombre', 'like', "%{$texto}%")
                     ->orWhere('descripcion', 'like', "%{$texto}%")
                     ->orWhereHas('tiposNegocio', fn ($c) => $c->where('nombre', 'like', "%{$texto}%"))
                     // Negocios con productos disponibles que coincidan por
                     // nombre o por el nombre de su categoría.
-                    ->orWhereHas('productos', function ($p) use ($texto) {
+                    ->when($seccion !== 'servicios', fn ($q) => $q->orWhereHas('productos', function ($p) use ($texto) {
                         $p->where('disponible', true)
                             ->where(function ($pp) use ($texto) {
                                 $pp->where('nombre', 'like', "%{$texto}%")
                                     ->orWhereRaw('LOWER(CAST(atributos AS CHAR)) LIKE ?', ['%'.mb_strtolower($texto).'%'])
                                     ->orWhereHas('categoria', fn ($c) => $c->where('nombre', 'like', "%{$texto}%"));
                             });
-                    });
+                    }))
+                    ->when($seccion !== 'productos', fn ($q) => $q->orWhereHas('servicios', function ($s) use ($texto) {
+                        $s->where('disponible', true)->where(fn ($s) => $s->where('nombre', 'like', "%{$texto}%")->orWhere('descripcion', 'like', "%{$texto}%"));
+                    }));
             });
         }
 
@@ -81,6 +88,7 @@ class CatalogoController extends Controller
             'barrio' => $n->barrio,
             'imagen' => $n->imagen ? '/storage/'.$n->imagen : null,
             'productos' => $n->productos_count,
+            'servicios' => $n->servicios_count,
             'abierto' => (bool) $n->activo,
             'horario_hoy' => HorarioNegocio::textoHoyDe($n, now()),
             'tiempo_preparacion' => $n->tiempo_preparacion,
@@ -169,7 +177,7 @@ class CatalogoController extends Controller
         $tipoNegocioId = $request->integer('tipo_negocio_id') ?: null;
 
         // Sin texto ni categoria no buscamos productos (la app muestra negocios).
-        if ($texto === '' && ! $tipoNegocioId) {
+        if ($texto === '' && ! $tipoNegocioId && ! $request->boolean('todos')) {
             return response()->json(['productos' => []]);
         }
 
@@ -277,6 +285,7 @@ class CatalogoController extends Controller
                 'lng' => $negocio->lng,
             ],
             'productos' => ProductoResource::collection($productos),
+            'servicios' => $negocio->servicios()->where('disponible', true)->orderBy('nombre')->get(['id', 'nombre', 'descripcion']),
         ]);
     }
 }
