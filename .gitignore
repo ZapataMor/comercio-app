@@ -1,0 +1,8 @@
+# Configuracion local con secretos.
+/.env.preproduccion
+# Evidencias, APK, certificados y salidas de compilacion/pruebas.
+/artifacts/
+/artifacts-*.log
+# Archivos generados al ejecutar las herramientas locales.
+/load/__pycache__/
+/frontend/android/app/src/staging/res/raw/
