@@ -90,6 +90,7 @@ class CatalogoController extends Controller
             'productos' => $n->productos_count,
             'servicios' => $n->servicios_count,
             'abierto' => (bool) $n->activo,
+            'estado_texto' => HorarioNegocio::estadoTexto($n),
             'horario_hoy' => HorarioNegocio::textoHoyDe($n, now()),
             'tiempo_preparacion' => $n->tiempo_preparacion,
             'reputacion' => Reputacion::resumen(Reputacion::NEGOCIO, $n),
@@ -128,6 +129,7 @@ class CatalogoController extends Controller
                 'barrio' => $n->barrio,
                 'imagen' => $n->imagen ? '/storage/'.$n->imagen : null,
                 'abierto' => (bool) $n->activo,
+                'estado_texto' => HorarioNegocio::estadoTexto($n),
                 'horario_hoy' => HorarioNegocio::textoHoyDe($n, now()),
                 'lat' => $n->lat,
                 'lng' => $n->lng,
@@ -240,6 +242,7 @@ class CatalogoController extends Controller
 
         return response()->json([
             'activo' => (bool) $negocio->activo,
+            'estado_texto' => HorarioNegocio::estadoTexto($negocio),
             'horario_hoy' => HorarioNegocio::textoHoyDe($negocio, now()),
         ]);
     }
@@ -270,6 +273,7 @@ class CatalogoController extends Controller
                 'barrio' => $negocio->barrio,
                 'telefono' => $negocio->telefono,
                 'activo' => (bool) $negocio->activo,
+                'estado_texto' => HorarioNegocio::estadoTexto($negocio),
                 'imagen' => $negocio->imagen ? '/storage/'.$negocio->imagen : null,
                 'tiempo_preparacion' => $negocio->tiempo_preparacion,
                 // Horario semanal y el texto de hoy ("Hoy de 7:00 a. m. a 8:00 p. m.").

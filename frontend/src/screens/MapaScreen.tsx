@@ -224,7 +224,7 @@ function TarjetaNegocio({ negocio, onVerTienda }: { negocio: NegocioMapa; onVerT
           )}
         </View>
         <Text style={[styles.estado, negocio.abierto ? styles.abierto : styles.cerrado]}>
-          {negocio.abierto ? 'Abierto' : 'Cerrado'}
+          {negocio.estado_texto ?? (negocio.abierto ? 'Abierto' : 'Cerrado')}
         </Text>
       </View>
       <View style={styles.botones}>

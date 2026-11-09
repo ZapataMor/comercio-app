@@ -53,8 +53,8 @@ const normalizar = (texto: string) =>
     .toLowerCase();
 
 /** Lo esencial de un negocio en una sola línea. */
-function metaNegocio(n: NegocioLista) {
-  return [n.categoria, n.tiempo_preparacion ? `~${n.tiempo_preparacion} min` : null, n.barrio]
+function metaNegocio(n: NegocioLista, mostrarPreparacion = true) {
+  return [n.categoria, mostrarPreparacion && n.tiempo_preparacion ? `~${n.tiempo_preparacion} min` : null, n.barrio]
     .filter(Boolean)
     .join(' · ');
 }
@@ -63,10 +63,13 @@ function metaNegocio(n: NegocioLista) {
 function filasListado(negocios: NegocioLista[]): Fila[] {
   const fila = (negocio: NegocioLista): Fila => ({ tipo: 'negocio', key: `n-${negocio.id}`, negocio });
   const abiertos = negocios.filter(n => n.abierto);
-  const cerrados = negocios.filter(n => !n.abierto);
+  const almorzando = negocios.filter(n => !n.abierto && n.estado_texto === 'Almorzando');
+  const cerrados = negocios.filter(n => !n.abierto && n.estado_texto !== 'Almorzando');
   return [
     ...(abiertos.length ? [titulo('Abiertos ahora')] : []),
     ...abiertos.map(fila),
+      ...(almorzando.length ? [titulo('En descanso de almuerzo')] : []),
+      ...almorzando.map(fila),
     ...(cerrados.length ? [titulo('Cerrados por ahora')] : []),
     ...cerrados.map(fila),
   ];
@@ -361,15 +364,15 @@ export default function ExplorarScreen({ navigation, route }: Props) {
           case 'titulo':
             return <Text style={styles.seccion}>{item.texto}</Text>;
           case 'negocio':
-            return <CardNegocio item={item.negocio} index={index} onAbrir={abrirNegocio} />;
+            return <CardNegocio item={item.negocio} index={index} onAbrir={abrirNegocio} seccion={seccion} />;
           case 'negocioHallado':
             return (
               <FilaResultado
                 imagen={item.negocio.imagen}
                 icono="tienda"
                 nombre={item.negocio.nombre}
-                linea={metaNegocio(item.negocio)}
-                detalle={item.negocio.abierto ? null : 'Cerrado'}
+                linea={metaNegocio(item.negocio, seccion === 'productos')}
+                detalle={item.negocio.abierto ? null : item.negocio.estado_texto ?? 'Cerrado'}
                 resenas={item.negocio.resenas}
                 index={index}
                 onPress={() => abrirNegocio(item.negocio)}
@@ -384,7 +387,7 @@ export default function ExplorarScreen({ navigation, route }: Props) {
                 nombre={item.producto.nombre}
                 linea={precioDe(item.producto)}
                 lineaResaltada
-                detalle={negocio.abierto ? negocio.nombre : `${negocio.nombre} · Cerrado`}
+                detalle={negocio.abierto ? negocio.nombre : `${negocio.nombre} · ${negocio.estado_texto ?? 'Cerrado'}`}
                 resenas={item.producto.resenas}
                 index={index}
                 onPress={() =>
@@ -424,15 +427,17 @@ const CardNegocio = React.memo(function CardNegocio({
   item,
   index,
   onAbrir,
+  seccion,
 }: {
   item: NegocioLista;
   index: number;
   onAbrir: (n: NegocioLista) => void;
+  seccion: 'productos' | 'servicios';
 }) {
   const { c } = useTheme();
   const styles = useStyles();
   const img = imagenUrl(item.imagen);
-  const meta = metaNegocio(item);
+  const meta = metaNegocio(item, seccion === 'productos');
   // "Nuevo" no distingue a nadie en la lista: solo se muestra el nivel ganado.
   const conNivel = !!item.reputacion && item.reputacion.nivel !== 'nuevo';
 
@@ -441,7 +446,7 @@ const CardNegocio = React.memo(function CardNegocio({
       <PressableScale
         scaleTo={0.98}
         accessibilityRole="button"
-        accessibilityLabel={item.abierto ? item.nombre : `${item.nombre}, cerrado`}
+        accessibilityLabel={item.abierto ? item.nombre : `${item.nombre}, ${(item.estado_texto ?? 'Cerrado').toLowerCase()}`}
         onPress={() => onAbrir(item)}>
         <View style={styles.portada}>
           {img ? (
@@ -452,7 +457,7 @@ const CardNegocio = React.memo(function CardNegocio({
           {!item.abierto && (
             <>
               <View style={styles.portadaVelo} />
-              <Text style={styles.sello}>Cerrado</Text>
+              <Text style={styles.sello}>{item.estado_texto ?? 'Cerrado'}</Text>
             </>
           )}
         </View>

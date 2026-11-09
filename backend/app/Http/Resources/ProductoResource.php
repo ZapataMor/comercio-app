@@ -50,6 +50,7 @@ class ProductoResource extends JsonResource
                 'id' => $this->negocio->id,
                 'nombre' => $this->negocio->nombre,
                 'abierto' => (bool) $this->negocio->activo,
+                'estado_texto' => \App\Support\HorarioNegocio::estadoTexto($this->negocio),
             ]),
         ];
     }

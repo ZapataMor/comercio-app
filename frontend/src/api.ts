@@ -96,6 +96,7 @@ export type Negocio = {
   barrio?: string | null;
   telefono: string | null;
   activo: boolean;
+  estado_texto?: 'Abierto' | 'Cerrado' | 'Almorzando';
   imagen?: string | null; // ruta relativa "/storage/negocios/x.jpg"
   /** Minutos que el negocio promete tardar en tener listo un pedido. */
   tiempo_preparacion?: number;
@@ -126,7 +127,8 @@ export type DiaSemana = 'lun' | 'mar' | 'mie' | 'jue' | 'vie' | 'sab' | 'dom';
 /** Los 7 días y 'fes': el horario de los festivos, que esos días reemplaza al del día. */
 export type ClaveHorario = DiaSemana | 'fes';
 /** null = ese día no abre. Horas "HH:MM" (24 h); si cierra <= abre, cierra al día siguiente. */
-export type HorarioSemana = Record<ClaveHorario, { abre: string; cierra: string } | null>;
+export type FranjaHorario = { abre: string; cierra: string; almuerzo?: { inicio: string; fin: string } | null };
+export type HorarioSemana = Record<ClaveHorario, FranjaHorario | null>;
 
 /** "Calle 12 #8-30 · Centro": la dirección con el barrio, si lo tiene. */
 export function direccionConBarrio(n: { direccion?: string | null; barrio?: string | null }): string {
@@ -186,6 +188,7 @@ export type NegocioLista = {
   productos: number;
   servicios?: number;
   abierto: boolean;
+  estado_texto?: string;
   /** "Hoy de 7:00 a. m. a 8:00 p. m." si el negocio tiene horario. */
   horario_hoy?: string | null;
   tiempo_preparacion?: number;
@@ -992,6 +995,7 @@ export type NegocioMapa = Coordenadas & {
   direccion: string | null;
   imagen?: string | null;
   abierto: boolean;
+  estado_texto?: string;
   horario_hoy?: string | null;
 };
 
@@ -1003,7 +1007,7 @@ export async function getNegociosMapa(token: string): Promise<NegocioMapa[]> {
 
 /** Producto de la búsqueda del cliente, con el negocio que lo vende. */
 export type ProductoConNegocio = Producto & {
-  negocio: { id: number; nombre: string; abierto: boolean };
+  negocio: { id: number; nombre: string; abierto: boolean; estado_texto?: string };
 };
 
 export async function getTiposNegocio(token: string): Promise<TipoNegocio[]> {
@@ -1041,7 +1045,7 @@ export async function getCatalogo(
   return { negocio: data.negocio as Negocio, productos: (data.productos ?? []) as Producto[], servicios: data.servicios ?? [] };
 }
 
-export type EstadoNegocio = Pick<Negocio, 'activo' | 'horario_hoy'>;
+export type EstadoNegocio = Pick<Negocio, 'activo' | 'horario_hoy' | 'estado_texto'>;
 
 /** Si la tienda sigue abierta, sin pedir todo el catálogo: es lo que se refresca seguido. */
 export async function getEstadoNegocio(token: string, id: number): Promise<EstadoNegocio> {
@@ -1095,6 +1099,7 @@ export type AdminUsuariosResp = {
 };
 
 export type AdminNegocio = {
+  estado_texto?: string;
   id: number;
   nombre: string;
   dueno: string | null;

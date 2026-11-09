@@ -197,6 +197,16 @@ test('un toque abre el catálogo, también si el negocio está cerrado', async (
   expect(navigation.navigate).toHaveBeenLastCalledWith('Negocio', { id: 2, nombre: 'La Fonda', seccion: 'productos' });
 });
 
+test('el descanso muestra Almorzando y no agrupa el negocio entre los cerrados', async () => {
+  mockNegocios.mockResolvedValue(pagina([{ ...negocio(1, 'Salón', false), estado_texto: 'Almorzando' }]));
+  const { textos, tocar, navigation } = await montar();
+  expect(textos()).toContain('Almorzando');
+  expect(textos()).toContain('En descanso de almuerzo');
+  expect(textos()).not.toContain('Cerrados por ahora');
+  await tocar('Salón, almorzando');
+  expect(navigation.navigate).toHaveBeenLastCalledWith('Negocio', { id: 1, nombre: 'Salón', seccion: 'productos' });
+});
+
 test('la búsqueda encuentra negocios por su nombre, sin importar las tildes', async () => {
   mockNegocios.mockResolvedValue(pagina([negocio(1, 'El Rincón Paisa')]));
   const { buscar, textos } = await montar();

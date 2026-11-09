@@ -39,7 +39,7 @@ export default function HeaderNegocios() {
           <OpcionMenu
             icono="tienda"
             titulo={n.nombre}
-            detalle={`${n.rol === 'propietario' ? 'Propietario' : 'Trabajador'} · ${n.activo ? 'Abierto' : 'Cerrado'}`}
+            detalle={`${n.rol === 'propietario' ? 'Propietario' : 'Trabajador'} · ${n.estado_texto ?? (n.activo ? 'Abierto' : 'Cerrado')}`}
             activa={n.id === negocio?.id}
             onPress={() => elegir(() => abrir(n.id))}
           />

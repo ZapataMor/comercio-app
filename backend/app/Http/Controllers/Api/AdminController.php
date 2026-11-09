@@ -193,6 +193,7 @@ class AdminController extends Controller
             'dueno' => $n->user?->nombre_completo,
             'productos' => $n->productos_count,
             'activo' => $n->activo,
+            'estado_texto' => \App\Support\HorarioNegocio::estadoTexto($n),
             'vetado' => $n->vetado_at !== null,
             'archivado' => $n->archivado_at !== null,
         ])->values();

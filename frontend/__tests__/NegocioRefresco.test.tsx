@@ -108,6 +108,16 @@ test('si el estado falla, lo que se ve no cambia', async () => {
   expect(textos()).toContain('Pollo asado');
 });
 
+test('durante el almuerzo muestra el estado actualizado y conserva el catálogo', async () => {
+  mockCatalogo.mockResolvedValue({ negocio, productos });
+  await montar();
+  mockEstado.mockResolvedValueOnce({ activo: false, estado_texto: 'Almorzando', horario_hoy: 'Almuerzo de 12:00 a 13:00' });
+  await tick();
+  expect(textos()).toContain('Almorzando');
+  expect(textos()).not.toContain('Cerrado');
+  expect(textos()).toContain('Pollo asado');
+});
+
 test('desde Servicios muestra solo servicios con su descripción', async () => {
   mockCatalogo.mockResolvedValueOnce({ negocio, productos, servicios: [{ id: 8, nombre: 'Instalación de internet', descripcion: 'Instalación y soporte técnico a domicilio.' }] });
   await montar('servicios');

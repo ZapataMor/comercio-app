@@ -118,7 +118,7 @@ export default function AdminNegociosScreen() {
               <Text style={[styles.badge, styles.vetado]}>Vetado</Text>
             ) : (
               <Text style={[styles.badge, item.activo ? styles.abierto : styles.cerrado]}>
-                {item.activo ? 'Abierto' : 'Cerrado'}
+                  {item.estado_texto ?? (item.activo ? 'Abierto' : 'Cerrado')}
               </Text>
             )}
           </View>

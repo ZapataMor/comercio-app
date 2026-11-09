@@ -260,9 +260,9 @@ export default function NegocioScreen({ navigation, route }: Props) {
               <View style={styles.estadoFila}>
                 <View style={[styles.punto, negocio.activo ? styles.puntoAbierto : styles.puntoCerrado]} />
                 <Text style={[styles.estado, !negocio.activo && styles.estadoCerrado]}>
-                  {negocio.activo ? 'Abierto' : 'Cerrado'}
+                  {negocio.estado_texto ?? (negocio.activo ? 'Abierto' : 'Cerrado')}
                 </Text>
-                {!!negocio.tiempo_preparacion && (
+                {seccion === 'productos' && !!negocio.tiempo_preparacion && (
                   <Text style={styles.dato}>· ~{negocio.tiempo_preparacion} min</Text>
                 )}
                 <NivelBadge reputacion={negocio.reputacion} />
@@ -276,7 +276,7 @@ export default function NegocioScreen({ navigation, route }: Props) {
                 <Icon name="chevron" size={13} color={c.muted} />
               </PressableScale>
               {!!negocio.horario_hoy && (
-                <Text style={styles.dato} numberOfLines={1}>{negocio.horario_hoy}</Text>
+                <Text style={styles.dato}>{negocio.horario_hoy}</Text>
               )}
               {!!direccionConBarrio(negocio) && (
                 <Text style={styles.dato} numberOfLines={1}>{direccionConBarrio(negocio)}</Text>

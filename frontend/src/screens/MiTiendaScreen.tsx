@@ -253,7 +253,7 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
           <View style={[styles.estado, negocio.activo ? styles.estadoAbierto : styles.estadoCerrado]}>
             <View style={[styles.estadoPunto, { backgroundColor: negocio.activo ? c.success : c.danger }]} />
             <Text style={[styles.estadoTxt, { color: negocio.activo ? c.success : c.danger }]}>
-              {negocio.activo ? 'Abierto' : 'Cerrado'}
+              {negocio.estado_texto ?? (negocio.activo ? 'Abierto' : 'Cerrado')}
             </Text>
           </View>
           <View style={styles.portadaTexto}>
@@ -332,7 +332,7 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
                   <Text style={[styles.diaNombre, esHoy && styles.diaNombreHoy]}>{dia}</Text>
                   {esHoy && <Text style={styles.hoy}>Hoy</Text>}
                   <Text style={[styles.diaHoras, !franja && styles.diaCerrado]}>
-                    {franja ? `${hora12(franja.abre)} – ${hora12(franja.cierra)}` : 'No abre'}
+                    {franja ? `${hora12(franja.abre)} - ${hora12(franja.cierra)}${franja.almuerzo ? `\nAlmuerzo ${hora12(franja.almuerzo.inicio)} - ${hora12(franja.almuerzo.fin)}` : ''}` : 'No abre'}
                   </Text>
                 </View>
               );

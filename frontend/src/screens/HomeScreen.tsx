@@ -31,7 +31,7 @@ function cop(n: number) {
  * Las dos palabras están siempre montadas, una encima de la otra, y solo se
  * animan su opacidad y su tamaño.
  */
-function EtiquetaEstado({ abierto }: { abierto: boolean }) {
+function EtiquetaEstado({ abierto, texto }: { abierto: boolean; texto?: string }) {
   const { c } = useTheme();
   const styles = useStyles();
   const opAbierto = useRef(new Animated.Value(abierto ? 1 : 0)).current;
@@ -76,9 +76,9 @@ function EtiquetaEstado({ abierto }: { abierto: boolean }) {
   return (
     // La topbar recorta lo que sale de aquí: el margen a la izquierda deja
     // sitio para la palabra más larga y para el zoom.
-    <View style={styles.etiqueta} accessible accessibilityLabel={abierto ? 'Abierto' : 'Cerrado'}>
+    <View style={styles.etiqueta} accessible accessibilityLabel={texto ?? (abierto ? 'Abierto' : 'Cerrado')}>
       {/* Invisible: le da al conjunto el ancho de la palabra actual. */}
-      <Text style={[styles.headerEstadoTxt, styles.oculto]}>{abierto ? 'Abierto' : 'Cerrado'}</Text>
+      <Text style={[styles.headerEstadoTxt, styles.oculto]}>{texto ?? (abierto ? 'Abierto' : 'Cerrado')}</Text>
       <Animated.Text
         style={[
           styles.headerEstadoTxt,
@@ -93,7 +93,7 @@ function EtiquetaEstado({ abierto }: { abierto: boolean }) {
           styles.capa,
           { color: c.onHeaderOff, opacity: opCerrado, transform: [{ scale: escCerrado }] },
         ]}>
-        Cerrado
+        {texto ?? 'Cerrado'}
       </Animated.Text>
     </View>
   );
@@ -116,7 +116,7 @@ function HeaderEstadoNegocio() {
 
   // Solo el propietario abre/cierra el negocio; el trabajador solo ve el estado.
   if (!esPropietario) {
-    return <EtiquetaEstado abierto={negocio.activo} />;
+    return <EtiquetaEstado abierto={negocio.activo} texto={negocio.estado_texto} />;
   }
 
   async function toggle(v: boolean) {
@@ -136,7 +136,7 @@ function HeaderEstadoNegocio() {
 
   return (
     <View style={styles.headerEstado}>
-      <EtiquetaEstado abierto={negocio.activo} />
+      <EtiquetaEstado abierto={negocio.activo} texto={negocio.estado_texto} />
       <BotonMantener
         icon="tienda"
         encendido={negocio.activo}

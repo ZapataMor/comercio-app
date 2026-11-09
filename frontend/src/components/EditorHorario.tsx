@@ -11,7 +11,7 @@
  */
 import React from 'react';
 import { Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { ClaveHorario, HorarioSemana } from '../api';
+import { ClaveHorario, FranjaHorario, HorarioSemana } from '../api';
 import { font, makeStyles, radius, useTheme } from '../theme';
 
 export const DIAS: { clave: ClaveHorario; nombre: string }[] = [
@@ -55,6 +55,14 @@ export function errorHorario(h: HorarioSemana | null): string | null {
     if (f.abre === f.cierra) {
       return `${nombre}: la hora de abrir y la de cerrar no pueden ser iguales.`;
     }
+    if (f.almuerzo) {
+      if (!HORA.test(f.almuerzo.inicio) || !HORA.test(f.almuerzo.fin)) return `${nombre}: escribe las horas de almuerzo como 12:00 o 13:00.`;
+      const min = (s: string) => Number(s.slice(0, 2)) * 60 + Number(s.slice(3));
+      const offset = (s: string) => (min(s) - min(f.abre) + 1440) % 1440;
+      if (offset(f.almuerzo.inicio) <= 0 || offset(f.almuerzo.fin) <= offset(f.almuerzo.inicio) || offset(f.almuerzo.fin) >= offset(f.cierra)) {
+        return `${nombre}: el almuerzo debe comenzar y terminar dentro del horario de atención, en ese orden.`;
+      }
+    }
   }
   return null;
 }
@@ -88,7 +96,7 @@ export default function EditorHorario({ valor, onCambiar, disabled }: Props) {
   const styles = useStyles();
   const activo = valor !== null;
 
-  function cambiarDia(dia: ClaveHorario, franja: { abre: string; cierra: string } | null) {
+  function cambiarDia(dia: ClaveHorario, franja: FranjaHorario | null) {
     if (!valor) return;
     onCambiar({ ...valor, [dia]: franja });
   }
@@ -126,7 +134,8 @@ export default function EditorHorario({ valor, onCambiar, disabled }: Props) {
           const franja = valor![clave] ?? null;
           return (
             // El festivo va aparte, bajo una línea: no es un día de la semana.
-            <View key={clave} style={[styles.dia, clave === 'fes' && styles.festivo]}>
+            <View key={clave}>
+            <View style={[styles.dia, clave === 'fes' && styles.festivo]}>
               <Switch
                 value={franja !== null}
                 onValueChange={v => cambiarDia(clave, v ? { ...FRANJA_TIPICA } : null)}
@@ -165,6 +174,21 @@ export default function EditorHorario({ valor, onCambiar, disabled }: Props) {
                 <Text style={styles.noAbre}>No abre</Text>
               )}
             </View>
+            {franja && <View style={styles.almuerzo}>
+              <View style={styles.fila}>
+                <Text style={styles.sub}>Descanso de almuerzo (opcional)</Text>
+                <Switch accessibilityLabel={`Almuerzo ${nombre}`} value={!!franja.almuerzo} disabled={disabled}
+                  onValueChange={v => cambiarDia(clave, { ...franja, almuerzo: v ? { inicio: '12:00', fin: '13:00' } : null })} />
+              </View>
+              {franja.almuerzo && <View style={styles.horas}>
+                {(['inicio', 'fin'] as const).map(campo => <TextInput key={campo}
+                  accessibilityLabel={`${campo === 'inicio' ? 'Inicio' : 'Fin'} del almuerzo ${nombre}`}
+                  style={styles.hora} value={franja.almuerzo![campo]} editable={!disabled} keyboardType="number-pad" maxLength={5}
+                  onChangeText={t => cambiarDia(clave, { ...franja, almuerzo: { ...franja.almuerzo!, [campo]: formatearHora(t) } })}
+                  onBlur={() => cambiarDia(clave, { ...franja, almuerzo: { ...franja.almuerzo!, [campo]: completarHora(franja.almuerzo![campo]) } })} />)}
+              </View>}
+            </View>}
+            </View>
           );
         })}
 
@@ -182,6 +206,7 @@ export default function EditorHorario({ valor, onCambiar, disabled }: Props) {
 }
 
 const useStyles = makeStyles(c => ({
+  almuerzo: { paddingLeft: 12, marginBottom: 8, gap: 6 },
   fila: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
   titulo: { fontSize: 13, fontFamily: font.semibold, color: c.text },
   sub: { fontSize: 12, fontFamily: font.regular, color: c.muted, marginTop: 2 },
