@@ -7,7 +7,7 @@
 import React from 'react';
 import { ActivityIndicator, Text } from 'react-native';
 import ReactTestRenderer, { act } from 'react-test-renderer';
-import { Usuario } from '../src/api';
+import { getServicios, Usuario } from '../src/api';
 import HomeScreen from '../src/screens/HomeScreen';
 
 const NEGOCIO = { id: 3, nombre: 'Asadero', rol: 'propietario' as const };
@@ -22,7 +22,7 @@ let refrescar: () => void;
 
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
-  useFocusEffect: () => {},
+  useFocusEffect: (callback: () => void) => { require('react').useEffect(callback, [callback]); },
 }));
 jest.mock('../src/AuthContext', () => ({
   useAuth: () => ({ auth: { token: 't', user: mockUsuario } }),
@@ -37,6 +37,8 @@ jest.mock('../src/usePolling', () => ({
 jest.mock('../src/api', () => ({
   ...jest.requireActual('../src/api'),
   getPedidosComercio: jest.fn(async () => []),
+  getServicios: jest.fn(async () => []),
+  getCitas: jest.fn(async () => ({ citas: [] })),
 }));
 
 let raiz: ReactTestRenderer.ReactTestRenderer;
@@ -54,6 +56,7 @@ const cargando = () => raiz.root.findAll(n => n.type === ActivityIndicator).leng
 
 beforeEach(() => {
   jest.clearAllMocks();
+  (getServicios as jest.Mock).mockResolvedValue([]);
   mockContexto.negocio = null;
   mockContexto.negocios = [];
 });
@@ -93,4 +96,23 @@ test('quien no tiene negocios sigue viendo Explorar, sin esperar nada', async ()
 
   expect(cargando()).toBe(false);
   expect(textos()).toContain('Explorar negocios');
+});
+
+test('sin servicios no aparece Agenda de citas', async () => {
+  mockContexto.negocio = NEGOCIO;
+  mockContexto.negocios = [NEGOCIO];
+  await montar([NEGOCIO]);
+  expect(textos()).not.toContain('Agenda de citas');
+});
+
+test('la agenda aparece al añadir el primer servicio y desaparece al eliminar el último', async () => {
+  mockContexto.negocio = NEGOCIO;
+  mockContexto.negocios = [NEGOCIO];
+  await montar([NEGOCIO]);
+  (getServicios as jest.Mock).mockResolvedValue([{ id: 1, nombre: 'Corte' }]);
+  await act(async () => { refrescar(); });
+  expect(textos()).toContain('Agenda de citas');
+  (getServicios as jest.Mock).mockResolvedValue([]);
+  await act(async () => { refrescar(); });
+  expect(textos()).not.toContain('Agenda de citas');
 });

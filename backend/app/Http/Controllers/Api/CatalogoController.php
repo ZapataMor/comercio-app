@@ -289,7 +289,7 @@ class CatalogoController extends Controller
                 'lng' => $negocio->lng,
             ],
             'productos' => ProductoResource::collection($productos),
-            'servicios' => $negocio->servicios()->where('disponible', true)->orderBy('nombre')->get(['id', 'nombre', 'descripcion']),
+            'servicios' => $negocio->servicios()->where('disponible', true)->orderBy('nombre')->get(),
         ]);
     }
 }

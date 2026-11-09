@@ -5,6 +5,7 @@ import {
   FlatList,
   GestureResponderEvent,
   Image,
+  ScrollView,
   Text,
   View,
 } from 'react-native';
@@ -297,6 +298,13 @@ export default function NegocioScreen({ navigation, route }: Props) {
           <View style={styles.servicio}>
             <Text style={styles.seccionTitulo}>{item.servicio.nombre}</Text>
             <Text style={styles.descripcion}>{item.servicio.descripcion}</Text>
+            {!!item.servicio.galeria?.length && <ScrollView horizontal style={{ marginTop: 12 }} contentContainerStyle={{ gap: 10 }}>
+              {item.servicio.galeria.map((uri, i) => <Image key={uri} accessibilityLabel={`${item.servicio.nombre}, trabajo ${i + 1}`} source={{ uri: imagenUrl(uri)! }} style={{ width: 220, height: 220, borderRadius: 12 }} resizeMode="cover" />)}
+            </ScrollView>}
+            <Text style={styles.dato}>{item.servicio.duracion_minutos ?? 30} min · {item.servicio.precio == null ? 'Consultar precio' : `$${item.servicio.precio.toLocaleString('es-CO')}`}</Text>
+            {item.servicio.permite_citas !== false && <PressableScale style={styles.solicitarCita} onPress={() => navigation.navigate('AgendarCita', { negocioId: id, negocioNombre: nombre, servicio: item.servicio })}>
+              <Text style={styles.solicitarTexto}>Solicitar cita</Text>
+            </PressableScale>}
             <BotonesContacto telefono={negocio?.telefono} mensaje={`Hola, quisiera información sobre ${item.servicio.nombre}.`} />
           </View>
         ) : item.tipo === 'categoria' ? (
@@ -326,6 +334,8 @@ export default function NegocioScreen({ navigation, route }: Props) {
 }
 
 const useStyles = makeStyles((c, shadow) => ({
+  solicitarCita: { backgroundColor: c.accent, borderRadius: radius.md, padding: 14, marginTop: 12, alignItems: 'center' },
+  solicitarTexto: { color: c.onBrand, fontFamily: font.semibold },
   container: { flex: 1, backgroundColor: c.bg },
   contenido: { paddingBottom: 110 },
   servicio: { marginHorizontal: 20, marginVertical: 8, padding: 16, borderRadius: radius.md, backgroundColor: c.surface2 },

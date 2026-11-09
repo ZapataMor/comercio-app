@@ -1,5 +1,5 @@
 // Rutas de navegación de la app (React Navigation - native stack).
-import { ComercioPedido, Producto } from './api';
+import { ComercioPedido, Producto, Servicio } from './api';
 
 export type RootStackParamList = {
   Login: undefined;
@@ -17,6 +17,9 @@ export type RootStackParamList = {
   MisProductos: undefined;
   // Miembros e invitaciones del negocio activo.
   Equipo: undefined;
+  AgendarCita: { negocioId: number; negocioNombre: string; servicio: Servicio; presencial?: boolean };
+  MisCitas: undefined;
+  AgendaNegocio: { negocioId?: number } | undefined;
   // `negocioId`: desde un push, el pedido puede ser de otro negocio que no es el activo.
   ComercioPedidoDetalle: { pedido?: ComercioPedido; pedidoId?: number; negocioId?: number };
   // Historial de pedidos del negocio activo (pestañas) y ventas de hoy.

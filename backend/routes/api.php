@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AdminResenaController;
 use App\Http\Controllers\Api\AjusteController;
 use App\Http\Controllers\Api\BarrioController;
 use App\Http\Controllers\Api\CatalogoController;
+use App\Http\Controllers\Api\CitaController;
 use App\Http\Controllers\Api\ClienteDireccionController;
 use App\Http\Controllers\Api\ComercioPedidoController;
 use App\Http\Controllers\Api\CuentaController;
@@ -98,6 +99,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/negocios/{id}/resenas', [ResenaController::class, 'index'])->whereNumber('id');
 
     Route::prefix('negocios/{negocio}')->whereNumber('negocio')->group(function () {
+        Route::get('/disponibilidad', [CitaController::class, 'disponibilidad']);
+        Route::post('/solicitudes-cita', [CitaController::class, 'store']);
+        Route::get('/citas', [CitaController::class, 'negocio']);
+        Route::post('/citas', [CitaController::class, 'presencial']);
+        Route::put('/citas/{id}', [CitaController::class, 'actualizar'])->whereNumber('id');
         // Datos del negocio: solo el propietario los edita.
         Route::put('/', [NegocioController::class, 'update']);
 
@@ -151,6 +157,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/invitaciones/{id}/rechazar', [InvitacionController::class, 'rechazar']);
 
     // --- Pedidos del cliente ---
+    Route::get('/citas', [CitaController::class, 'index']);
+    Route::post('/citas/{id}/cancelar', [CitaController::class, 'cancelar'])->whereNumber('id');
     Route::get('/cliente/direcciones', [ClienteDireccionController::class, 'index']);
     Route::post('/cliente/direcciones', [ClienteDireccionController::class, 'store']);
     Route::post('/pedidos', [ApiPedidoController::class, 'store']);

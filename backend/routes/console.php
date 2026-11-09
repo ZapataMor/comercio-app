@@ -4,6 +4,7 @@ use App\Models\Negocio;
 use App\Models\Pedido;
 use App\Notifications\PreguntaCierreNegocio;
 use App\Support\CancelarPedido;
+use App\Support\AgendaCitas;
 use App\Support\HorarioNegocio;
 use App\Support\Push;
 use Illuminate\Foundation\Inspiring;
@@ -70,3 +71,8 @@ Artisan::command('pedidos:vencer', function () {
 Schedule::command('negocios:aplicar-horario')->everyMinute()->withoutOverlapping();
 Schedule::command('negocios:preguntar-cierre')->everyMinute()->withoutOverlapping();
 Schedule::command('pedidos:vencer')->everyThirtySeconds()->withoutOverlapping();
+
+Artisan::command('citas:vencer', function () {
+    $this->info('Solicitudes de cita vencidas: '.AgendaCitas::vencer());
+})->purpose('Libera las solicitudes de cita sin respuesta en una hora');
+Schedule::command('citas:vencer')->everyMinute()->withoutOverlapping();

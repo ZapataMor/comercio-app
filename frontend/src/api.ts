@@ -433,6 +433,7 @@ async function authUpload(
   token: string,
   campos: Record<string, any>,
   imagenUri?: string,
+  imagenesUri?: string[],
 ): Promise<any> {
   const form = new FormData();
   if (metodo === 'PUT') {
@@ -452,6 +453,10 @@ async function authUpload(
     const tipo = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
     // En React Native el archivo se adjunta como {uri, name, type}.
     form.append('imagen', { uri: imagenUri, name: nombre, type: tipo } as any);
+  }
+
+  for (const [indice, uri] of (imagenesUri ?? []).entries()) {
+    form.append(`imagenes[${indice}]`, { uri, name: `trabajo-${indice}.jpg`, type: 'image/jpeg' } as any);
   }
 
   let res: Response;
@@ -1647,13 +1652,40 @@ export async function calificarPedido(token: string, id: number, body: NuevaCali
   return d.message as string;
 }
 
-export type Servicio = { id: number; nombre: string; descripcion: string; disponible?: boolean };
+export type Servicio = { id: number; nombre: string; descripcion: string; disponible?: boolean; duracion_minutos?: number; precio?: number | null; permite_citas?: boolean; galeria?: string[] | null };
 export async function getServicios(token: string, negocioId: number): Promise<Servicio[]> {
   return (await authGet(`/api/negocios/${negocioId}/servicios`, token)).servicios;
 }
-export async function guardarServicio(token: string, negocioId: number, datos: Omit<Servicio, 'id'>, id?: number): Promise<Servicio> {
-  return (await authSend(id ? 'PUT' : 'POST', `/api/negocios/${negocioId}/servicios${id ? `/${id}` : ''}`, token, datos)).servicio;
+export async function guardarServicio(token: string, negocioId: number, datos: Omit<Servicio, 'id'>, id?: number, nuevasImagenes?: string[]): Promise<Servicio> {
+  const { galeria, ...campos } = datos;
+  return (await authUpload(id ? 'PUT' : 'POST', `/api/negocios/${negocioId}/servicios${id ? `/${id}` : ''}`, token, { ...campos, conservar_imagenes: JSON.stringify(galeria ?? []) }, undefined, nuevasImagenes)).servicio;
 }
 export async function eliminarServicio(token: string, negocioId: number, id: number): Promise<void> {
   await authSend('DELETE', `/api/negocios/${negocioId}/servicios/${id}`, token);
+}
+
+export type Cita = {
+  id: number; negocio_id: number; negocio_nombre: string; servicio_nombre: string;
+  profesional_id: number | null; profesional_nombre: string; cliente_nombre: string; cliente_telefono: string | null;
+  estado: 'pendiente' | 'confirmada' | 'rechazada' | 'cancelada' | 'vencida' | 'completada';
+  origen: 'app' | 'presencial'; fecha: string; hora: string; hora_fin: string; fecha_fin: string;
+  confirmar_antes_de: string | null; notas: string | null; motivo: string | null;
+};
+export type DisponibilidadCitas = { fecha: string; profesional_id: number; profesionales: { id: number; nombre: string }[]; horas: string[]; duracion_minutos: number; mensaje: string | null };
+export type NuevaCita = { servicio_id: number; profesional_id: number; fecha: string; hora: string; notas?: string; cliente_nombre?: string; cliente_telefono?: string };
+export type PaginaCitas = { citas: Cita[]; pagina: number; ultima_pagina: number };
+export async function getDisponibilidadCitas(token: string, negocioId: number, servicioId: number, fecha: string, profesionalId?: number): Promise<DisponibilidadCitas> {
+  return authGet(`/api/negocios/${negocioId}/disponibilidad?servicio_id=${servicioId}&fecha=${fecha}${profesionalId ? `&profesional_id=${profesionalId}` : ''}`, token);
+}
+export async function solicitarCita(token: string, negocioId: number, datos: NuevaCita, presencial = false): Promise<Cita> {
+  return (await authSend('POST', `/api/negocios/${negocioId}/${presencial ? 'citas' : 'solicitudes-cita'}`, token, datos)).cita;
+}
+export async function getCitas(token: string, negocioId?: number, pagina = 1, fecha?: string): Promise<PaginaCitas> {
+  return authGet(`${negocioId ? `/api/negocios/${negocioId}/citas` : '/api/citas'}?page=${pagina}${fecha ? `&fecha=${fecha}` : ''}`, token);
+}
+export async function actualizarCita(token: string, negocioId: number, id: number, estado: Cita['estado'], motivo?: string): Promise<Cita> {
+  return (await authSend('PUT', `/api/negocios/${negocioId}/citas/${id}`, token, { estado, motivo })).cita;
+}
+export async function cancelarCita(token: string, id: number): Promise<Cita> {
+  return (await authSend('POST', `/api/citas/${id}/cancelar`, token)).cita;
 }

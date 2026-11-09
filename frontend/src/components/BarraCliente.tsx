@@ -8,6 +8,7 @@
  *    cliente la ve al pasar a Explorar.
  *  - En "Carrito", "Confirmar pedido" (Checkout) y "Mis pedidos" la barra no
  *    se muestra: son pasos de compra/consulta y sobraría un botón flotante.
+ *  - Dentro del catálogo de servicios de una tienda tampoco se muestra.
  *  - El botón Carrito es, además, el DESTINO de la animación del paquete:
  *    registra su posición y rebota cuando un paquete aterriza.
  */
@@ -30,13 +31,13 @@ const RUTAS_CLIENTE = new Set([
   'PedidoDetalle',
 ]);
 
-type Props = { ruta?: string };
+type Props = { ruta?: string; seccion?: 'productos' | 'servicios' };
 
-export default function BarraCliente({ ruta }: Props) {
+export default function BarraCliente({ ruta, seccion }: Props) {
   const { auth } = useAuth();
   const esCliente = auth?.user.roles.includes('usuario') ?? false;
 
-  if (!esCliente || !ruta || !RUTAS_CLIENTE.has(ruta)) {
+  if (!esCliente || !ruta || !RUTAS_CLIENTE.has(ruta) || (ruta === 'Negocio' && seccion === 'servicios')) {
     return null;
   }
   return <Barra ruta={ruta} />;

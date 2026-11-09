@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -15,6 +16,7 @@ import {
   eliminarServicio,
   getServicios,
   guardarServicio,
+  imagenUrl,
   Servicio,
 } from '../api';
 import { font, makeStyles, radius, useTheme } from '../theme';
@@ -26,6 +28,7 @@ import {
   messageFromError,
 } from '../formErrors';
 import FieldError from './FieldError';
+import SelectorImagen from './SelectorImagen';
 
 export default function CatalogoServicios({
   token,
@@ -48,6 +51,11 @@ export default function CatalogoServicios({
   const [nombre, setNombre] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [disponible, setDisponible] = useState(true);
+  const [duracion, setDuracion] = useState('30');
+  const [precio, setPrecio] = useState('');
+  const [permiteCitas, setPermiteCitas] = useState(true);
+  const [galeria, setGaleria] = useState<string[]>([]);
+  const [nuevasImagenes, setNuevasImagenes] = useState<string[]>([]);
   const [guardando, setGuardando] = useState(false);
   const [errores, setErrores] = useState<FieldErrors>({});
   const cargar = useCallback(() => {
@@ -64,6 +72,11 @@ export default function CatalogoServicios({
     setNombre(servicio?.nombre ?? '');
     setDescripcion(servicio?.descripcion ?? '');
     setDisponible(servicio?.disponible ?? true);
+    setDuracion(String(servicio?.duracion_minutos ?? 30));
+    setPrecio(servicio?.precio != null ? String(servicio.precio) : '');
+    setPermiteCitas(servicio?.permite_citas ?? true);
+    setGaleria(servicio?.galeria ?? []);
+    setNuevasImagenes([]);
     setErrores({});
     setModal(true);
   }
@@ -74,14 +87,17 @@ export default function CatalogoServicios({
     if (!descripcion.trim())
       campos.descripcion = 'Describe el servicio que ofreces.';
     setErrores(campos);
+    if (!/^\d+$/.test(duracion) || Number(duracion) < 5 || Number(duracion) > 480) campos.duracion_minutos = 'Indica una duración de 5 a 480 minutos.';
+    if (precio && (!/^\d+$/.test(precio) || Number(precio) > 100000000)) campos.precio = 'Escribe el precio en pesos, sin puntos ni comas.';
     if (Object.keys(campos).length) return;
     setGuardando(true);
     try {
       const servicio = await guardarServicio(
         token,
         negocioId,
-        { nombre: nombre.trim(), descripcion: descripcion.trim(), disponible },
+        { nombre: nombre.trim(), descripcion: descripcion.trim(), disponible, duracion_minutos: Number(duracion), precio: precio ? Number(precio) : null, permite_citas: permiteCitas, galeria },
         editando?.id,
+        nuevasImagenes,
       );
       setServicios(prev =>
         [...prev.filter(s => s.id !== servicio.id), servicio].sort((a, b) =>
@@ -210,6 +226,27 @@ export default function CatalogoServicios({
               placeholderTextColor={c.muted}
             />
             <FieldError mensaje={errores.descripcion} />
+            <Text style={styles.nombre}>Duración del servicio (minutos) *</Text>
+            <TextInput accessibilityLabel="Duración del servicio" style={styles.input} value={duracion} onChangeText={setDuracion} keyboardType="number-pad" editable={!guardando} />
+            <FieldError mensaje={errores.duracion_minutos} />
+            <Text style={styles.nombre}>Precio en pesos (opcional)</Text>
+            <TextInput accessibilityLabel="Precio del servicio" style={styles.input} value={precio} onChangeText={setPrecio} keyboardType="number-pad" editable={!guardando} placeholder="Consultar precio" placeholderTextColor={c.muted} />
+            <FieldError mensaje={errores.precio} />
+            <View style={styles.botones}>
+              <Text style={styles.nombre}>Permitir citas para este servicio</Text>
+              <Switch accessibilityLabel="Permitir citas" value={permiteCitas} onValueChange={setPermiteCitas} disabled={guardando} />
+            </View>
+            <Text style={styles.detalle}>Muestra tus trabajos: diseños de uñas, cortes, peinados y otros resultados. Hasta 8 fotografías.</Text>
+            <View style={styles.botones}>
+              {[...galeria, ...nuevasImagenes].map((uri, i) => <View key={`${uri}-${i}`}>
+                <Image source={{ uri: i < galeria.length ? imagenUrl(uri)! : uri }} style={{ width: 84, height: 84, borderRadius: 8 }} />
+                <TouchableOpacity disabled={guardando} accessibilityLabel={`Quitar fotografía ${i + 1}`} onPress={() => i < galeria.length ? setGaleria(prev => prev.filter((_, j) => i !== j)) : setNuevasImagenes(prev => prev.filter((_, j) => i - galeria.length !== j))}>
+                  <Text style={styles.error}>Quitar</Text>
+                </TouchableOpacity>
+              </View>)}
+            </View>
+            {galeria.length + nuevasImagenes.length < 8 && <SelectorImagen label="Añadir fotografía del trabajo" disabled={guardando} onSelect={uri => setNuevasImagenes(prev => [...prev, uri].slice(0, 8 - galeria.length))} />}
+            <FieldError mensaje={errores.imagenes} />
             <View style={styles.botones}>
               <Text style={styles.nombre}>Visible para clientes</Text>
               <Switch

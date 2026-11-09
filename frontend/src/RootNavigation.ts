@@ -44,6 +44,15 @@ type PushData = {
 let pendingData: PushData | null = null;
 
 function navigateFromData(data: PushData, user: Usuario) {
+  if (data.tipo === 'cita_cliente') {
+    navigationRef.navigate('MisCitas');
+    return;
+  }
+  if (data.tipo === 'cita_negocio') {
+    const negocioId = Number(data.negocio_id);
+    if (Number.isInteger(negocioId) && negocioId > 0) navigationRef.navigate('AgendaNegocio', { negocioId });
+    return;
+  }
   // La pregunta del cierre es un modal encima de cualquier pantalla: no se navega.
   if (data.tipo === 'confirmar_cierre') {
     return;

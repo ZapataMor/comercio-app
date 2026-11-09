@@ -3,7 +3,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, ScrollView, Text, View } from 'react-native';
 import { detenerAlarma } from '../alarmaPedidos';
-import { aceptarPedido, ComercioPedido, confirmarRecogida, getPedidosComercio } from '../api';
+import { aceptarPedido, ComercioPedido, confirmarRecogida, getCitas, getPedidosComercio, getServicios } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import BotonMantener from '../components/BotonMantener';
@@ -248,6 +248,11 @@ export default function HomeScreen({ navigation }: Props) {
   // mientras tanto no se le muestra el Inicio de quien no tiene ninguno.
   const cargandoPanel = !tienePanel && (user.negocios?.length ?? 0) > 0;
   const [pedidos, setPedidos] = useState<ComercioPedido[]>([]);
+  const [citasPendientes, setCitasPendientes] = useState(0);
+  const [catalogoServicios, setCatalogoServicios] = useState<{ negocioId: number; tieneServicios: boolean } | null>(null);
+  const negocioIdActual = useRef(negocioId);
+  negocioIdActual.current = negocioId;
+  const tieneServicios = catalogoServicios?.negocioId === negocioId && catalogoServicios?.tieneServicios === true;
   // Pedido que se está aceptando: su botón muestra que va en curso.
   const [aceptando, setAceptando] = useState<number | null>(null);
 
@@ -271,16 +276,27 @@ export default function HomeScreen({ navigation }: Props) {
   const cargarPedidos = useCallback(() => {
     if (!negocioId) {
       setPedidos([]);
+      setCitasPendientes(0);
       return;
     }
 
     getPedidosComercio(token, negocioId)
       .then(setPedidos)
       .catch(() => {});
+    getServicios(token, negocioId)
+      .then(servicios => {
+        if (negocioIdActual.current !== negocioId) return;
+        setCatalogoServicios({ negocioId, tieneServicios: servicios.length > 0 });
+        if (!servicios.length) { setCitasPendientes(0); return; }
+        return getCitas(token, negocioId).then(d => {
+          if (negocioIdActual.current === negocioId) setCitasPendientes(d.citas.filter(cita => cita.estado === 'pendiente').length);
+        });
+      })
+      .catch(() => {});
   }, [negocioId, token]);
 
   // Al cambiar de negocio no se muestran los pedidos del anterior.
-  useEffect(() => setPedidos([]), [negocioId]);
+  useEffect(() => { setPedidos([]); setCitasPendientes(0); }, [negocioId]);
 
   // Pedidos en espera del negocio activo: se recargan al entrar, al llegar un
   // push y cada 15 s mientras la pantalla está visible.
@@ -337,6 +353,7 @@ export default function HomeScreen({ navigation }: Props) {
           { icono: 'caja', titulo: 'Catálogo', abrir: () => navigation.navigate('MisProductos') },
           { icono: 'lista', titulo: 'Pedidos y ventas', abrir: () => navigation.navigate('PedidosNegocio') },
           { icono: 'usuarios', titulo: 'Equipo', abrir: () => navigation.navigate('Equipo') },
+          ...(tieneServicios ? [{ icono: 'calendario', titulo: 'Agenda de citas', abrir: () => navigation.navigate('AgendaNegocio', { negocioId: negocio.id }) } satisfies Acceso] : []),
         ] satisfies Acceso[])
       : []),
     ...(user.roles.includes('usuario')
@@ -357,6 +374,10 @@ export default function HomeScreen({ navigation }: Props) {
       {tienePanel && (
         <>
           <CuadrosAcceso accesos={accesos} />
+          {!!negocio && tieneServicios && citasPendientes > 0 && <PressableScale style={styles.pedidoCard} onPress={() => navigation.navigate('AgendaNegocio', { negocioId: negocio.id })}>
+            <Text style={styles.pedidoId}>{citasPendientes}{citasPendientes === 30 ? '+' : ''} solicitud(es) de cita por confirmar</Text>
+            <Text style={styles.pedidoVer}>Revisa la agenda presencial y responde antes de una hora. Ver agenda ›</Text>
+          </PressableScale>}
 
           {/* Pedidos en espera del negocio activo, directamente en el Inicio. */}
           {negocio && (

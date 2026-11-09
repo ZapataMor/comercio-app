@@ -42,6 +42,7 @@ const RUTAS_NEGOCIO = new Set([
   'MiTienda',
   'MisProductos',
   'Equipo',
+  'AgendaNegocio',
   'PedidosNegocio',
   'ComercioPedidoDetalle',
 ]);
@@ -66,6 +67,7 @@ function modulosPara(roles: string[], enNegocio: boolean, serDomiciliario: () =>
   if (roles.includes('domiciliario')) {
     modulos.push({ titulo: 'Mis entregas', icono: 'moto', abrir: abrirEntregas });
   }
+  modulos.push({ titulo: 'Mis citas', icono: 'calendario', abrir: () => navigationRef.navigate('MisCitas') });
   // Política de privacidad: página pública del servidor.
   modulos.push({ titulo: 'Privacidad', icono: 'escudo', abrir: () => Linking.openURL(`${WEB_URL}/privacidad`) });
   if (roles.includes('usuario') && !roles.includes('domiciliario')) {

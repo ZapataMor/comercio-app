@@ -39,6 +39,8 @@ import ResenasScreen from './src/screens/ResenasScreen';
 import MisNegociosScreen from './src/screens/MisNegociosScreen';
 import MisProductosScreen from './src/screens/MisProductosScreen';
 import EquipoScreen from './src/screens/EquipoScreen';
+import AgendarCitaScreen from './src/screens/AgendarCitaScreen';
+import CitasScreen from './src/screens/CitasScreen';
 import ComercioPedidoDetalleScreen from './src/screens/ComercioPedidoDetalleScreen';
 import PedidosNegocioScreen from './src/screens/PedidosNegocioScreen';
 import ExplorarScreen from './src/screens/ExplorarScreen';
@@ -87,8 +89,8 @@ function Navegacion() {
   const { auth, cargando } = useAuth();
   const roles = auth?.user.roles ?? [];
   // Ruta actual: la barra flotante del cliente decide con ella qué mostrar.
-  const [ruta, setRuta] = React.useState<string | undefined>();
-  const actualizarRuta = () => setRuta(navigationRef.getCurrentRoute()?.name);
+  const [ruta, setRuta] = React.useState<ReturnType<typeof navigationRef.getCurrentRoute>>();
+  const actualizarRuta = () => setRuta(navigationRef.getCurrentRoute());
 
   if (cargando) {
     return (
@@ -204,6 +206,9 @@ function Navegacion() {
             <Stack.Screen name="Resenas" component={ResenasScreen} options={{ title: 'Reseñas' }} />
             <Stack.Screen name="MisProductos" component={MisProductosScreen} options={{ title: 'Productos y servicios' }} />
             <Stack.Screen name="Equipo" component={EquipoScreen} options={{ title: 'Equipo' }} />
+            <Stack.Screen name="AgendarCita" component={AgendarCitaScreen} options={{ title: 'Agendar cita' }} />
+            <Stack.Screen name="MisCitas" component={CitasScreen} options={{ title: 'Mis citas' }} />
+            <Stack.Screen name="AgendaNegocio" component={CitasScreen} options={{ title: 'Agenda de citas' }} />
             <Stack.Screen
               name="ComercioPedidoDetalle"
               component={ComercioPedidoDetalleScreen}
@@ -238,7 +243,7 @@ function Navegacion() {
         )}
       </Stack.Navigator>
         </NavigationContainer>
-        <BarraCliente ruta={ruta} />
+        <BarraCliente ruta={ruta?.name} seccion={ruta?.name === 'Negocio' ? ruta.params.seccion : undefined} />
       </AppDesenfocable>
       </CapaMenus>
     </FlyToCartProvider>
