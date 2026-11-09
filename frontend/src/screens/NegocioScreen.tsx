@@ -5,6 +5,7 @@ import {
   FlatList,
   GestureResponderEvent,
   Image,
+  Modal,
   ScrollView,
   Text,
   View,
@@ -42,7 +43,7 @@ const COLUMNAS = 2;
 type CatalogoFila =
   | { tipo: 'categoria'; key: string; nombre: string; cantidad: number }
   | { tipo: 'productos'; key: string; productos: Producto[] }
-  | { tipo: 'servicio'; key: string; servicio: Servicio };
+  | { tipo: 'servicios'; key: string; servicios: Servicio[] };
 
 function categoriasNegocio(negocio: Negocio) {
   return negocio.categorias?.length ? negocio.categorias : negocio.categoria ? [negocio.categoria] : [];
@@ -122,11 +123,16 @@ export default function NegocioScreen({ navigation, route }: Props) {
   const [negocio, setNegocio] = useState<Negocio | null>(null);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [servicios, setServicios] = useState<Servicio[]>([]);
+  const [servicioSeleccionado, setServicioSeleccionado] = useState<Servicio | null>(null);
   const [recetas, setRecetas] = useState<RecetaPreferida[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const catalogo = useMemo<CatalogoFila[]>(() => seccion === 'servicios'
-    ? servicios.map(servicio => ({ tipo: 'servicio', key: `servicio-${servicio.id}`, servicio }))
+    ? Array.from({ length: Math.ceil(servicios.length / COLUMNAS) }, (_, i) => ({
+        tipo: 'servicios',
+        key: `servicios-${servicios[i * COLUMNAS].id}`,
+        servicios: servicios.slice(i * COLUMNAS, (i + 1) * COLUMNAS),
+      }))
     : construirCatalogo(productos), [productos, servicios, seccion]);
   const listaRef = useRef<FlatList<CatalogoFila>>(null);
   const negocioAbierto = negocio?.activo !== false;
@@ -223,6 +229,7 @@ export default function NegocioScreen({ navigation, route }: Props) {
   const etiquetas = negocio ? categoriasNegocio(negocio).join(' · ') : '';
 
   return (
+    <>
     <FlatList
       ref={listaRef}
       style={styles.container}
@@ -294,19 +301,25 @@ export default function NegocioScreen({ navigation, route }: Props) {
       }
       ListEmptyComponent={<Text style={styles.vacio}>{seccion === 'servicios' ? 'Este negocio no tiene servicios disponibles.' : 'Este negocio no tiene productos disponibles.'}</Text>}
       renderItem={({ item, index }) =>
-        item.tipo === 'servicio' ? (
-          <View style={styles.servicio}>
-            <Text style={styles.seccionTitulo}>{item.servicio.nombre}</Text>
-            <Text style={styles.descripcion}>{item.servicio.descripcion}</Text>
-            {!!item.servicio.galeria?.length && <ScrollView horizontal style={{ marginTop: 12 }} contentContainerStyle={{ gap: 10 }}>
-              {item.servicio.galeria.map((uri, i) => <Image key={uri} accessibilityLabel={`${item.servicio.nombre}, trabajo ${i + 1}`} source={{ uri: imagenUrl(uri)! }} style={{ width: 220, height: 220, borderRadius: 12 }} resizeMode="cover" />)}
-            </ScrollView>}
-            <Text style={styles.dato}>{item.servicio.duracion_minutos ?? 30} min · {item.servicio.precio == null ? 'Consultar precio' : `$${item.servicio.precio.toLocaleString('es-CO')}`}</Text>
-            {item.servicio.permite_citas !== false && <PressableScale style={styles.solicitarCita} onPress={() => navigation.navigate('AgendarCita', { negocioId: id, negocioNombre: nombre, servicio: item.servicio })}>
-              <Text style={styles.solicitarTexto}>Solicitar cita</Text>
-            </PressableScale>}
-            <BotonesContacto telefono={negocio?.telefono} mensaje={`Hola, quisiera información sobre ${item.servicio.nombre}.`} />
-          </View>
+        item.tipo === 'servicios' ? (
+          <FadeInView delay={Math.min(index, 6) * 45} style={styles.fila}>
+            {item.servicios.map(servicio => (
+              <PressableScale key={servicio.id} style={styles.tarjeta} scaleTo={0.98}
+                accessibilityLabel={`Ver servicio ${servicio.nombre}`}
+                onPress={() => setServicioSeleccionado(servicio)}>
+                <View style={styles.foto}>
+                  {servicio.galeria?.[0] ? (
+                    <Image source={{ uri: imagenUrl(servicio.galeria[0])! }} style={styles.fotoImagen} resizeMode="cover" />
+                  ) : <Icon name="tienda" size={30} color={c.mutedSoft} />}
+                </View>
+                <Text style={styles.nombre} numberOfLines={2}>{servicio.nombre}</Text>
+                <Text style={styles.descripcion} numberOfLines={2}>{servicio.descripcion}</Text>
+                <Text style={styles.precio}>{servicio.precio == null ? 'Consultar precio' : `$${servicio.precio.toLocaleString('es-CO')}`}</Text>
+                <Text style={styles.dato}>{servicio.duracion_minutos ?? 30} min</Text>
+              </PressableScale>
+            ))}
+            {item.servicios.length < COLUMNAS && <View style={styles.tarjeta} />}
+          </FadeInView>
         ) : item.tipo === 'categoria' ? (
           <View style={styles.seccion}>
             <Text style={styles.seccionTitulo}>{item.nombre}</Text>
@@ -330,6 +343,32 @@ export default function NegocioScreen({ navigation, route }: Props) {
         )
       }
     />
+    <Modal visible={!!servicioSeleccionado} transparent animationType="slide" onRequestClose={() => setServicioSeleccionado(null)}>
+      <View style={styles.fondoDetalle}>
+        <ScrollView style={styles.detalleServicio} contentContainerStyle={styles.detalleContenido}>
+          <PressableScale accessibilityLabel="Cerrar detalle del servicio" onPress={() => setServicioSeleccionado(null)}>
+            <Text style={styles.precio}>Cerrar</Text>
+          </PressableScale>
+          {servicioSeleccionado && <>
+            <Text style={styles.titulo}>{servicioSeleccionado.nombre}</Text>
+            {!!servicioSeleccionado.galeria?.length && <ScrollView horizontal contentContainerStyle={styles.galeriaServicio}>
+              {servicioSeleccionado.galeria.map((uri, i) => <Image key={`${uri}-${i}`} accessibilityLabel={`${servicioSeleccionado.nombre}, trabajo ${i + 1}`} source={{ uri: imagenUrl(uri)! }} style={styles.fotoTrabajo} resizeMode="cover" />)}
+            </ScrollView>}
+            <Text style={styles.precio}>{servicioSeleccionado.precio == null ? 'Consultar precio' : `$${servicioSeleccionado.precio.toLocaleString('es-CO')}`}</Text>
+            <Text style={styles.dato}>{servicioSeleccionado.duracion_minutos ?? 30} min</Text>
+            <Text style={styles.descripcion}>{servicioSeleccionado.descripcion}</Text>
+            {servicioSeleccionado.permite_citas !== false && <PressableScale style={styles.solicitarCita} onPress={() => {
+              setServicioSeleccionado(null);
+              navigation.navigate('AgendarCita', { negocioId: id, negocioNombre: nombre, servicio: servicioSeleccionado });
+            }}>
+              <Text style={styles.solicitarTexto}>Solicitar cita</Text>
+            </PressableScale>}
+            <BotonesContacto telefono={negocio?.telefono} mensaje={`Hola, quisiera información sobre ${servicioSeleccionado.nombre}.`} />
+          </>}
+        </ScrollView>
+      </View>
+    </Modal>
+    </>
   );
 }
 
@@ -338,7 +377,11 @@ const useStyles = makeStyles((c, shadow) => ({
   solicitarTexto: { color: c.onBrand, fontFamily: font.semibold },
   container: { flex: 1, backgroundColor: c.bg },
   contenido: { paddingBottom: 110 },
-  servicio: { marginHorizontal: 20, marginVertical: 8, padding: 16, borderRadius: radius.md, backgroundColor: c.surface2 },
+  fondoDetalle: { flex: 1, justifyContent: 'center', backgroundColor: '#0008', padding: 20 },
+  detalleServicio: { flexGrow: 0, maxHeight: '90%', borderRadius: radius.lg, backgroundColor: c.bg },
+  detalleContenido: { padding: 20, gap: 12 },
+  galeriaServicio: { gap: 10 },
+  fotoTrabajo: { width: 220, height: 220, borderRadius: radius.md },
   portada: {
     height: 176,
     alignItems: 'center',
