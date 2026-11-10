@@ -7,13 +7,16 @@ use App\Models\Ajuste;
 use App\Models\Negocio;
 use App\Models\Pedido;
 use App\Models\ReputacionEvento;
+use App\Models\User;
 use App\Notifications\NuevoPedidoParaComercio;
 use App\Support\CancelarPedido;
 use App\Support\OpcionesPedido;
+use App\Support\PrecioCarrito;
 use App\Support\Push;
 use App\Support\Reputacion;
 use App\Support\Resenas;
 use App\Support\UbicacionDomiciliario;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -34,6 +37,7 @@ class PedidoController extends Controller
             'items' => ['required', 'array', 'min:1'],
             'items.*.producto_id' => ['required', 'integer'],
             'items.*.cantidad' => ['required', 'integer', 'min:1', 'max:99'],
+            'items.*.precio_token' => ['sometimes', 'nullable', 'string', 'max:2048'],
             // Ropa y calzado.
             'items.*.talla' => ['nullable', 'string', 'max:100'],
             'items.*.color' => ['nullable', 'string', 'max:100'],
@@ -45,7 +49,18 @@ class PedidoController extends Controller
             'metodo_pago' => ['required', Rule::in(Pedido::METODOS_PAGO)],
             'direccion_entrega' => ['required', 'string', 'max:255'],
             'telefono_contacto' => ['required', 'string', 'max:30'],
+            // Identifica el intento de compra: reintentar con la misma clave
+            // devuelve el pedido ya creado en vez de duplicarlo.
+            'clave_intento' => ['sometimes', 'nullable', 'string', 'min:8', 'max:64'],
+            // Total que el cliente vio en pantalla: si ya no coincide (cambió un
+            // precio o la tarifa), no se crea hasta que acepte el nuevo.
+            'total_esperado' => ['sometimes', 'nullable', 'numeric', 'min:0'],
         ]);
+
+        $clave = $datos['clave_intento'] ?? null;
+        if ($clave && $repetido = $request->user()->pedidos()->where('clave_intento', $clave)->first()) {
+            return $this->pedidoCreado($repetido);
+        }
 
         // El negocio debe estar abierto (y no vetado por baja confiabilidad ni
         // archivado porque su único dueño eliminó la cuenta).
@@ -78,43 +93,38 @@ class PedidoController extends Controller
             }
         }
 
-        $pedido = DB::transaction(function () use ($request, $negocio, $datos, $productos) {
-            $pedido = Pedido::create([
-                'negocio_id' => $negocio->id,
-                'user_id' => $request->user()->id,
-                'estado' => 'pendiente',
-                'metodo_pago' => $datos['metodo_pago'],
-                'total' => 0,
-                'direccion_entrega' => $datos['direccion_entrega'],
-                'telefono_contacto' => $datos['telefono_contacto'],
-                // Lo que el negocio promete tardar HOY: con esto se mide si cumplió.
-                'minutos_preparacion' => $negocio->tiempo_preparacion,
-            ]);
+        // El domicilio se cobra aparte: la tarifa vigente queda copiada en el
+        // pedido (si el admin la cambia después, este pedido no cambia).
+        $domicilio = Ajuste::tarifaDomicilio();
+        foreach ($datos['items'] as &$item) {
+            $item['precio_reservado'] = PrecioCarrito::deItem($productos[$item['producto_id']], $item, $request->user()->id);
+        }
+        unset($item);
+        $subtotal = collect($datos['items'])->sum(fn ($item) => $item['precio_reservado'] * $item['cantidad']);
+        $total = $subtotal + $domicilio;
 
-            $subtotal = 0;
-            foreach ($datos['items'] as $item) {
-                $p = $productos[$item['producto_id']];
-                $pedido->items()->create([
-                    'producto_id' => $p->id,
-                    'nombre' => $p->nombre,
-                    'precio' => $p->precio,
-                    'cantidad' => $item['cantidad'],
-                    'opciones' => OpcionesPedido::normalizar($p, $item),
-                ]);
-                $subtotal += $p->precio * $item['cantidad'];
+        if (isset($datos['total_esperado']) && abs((float) $datos['total_esperado'] - $total) >= 0.01) {
+            return response()->json([
+                'message' => 'El total cambió desde que armaste el pedido. Revisa el nuevo total y confirma de nuevo.',
+                'codigo' => 'total_cambio',
+                'subtotal' => (float) $subtotal,
+                'costo_domicilio' => (float) $domicilio,
+                'total' => (float) $total,
+                'precios' => $productos->map(fn ($p) => ['producto_id' => $p->id, 'precio' => (float) $p->precio])->values(),
+            ], 409);
+        }
+
+        try {
+            $pedido = $this->crear($request, $negocio, $datos, $productos, $subtotal, $domicilio);
+        } catch (UniqueConstraintViolationException $e) {
+            // Dos envíos del mismo intento a la vez: el segundo recibe el del primero.
+            $repetido = $clave ? $request->user()->pedidos()->where('clave_intento', $clave)->first() : null;
+            if (! $repetido) {
+                throw $e;
             }
 
-            // El domicilio se cobra aparte: la tarifa vigente queda copiada en el
-            // pedido (si el admin la cambia después, este pedido no cambia).
-            $domicilio = Ajuste::tarifaDomicilio();
-            $pedido->update([
-                'subtotal' => $subtotal,
-                'costo_domicilio' => $domicilio,
-                'total' => $subtotal + $domicilio,
-            ]);
-
-            return $pedido;
-        });
+            return $this->pedidoCreado($repetido);
+        }
 
         // Si el cliente aún no tenía teléfono guardado, el que escribió aquí
         // queda en su perfil como opción para los próximos pedidos.
@@ -130,7 +140,54 @@ class PedidoController extends Controller
             Push::enviar($miembros, new NuevoPedidoParaComercio($pedido));
         }
 
+        return $this->pedidoCreado($pedido);
+    }
+
+    private function pedidoCreado(Pedido $pedido): JsonResponse
+    {
         return response()->json(['id' => $pedido->id, 'message' => '¡Pedido confirmado!'], 201);
+    }
+
+    /** Guarda los ítems con su precio reservado válido o el precio confirmado. */
+    private function crear(Request $request, Negocio $negocio, array $datos, $productos, float $subtotal, float $domicilio): Pedido
+    {
+        return DB::transaction(function () use ($request, $negocio, $datos, $productos, $subtotal, $domicilio) {
+            $negocio = Negocio::whereKey($negocio->id)->lockForUpdate()->firstOrFail();
+            abort_if($negocio->archivado_at || ! $negocio->activo, 409, 'El negocio ya no está disponible.');
+            $cliente = User::whereKey($request->user()->id)->lockForUpdate()->firstOrFail();
+            abort_if($cliente->eliminado_at || $cliente->suspendido_at, 403, 'Tu cuenta no está habilitada para hacer pedidos.');
+            $pedido = Pedido::create([
+                'negocio_id' => $negocio->id,
+                'user_id' => $request->user()->id,
+                'estado' => 'pendiente',
+                'metodo_pago' => $datos['metodo_pago'],
+                'total' => 0,
+                'direccion_entrega' => $datos['direccion_entrega'],
+                'telefono_contacto' => $datos['telefono_contacto'],
+                // Lo que el negocio promete tardar HOY: con esto se mide si cumplió.
+                'minutos_preparacion' => $negocio->tiempo_preparacion,
+                'clave_intento' => $datos['clave_intento'] ?? null,
+            ]);
+
+            foreach ($datos['items'] as $item) {
+                $p = $productos[$item['producto_id']];
+                $pedido->items()->create([
+                    'producto_id' => $p->id,
+                    'nombre' => $p->nombre,
+                    'precio' => $item['precio_reservado'],
+                    'cantidad' => $item['cantidad'],
+                    'opciones' => OpcionesPedido::normalizar($p, $item),
+                ]);
+            }
+
+            $pedido->update([
+                'subtotal' => $subtotal,
+                'costo_domicilio' => $domicilio,
+                'total' => $subtotal + $domicilio,
+            ]);
+
+            return $pedido;
+        });
     }
 
     /** Mis pedidos (más recientes primero), 20 por página (`?page=`). */
@@ -184,7 +241,7 @@ class PedidoController extends Controller
             'codigo' => $pedido->codigo,
             'estado' => $pedido->estado,
             'estado_label' => $pedido->estadoLabel(),
-            'estados' => Pedido::ESTADOS,
+            'estados' => $pedido->estado === 'devolviendo' ? ['devolviendo'] : Pedido::ESTADOS,
             'estado_index' => $pedido->estadoIndex(),
             'subtotal' => (float) $pedido->subtotal,
             'costo_domicilio' => (float) $pedido->costo_domicilio,
@@ -194,6 +251,10 @@ class PedidoController extends Controller
             'minutos_recogida' => $pedido->minutos_recogida,
             'fecha' => $pedido->created_at->format('d/m/Y H:i'),
             'negocio' => $pedido->negocio?->nombre,
+            'negocio_id' => $pedido->negocio_id,
+            'faltante_motivo' => $pedido->faltante_motivo,
+            'faltante_version' => $pedido->faltante_version,
+            'cliente_no_encontrado_at' => $pedido->cliente_no_encontrado_at?->toIso8601String(),
             // Para llamar o escribir por WhatsApp al negocio.
             'negocio_telefono' => $pedido->negocio?->telefono,
             'negocio_reputacion' => $pedido->negocio
@@ -220,6 +281,8 @@ class PedidoController extends Controller
                 ? ['lat' => $pedido->negocio->lat, 'lng' => $pedido->negocio->lng]
                 : null,
             'items' => $pedido->items->map(fn ($i) => [
+                'producto_id' => $i->producto_id,
+                'opciones' => $i->opciones,
                 'nombre' => $i->nombre,
                 'cantidad' => $i->cantidad,
                 'precio' => (float) $i->precio,
@@ -254,7 +317,7 @@ class PedidoController extends Controller
     }
 
     /**
-     * El cliente cancela su pedido mientras el negocio no lo tenga listo.
+     * El cliente cancela antes de que el domiciliario marque en camino.
      * Se avisa a todo el equipo del negocio.
      */
     public function cancelar(Request $request, int $id): JsonResponse
@@ -270,7 +333,7 @@ class PedidoController extends Controller
 
         if (! CancelarPedido::ejecutar($pedido, CancelarPedido::POR_CLIENTE, $datos['motivo'] ?? null)) {
             return response()->json([
-                'message' => 'El negocio ya tiene listo tu pedido; ya no se puede cancelar desde la app. Llama al negocio.',
+                'message' => 'El pedido ya salió en camino o terminó. Ya no se puede cancelar.',
             ], 409);
         }
 

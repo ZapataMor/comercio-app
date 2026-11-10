@@ -11,6 +11,9 @@ import { useAlarmaPedidos } from './src/alarmaPedidos';
 import { Colores, font, makeStyles, ThemeProvider, useTheme } from './src/theme';
 import { AuthProvider, useAuth } from './src/AuthContext';
 import { CartProvider } from './src/CartContext';
+import { PedidoPendienteProvider } from './src/PedidoPendienteContext';
+import VigilarCarrito from './src/components/VigilarCarrito';
+import EnvioPedidoAviso from './src/components/EnvioPedidoAviso';
 import AvisoPedidoNuevo from './src/components/AvisoPedidoNuevo';
 import BarraCliente from './src/components/BarraCliente';
 import { ConfirmacionProvider } from './src/components/Confirmacion';
@@ -50,6 +53,8 @@ import ProductoScreen from './src/screens/ProductoScreen';
 import AdminTableroScreen from './src/screens/AdminTableroScreen';
 import AdminUsuariosScreen from './src/screens/AdminUsuariosScreen';
 import AdminNegociosScreen from './src/screens/AdminNegociosScreen';
+import AdminPedidosScreen from './src/screens/AdminPedidosScreen';
+import AdminReportesScreen from './src/screens/AdminReportesScreen';
 import AdminBarriosScreen from './src/screens/AdminBarriosScreen';
 import AdminReputacionScreen from './src/screens/AdminReputacionScreen';
 import AdminResenasScreen from './src/screens/AdminResenasScreen';
@@ -223,7 +228,9 @@ function Navegacion() {
                 <Stack.Screen name="AdminTablero" component={AdminTableroScreen} options={{ title: 'Administración' }} />
                 <Stack.Screen name="AdminUsuarios" component={AdminUsuariosScreen} options={{ title: 'Usuarios' }} />
                 <Stack.Screen name="AdminNegocios" component={AdminNegociosScreen} options={{ title: 'Negocios' }} />
-                <Stack.Screen name="AdminBarrios" component={AdminBarriosScreen} options={{ title: 'Barrios sugeridos' }} />
+                <Stack.Screen name="AdminPedidos" component={AdminPedidosScreen} options={{ title: 'Pedidos en curso' }} />
+            <Stack.Screen name="AdminReportes" component={AdminReportesScreen} options={{ title: 'Reportes' }} />
+                <Stack.Screen name="AdminBarrios"component={AdminBarriosScreen} options={{ title: 'Barrios sugeridos' }} />
                 <Stack.Screen
                   name="AdminReputacion"
                   component={AdminReputacionScreen}
@@ -330,6 +337,7 @@ function AppContenido() {
             <ToastProvider>
               {/* Diálogos de confirmación con el estilo de la app (useConfirmar). */}
               <ConfirmacionProvider>
+                <PedidoPendienteProvider>
                 <StatusBar barStyle="light-content" backgroundColor={c.header} />
                 <PushBridge />
                 <AlarmaBridge mostrarAviso={!splashVisible} />
@@ -337,8 +345,11 @@ function AppContenido() {
                 {!splashVisible && <CierreBridge />}
                 <View style={styles.raiz}>
                   <Navegacion />
+                  {!splashVisible && <EnvioPedidoAviso />}
+                  {!splashVisible && <VigilarCarrito />}
                   {splashVisible && <SplashVitrina onFin={ocultarSplash} />}
                 </View>
+                </PedidoPendienteProvider>
               </ConfirmacionProvider>
             </ToastProvider>
           </SafeAreaProvider>

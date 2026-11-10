@@ -5,9 +5,13 @@ namespace App\Http\Controllers;
 use App\Http\Resources\ProductoResource;
 use App\Models\Negocio;
 use App\Models\Producto;
+use App\Models\User;
+use App\Notifications\PrecioProductoActualizado;
+use App\Support\Push;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
@@ -109,6 +113,11 @@ class ProductoController extends Controller
         $data = $this->normalizarAtributos($request->validate($this->reglas($negocio, creando: false)));
 
         $producto->update($data);
+        if ($producto->wasChanged('precio')) {
+            $usuarios = User::whereIn('id', DB::table('carrito_reservas')
+                ->where('producto_id', $producto->id)->where('vence_at', '>', now())->select('user_id'))->get();
+            Push::enviar($usuarios, new PrecioProductoActualizado($producto));
+        }
 
         $this->guardarImagen($request, $producto);
 

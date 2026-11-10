@@ -44,6 +44,9 @@ export type RootStackParamList = {
   AdminTablero: undefined;
   AdminUsuarios: undefined;
   AdminNegocios: undefined;
+  // Pedidos en curso y cierre manual de los que se atascan.
+  AdminPedidos: undefined;
+  AdminReportes: undefined;
   // Barrios sugeridos por clientes, pendientes de aprobación.
   AdminBarrios: undefined;
   // Confiabilidad de domiciliarios y negocios (vetados, en riesgo, eventos).

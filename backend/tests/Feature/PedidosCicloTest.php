@@ -3,6 +3,7 @@
 use App\Models\Ajuste;
 use App\Models\Negocio;
 use App\Models\Pedido;
+use App\Models\Producto;
 use App\Models\User;
 use App\Notifications\PedidoCancelado;
 use Illuminate\Support\Facades\Notification;
@@ -29,7 +30,7 @@ function conRol(string $rol): User
     return $user;
 }
 
-/** @return array{0: User, 1: Negocio, 2: App\Models\Producto} */
+/** @return array{0: User, 1: Negocio, 2: Producto} */
 function negocioConProducto(): array
 {
     $dueno = conRol('usuario');
@@ -122,14 +123,14 @@ test('el cliente cancela un pedido pendiente y se avisa al negocio', function ()
     Notification::assertSentTo($dueno, PedidoCancelado::class);
 });
 
-test('el cliente no puede cancelar cuando el negocio ya lo tiene listo', function () {
+test('el cliente todavía puede cancelar cuando el negocio ya lo tiene listo', function () {
     [, $negocio, $producto] = negocioConProducto();
     $cliente = conRol('usuario');
     $id = pedirComo($cliente, $negocio, $producto)->json('id');
     Pedido::whereKey($id)->update(['estado' => 'listo']);
 
-    $this->postJson("/api/pedidos/{$id}/cancelar")->assertStatus(409);
-    expect(Pedido::find($id)->estado)->toBe('listo');
+    $this->postJson("/api/pedidos/{$id}/cancelar")->assertOk();
+    expect(Pedido::find($id)->estado)->toBe('cancelado');
 });
 
 test('nadie cancela el pedido de otro cliente', function () {
@@ -153,7 +154,7 @@ test('el negocio rechaza un pedido pendiente con motivo y se avisa al cliente', 
     Notification::assertSentTo($cliente, PedidoCancelado::class);
 });
 
-test('el negocio cancela un pedido listo que nadie tomó, pero no uno ya tomado', function () {
+test('el negocio no cancela pedidos listos ni tomados', function () {
     [$dueno, $negocio, $producto] = negocioConProducto();
     $cliente = conRol('usuario');
     $listo = pedirComo($cliente, $negocio, $producto)->json('id');
@@ -162,16 +163,17 @@ test('el negocio cancela un pedido listo que nadie tomó, pero no uno ya tomado'
     Pedido::whereKey($tomado)->update(['estado' => 'tomado', 'domiciliario_id' => conRol('domiciliario')->id]);
 
     Sanctum::actingAs($dueno);
-    $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$listo}/cancelar")->assertOk();
-    $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$tomado}/cancelar")->assertStatus(409);
+    $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$listo}/cancelar", ['motivo' => 'No hay domiciliarios'])->assertStatus(409);
+    $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$tomado}/cancelar", ['motivo' => 'No hay domiciliarios'])->assertStatus(409);
 });
 
 test('un pedido cancelado no aparece para los domiciliarios ni se puede tomar', function () {
     [$dueno, $negocio, $producto] = negocioConProducto();
-    $id = pedirComo(conRol('usuario'), $negocio, $producto)->json('id');
+    $cliente = conRol('usuario');
+    $id = pedirComo($cliente, $negocio, $producto)->json('id');
     Pedido::whereKey($id)->update(['estado' => 'listo']);
-    Sanctum::actingAs($dueno);
-    $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$id}/cancelar")->assertOk();
+    Sanctum::actingAs($cliente);
+    $this->postJson("/api/pedidos/{$id}/cancelar")->assertOk();
 
     Sanctum::actingAs(conRol('domiciliario'));
     $this->getJson('/api/domiciliario/disponibles')->assertJsonCount(0, 'pedidos');

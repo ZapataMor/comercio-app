@@ -32,6 +32,9 @@ jest.mock('../src/api', () => ({
   getMisNegocios: jest.fn(() => new Promise(() => {})),
   registrarDeviceToken: jest.fn().mockResolvedValue(undefined),
   eliminarDeviceToken: jest.fn().mockResolvedValue(undefined),
+  getDisponibles: jest.fn().mockResolvedValue({ pedidos: [], vetado: false, en_turno: false, compartir_ubicacion: false }),
+  getPedidosPorAceptar: jest.fn().mockResolvedValue([]),
+  sincronizarCarrito: jest.fn().mockResolvedValue(undefined),
 }));
 
 const NEGOCIO = { id: 3, nombre: 'Zapatería', rol: 'propietario' as const };
@@ -65,11 +68,13 @@ const entrar = (user: Usuario) => yEsperar(() => mockSesion.entrar('t', user));
 const salir = () => yEsperar(() => mockSesion.salir());
 
 beforeEach(async () => {
+  jest.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Sin servidor en las pruebas de navegación'));
   await AsyncStorage.clear();
 });
 
 afterEach(async () => {
   await act(async () => app?.unmount());
+  jest.mocked(globalThis.fetch).mockRestore();
 });
 
 test.each([

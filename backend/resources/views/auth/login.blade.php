@@ -37,11 +37,6 @@
             </button>
         </form>
 
-        @if (app()->environment('local', 'staging'))
-        <p class="text-center text-xs text-slate-400 mt-4">
-            Demo: admin@demo.co / password123
-        </p>
-        @endif
     </div>
 </div>
 @endsection

@@ -20,7 +20,7 @@ class Pedido extends Model
     public const ESTADOS = ['pendiente', 'aceptado', 'listo', 'tomado', 'recogido', 'en_camino', 'entregado'];
 
     /** Estados con un domiciliario llevando el pedido. */
-    public const EN_RUTA = ['tomado', 'recogido', 'en_camino'];
+    public const EN_RUTA = ['tomado', 'recogido', 'en_camino', 'devolviendo'];
 
     /** Desde que lo recogen el cliente tiene código de entrega. */
     public const CON_CODIGO_ENTREGA = ['recogido', 'en_camino'];
@@ -34,7 +34,7 @@ class Pedido extends Model
     private const INTENTOS_CODIGO = 5;
 
     /** Estados en los que el pedido sigue vivo (ni entregado ni cancelado). */
-    public const EN_CURSO = ['pendiente', 'aceptado', 'listo', 'tomado', 'recogido', 'en_camino'];
+    public const EN_CURSO = ['pendiente', 'aceptado', 'listo', 'tomado', 'recogido', 'en_camino', 'devolviendo'];
 
     /** Etiquetas legibles de cada estado. */
     public const ESTADO_LABEL = [
@@ -46,6 +46,7 @@ class Pedido extends Model
         'en_camino' => 'En camino',
         'entregado' => 'Entregado',
         'cancelado' => 'Cancelado',
+        'devolviendo' => 'Devolviendo al comercio',
     ];
 
     /** Formas de pago admitidas. */
@@ -78,6 +79,15 @@ class Pedido extends Model
         'cancelado_por',
         'motivo_cancelacion',
         'cancelado_at',
+        'clave_intento',
+        'llegada_at',
+        'cliente_no_encontrado_at',
+        'devuelto_at',
+        'devolucion_confirmada_por',
+        'faltante_motivo',
+        'faltante_at',
+        'faltante_version',
+        'ajustado_at',
     ];
 
     /** Lo que el negocio dice del dinero de un pedido en efectivo. */
@@ -100,6 +110,11 @@ class Pedido extends Model
             'entregado_at' => 'datetime',
             'novedad_at' => 'datetime',
             'dinero_confirmado_at' => 'datetime',
+            'llegada_at' => 'datetime',
+            'cliente_no_encontrado_at' => 'datetime',
+            'devuelto_at' => 'datetime',
+            'faltante_at' => 'datetime',
+            'ajustado_at' => 'datetime',
         ];
     }
 
@@ -176,6 +191,15 @@ class Pedido extends Model
         return self::ESTADO_LABEL[$this->estado] ?? $this->estado;
     }
 
+    public function segundosParaReportarAusencia(): ?int
+    {
+        if ($this->estado !== 'en_camino' || ! $this->llegada_at) {
+            return null;
+        }
+
+        return max(0, $this->llegada_at->timestamp + 300 - now()->timestamp);
+    }
+
     /**
      * ¿El cliente todavía puede calificar este pedido? Solo entregado, una
      * vez, y dentro de las horas que da `reputacion.horas_para_calificar`.
@@ -188,7 +212,18 @@ class Pedido extends Model
 
         $entregado = $this->entregado_at ?? $this->updated_at;
 
-        return $entregado->gte(now()->subHours((int) config('reputacion.horas_para_calificar')));
+        return $entregado->gte(now()->subHours((int) config('reputacion.horas_para_calificar')))
+            && ! $this->esDelPropioEquipo();
+    }
+
+    /**
+     * ¿Quien pidió hace parte del equipo del negocio? Puede comprar ahí, pero
+     * su opinión no cuenta: ni califica ni reseña su propio negocio.
+     */
+    public function esDelPropioEquipo(): bool
+    {
+        return $this->negocio !== null
+            && $this->negocio->miembrosActivos()->whereKey($this->user_id)->exists();
     }
 
     /**
@@ -207,7 +242,8 @@ class Pedido extends Model
 
         $entregado = $this->entregado_at ?? $this->updated_at;
 
-        return $entregado->gte(now()->subDays((int) config('reputacion.dias_para_resenar')));
+        return $entregado->gte(now()->subDays((int) config('reputacion.dias_para_resenar')))
+            && ! $this->esDelPropioEquipo();
     }
 
     /**

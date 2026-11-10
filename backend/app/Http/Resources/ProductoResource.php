@@ -2,6 +2,8 @@
 
 namespace App\Http\Resources;
 
+use App\Support\HorarioNegocio;
+use App\Support\PrecioCarrito;
 use App\Support\Resenas;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -15,7 +17,7 @@ class ProductoResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return [
+        return PrecioCarrito::cotizar($this->resource, $request->user()?->id) + [
             'id' => $this->id,
             'nombre' => $this->nombre,
             'descripcion' => $this->descripcion,
@@ -50,7 +52,7 @@ class ProductoResource extends JsonResource
                 'id' => $this->negocio->id,
                 'nombre' => $this->negocio->nombre,
                 'abierto' => (bool) $this->negocio->activo,
-                'estado_texto' => \App\Support\HorarioNegocio::estadoTexto($this->negocio),
+                'estado_texto' => HorarioNegocio::estadoTexto($this->negocio),
             ]),
         ];
     }

@@ -23,9 +23,7 @@ class PedidoCancelado extends Notification implements ShouldQueue
     // En cola: el push sale del worker y no hace esperar al pedido.
     use Queueable, UsaCanalPedidosFcm;
 
-    public function __construct(public Pedido $pedido)
-    {
-    }
+    public function __construct(public Pedido $pedido) {}
 
     public function via(object $notifiable): array
     {
@@ -40,7 +38,11 @@ class PedidoCancelado extends Notification implements ShouldQueue
         $negocio = $this->pedido->negocio?->nombre ?? 'El negocio';
         $vencido = $this->pedido->cancelado_por === CancelarPedido::POR_SISTEMA;
 
+        $porAdmin = $this->pedido->cancelado_por === CancelarPedido::POR_ADMIN;
+
         [$titulo, $cuerpo] = match (true) {
+            $porAdmin && $paraCliente => ['Tu pedido fue cancelado', 'Vitrina cerró tu pedido'.($motivo ? ": {$motivo}" : '.')],
+            $porAdmin => ["Pedido #{$this->pedido->codigo} cancelado", 'Vitrina cerró el pedido'.($motivo ? ": {$motivo}" : '.')],
             $vencido && $paraCliente => ['Tu pedido no fue recibido', "{$negocio} no recibió tu pedido. No se te cobra nada."],
             $vencido => ["Pedido #{$this->pedido->codigo} vencido", 'Nadie lo aceptó a tiempo y se le avisó al cliente.'],
             $paraCliente => ['Tu pedido fue cancelado', "{$negocio} no pudo atenderlo".($motivo ? ": {$motivo}" : '.')],

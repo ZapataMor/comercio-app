@@ -4,12 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\NegocioResource;
 use App\Models\Barrio;
+use App\Models\Cita;
 use App\Models\Negocio;
+use App\Models\Pedido;
 use App\Models\TipoNegocio;
+use App\Support\AgendaCitas;
 use App\Support\HorarioNegocio;
 use App\Support\Reputacion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -21,6 +25,19 @@ use Illuminate\Validation\ValidationException;
  */
 class NegocioController extends Controller
 {
+    public function destroy(Request $request, Negocio $negocio): JsonResponse
+    {
+        DB::transaction(function () use ($request, $negocio) {
+            $negocio = Negocio::lockForUpdate()->findOrFail($negocio->id);
+            abort_unless($negocio->esPropietario($request->user()), 403);
+            abort_if($negocio->pedidos()->whereIn('estado', Pedido::EN_CURSO)->exists(), 409, 'Termina o cancela los pedidos activos antes de eliminar el negocio. Los pedidos en camino deben finalizar su entrega o devolución.');
+            $negocio->forceFill(['activo' => false, 'archivado_at' => now()])->save();
+            AgendaCitas::cancelarFuturas(Cita::where('negocio_id', $negocio->id), 'El negocio cerró.');
+        });
+
+        return response()->json(['message' => 'Negocio eliminado. Conservamos el historial de pedidos.']);
+    }
+
     /**
      * Mis negocios: todos aquellos donde soy miembro activo, con mi rol en
      * cada uno. Incluye mi código público (para que me inviten a trabajar).
@@ -253,7 +270,17 @@ class NegocioController extends Controller
     {
         $horario = $request->input('horario');
         if (is_string($horario)) {
-            $request->merge(['horario' => $horario === '' ? null : json_decode($horario, true)]);
+            if ($horario === '') {
+                $request->merge(['horario' => null]);
+
+                return;
+            }
+            try {
+                $horario = json_decode($horario, true, flags: JSON_THROW_ON_ERROR);
+            } catch (\JsonException) {
+                throw ValidationException::withMessages(['horario' => 'El horario no tiene un formato válido. Revisa los días y las horas.']);
+            }
+            $request->merge(['horario' => $horario]);
         }
     }
 
@@ -282,7 +309,7 @@ class NegocioController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      * @return array<int, string>
      */
     private function normalizarCategorias(array $data): array
@@ -306,7 +333,7 @@ class NegocioController extends Controller
     }
 
     /**
-     * @param array<int, string> $categorias
+     * @param  array<int, string>  $categorias
      */
     private function sincronizarCategorias(Negocio $negocio, array $categorias): void
     {

@@ -30,6 +30,6 @@ describe('URL de API segun la variante Android', () => {
   });
 
   it('desarrollo conserva la API del emulador sin modulo nativo', () => {
-    expect(loadConfig(true).API_URL).toBe('http://10.0.2.2:8000');
+    expect(loadConfig(true).API_URL).toBe('http://localhost:8000');
   });
 });

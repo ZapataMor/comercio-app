@@ -240,29 +240,29 @@ test('cancelar después de 5 minutos de aceptado le baja la confiabilidad al neg
     Sanctum::actingAs($negocio->user);
 
     $this->getJson(flujoRutaPedido($pedido, ''))->assertJsonPath('cancelar_penaliza', true);
-    $this->putJson(flujoRutaPedido($pedido, 'cancelar'))->assertOk();
+    $this->putJson(flujoRutaPedido($pedido, 'cancelar'), ['motivo' => 'No podemos preparar el pedido'])->assertOk();
 
     expect(ReputacionEvento::where('tipo', 'negocio')->pluck('motivo')->all())->toBe(['cancelo_tras_aceptar'])
         ->and($negocio->fresh()->reputacion)->toBe(72);
 });
 
-test('rechazar sin aceptar o cancelar un pedido listo que nadie toma no tiene consecuencias', function () {
+test('rechazar sin aceptar no penaliza y el comercio no cancela pedidos listos', function () {
     $negocio = flujoNegocio();
     $sinAceptar = flujoPedido($negocio);
     $listo = flujoPedido($negocio, 'listo', ['aceptado_at' => now()]);
 
     $this->travel(4)->minutes();
     Sanctum::actingAs($negocio->user);
-    $this->putJson(flujoRutaPedido($sinAceptar, 'cancelar'))->assertOk();
+    $this->putJson(flujoRutaPedido($sinAceptar, 'cancelar'), ['motivo' => 'El producto está agotado'])->assertOk();
 
     $this->travel(20)->minutes();
-    $this->putJson(flujoRutaPedido($listo, 'cancelar'))->assertOk();
+    $this->putJson(flujoRutaPedido($listo, 'cancelar'), ['motivo' => 'Nadie lo ha recogido'])->assertStatus(409);
 
     expect(ReputacionEvento::count())->toBe(0);
     Notification::assertSentTo($negocio->user, PedidoYaAtendido::class);
 });
 
-test('el cliente puede cancelar mientras se prepara, pero no cuando ya está listo', function () {
+test('el cliente puede cancelar mientras se prepara y también cuando está listo', function () {
     $negocio = flujoNegocio();
     $preparando = flujoPedido($negocio, 'aceptado', ['aceptado_at' => now()]);
     $listo = flujoPedido($negocio, 'listo');
@@ -272,7 +272,7 @@ test('el cliente puede cancelar mientras se prepara, pero no cuando ya está lis
     $this->postJson("/api/pedidos/{$preparando->id}/cancelar")->assertOk();
 
     Sanctum::actingAs($listo->cliente);
-    $this->postJson("/api/pedidos/{$listo->id}/cancelar")->assertStatus(409);
+    $this->postJson("/api/pedidos/{$listo->id}/cancelar")->assertOk();
 
     expect(ReputacionEvento::count())->toBe(0);
 });

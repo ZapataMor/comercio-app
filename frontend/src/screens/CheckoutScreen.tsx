@@ -1,6 +1,6 @@
 import { CommonActions } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -12,13 +12,14 @@ import {
 import {
   ClienteDireccion,
   crearClienteDireccion,
-  crearPedido,
   getCatalogo,
   getClienteDirecciones,
   getTarifaDomicilio,
+  nuevaClaveIntento,
 } from '../api';
 import { useAuth } from '../AuthContext';
 import { useCart } from '../CartContext';
+import { usePedidoPendiente } from '../PedidoPendienteContext';
 import { detalleOpciones } from '../opcionesProducto';
 import { FadeInView, PressableScale } from '../components/anim';
 import BarrioSelect from '../components/BarrioSelect';
@@ -46,6 +47,7 @@ export default function CheckoutScreen({ navigation }: Props) {
   const styles = useStyles();
   const { auth, actualizarUsuario } = useAuth();
   const cart = useCart();
+  const envio = usePedidoPendiente();
   const toast = useToast();
   const pedirConfirmacion = useConfirmar();
   const [direcciones, setDirecciones] = useState<ClienteDireccion[]>([]);
@@ -62,14 +64,40 @@ export default function CheckoutScreen({ navigation }: Props) {
   const [errores, setErrores] = useState<FieldErrors>({});
   // Tarifa vigente del domicilio (la confirma el servidor al crear el pedido).
   const [domicilio, setDomicilio] = useState<number | null>(null);
+  const [tarifaFallo, setTarifaFallo] = useState(false);
   const totalConDomicilio = cart.total + (domicilio ?? 0);
+  // Un mismo intento de compra conserva su clave aunque se reintente por un
+  // corte de red: el servidor devuelve el pedido ya creado en vez de duplicarlo.
+  const claveIntento = useRef(nuevaClaveIntento());
+  const navegando = useRef<number | null>(null);
+  const confirmadoAlEntrar = useRef(envio.confirmado?.id);
+  const consumirConfirmado = envio.consumirConfirmado;
 
   useEffect(() => {
+    const p = envio.confirmado;
+    if (!p || navegando.current === p.id) return;
+    consumirConfirmado();
+    if (p.id === confirmadoAlEntrar.current) return;
+    navegando.current = p.id;
+    navigation.dispatch(CommonActions.reset({ index: 2, routes: [
+      { name: 'Explorar' },
+      { name: 'MisPedidos' },
+      { name: 'PedidoDetalle', params: { id: p.id } },
+    ] }));
+  }, [envio.confirmado, navigation, consumirConfirmado]);
+
+  const cargarTarifa = useCallback(() => {
     if (!auth?.token) return;
+    setTarifaFallo(false);
     getTarifaDomicilio(auth.token)
       .then(setDomicilio)
-      .catch(() => setDomicilio(null));
+      .catch(() => {
+        setDomicilio(null);
+        setTarifaFallo(true);
+      });
   }, [auth?.token]);
+
+  useEffect(cargarTarifa, [cargarTarifa]);
 
   function limpiarError(campo: string) {
     setErrores(prev => {
@@ -114,7 +142,20 @@ export default function CheckoutScreen({ navigation }: Props) {
   const telefonoContacto = usarOtroTelefono ? telefono.trim() : telefonoGuardado ?? '';
 
   async function confirmar() {
+    if (enviando || envio.pendiente || envio.cargando) return;
     setErrores({});
+    if (!cart.items.length || (cart.venceEn != null && cart.venceEn <= Date.now())) {
+      toast.info('El carrito venció', 'Los productos permanecen una hora. Agrega de nuevo los que quieras pedir.');
+      navigation.navigate('Carrito');
+      return;
+    }
+    if (cart.cambiosPrecio?.length) return;
+    // Sin la tarifa el total estaría incompleto: no se confirma a ciegas.
+    if (domicilio == null) {
+      toast.error('Falta el costo del domicilio', 'No pudimos consultarlo. Revisa tu conexión e inténtalo de nuevo.');
+      cargarTarifa();
+      return;
+    }
     if (!telefonoContacto) {
       setErrores({ telefono: 'El campo telefono de contacto es obligatorio.' });
       return;
@@ -180,13 +221,15 @@ export default function CheckoutScreen({ navigation }: Props) {
       const negocioId = cart.negocioId!;
       const negocioNombre = cart.negocioNombre ?? '';
 
-      await crearPedido(auth!.token, {
+      await envio.enviar({
         negocio_id: negocioId,
-        items: cart.items.map(i => ({ producto_id: i.producto_id, cantidad: i.cantidad, ...i.opciones })),
+        items: cart.items.map(i => ({ producto_id: i.producto_id, cantidad: i.cantidad, precio_token: i.precio_token, ...i.opciones })),
         metodo_pago: pago,
         direccion_entrega: direccionEntrega,
         telefono_contacto: telefonoContacto,
-      });
+        clave_intento: claveIntento.current,
+        total_esperado: totalConDomicilio,
+      }, negocioNombre);
 
       // El backend guarda este teléfono en el perfil cuando no había uno;
       // se refleja en la sesión local para que aparezca en el próximo pedido.
@@ -194,22 +237,6 @@ export default function CheckoutScreen({ navigation }: Props) {
         actualizarUsuario({ ...auth!.user, telefono: telefonoContacto });
       }
 
-      cart.vaciar();
-      toast.exito('Pedido confirmado', 'El negocio ya recibio tu pedido.');
-      // Se rearma la pila para que "atrás" desde Mis pedidos lleve al catálogo
-      // del negocio donde pidió, y no de vuelta al formulario de confirmación.
-      // La base es Explorar: el "Home" del cliente (la pantalla Home no existe
-      // en la pila del rol usuario).
-      navigation.dispatch(
-        CommonActions.reset({
-          index: 2,
-          routes: [
-            { name: 'Explorar' },
-            { name: 'Negocio', params: { id: negocioId, nombre: negocioNombre } },
-            { name: 'MisPedidos' },
-          ],
-        }),
-      );
     } catch (e) {
       const campos = fieldErrorsFromError(e, {
         direccion: 'nuevaDireccion',
@@ -226,6 +253,30 @@ export default function CheckoutScreen({ navigation }: Props) {
     } finally {
       setEnviando(false);
     }
+  }
+
+  if (envio.cargando || envio.pendiente) {
+    return <View style={[styles.container, { padding: 24, justifyContent: 'center' }]}>
+      {envio.errorCarga ? <>
+        <Text style={styles.resumenTitulo}>No se pudieron consultar tus envíos guardados</Text>
+        <Text style={styles.lineaTxt}>Necesitamos recuperar el estado del envío anterior antes de confirmar otro pedido.</Text>
+        <TouchableOpacity onPress={envio.recargar}><Text style={styles.reintentar}>Reintentar</Text></TouchableOpacity>
+      </> :
+      envio.pendiente?.error ? <>
+        <Text style={styles.resumenTitulo}>El pedido no fue aceptado</Text>
+        <Text style={styles.lineaTxt}>{envio.pendiente.error}</Text>
+        <TouchableOpacity style={styles.btn} onPress={async () => {
+          await envio.revisar();
+          claveIntento.current = nuevaClaveIntento();
+          cargarTarifa();
+          if (!cart.items.length) navigation.navigate('Carrito');
+        }}><Text style={styles.btnTxt}>Revisar pedido</Text></TouchableOpacity>
+      </> : <>
+        <ActivityIndicator color={c.accent} size="large" />
+        <Text style={styles.resumenTitulo}>{envio.cargando ? 'Comprobando envíos guardados' : 'Enviando tu pedido'}</Text>
+        <Text style={styles.lineaTxt}>Si se fue el internet, lo enviaremos al recuperar la conexión. Este intento queda guardado aunque cierres la app. Te avisaremos cuando el comercio lo reciba.</Text>
+      </>}
+    </View>;
   }
 
   return (
@@ -255,11 +306,16 @@ export default function CheckoutScreen({ navigation }: Props) {
         </View>
         <View style={styles.linea}>
           <Text style={styles.lineaTxt}>Domicilio</Text>
-          <Text style={styles.lineaTxt}>{domicilio == null ? '…' : cop(domicilio)}</Text>
+          <Text style={styles.lineaTxt}>{domicilio == null ? (tarifaFallo ? 'Sin consultar' : '…') : cop(domicilio)}</Text>
         </View>
+        {tarifaFallo && (
+          <TouchableOpacity onPress={cargarTarifa} accessibilityRole="button">
+            <Text style={styles.reintentar}>No pudimos consultar el domicilio. Toca para reintentar.</Text>
+          </TouchableOpacity>
+        )}
         <View style={styles.totalRow}>
           <Text style={styles.totalLabel}>Total a pagar</Text>
-          <Text style={styles.totalValor}>{cop(totalConDomicilio)}</Text>
+          <Text style={styles.totalValor}>{domicilio == null ? 'Pendiente de tarifa' : cop(totalConDomicilio)}</Text>
         </View>
       </FadeInView>
 
@@ -415,11 +471,13 @@ export default function CheckoutScreen({ navigation }: Props) {
       </View>
       <FieldError mensaje={errores.pago} />
 
-      <PressableScale style={styles.btn} onPress={confirmar} disabled={enviando || cargandoDirecciones}>
+      <PressableScale style={styles.btn} onPress={confirmar} disabled={enviando || cargandoDirecciones || domicilio == null || cart.items.length === 0 || !!cart.cambiosPrecio?.length}>
         {enviando ? (
           <ActivityIndicator color={c.onAccent} />
         ) : (
-          <Text style={styles.btnTxt}>Confirmar pedido - {cop(totalConDomicilio)}</Text>
+          <Text style={styles.btnTxt}>
+            {domicilio == null ? 'Confirmar pedido' : `Confirmar pedido - ${cop(totalConDomicilio)}`}
+          </Text>
         )}
       </PressableScale>
     </ScrollView>
@@ -434,6 +492,7 @@ const useStyles = makeStyles((c, shadow) => ({
   linea: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3, gap: 12 },
   lineaTxt: { color: c.text, fontFamily: font.regular, flexShrink: 1 },
   lineaProducto: { flex: 1, marginRight: 12 },
+  reintentar: { color: c.danger, fontFamily: font.regular, fontSize: 13, paddingVertical: 6 },
   lineaDetalle: { color: c.muted, fontSize: 12, lineHeight: 17, marginTop: 1, fontFamily: font.regular },
   subtotalRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, paddingBottom: 3, borderTopWidth: 1, borderTopColor: c.border },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: c.border },

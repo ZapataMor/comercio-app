@@ -5,10 +5,13 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
-use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -85,7 +88,7 @@ class User extends Authenticatable
      * Solo para seeders y tests (crear un negocio con su creador); la
      * autorización siempre va por negocios() (membresías).
      */
-    public function negocio(): \Illuminate\Database\Eloquent\Relations\HasOne
+    public function negocio(): HasOne
     {
         return $this->hasOne(Negocio::class);
     }
@@ -95,7 +98,7 @@ class User extends Authenticatable
      * El rol vive en la tabla pivote: una persona puede ser propietaria de un
      * negocio y trabajadora de otro a la vez.
      */
-    public function negocios(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function negocios(): BelongsToMany
     {
         return $this->belongsToMany(Negocio::class, 'negocio_user')
             ->withPivot(['rol', 'activo'])
@@ -103,31 +106,31 @@ class User extends Authenticatable
     }
 
     /** Solo las membresías activas (no suspendidas). */
-    public function negociosActivos(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function negociosActivos(): BelongsToMany
     {
-        return $this->negocios()->wherePivot('activo', true);
+        return $this->negocios()->wherePivot('activo', true)->whereNull('negocios.archivado_at');
     }
 
     /** Invitaciones de trabajo que ha recibido este usuario. */
-    public function invitacionesTrabajo(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function invitacionesTrabajo(): HasMany
     {
         return $this->hasMany(InvitacionTrabajo::class);
     }
 
     /** Reseñas públicas que ha escrito de tiendas y productos. */
-    public function resenas(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function resenas(): HasMany
     {
         return $this->hasMany(Resena::class);
     }
 
     /** Pedidos que ha hecho como cliente. */
-    public function pedidos(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function pedidos(): HasMany
     {
         return $this->hasMany(Pedido::class, 'user_id');
     }
 
     /** Ubicaciones guardadas por el cliente para sus pedidos. */
-    public function clienteDirecciones(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function clienteDirecciones(): HasMany
     {
         return $this->hasMany(ClienteDireccion::class);
     }
@@ -177,13 +180,13 @@ class User extends Authenticatable
     }
 
     /** Pedidos que lleva como domiciliario. */
-    public function entregas(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function entregas(): HasMany
     {
         return $this->hasMany(Pedido::class, 'domiciliario_id');
     }
 
     /** Dispositivos (tokens FCM) donde el usuario recibe notificaciones push. */
-    public function deviceTokens(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function deviceTokens(): HasMany
     {
         return $this->hasMany(DeviceToken::class);
     }

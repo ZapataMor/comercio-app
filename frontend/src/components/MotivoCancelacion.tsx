@@ -24,10 +24,11 @@ type Props = {
   enviando: boolean;
   onCerrar: () => void;
   onConfirmar: (motivo: string) => void;
+  obligatorio?: boolean;
 };
 
 export default function MotivoCancelacion({
-  visible, titulo, explicacion, motivos, textoBoton, enviando, onCerrar, onConfirmar,
+  visible, titulo, explicacion, motivos, textoBoton, enviando, onCerrar, onConfirmar, obligatorio = false,
 }: Props) {
   const { c } = useTheme();
   const styles = useStyles();
@@ -72,16 +73,16 @@ export default function MotivoCancelacion({
               setOtro(v);
               setElegido(null);
             }}
-            placeholder="Otro motivo (opcional)"
+            placeholder={obligatorio ? 'Escribe el motivo (obligatorio)' : 'Otro motivo (opcional)'}
             placeholderTextColor={c.mutedSoft}
             maxLength={255}
             editable={!enviando}
           />
 
           <TouchableOpacity
-            style={[styles.boton, enviando && styles.botonDeshabilitado]}
+            style={[styles.boton, (enviando || (obligatorio && motivo.length < 5)) && styles.botonDeshabilitado]}
             onPress={() => onConfirmar(motivo)}
-            disabled={enviando}>
+            disabled={enviando || (obligatorio && motivo.length < 5)}>
             {enviando ? <ActivityIndicator color={c.surface} /> : <Text style={styles.botonTxt}>{textoBoton}</Text>}
           </TouchableOpacity>
           <TouchableOpacity onPress={onCerrar} disabled={enviando}>

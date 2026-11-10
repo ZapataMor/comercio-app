@@ -46,7 +46,13 @@ class HorarioNegocio
     /** Reglas de validación para `horario` en el formulario del negocio. */
     public static function reglas(): array
     {
-        $reglas = ['horario' => ['sometimes', 'nullable', 'array']];
+        // Un día mal nombrado ("lunes" por "lun") se rechaza: antes se ignoraba y
+        // el horario quedaba vacío sin avisar.
+        $reglas = ['horario' => ['sometimes', 'nullable', 'array', function ($atributo, $valor, $fallar) {
+            if (is_array($valor) && array_diff(array_keys($valor), self::CLAVES) !== []) {
+                $fallar('El horario solo admite los días '.implode(', ', self::CLAVES).'.');
+            }
+        }]];
         foreach (self::CLAVES as $dia) {
             $reglas["horario.{$dia}"] = ['nullable', 'array'];
             $reglas["horario.{$dia}.abre"] = ["required_with:horario.{$dia}", 'date_format:H:i'];
@@ -170,8 +176,12 @@ class HorarioNegocio
     {
         $inicio = $abre->copy()->setTimeFromTimeString($almuerzo['inicio']);
         $fin = $abre->copy()->setTimeFromTimeString($almuerzo['fin']);
-        if ($inicio->lt($abre)) $inicio->addDay();
-        if ($fin->lte($inicio)) $fin->addDay();
+        if ($inicio->lt($abre)) {
+            $inicio->addDay();
+        }
+        if ($fin->lte($inicio)) {
+            $fin->addDay();
+        }
 
         return [$inicio, $fin];
     }
@@ -179,7 +189,9 @@ class HorarioNegocio
     /** Franjas de atención que pueden contener citas que comiencen en esta fecha. */
     public static function intervalosDeFecha(?array $horario, CarbonInterface $fecha): array
     {
-        if (! self::normalizar($horario)) return [];
+        if (! self::normalizar($horario)) {
+            return [];
+        }
         $desde = $fecha->copy()->startOfDay();
         $hasta = $desde->copy()->addDay();
 
@@ -188,15 +200,23 @@ class HorarioNegocio
 
     public static function almorzando(Negocio $negocio, CarbonInterface $ahora): bool
     {
-        if ($negocio->activo) return false;
+        if ($negocio->activo) {
+            return false;
+        }
         $horario = self::normalizar($negocio->horario);
-        if (! $horario) return false;
+        if (! $horario) {
+            return false;
+        }
         foreach ([$ahora->copy()->subDay(), $ahora] as $dia) {
             $h = $horario[self::claveDelDia($dia)] ?? null;
-            if (empty($h['almuerzo'])) continue;
+            if (empty($h['almuerzo'])) {
+                continue;
+            }
             $abre = $dia->copy()->startOfDay()->setTimeFromTimeString($h['abre']);
             [$inicio, $fin] = self::pausa($abre, $h['almuerzo']);
-            if ($ahora->gte($inicio) && $ahora->lt($fin)) return true;
+            if ($ahora->gte($inicio) && $ahora->lt($fin)) {
+                return true;
+            }
         }
 
         return false;

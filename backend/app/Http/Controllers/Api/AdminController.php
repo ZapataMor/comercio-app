@@ -5,12 +5,15 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Negocio;
 use App\Models\Pedido;
+use App\Models\PedidoReporte;
 use App\Models\Producto;
 use App\Models\Resena;
 use App\Models\User;
+use App\Support\HorarioNegocio;
 use App\Support\UbicacionDomiciliario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 /**
@@ -30,6 +33,9 @@ class AdminController extends Controller
             'negocios' => Negocio::count(),
             'negocios_activos' => Negocio::where('activo', true)->count(),
             'productos' => Producto::count(),
+            // Pedidos vivos (revisar en Pedidos si alguno se atascó).
+            'pedidos_en_curso' => Pedido::whereIn('estado', Pedido::EN_CURSO)->count(),
+            'reportes_pendientes' => PedidoReporte::whereNull('resuelto_at')->count(),
             // Vetados por baja confiabilidad (revisar en Reputación).
             'domiciliarios_vetados' => User::whereNotNull('domiciliario_vetado_at')->count(),
             'negocios_vetados' => Negocio::whereNotNull('vetado_at')->count(),
@@ -99,9 +105,14 @@ class AdminController extends Controller
             return response()->json(['message' => 'No puedes suspender tu propia cuenta.'], 422);
         }
 
-        $usuario->forceFill(['suspendido_at' => now(), 'motivo_suspension' => $datos['motivo']])->save();
-        $usuario->tokens()->delete();
-        $usuario->deviceTokens()->delete();
+        DB::transaction(function () use ($usuario, $datos) {
+            $usuario = User::lockForUpdate()->findOrFail($usuario->id);
+            abort_if(UbicacionDomiciliario::tieneEntregaEnCurso($usuario), 409, 'Tiene una recogida, entrega o devolución en curso. Debe terminarla antes de suspender la cuenta.');
+            $usuario->forceFill(['suspendido_at' => now(), 'motivo_suspension' => $datos['motivo'], 'en_turno' => false])->save();
+            $usuario->tokens()->delete();
+            $usuario->deviceTokens()->delete();
+            UbicacionDomiciliario::borrar($usuario);
+        });
 
         return response()->json(['message' => "Cuenta de {$usuario->nombre_completo} suspendida."]);
     }
@@ -148,7 +159,17 @@ class AdminController extends Controller
             return response()->json(['message' => 'No puedes quitarte tu propio rol de administrador.'], 422);
         }
 
-        $usuario->syncRoles(User::rolesDelTipo($datos['rol']));
+        // Con entregas en curso no se le quita el rol: esos pedidos quedarían
+        // sin nadie que los pueda terminar.
+        DB::transaction(function () use ($usuario, $datos) {
+            $usuario = User::lockForUpdate()->findOrFail($usuario->id);
+            abort_if($datos['rol'] !== 'domiciliario' && UbicacionDomiciliario::tieneEntregaEnCurso($usuario), 409, 'Tiene una recogida, entrega o devolución en curso. Debe terminarla antes de quitar el rol.');
+            $usuario->syncRoles(User::rolesDelTipo($datos['rol']));
+            if ($datos['rol'] !== 'domiciliario') {
+                $usuario->forceFill(['en_turno' => false])->save();
+                UbicacionDomiciliario::borrar($usuario);
+            }
+        });
         $tipo = User::TIPOS[$datos['rol']];
 
         return response()->json(['message' => "{$usuario->nombre_completo} ahora es {$tipo}."]);
@@ -193,7 +214,7 @@ class AdminController extends Controller
             'dueno' => $n->user?->nombre_completo,
             'productos' => $n->productos_count,
             'activo' => $n->activo,
-            'estado_texto' => \App\Support\HorarioNegocio::estadoTexto($n),
+            'estado_texto' => HorarioNegocio::estadoTexto($n),
             'vetado' => $n->vetado_at !== null,
             'archivado' => $n->archivado_at !== null,
         ])->values();

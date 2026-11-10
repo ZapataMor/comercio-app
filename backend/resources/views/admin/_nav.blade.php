@@ -7,4 +7,5 @@
        class="px-3 py-1.5 rounded-lg {{ $r === 'admin.usuarios' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50' }}">Usuarios</a>
     <a href="{{ route('admin.negocios') }}"
        class="px-3 py-1.5 rounded-lg {{ $r === 'admin.negocios' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50' }}">Negocios</a>
+    <a href="{{ route('admin.reportes') }}" class="px-3 py-1.5 rounded-lg {{ $r === 'admin.reportes' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50' }}">Reportes</a>
 </nav>

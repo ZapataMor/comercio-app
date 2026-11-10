@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import { Producto } from './api';
 import { useAuth } from './AuthContext';
 import { animarDespliegue } from './components/anim';
@@ -7,6 +8,7 @@ import { coloresDe, ingredientesDe, OpcionesLinea, tallasDe } from './opcionesPr
 
 /** Tiempo que una línea sigue en el carrito después de quitarla (ms). */
 export const DURACION_RETIRO = 3000;
+export const DURACION_CARRITO = 60 * 60 * 1000;
 
 export type CartItem = {
   /** Identifica la línea: el mismo producto con otras opciones es otra línea. */
@@ -14,6 +16,10 @@ export type CartItem = {
   producto_id: number;
   nombre: string;
   precio: number;
+  precio_token?: string;
+  precio_vence_at?: string;
+  precioVigente?: number;
+  precioAvisado?: number;
   cantidad: number;
   imagen?: string | null;
   opciones?: OpcionesLinea;
@@ -34,6 +40,10 @@ type CartContextType = {
   lineas: CartItem[];
   count: number;
   total: number;
+  venceEn: number | null;
+  cambiosPrecio: CartItem[];
+  revisarPrecios: (productos: Producto[]) => void;
+  resolverCambioPrecio: (productoId: number, conservar: boolean) => void;
   /** Devuelve false si el producto es de otra tienda (carrito = 1 negocio). */
   agregar: (
     negocioId: number,
@@ -67,14 +77,14 @@ type CartContextType = {
   vaciar: () => void;
 };
 
-type CarritoGuardado = { negocioId: number | null; negocioNombre: string | null; items: CartItem[] };
+type CarritoGuardado = { negocioId: number | null; negocioNombre: string | null; items: CartItem[]; venceEn: number | null };
 
 const CartContext = createContext<CartContextType>({} as CartContextType);
 
 /**
  * El carrito se guarda en el teléfono, uno por cuenta: sobrevive a cerrar la
  * app y no se mezcla si otra persona inicia sesión en el mismo aparato. Los
- * precios guardados son orientativos: el servidor recalcula al confirmar.
+ * precios se reservan por una hora y el servidor verifica la reserva al confirmar.
  */
 const claveCarrito = (userId: number) => `carrito:${userId}`;
 
@@ -100,6 +110,8 @@ function crearLinea(p: Producto, opciones?: OpcionesLinea, cantidad = 1): CartIt
     producto_id: p.id,
     nombre: p.nombre,
     precio: p.precio,
+    precio_token: p.precio_token,
+    precio_vence_at: p.precio_vence_at,
     cantidad,
     imagen: p.imagen ?? null,
     opciones: limpias,
@@ -119,6 +131,7 @@ function sumarLinea(lineas: CartItem[], nueva: CartItem): CartItem[] {
     i === existente
       ? {
           ...i,
+          ...(i.saleEn ? nueva : {}),
           cantidad: i.saleEn ? nueva.cantidad : i.cantidad + nueva.cantidad,
           saleEn: undefined,
         }
@@ -132,6 +145,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [negocioId, setNegocioId] = useState<number | null>(null);
   const [negocioNombre, setNegocioNombre] = useState<string | null>(null);
   const [lineas, setLineas] = useState<CartItem[]>([]);
+  const [venceEn, setVenceEn] = useState<number | null>(null);
   const items = useMemo(() => lineas.filter(i => !i.saleEn), [lineas]);
   // No se guarda nada hasta haber leído el carrito de esta cuenta (si no, el
   // carrito vacío inicial borraría el guardado).
@@ -142,6 +156,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setLineas([]);
     setNegocioId(null);
     setNegocioNombre(null);
+    setVenceEn(null);
     if (userId == null) return;
 
     let vigente = true;
@@ -150,6 +165,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         if (!vigente || !raw) return;
         try {
           const guardado = JSON.parse(raw) as CarritoGuardado;
+          if (!guardado.venceEn || guardado.venceEn <= Date.now()) {
+            AsyncStorage.removeItem(claveCarrito(userId)).catch(() => {});
+            return;
+          }
+          setVenceEn(guardado.venceEn);
           setLineas(
             (guardado.items ?? []).map(i => ({
               ...i,
@@ -174,9 +194,24 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   // la cuenta regresiva, el cliente ya había decidido quitarlo.
   useEffect(() => {
     if (userId == null || cargadoPara.current !== userId) return;
-    const guardado: CarritoGuardado = { negocioId, negocioNombre, items };
+    const guardado: CarritoGuardado = { negocioId, negocioNombre, items, venceEn };
     AsyncStorage.setItem(claveCarrito(userId), JSON.stringify(guardado)).catch(() => {});
-  }, [userId, negocioId, negocioNombre, items]);
+  }, [userId, negocioId, negocioNombre, items, venceEn]);
+
+  useEffect(() => {
+    if (venceEn == null) return;
+    const vencer = () => {
+      if (venceEn != null && venceEn <= Date.now()) {
+        setLineas([]);
+        setNegocioId(null);
+        setNegocioNombre(null);
+        setVenceEn(null);
+      }
+    };
+    const timer = setInterval(vencer, 1000);
+    const sub = AppState.addEventListener('change', estado => { if (estado === 'active') vencer(); });
+    return () => { clearInterval(timer); sub.remove(); };
+  }, [venceEn]);
 
   const agregar = (
     nid: number,
@@ -190,8 +225,23 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
     setNegocioId(nid);
     setNegocioNombre(nombre);
+    const vencePrecio = p.precio_vence_at ? Date.parse(p.precio_vence_at) : Date.now() + DURACION_CARRITO;
+    setVenceEn(prev => Math.min(items.length && prev && negocioId === nid ? prev : Date.now() + DURACION_CARRITO, vencePrecio));
     // De otra tienda solo pueden quedar líneas saliendo: esas no se conservan.
-    setLineas(prev => sumarLinea(negocioId === nid ? prev : [], crearLinea(p, opciones, cantidad)));
+    setLineas(prev => {
+      const actuales = negocioId === nid ? prev : [];
+      const reservado = actuales.find(i => i.producto_id === p.id && !i.saleEn);
+      const nueva = crearLinea(p, opciones, cantidad);
+      // Otra combinación del mismo producto usa la reserva que ya tiene en el carrito.
+      if (reservado) {
+        nueva.precio = reservado.precio;
+        nueva.precio_token = reservado.precio_token;
+        nueva.precio_vence_at = reservado.precio_vence_at;
+        nueva.precioVigente = reservado.precioVigente;
+        nueva.precioAvisado = reservado.precioAvisado;
+      }
+      return sumarLinea(actuales, nueva);
+    });
     return true;
   };
 
@@ -206,6 +256,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   ) => {
     setNegocioId(nid);
     setNegocioNombre(nombre);
+    setVenceEn(Math.min(Date.now() + DURACION_CARRITO, p.precio_vence_at ? Date.parse(p.precio_vence_at) : Infinity));
     setLineas([crearLinea(p, opciones, cantidad)]);
   };
 
@@ -274,10 +325,26 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
+  const revisarPrecios = (productos: Producto[]) => {
+    const precios = new Map(productos.map(p => [p.id, p.precio]));
+    setLineas(prev => {
+      const nuevas = prev.map(i => precios.has(i.producto_id) && precios.get(i.producto_id) !== i.precioVigente
+        ? { ...i, precioVigente: precios.get(i.producto_id) } : i);
+      return nuevas.some((i, idx) => i !== prev[idx]) ? nuevas : prev;
+    });
+  };
+  const cambiosPrecio = items.filter((i, idx) => i.precioVigente != null && i.precioVigente !== i.precio && i.precioVigente !== i.precioAvisado
+    && items.findIndex(j => j.producto_id === i.producto_id) === idx);
+  const resolverCambioPrecio = (productoId: number, conservar: boolean) => {
+    setLineas(prev => conservar ? prev.map(i => i.producto_id === productoId ? { ...i, precioAvisado: i.precioVigente } : i)
+      : prev.filter(i => i.producto_id !== productoId));
+  };
+
   const vaciar = () => {
     setLineas([]);
     setNegocioId(null);
     setNegocioNombre(null);
+    setVenceEn(null);
   };
 
   const count = items.reduce((s, i) => s + i.cantidad, 0);
@@ -292,6 +359,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         lineas,
         count,
         total,
+        venceEn,
+        cambiosPrecio,
+        revisarPrecios,
+        resolverCambioPrecio,
         agregar,
         reemplazar,
         cambiar,

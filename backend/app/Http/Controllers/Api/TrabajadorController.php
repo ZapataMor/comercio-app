@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Cita;
 use App\Models\InvitacionTrabajo;
 use App\Models\Negocio;
 use App\Models\User;
@@ -10,6 +11,7 @@ use App\Notifications\InvitacionTrabajoRecibida;
 use App\Support\Push;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -167,8 +169,12 @@ class TrabajadorController extends Controller
             return response()->json(['message' => 'No puedes quitar a un propietario.'], 422);
         }
 
-        // Se elimina la membresía; su cuenta y su historial de pedidos quedan intactos.
-        $negocio->miembros()->detach($userId);
+        DB::transaction(function () use ($negocio, $request, $userId) {
+            $negocio = Negocio::lockForUpdate()->findOrFail($negocio->id);
+            abort_unless($negocio->esPropietario($request->user()), 403);
+            $this->exigirSinCitas($negocio, $userId);
+            $negocio->miembros()->detach($userId);
+        });
 
         return response()->json(['message' => "{$miembro->nombre_completo} ya no hace parte del negocio."]);
     }
@@ -187,12 +193,23 @@ class TrabajadorController extends Controller
             return response()->json(['message' => 'El propietario no puede renunciar a su propio negocio.'], 422);
         }
 
-        $negocio->miembros()->detach($user->id);
+        DB::transaction(function () use ($negocio, $user) {
+            $negocio = Negocio::lockForUpdate()->findOrFail($negocio->id);
+            $this->exigirSinCitas($negocio, $user->id);
+            $negocio->miembros()->detach($user->id);
+        });
 
         return response()->json(['message' => 'Saliste del negocio.']);
     }
 
     // ---------- Helpers privados ----------
+
+    private function exigirSinCitas(Negocio $negocio, int $userId): void
+    {
+        abort_if(Cita::where('negocio_id', $negocio->id)->where('profesional_id', $userId)
+            ->whereIn('estado', ['pendiente', 'confirmada'])->where('fin', '>', now())->exists(),
+            409, 'Antes de quitar al trabajador, reasigna sus citas pendientes y confirmadas a otro trabajador desde la agenda. El cliente recibirá una notificación.');
+    }
 
     /** Busca por código EXACTO (acepta con o sin '#', en cualquier caja). */
     private function porCodigo(string $codigo): ?User

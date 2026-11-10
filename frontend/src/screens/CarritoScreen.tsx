@@ -183,6 +183,7 @@ export default function CarritoScreen({ navigation }: Props) {
           <Text style={styles.totalValor}>{cop(total)}</Text>
         </View>
         <Text style={styles.notaDomicilio}>El domicilio se suma en el siguiente paso.</Text>
+        <Text style={styles.notaDomicilio}>El carrito vence una hora después de agregar el primer producto. Los precios se conservan durante su vigencia.</Text>
         <PressableScale
           style={[styles.btn, items.length === 0 && styles.btnOff]}
           disabled={items.length === 0}

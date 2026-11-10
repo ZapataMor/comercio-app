@@ -8,6 +8,8 @@ import {
   ComercioPedido,
   confirmarDinero,
   confirmarRecogida,
+  confirmarDevolucion,
+  informarFaltante,
   DineroEstado,
   getPedidoNegocio,
   marcarPedidoListo,
@@ -21,6 +23,7 @@ import { useConfirmar } from '../components/Confirmacion';
 import Icon from '../components/Icon';
 import { haceCuanto, MapaSeguimiento, NotaEnVivo } from '../components/Mapa';
 import MotivoCancelacion from '../components/MotivoCancelacion';
+import ReportarPedido from '../components/ReportarPedido';
 import { NivelBadge } from '../components/Reputacion';
 import { useNegocio } from '../NegocioContext';
 import { RootStackParamList } from '../navTypes';
@@ -81,6 +84,25 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
   // Rechazar (pendiente) o cancelar (aceptado, o listo y nadie lo tomó), con motivo.
   const [cancelando, setCancelando] = useState(false);
   const [enviandoCancelacion, setEnviandoCancelacion] = useState(false);
+  const [faltante, setFaltante] = useState(false);
+
+  async function enviarFaltante(motivo: string) {
+    if (!pedido || !negocioId) return;
+    setEnviando(true);
+    try { await informarFaltante(token, negocioId, pedido.id, motivo); setFaltante(false); await detenerAlarma(pedido.id); await recargar(); toast.info('Cliente avisado', 'Espera su nueva elección o cancelación.'); }
+    catch (e) { toast.error('No se pudo avisar', e instanceof Error ? e.message : 'Error'); }
+    finally { setEnviando(false); }
+  }
+
+  function onDevolucion() {
+    if (!pedido || !negocioId) return;
+    confirmar({ icono: 'caja', titulo: '¿Recibiste el pedido de vuelta?', texto: 'Confirma únicamente cuando el domiciliario haya devuelto el pedido al comercio. Esta acción cierra la devolución.', textoBoton: 'Confirmar devolución',
+      accion: async () => {
+        try { await confirmarDevolucion(token, negocioId, pedido.id); await recargar(); toast.exito('Devolución confirmada'); }
+        catch (e) { toast.error('No se pudo confirmar', e instanceof Error ? e.message : 'Error'); }
+      },
+    });
+  }
 
   async function confirmarCancelacion(motivo: string) {
     if (!pedido || !negocioId) return;
@@ -316,6 +338,7 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
 
       <MotivoCancelacion
         visible={cancelando}
+        obligatorio
         titulo={pedido.estado === 'pendiente' ? 'Rechazar pedido' : 'Cancelar pedido'}
         explicacion={
           pedido.cancelar_penaliza
@@ -328,6 +351,13 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
         onCerrar={() => setCancelando(false)}
         onConfirmar={confirmarCancelacion}
       />
+
+      <MotivoCancelacion visible={faltante} obligatorio titulo="Producto o ingrediente agotado"
+        explicacion="Escribe exactamente qué se agotó y qué alternativas puedes ofrecer. El cliente podrá cambiar su elección o cancelar. No marques listo hasta que responda."
+        motivos={[]} textoBoton="Avisar al cliente" enviando={enviando} onCerrar={() => setFaltante(false)} onConfirmar={enviarFaltante} />
+      {!!pedido.faltante_motivo && <View style={styles.card}><Text style={styles.novedadTxt}>Esperando la elección del cliente: {pedido.faltante_motivo}</Text></View>}
+      {['pendiente', 'aceptado'].includes(pedido.estado) && <PressableScale style={styles.btnRechazar} onPress={() => setFaltante(true)}><Text style={styles.btnRechazarTxt}>Informar producto o ingrediente agotado</Text></PressableScale>}
+      {pedido.puede_confirmar_devolucion && <PressableScale style={styles.btn} onPress={onDevolucion}><Text style={styles.btnTxt}>Confirmar devolución al comercio</Text></PressableScale>}
 
       {/* Efectivo: el negocio dice si el domiciliario le entregó el dinero
           (sube o baja su nivel de confiabilidad). */}
@@ -378,7 +408,7 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
           )}
         </PressableScale>
       ) : pedido.estado === 'aceptado' ? (
-        <PressableScale style={styles.btn} onPress={onListo} disabled={enviando}>
+        <PressableScale style={styles.btn} onPress={onListo} disabled={enviando || !!pedido.faltante_motivo}>
           {enviando ? (
             <ActivityIndicator color={c.onBrand} />
           ) : (
@@ -413,6 +443,7 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
           </Text>
         </PressableScale>
       )}
+      <ReportarPedido id={pedido.id} objetivos={pedido.domiciliario ? ['cliente', 'domiciliario'] : ['cliente']} />
     </ScrollView>
   );
 }

@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Cita;
 use App\Models\Negocio;
 use App\Models\User;
+use App\Notifications\CitaActualizada;
 use App\Support\AgendaCitas;
 use App\Support\HorarioNegocio;
+use App\Support\Push;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -33,10 +35,16 @@ class CitaController extends Controller
         $horas = [];
         foreach (HorarioNegocio::intervalosDeFecha($negocio->horario, $dia) as [$abre, $cierra]) {
             for ($hora = $abre->copy(); $hora->lt($cierra) && $hora->lt($limite); $hora->addMinutes(15)) {
-                if ($hora->lt($dia) || $hora->lte(now()) || $hora->gt(now()->addDays(90))) continue;
+                if ($hora->lt($dia) || $hora->lte(now()) || $hora->gt(now()->addDays(90))) {
+                    continue;
+                }
                 $fin = $hora->copy()->addMinutes($servicio->duracion_minutos);
-                if ($fin->gt($cierra)) continue;
-                if ($ocupadas->contains(fn ($cita) => $cita->inicio->lt($fin) && $cita->fin->gt($hora))) continue;
+                if ($fin->gt($cierra)) {
+                    continue;
+                }
+                if ($ocupadas->contains(fn ($cita) => $cita->inicio->lt($fin) && $cita->fin->gt($hora))) {
+                    continue;
+                }
                 $horas[] = $hora->format('H:i');
             }
         }
@@ -71,7 +79,9 @@ class CitaController extends Controller
             'cliente_telefono' => ['nullable', 'string', 'max:30'],
         ]);
         $cita = AgendaCitas::crear($negocio, $request->user(), $d, $presencial);
-        if (! $presencial) AgendaCitas::avisar($cita, true);
+        if (! $presencial) {
+            AgendaCitas::avisar($cita, true);
+        }
 
         return response()->json(['cita' => AgendaCitas::datos($cita)], 201);
     }
@@ -121,7 +131,9 @@ class CitaController extends Controller
                 abort_unless(AgendaCitas::disponible($negocio, $cita->inicio, $cita->fin), 409, 'El horario de atención cambió. Rechaza la solicitud para que el cliente elija otra hora.');
                 abort_if(AgendaCitas::ocupadas($cita->profesional_id)->whereKeyNot($cita->id)->where('inicio', '<', $cita->fin)->where('fin', '>', $cita->inicio)->lockForUpdate()->first(['id']) !== null, 409, 'El profesional ya tiene otra cita en ese horario.');
             }
-            if ($d['estado'] === 'completada') abort_unless($cita->fin->lte(now()), 422, 'Todavía no termina la cita.');
+            if ($d['estado'] === 'completada') {
+                abort_unless($cita->fin->lte(now()), 422, 'Todavía no termina la cita.');
+            }
             $cita->update(['estado' => $d['estado'], 'motivo' => $d['motivo'] ?? null]);
 
             return $cita;
@@ -144,6 +156,31 @@ class CitaController extends Controller
             return $cita;
         });
         AgendaCitas::avisar($cita, true);
+
+        return response()->json(['cita' => AgendaCitas::datos($cita)]);
+    }
+
+    public function reasignar(Request $request, Negocio $negocio, int $id): JsonResponse
+    {
+        abort_unless($negocio->esPropietario($request->user()), 403);
+        $datos = $request->validate(['profesional_id' => ['required', 'integer']]);
+        AgendaCitas::vencer(negocioId: $negocio->id);
+        $cita = DB::transaction(function () use ($request, $negocio, $id, $datos) {
+            $negocio = Negocio::lockForUpdate()->findOrFail($negocio->id);
+            abort_unless($negocio->esPropietario($request->user()), 403);
+            $cita = Cita::where('negocio_id', $negocio->id)->findOrFail($id);
+            User::whereIn('id', [$cita->profesional_id, $datos['profesional_id']])->orderBy('id')->lockForUpdate()->get();
+            $cita = Cita::lockForUpdate()->findOrFail($id);
+            abort_unless(in_array($cita->estado, ['pendiente', 'confirmada']) && $cita->inicio->gt(now()), 409, 'Solo se reasignan citas futuras pendientes o confirmadas.');
+            $profesional = User::findOrFail($datos['profesional_id']);
+            abort_unless($negocio->esMiembroActivo($profesional) && ! $profesional->suspendido_at, 422, 'Elige a un trabajador activo del negocio.');
+            abort_if($cita->profesional_id === $profesional->id, 422, 'Selecciona otro trabajador.');
+            abort_if(AgendaCitas::ocupadas($profesional->id)->whereKeyNot($id)->where('inicio', '<', $cita->fin)->where('fin', '>', $cita->inicio)->lockForUpdate()->first(['id']), 409, 'Ese trabajador ya tiene una cita en ese horario.');
+            $cita->update(['profesional_id' => $profesional->id]);
+
+            return $cita->load('profesional');
+        });
+        Push::enviar(User::whereKey($cita->cliente_id)->get(), new CitaActualizada($cita, false, true));
 
         return response()->json(['cita' => AgendaCitas::datos($cita)]);
     }

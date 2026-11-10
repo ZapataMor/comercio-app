@@ -29,7 +29,7 @@ class ComercioPedidoController extends Controller
     /** Qué estados entran en cada pestaña del historial. */
     private const GRUPOS = [
         'en_espera' => ['pendiente'],
-        'en_curso' => ['aceptado', 'listo', 'tomado', 'recogido', 'en_camino'],
+        'en_curso' => ['aceptado', 'listo', 'tomado', 'recogido', 'en_camino', 'devolviendo'],
         'entregados' => ['entregado'],
         'cancelados' => ['cancelado'],
     ];
@@ -153,13 +153,13 @@ class ComercioPedidoController extends Controller
         }
 
         $datos = $request->validate([
-            'motivo' => ['nullable', 'string', 'max:255'],
+            'motivo' => ['required', 'string', 'min:5', 'max:255'],
         ]);
 
         $pedido = $negocio->pedidos()->find($id);
         if (! $pedido || ! CancelarPedido::ejecutar($pedido, CancelarPedido::POR_NEGOCIO, $datos['motivo'] ?? null)) {
             return response()->json([
-                'message' => 'Ese pedido ya no se puede cancelar (un domiciliario ya lo tomó o ya terminó).',
+                'message' => 'Solo puedes cancelar antes de marcar el pedido como listo y debes escribir el motivo.',
             ], 409);
         }
 
@@ -196,6 +196,9 @@ class ComercioPedidoController extends Controller
             // Sin aceptar: segundos que quedan antes de que venza.
             'segundos_para_aceptar' => $p->estado === 'pendiente' ? $p->segundosParaAceptar() : null,
             'novedad' => $p->novedad,
+            'faltante_motivo' => $p->faltante_motivo,
+            'puede_confirmar_devolucion' => $p->estado === 'devolviendo',
+            'cliente_no_encontrado_at' => $p->cliente_no_encontrado_at?->toIso8601String(),
             'dinero_estado' => $p->dinero_estado,
             'puede_confirmar_dinero' => $p->puedeConfirmarDinero(),
             'cancelado_por' => $p->cancelado_por,
@@ -256,7 +259,12 @@ class ComercioPedidoController extends Controller
             return response()->json(['message' => 'No se puede marcar listo ese pedido.'], 409);
         }
 
-        $pedido->update(['estado' => 'listo', 'listo_at' => now()]);
+        $afectados = Pedido::whereKey($id)->where('estado', 'aceptado')->whereNull('faltante_motivo')
+            ->update(['estado' => 'listo', 'listo_at' => now()]);
+        if (! $afectados) {
+            return response()->json(['message' => 'El pedido cambió o falta que el cliente resuelva un producto agotado.'], 409);
+        }
+        $pedido->refresh();
 
         // ¿Cumplió el tiempo de preparación que promete? Cuenta desde que lo aceptó.
         if ($pedido->minutos_preparacion) {
@@ -274,7 +282,7 @@ class ComercioPedidoController extends Controller
 
         return response()->json([
             'message' => $domiciliarios->isEmpty()
-                ? 'Pedido listo, pero ahora no hay domiciliarios en turno. Si nadie lo toma, puedes cancelarlo.'
+                ? 'Pedido listo, pero ahora no hay domiciliarios en turno. Avisaremos en cuanto haya uno disponible.'
                 : 'Pedido listo. Avisamos a '.$domiciliarios->count().' domiciliario(s) en turno.',
             'domiciliarios_en_turno' => $domiciliarios->count(),
         ]);
@@ -304,12 +312,17 @@ class ComercioPedidoController extends Controller
             throw ValidationException::withMessages(['codigo' => ['Ese no es el código del domiciliario. Pídeselo de nuevo.']]);
         }
 
-        Pedido::conCodigoDeConfirmacion(fn (string $codigo) => $pedido->update([
-            'estado' => 'recogido',
-            'recogido_at' => now(),
-            // Nace aquí: el cliente se lo da al domiciliario para confirmar la entrega.
-            'codigo_confirmacion' => $codigo,
-        ]));
+        $afectados = Pedido::conCodigoDeConfirmacion(fn (string $codigo) => Pedido::whereKey($id)->where('estado', 'tomado')
+            ->where('codigo_confirmacion', $datos['codigo'])->update([
+                'estado' => 'recogido',
+                'recogido_at' => now(),
+                // Nace aquí: el cliente se lo da al domiciliario para confirmar la entrega.
+                'codigo_confirmacion' => $codigo,
+            ]));
+        if (! $afectados) {
+            return response()->json(['message' => 'El pedido cambió. Actualiza para continuar.'], 409);
+        }
+        $pedido->refresh();
 
         // ¿Recogió en los minutos que prometió al tomarlo? (con margen; si
         // reportó una novedad, la demora queda anotada pero no resta).

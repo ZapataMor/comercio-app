@@ -2,12 +2,14 @@
 
 use App\Models\DeviceToken;
 use App\Models\Negocio;
+use App\Models\Pedido;
 use App\Models\User;
 use App\Notifications\EstadoPedidoActualizado;
 use App\Notifications\NuevoPedidoParaComercio;
 use App\Notifications\PedidoDisponibleParaDomiciliario;
 use App\Notifications\PedidoYaNoDisponible;
 use App\Support\CancelarPedido;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
@@ -38,7 +40,7 @@ function negocioAbierto(): Negocio
 }
 
 /** Crea un pedido en el estado pedido, para el negocio y cliente dados. */
-function pedidoEnEstado(Negocio $negocio, User $cliente, string $estado, ?User $domiciliario = null): App\Models\Pedido
+function pedidoEnEstado(Negocio $negocio, User $cliente, string $estado, ?User $domiciliario = null): Pedido
 {
     return $negocio->pedidos()->create([
         'user_id' => $cliente->id,
@@ -203,7 +205,7 @@ test('cancelar un pedido listo retira la oferta; uno sin ofrecer no avisa', func
     CancelarPedido::ejecutar($aceptado, CancelarPedido::POR_NEGOCIO, null);
     Notification::assertNotSentTo($domiciliario, PedidoYaNoDisponible::class);
 
-    CancelarPedido::ejecutar($listo, CancelarPedido::POR_NEGOCIO, null);
+    CancelarPedido::ejecutar($listo, CancelarPedido::POR_CLIENTE, null);
     Notification::assertSentTo($domiciliario, PedidoYaNoDisponible::class);
 });
 
@@ -295,7 +297,6 @@ test('avanzar el pedido a entregado notifica al cliente', function () {
         fn (EstadoPedidoActualizado $n) => $n->pedido->estado === 'entregado');
 });
 
-
 test('el push de recogido le trae el código de entrega al cliente', function () {
     $pedido = pedidoEnEstado(negocioAbierto(), usuarioCon('usuario'), 'recogido');
     $pedido->update(['codigo_confirmacion' => '4821']);
@@ -308,7 +309,7 @@ test('el push de recogido le trae el código de entrega al cliente', function ()
 test('los push salen en cola para no frenar el pedido', function () {
     $pedido = pedidoEnEstado(negocioAbierto(), usuarioCon('usuario'), 'pendiente');
 
-    expect(new NuevoPedidoParaComercio($pedido))->toBeInstanceOf(Illuminate\Contracts\Queue\ShouldQueue::class)
-        ->and(new PedidoDisponibleParaDomiciliario($pedido))->toBeInstanceOf(Illuminate\Contracts\Queue\ShouldQueue::class)
-        ->and(new EstadoPedidoActualizado($pedido))->toBeInstanceOf(Illuminate\Contracts\Queue\ShouldQueue::class);
+    expect(new NuevoPedidoParaComercio($pedido))->toBeInstanceOf(ShouldQueue::class)
+        ->and(new PedidoDisponibleParaDomiciliario($pedido))->toBeInstanceOf(ShouldQueue::class)
+        ->and(new EstadoPedidoActualizado($pedido))->toBeInstanceOf(ShouldQueue::class);
 });

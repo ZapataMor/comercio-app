@@ -3,24 +3,24 @@
 namespace App\Support;
 
 use App\Models\Pedido;
+use App\Models\PedidoReporte;
+use App\Notifications\EstadoPedidoActualizado;
 use App\Notifications\PedidoCancelado;
 use App\Notifications\PedidoYaAtendido;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Cancelar un pedido antes de que salga del negocio.
  *
- *  - El CLIENTE puede cancelar mientras el negocio no lo tenga listo
- *    ('pendiente' o 'aceptado').
- *  - El NEGOCIO puede rechazarlo mientras está 'pendiente', cancelarlo
- *    después de aceptarlo (sin consecuencias los primeros minutos, ver
- *    penaliza()) o cancelarlo si está 'listo' y ningún domiciliario lo ha
- *    tomado (nadie disponible).
+ *  - El CLIENTE puede cancelar hasta antes de 'en_camino'. Si ya fue
+ *    recogido, pasa a devolución hasta que el comercio confirme la recepción.
+ *  - El NEGOCIO puede rechazarlo o cancelarlo antes de marcarlo listo,
+ *    dejando un motivo escrito. Ver penaliza() para lo ya aceptado.
  *  - El SISTEMA lo cancela si nadie del negocio respondió a tiempo
  *    (comando `pedidos:vencer`).
  *
- * Después de que un domiciliario lo toma ya no se cancela desde la app.
- * El cambio es un update condicional: si en el mismo instante un domiciliario
- * lo toma, gana uno solo y el otro recibe "ya no se puede".
+ * El bloqueo y las transiciones condicionales evitan cancelar al mismo
+ * tiempo que el domiciliario sale en camino o confirma una entrega.
  */
 class CancelarPedido
 {
@@ -29,6 +29,9 @@ class CancelarPedido
     public const POR_NEGOCIO = 'negocio';
 
     public const POR_SISTEMA = 'sistema';
+
+    /** Cierre manual de un pedido atascado (ver AdminPedidoController). */
+    public const POR_ADMIN = 'administrador';
 
     /** Motivos sugeridos en la app (el texto es libre). */
     public const MOTIVOS_NEGOCIO = [
@@ -48,16 +51,16 @@ class CancelarPedido
     public static function estadosPermitidos(string $quien): array
     {
         return match ($quien) {
-            self::POR_NEGOCIO => ['pendiente', 'aceptado', 'listo'],
+            self::POR_NEGOCIO => ['pendiente', 'aceptado'],
             self::POR_SISTEMA => ['pendiente'],
-            default => ['pendiente', 'aceptado'],
+            self::POR_CLIENTE => ['pendiente', 'aceptado', 'listo', 'tomado', 'recogido'],
+            default => [],
         };
     }
 
     /**
      * ¿Si el negocio cancela ahora, baja su confiabilidad? Solo si lo aceptó
-     * hace más de `reputacion.minutos_cancelacion_libre`. Un pedido listo que
-     * nadie toma no cuenta: ahí la falta no es del negocio.
+     * hace más de `reputacion.minutos_cancelacion_libre`.
      */
     public static function penaliza(Pedido $pedido): bool
     {
@@ -67,39 +70,51 @@ class CancelarPedido
 
     public static function puede(Pedido $pedido, string $quien): bool
     {
-        return in_array($pedido->estado, self::estadosPermitidos($quien), true)
-            && $pedido->domiciliario_id === null;
+        return in_array($pedido->estado, self::estadosPermitidos($quien), true);
     }
 
     /** Cancela y avisa a la otra parte. Devuelve false si ya no se podía. */
     public static function ejecutar(Pedido $pedido, string $quien, ?string $motivo): bool
     {
-        $penalizar = $quien === self::POR_NEGOCIO && self::penaliza($pedido);
-        $estabaOfrecido = $pedido->estado === 'listo';
-
-        $afectados = Pedido::whereKey($pedido->id)
-            ->whereIn('estado', self::estadosPermitidos($quien))
-            ->whereNull('domiciliario_id')
-            ->update([
-                'estado' => 'cancelado',
+        $resultado = DB::transaction(function () use ($pedido, $quien, $motivo) {
+            $actual = Pedido::whereKey($pedido->id)->lockForUpdate()->first();
+            if (! $actual || ! self::puede($actual, $quien)) {
+                return null;
+            }
+            $devolver = $actual->estado === 'recogido';
+            $resultado = ['ofrecido' => $actual->estado === 'listo', 'penalizar' => $quien === self::POR_NEGOCIO && self::penaliza($actual)];
+            $actual->update([
+                'estado' => $devolver ? 'devolviendo' : 'cancelado',
                 'cancelado_por' => $quien,
                 'motivo_cancelacion' => $motivo ? mb_substr(trim($motivo), 0, 255) : null,
-                'cancelado_at' => now(),
+                'cancelado_at' => $devolver ? null : now(),
+                'codigo_confirmacion' => null,
             ]);
+            if ($quien === self::POR_SISTEMA || $quien === self::POR_NEGOCIO) {
+                PedidoReporte::registrar($actual, 'negocio', $quien === self::POR_SISTEMA ? 'sin_aceptar' : 'cancelacion_comercio', $motivo ?: 'El comercio no aceptó el pedido dentro del tiempo establecido.');
+            }
 
-        if (! $afectados) {
+            return $resultado;
+        });
+        if (! $resultado) {
             return false;
         }
 
         $pedido->refresh();
 
-        if ($penalizar && $pedido->negocio) {
+        if ($resultado['penalizar'] && $pedido->negocio) {
             Reputacion::registrar(Reputacion::NEGOCIO, $pedido->negocio, 'cancelo_tras_aceptar', $pedido);
         }
 
         self::avisar($pedido, $quien);
 
-        if ($estabaOfrecido) {
+        if ($pedido->domiciliario) {
+            Push::enviar($pedido->domiciliario, new EstadoPedidoActualizado($pedido, $pedido->estado === 'devolviendo'
+                ? ['Devuelve el pedido al comercio', 'El cliente canceló antes de salir en camino. El comercio debe confirmar la devolución.']
+                : ['Pedido cancelado', 'El cliente canceló el pedido. Ya no debes recogerlo.']));
+        }
+
+        if ($resultado['ofrecido']) {
             OfrecerPedido::retirar($pedido);
         }
 

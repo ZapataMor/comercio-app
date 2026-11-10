@@ -8,6 +8,8 @@ import React from 'react';
 import ReactTestRenderer, { act } from 'react-test-renderer';
 import { Producto } from '../src/api';
 import { CartProvider, useCart } from '../src/CartContext';
+const raices: ReactTestRenderer.ReactTestRenderer[] = [];
+afterEach(() => { act(() => { raices.splice(0).forEach(raiz => raiz.unmount()); }); });
 
 function producto(id: number, nombre: string, precio: number): Producto {
   return { id, nombre, descripcion: null, precio, disponible: true, categoria: null };
@@ -21,11 +23,11 @@ function montarCarrito() {
     return null;
   }
   act(() => {
-    ReactTestRenderer.create(
+    raices.push(ReactTestRenderer.create(
       <CartProvider>
         <Sonda />
       </CartProvider>,
-    );
+    ));
   });
   return api;
 }

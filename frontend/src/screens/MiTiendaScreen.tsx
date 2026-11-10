@@ -21,7 +21,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { ClaveHorario, Coordenadas, DiaSemana, HorarioSemana, imagenUrl, Negocio } from '../api';
+import { ClaveHorario, Coordenadas, DiaSemana, HorarioSemana, imagenUrl, Negocio, eliminarNegocio } from '../api';
+import { useAuth } from '../AuthContext';
+import { useConfirmar } from '../components/Confirmacion';
 import { FadeInView, PressableScale } from '../components/anim';
 import BarrioSelect from '../components/BarrioSelect';
 import { DropdownMultiple } from '../components/Dropdown';
@@ -84,7 +86,9 @@ function categoriasDe(n: Negocio): string[] {
 export default function MiTiendaScreen({ navigation, route }: Props) {
   const { c } = useTheme();
   const styles = useStyles();
-  const { negocio: negocioActivo, cargando, crear, guardar, esPropietario } = useNegocio();
+  const { negocio: negocioActivo, cargando, crear, guardar, esPropietario, recargar } = useNegocio();
+  const { auth } = useAuth();
+  const confirmar = useConfirmar();
   const toast = useToast();
   // `nuevo`: crear OTRO negocio (no editar el activo). Sin negocios, también se crea.
   const creando = !!route.params?.nuevo || (!cargando && !negocioActivo);
@@ -353,6 +357,15 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
             Eres trabajador de este negocio: solo el propietario puede editar su información.
           </Text>
         )}
+        {esPropietario && <TouchableOpacity onPress={() => confirmar({
+          icono: 'basura', titulo: '¿Eliminar este negocio?',
+          texto: 'Primero debes terminar o cancelar todos sus pedidos activos. Al eliminarlo, avisaremos a los clientes con citas futuras y conservaremos el historial de pedidos.',
+          textoBoton: 'Eliminar negocio', peligro: true,
+          accion: async () => {
+            try { await eliminarNegocio(auth!.token, negocio.id); await recargar(); navigation.navigate('MisNegocios'); toast.exito('Negocio eliminado'); }
+            catch (e) { toast.error('No se pudo eliminar', messageFromError(e)); }
+          },
+        })}><Text style={[styles.cancelar, { color: c.danger }]}>Eliminar negocio</Text></TouchableOpacity>}
       </ScrollView>
     );
   }

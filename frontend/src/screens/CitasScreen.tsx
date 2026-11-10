@@ -17,6 +17,9 @@ import {
   getCitas,
   getServicios,
   Servicio,
+  getEquipo,
+  MiembroNegocio,
+  reasignarCita,
 } from '../api';
 import { useAuth } from '../AuthContext';
 import { estadosCita, fechaCita } from '../citas';
@@ -60,6 +63,10 @@ export default function CitasScreen({ route, navigation }: Props) {
   } | null>(null);
   const [motivo, setMotivo] = useState('');
   const [errorDecision, setErrorDecision] = useState('');
+  const [porReasignar, setPorReasignar] = useState<Cita | null>(null);
+  const [equipo, setEquipo] = useState<MiembroNegocio[]>([]);
+  const [errorReasignar, setErrorReasignar] = useState('');
+  const propietario = negocios.find(n => n.id === negocioId)?.rol === 'propietario';
   const consulta = useRef(0);
   const cargar = useCallback(
     async (pag = 1) => {
@@ -123,6 +130,19 @@ export default function CitasScreen({ route, navigation }: Props) {
     } finally {
       setOcupado(false);
     }
+  }
+  async function elegirProfesional(cita: Cita) {
+    if (!negocioId) return;
+    setPorReasignar(cita); setEquipo([]); setErrorReasignar('');
+    try { setEquipo((await getEquipo(token, negocioId)).miembros.filter(m => m.id !== cita.profesional_id && m.activo)); }
+    catch (e) { setErrorReasignar(messageFromError(e)); }
+  }
+  async function reasignar(profesionalId: number) {
+    if (!negocioId || !porReasignar || ocupado) return;
+    setOcupado(true);
+    try { await reasignarCita(token, negocioId, porReasignar.id, profesionalId); setPorReasignar(null); await cargar(); toast.exito('Cita reasignada', 'El cliente recibió el aviso con el nuevo profesional.'); }
+    catch (e) { setErrorReasignar(messageFromError(e)); }
+    finally { setOcupado(false); }
   }
   function confirmarAccion(cita: Cita, estado: Cita['estado']) {
     confirmar({
@@ -251,6 +271,11 @@ export default function CitasScreen({ route, navigation }: Props) {
             {!!cita.notas && <Text style={styles.texto}>{cita.notas}</Text>}
             {!!cita.motivo && <Text style={styles.detalle}>{cita.motivo}</Text>}
             <View style={styles.acciones}>
+              {gestion && propietario && ['pendiente', 'confirmada'].includes(cita.estado) && (
+                <TouchableOpacity disabled={ocupado} style={styles.secundario} onPress={() => elegirProfesional(cita)}>
+                  <Text style={styles.enlace}>Reasignar a otro trabajador</Text>
+                </TouchableOpacity>
+              )}
               {gestion && cita.estado === 'pendiente' && (
                 <>
                   <TouchableOpacity
@@ -321,6 +346,16 @@ export default function CitasScreen({ route, navigation }: Props) {
           </TouchableOpacity>
         )}
       </ScrollView>
+      <Modal visible={porReasignar !== null} transparent animationType="slide" onRequestClose={() => { if (!ocupado) setPorReasignar(null); }}>
+        <View style={styles.modalFondo}><ScrollView style={styles.modal} contentContainerStyle={styles.contenido}>
+          <Text style={styles.nombre}>Reasignar cita</Text>
+          <Text style={styles.texto}>Conservaremos la fecha y la hora. El cliente recibirá una notificación con el nuevo profesional.</Text>
+          {!!errorReasignar && <Text style={styles.error}>{errorReasignar}</Text>}
+          {!equipo.length && <Text style={styles.detalle}>No hay otro trabajador disponible en el equipo. Agrega uno antes de retirar al profesional.</Text>}
+          {equipo.map(m => <TouchableOpacity key={m.id} style={styles.secundario} disabled={ocupado} onPress={() => reasignar(m.id)}><Text style={styles.enlace}>{m.name}</Text></TouchableOpacity>)}
+          <TouchableOpacity disabled={ocupado} onPress={() => setPorReasignar(null)}><Text style={styles.enlace}>Volver</Text></TouchableOpacity>
+        </ScrollView></View>
+      </Modal>
       <Modal
         visible={servicios !== null}
         transparent

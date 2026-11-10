@@ -19,10 +19,12 @@ Route::post('/login', [AuthWebController::class, 'login'])->middleware('throttle
 Route::post('/logout', [AuthWebController::class, 'logout'])->name('logout');
 
 // --- Zona del ADMINISTRADOR (sesión + rol administrador) ---
-Route::middleware(['auth', 'role:administrador'])->prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['auth', 'auth.session', 'role:administrador'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', [AdminController::class, 'index'])->name('panel');
     Route::get('/usuarios', [AdminController::class, 'usuarios'])->name('usuarios');
     Route::post('/usuarios', [AdminController::class, 'storeUsuario'])->name('usuarios.store');
     Route::put('/usuarios/{usuario}/rol', [AdminController::class, 'updateRol'])->name('usuarios.rol');
     Route::get('/negocios', [AdminController::class, 'negocios'])->name('negocios');
+    Route::get('/reportes', [AdminController::class, 'reportes'])->name('reportes');
+    Route::put('/reportes/{id}/resolver', [AdminController::class, 'resolverReporte'])->whereNumber('id')->name('reportes.resolver');
 });

@@ -60,6 +60,7 @@ function navigateFromData(data: PushData, user: Usuario) {
 
   const roles = user.roles ?? [];
   const pedidoId = Number(data.pedido_id);
+  if (data.tipo === 'precio_carrito') { navigationRef.navigate('Carrito'); return; }
 
   if (data.tipo === 'estado_pedido' && roles.includes('usuario') && Number.isFinite(pedidoId)) {
     navigationRef.navigate('PedidoDetalle', { id: pedidoId });
@@ -77,7 +78,7 @@ function navigateFromData(data: PushData, user: Usuario) {
   }
 
   // El cliente canceló un pedido de uno de mis negocios.
-  if (data.tipo === 'pedido_cancelado' && Number.isFinite(pedidoId)) {
+  if (['pedido_cancelado', 'pedido_negocio_actualizado'].includes(data.tipo ?? '') && Number.isFinite(pedidoId)) {
     const negocioId = Number(data.negocio_id);
     navigationRef.navigate('ComercioPedidoDetalle', {
       pedidoId,
@@ -91,7 +92,7 @@ function navigateFromData(data: PushData, user: Usuario) {
     return;
   }
 
-  if (data.tipo === 'pedido_disponible' && roles.includes('domiciliario')) {
+  if (['pedido_disponible', 'entrega_actualizada'].includes(data.tipo ?? '') && roles.includes('domiciliario')) {
     abrirEntregas();
     return;
   }

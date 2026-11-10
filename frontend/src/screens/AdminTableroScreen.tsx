@@ -123,6 +123,13 @@ export default function AdminTableroScreen({ navigation }: Props) {
       </FadeInView>
 
       <FadeInView delay={20}>
+        <PressableScale style={styles.item} onPress={() => navigation.navigate('AdminReportes')}>
+          <Icon name="alerta" size={24} color={c.accent} style={styles.itemEmoji} />
+          <Text style={styles.itemTitulo}>Reportes de incumplimiento ({stats?.reportes_pendientes ?? 0})</Text>
+          <Icon name="chevron" size={20} color={c.chevron} />
+        </PressableScale>
+      </FadeInView>
+      <FadeInView delay={20}>
         <PressableScale style={styles.item} onPress={() => navigation.navigate('Mapa', { admin: true })}>
           <Icon name="moto" size={24} color={c.accent} style={styles.itemEmoji} />
           <Text style={styles.itemTitulo}>Mapa de domiciliarios y negocios</Text>
@@ -142,6 +149,16 @@ export default function AdminTableroScreen({ navigation }: Props) {
         <PressableScale style={styles.item} onPress={() => navigation.navigate('AdminResenas')}>
           <Icon name="estrella" size={24} color={c.accent} style={styles.itemEmoji} />
           <Text style={styles.itemTitulo}>Reseñas</Text>
+          <Icon name="chevron" size={20} color={c.chevron} />
+        </PressableScale>
+      </FadeInView>
+
+      <FadeInView delay={70}>
+        <PressableScale style={styles.item} onPress={() => navigation.navigate('AdminPedidos')}>
+          <Icon name="bolsa" size={24} color={c.accent} style={styles.itemEmoji} />
+          <Text style={styles.itemTitulo}>
+            Pedidos en curso{stats?.pedidos_en_curso ? ` (${stats.pedidos_en_curso})` : ''}
+          </Text>
           <Icon name="chevron" size={20} color={c.chevron} />
         </PressableScale>
       </FadeInView>

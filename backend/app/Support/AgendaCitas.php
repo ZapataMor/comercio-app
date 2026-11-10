@@ -27,7 +27,9 @@ class AgendaCitas
     public static function disponible(Negocio $negocio, Carbon $inicio, Carbon $fin): bool
     {
         foreach (HorarioNegocio::intervalosDeFecha($negocio->horario, $inicio) as [$abre, $cierra]) {
-            if ($inicio->gte($abre) && $fin->lte($cierra)) return true;
+            if ($inicio->gte($abre) && $fin->lte($cierra)) {
+                return true;
+            }
         }
 
         return false;
@@ -58,7 +60,9 @@ class AgendaCitas
             // Todos los escritores de la agenda toman estos bloqueos en el mismo orden.
             $negocio = Negocio::lockForUpdate()->findOrFail($negocio->id);
             abort_if($negocio->archivado_at || $negocio->estaVetado(), 404, 'Negocio no disponible.');
-            if ($presencial) abort_unless($negocio->esMiembroActivo($usuario), 403);
+            if ($presencial) {
+                abort_unless($negocio->esMiembroActivo($usuario), 403);
+            }
             $profesional = User::lockForUpdate()->findOrFail($datos['profesional_id']);
             abort_unless($negocio->esMiembroActivo($profesional), 422, 'El profesional ya no está disponible en este negocio.');
             $servicio = Servicio::where('negocio_id', $negocio->id)->where('disponible', true)->where('permite_citas', true)->lockForUpdate()->findOrFail($datos['servicio_id']);
@@ -85,6 +89,34 @@ class AgendaCitas
                 'notas' => $datos['notas'] ?? null,
             ]);
         });
+    }
+
+    /**
+     * Cancela las citas futuras (pendientes o confirmadas) de `$citas` y avisa
+     * a la otra parte. Para cuando la cita ya no se puede cumplir: el profesional
+     * salió del negocio, el negocio cerró o el cliente eliminó su cuenta.
+     *
+     * @return int cuántas se cancelaron
+     */
+    public static function cancelarFuturas(Builder $citas, string $motivo, bool $alNegocio = false): int
+    {
+        $total = 0;
+        $futuras = $citas->whereIn('estado', ['pendiente', 'confirmada'])->where('fin', '>', now())->get();
+
+        foreach ($futuras as $cita) {
+            $cambio = Cita::whereKey($cita->id)
+                ->whereIn('estado', ['pendiente', 'confirmada'])
+                ->update(['estado' => 'cancelada', 'motivo' => $motivo, 'updated_at' => now()]);
+
+            if ($cambio) {
+                $cita->estado = 'cancelada';
+                $cita->motivo = $motivo;
+                self::avisar($cita, $alNegocio);
+                $total++;
+            }
+        }
+
+        return $total;
     }
 
     public static function avisar(Cita $cita, bool $alNegocio = false): void

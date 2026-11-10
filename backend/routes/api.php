@@ -1,10 +1,12 @@
 <?php
 
 use App\Http\Controllers\Api\AdminController;
+use App\Http\Controllers\Api\AdminPedidoController;
 use App\Http\Controllers\Api\AdminReputacionController;
 use App\Http\Controllers\Api\AdminResenaController;
 use App\Http\Controllers\Api\AjusteController;
 use App\Http\Controllers\Api\BarrioController;
+use App\Http\Controllers\Api\CarritoController;
 use App\Http\Controllers\Api\CatalogoController;
 use App\Http\Controllers\Api\CitaController;
 use App\Http\Controllers\Api\ClienteDireccionController;
@@ -14,6 +16,8 @@ use App\Http\Controllers\Api\DeviceTokenController;
 use App\Http\Controllers\Api\DomiciliarioController as ApiDomiciliarioController;
 use App\Http\Controllers\Api\InvitacionController;
 use App\Http\Controllers\Api\PedidoController as ApiPedidoController;
+use App\Http\Controllers\Api\PedidoIncidenciaController;
+use App\Http\Controllers\Api\PedidoReporteController;
 use App\Http\Controllers\Api\RecetaPreferidaController;
 use App\Http\Controllers\Api\RecuperarClaveController;
 use App\Http\Controllers\Api\ResenaController;
@@ -26,6 +30,11 @@ use App\Http\Controllers\ProductoController;
 use App\Http\Controllers\ServicioController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+
+// Los identificadores de las rutas son siempre números: /pedidos/abc responde
+// 404 en vez de reventar en el controlador.
+Route::pattern('id', '[0-9]{1,18}');
+Route::pattern('userId', '[0-9]{1,18}');
 
 // Rutas públicas de autenticación.
 // Límites de intentos con nombre: ver AppServiceProvider::limitesDeIntentos().
@@ -104,8 +113,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/citas', [CitaController::class, 'negocio']);
         Route::post('/citas', [CitaController::class, 'presencial']);
         Route::put('/citas/{id}', [CitaController::class, 'actualizar'])->whereNumber('id');
+        Route::put('/citas/{id}/reasignar', [CitaController::class, 'reasignar']);
         // Datos del negocio: solo el propietario los edita.
         Route::put('/', [NegocioController::class, 'update']);
+        Route::delete('/', [NegocioController::class, 'destroy']);
 
         Route::get('/servicios', [ServicioController::class, 'index']);
         Route::post('/servicios', [ServicioController::class, 'store']);
@@ -136,6 +147,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/pedidos/{id}/recogido', [ComercioPedidoController::class, 'recogido'])->middleware('throttle:codigo-pedido');
         // Rechazar (pendiente), cancelar lo aceptado o lo listo sin domiciliario, con motivo.
         Route::put('/pedidos/{id}/cancelar', [ComercioPedidoController::class, 'cancelar']);
+        Route::put('/pedidos/{id}/faltante', [PedidoIncidenciaController::class, 'faltante']);
+        Route::put('/pedidos/{id}/devolucion', [PedidoIncidenciaController::class, 'devolucion']);
         // Efectivo: ¿el domiciliario entregó el dinero? (afecta su confiabilidad).
         Route::put('/pedidos/{id}/dinero', [ComercioPedidoController::class, 'confirmarDinero']);
 
@@ -162,10 +175,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/cliente/direcciones', [ClienteDireccionController::class, 'index']);
     Route::post('/cliente/direcciones', [ClienteDireccionController::class, 'store']);
     Route::post('/pedidos', [ApiPedidoController::class, 'store']);
+    Route::put('/carrito', [CarritoController::class, 'actualizar']);
     Route::get('/pedidos', [ApiPedidoController::class, 'index']);
     Route::get('/pedidos/{id}', [ApiPedidoController::class, 'show']);
     // Cancelar mientras el negocio no lo tenga listo.
     Route::post('/pedidos/{id}/cancelar', [ApiPedidoController::class, 'cancelar']);
+    Route::put('/pedidos/{id}/ajuste', [PedidoIncidenciaController::class, 'ajustar']);
+    Route::post('/pedidos/{id}/reporte', [PedidoReporteController::class, 'store']);
     // Tarifa de domicilio vigente (para mostrar el total en el checkout).
     Route::get('/ajustes', [AjusteController::class, 'publicos']);
     // Al terminar: ¿el negocio y el domiciliario cumplieron? (reputación).
@@ -186,6 +202,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/usuarios/{usuario}/suspender', [AdminController::class, 'suspender']);
         Route::put('/usuarios/{usuario}/reactivar', [AdminController::class, 'reactivar']);
         Route::get('/negocios', [AdminController::class, 'negocios']);
+        // Pedidos en curso y cierre manual de los que se atascan.
+        Route::get('/pedidos', [AdminPedidoController::class, 'index']);
+        Route::get('/reportes', [PedidoReporteController::class, 'index']);
+        Route::put('/reportes/{id}/resolver', [PedidoReporteController::class, 'resolver']);
+        Route::put('/pedidos/{id}/cerrar', [AdminPedidoController::class, 'cerrar']);
         // Mapa: dónde están los domiciliarios que reportaron su posición hace poco.
         Route::get('/mapa/domiciliarios', [AdminController::class, 'mapaDomiciliarios']);
         // Tarifa de domicilio (aplica a los pedidos nuevos).
@@ -226,6 +247,8 @@ Route::middleware('auth:sanctum')->group(function () {
         // Devolver un pedido tomado: solo antes de recogerlo.
         Route::put('/pedidos/{id}/soltar', [ApiDomiciliarioController::class, 'soltar']);
         Route::put('/pedidos/{id}/en-camino', [ApiDomiciliarioController::class, 'enCamino']);
+        Route::put('/pedidos/{id}/llegada', [ApiDomiciliarioController::class, 'llegada']);
+        Route::put('/pedidos/{id}/cliente-no-encontrado', [ApiDomiciliarioController::class, 'clienteNoEncontrado']);
         // Se confirma con el código que le da el cliente.
         Route::put('/pedidos/{id}/entregado', [ApiDomiciliarioController::class, 'entregado'])->middleware('throttle:codigo-pedido');
     });

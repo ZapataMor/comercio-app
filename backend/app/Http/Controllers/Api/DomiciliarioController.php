@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Pedido;
+use App\Models\PedidoReporte;
+use App\Models\User;
 use App\Notifications\EstadoPedidoActualizado;
 use App\Support\OfrecerPedido;
 use App\Support\Push;
@@ -11,6 +13,7 @@ use App\Support\Reputacion;
 use App\Support\UbicacionDomiciliario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -88,7 +91,7 @@ class DomiciliarioController extends Controller
     public function entregas(Request $request): JsonResponse
     {
         $pedidos = Pedido::where('domiciliario_id', $request->user()->id)
-            ->whereIn('estado', ['tomado', 'recogido', 'en_camino'])
+            ->whereIn('estado', Pedido::EN_RUTA)
             ->with(['negocio', 'cliente', 'items'])
             ->latest('tomado_at')
             ->latest('id')
@@ -169,18 +172,23 @@ class DomiciliarioController extends Controller
         ]);
 
         // Update condicional: evita choques si dos lo toman a la vez.
-        $afectados = Pedido::conCodigoDeConfirmacion(fn (string $codigo) => Pedido::where('id', $id)
-            ->where('estado', 'listo')
-            ->whereNull('domiciliario_id')
-            ->where('user_id', '!=', $request->user()->id)
-            ->update([
-                'estado' => 'tomado',
-                'domiciliario_id' => $request->user()->id,
-                'minutos_recogida' => $datos['minutos_recogida'],
-                'tomado_at' => now(),
-                // Se lo dicta al negocio para que le entregue el pedido.
-                'codigo_confirmacion' => $codigo,
-            ]));
+        $afectados = DB::transaction(function () use ($request, $id, $datos) {
+            $yo = User::lockForUpdate()->findOrFail($request->user()->id);
+            abort_unless($yo->hasRole('domiciliario') && ! $yo->suspendido_at && ! $yo->domiciliarioVetado(), 403, 'Tu cuenta no está habilitada para tomar pedidos.');
+
+            return Pedido::conCodigoDeConfirmacion(fn (string $codigo) => Pedido::where('id', $id)
+                ->where('estado', 'listo')
+                ->whereNull('domiciliario_id')
+                ->where('user_id', '!=', $request->user()->id)
+                ->update([
+                    'estado' => 'tomado',
+                    'domiciliario_id' => $request->user()->id,
+                    'minutos_recogida' => $datos['minutos_recogida'],
+                    'tomado_at' => now(),
+                    // Se lo dicta al negocio para que le entregue el pedido.
+                    'codigo_confirmacion' => $codigo,
+                ]));
+        });
 
         if (! $afectados) {
             return response()->json(['message' => 'Ese pedido ya no está disponible (lo tomó otro domiciliario o se canceló).'], 409);
@@ -246,6 +254,34 @@ class DomiciliarioController extends Controller
         return $this->avanzar($this->pedidoMio($request, $id, 'recogido'), 'en_camino', 'Pedido en camino.');
     }
 
+    public function llegada(Request $request, int $id): JsonResponse
+    {
+        $pedido = $this->pedidoMio($request, $id, 'en_camino');
+        abort_unless($pedido, 409, 'Solo puedes registrar la llegada de una entrega tuya en camino.');
+        Pedido::whereKey($id)->where('estado', 'en_camino')->whereNull('llegada_at')->update(['llegada_at' => now()]);
+
+        return response()->json(['message' => 'Llegada registrada. Contacta al cliente y espera 5 minutos antes de reportarlo como no encontrado.']);
+    }
+
+    public function clienteNoEncontrado(Request $request, int $id): JsonResponse
+    {
+        $pedido = DB::transaction(function () use ($request, $id) {
+            $pedido = Pedido::whereKey($id)->where('domiciliario_id', $request->user()->id)->lockForUpdate()->first();
+            abort_unless($pedido && $pedido->estado === 'en_camino' && $pedido->llegada_at?->lte(now()->subMinutes(5)), 409, 'Debes registrar tu llegada y esperar 5 minutos para marcar Cliente no encontrado.');
+            $pedido->update(['estado' => 'devolviendo', 'cliente_no_encontrado_at' => now(), 'codigo_confirmacion' => null]);
+            PedidoReporte::registrar($pedido, 'cliente', 'cliente_no_encontrado', 'El domiciliario esperó al menos 5 minutos desde su llegada y no encontró al cliente.', $request->user()->id);
+
+            return $pedido;
+        });
+        $aviso = new EstadoPedidoActualizado($pedido, ['Cliente no encontrado', 'El pedido regresa al comercio. El comerciante debe confirmar que lo recibió.']);
+        if ($pedido->cliente) {
+            Push::enviar($pedido->cliente, $aviso);
+        }
+        Push::enviar($pedido->negocio->miembrosActivos()->get(), $aviso);
+
+        return response()->json(['message' => 'Avisamos al cliente y al comercio. Devuelve el pedido al comercio para que confirme la devolución.']);
+    }
+
     /** Confirma la entrega con el código que le da el cliente (queda la hora exacta). */
     public function entregado(Request $request, int $id): JsonResponse
     {
@@ -277,7 +313,7 @@ class DomiciliarioController extends Controller
 
         $pedido = Pedido::where('id', $id)
             ->where('domiciliario_id', $request->user()->id)
-            ->whereIn('estado', ['tomado', 'recogido', 'en_camino'])
+            ->whereIn('estado', Pedido::EN_RUTA)
             ->first();
 
         if (! $pedido) {
@@ -306,7 +342,13 @@ class DomiciliarioController extends Controller
         }
 
         // Marca de tiempo del estado (en_camino_at, entregado_at).
-        $pedido->update(['estado' => $hacia, "{$hacia}_at" => now(), ...$ademas]);
+        $afectados = Pedido::whereKey($pedido->id)->where('estado', $pedido->estado)
+            ->where('domiciliario_id', $pedido->domiciliario_id)
+            ->update(['estado' => $hacia, "{$hacia}_at" => now(), ...$ademas]);
+        if (! $afectados) {
+            return response()->json(['message' => 'El pedido cambió. Actualiza tus entregas.'], 409);
+        }
+        $pedido->refresh();
 
         // Avisa al cliente del nuevo estado (en camino / entregado).
         if ($pedido->cliente) {
@@ -338,6 +380,8 @@ class DomiciliarioController extends Controller
             // El teléfono del cliente solo lo ve quien lleva el pedido.
             'telefono_contacto' => in_array($p->estado, Pedido::EN_RUTA, true) ? $p->telefono_contacto : null,
             'novedad' => $p->novedad,
+            'llegada_at' => $p->llegada_at?->toIso8601String(),
+            'segundos_para_reportar_ausencia' => $p->segundosParaReportarAusencia(),
             'negocio' => $p->negocio ? [
                 'nombre' => $p->negocio->nombre,
                 'direccion' => $p->negocio->direccion,

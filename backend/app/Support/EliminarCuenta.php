@@ -2,9 +2,11 @@
 
 namespace App\Support;
 
+use App\Models\Cita;
 use App\Models\Negocio;
 use App\Models\Pedido;
 use App\Models\User;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -35,27 +37,61 @@ class EliminarCuenta
             return 'Tienes entregas en curso. Termínalas antes de eliminar tu cuenta.';
         }
 
+        // Negocios que se archivarían con la cuenta: sus pedidos vivos se
+        // quedarían sin nadie que los atienda.
+        $conPedidos = $user->negociosActivos()->wherePivot('rol', Negocio::ROL_PROPIETARIO)->get()
+            ->first(fn (Negocio $n) => $n->pedidos()->whereIn('estado', self::EN_CURSO)->exists());
+        if ($conPedidos) {
+            return "{$conPedidos->nombre} tiene pedidos en curso. Termínalos o cancélalos antes de eliminar tu cuenta.";
+        }
+
+        $seArchivan = self::negociosQueSeArchivan($user)->pluck('id');
+        if (Cita::where('profesional_id', $user->id)->whereNotIn('negocio_id', $seArchivan)
+            ->whereIn('estado', ['pendiente', 'confirmada'])->where('fin', '>', now())->exists()) {
+            return 'Tienes citas por atender. Pide al propietario que las reasigne antes de eliminar tu cuenta.';
+        }
+
         return null;
+    }
+
+    /**
+     * Negocios donde la persona es el único propietario activo.
+     *
+     * @return Collection<int, Negocio>
+     */
+    private static function negociosQueSeArchivan(User $user): Collection
+    {
+        return $user->negociosActivos()
+            ->wherePivot('rol', Negocio::ROL_PROPIETARIO)
+            ->get()
+            ->reject(fn (Negocio $negocio) => $negocio->miembrosActivos()
+                ->wherePivot('rol', Negocio::ROL_PROPIETARIO)
+                ->where('users.id', '!=', $user->id)
+                ->exists())
+            ->values();
     }
 
     public static function ejecutar(User $user): void
     {
         DB::transaction(function () use ($user) {
-            // Negocios que quedarían sin ningún propietario activo.
-            $negocios = $user->negociosActivos()
-                ->wherePivot('rol', Negocio::ROL_PROPIETARIO)
-                ->get();
-
-            foreach ($negocios as $negocio) {
-                $otrosPropietarios = $negocio->miembrosActivos()
-                    ->wherePivot('rol', Negocio::ROL_PROPIETARIO)
-                    ->where('users.id', '!=', $user->id)
-                    ->exists();
-
-                if (! $otrosPropietarios) {
-                    $negocio->forceFill(['activo' => false, 'archivado_at' => now()])->save();
-                }
+            Negocio::whereIn('id', $user->negociosActivos()->pluck('negocios.id'))->orderBy('id')->lockForUpdate()->get();
+            $user = User::lockForUpdate()->findOrFail($user->id);
+            abort_if($motivo = self::bloqueo($user), 409, $motivo ?? 'Cuenta con operaciones en curso.');
+            // Negocios que quedarían sin ningún propietario activo: se archivan
+            // y sus citas futuras se cancelan avisando a cada cliente.
+            foreach (self::negociosQueSeArchivan($user) as $negocio) {
+                $negocio->forceFill(['activo' => false, 'archivado_at' => now()])->save();
+                AgendaCitas::cancelarFuturas(Cita::where('negocio_id', $negocio->id), 'El negocio cerró.');
             }
+
+            // En los negocios que siguen, ya no atiende: sus citas se cancelan.
+            AgendaCitas::cancelarFuturas(
+                Cita::where('profesional_id', $user->id),
+                'El profesional ya no atiende en este negocio. Agenda de nuevo con otra persona.',
+            );
+            // Las que pidió como cliente se liberan, y de todas se borran sus datos.
+            AgendaCitas::cancelarFuturas(Cita::where('cliente_id', $user->id), 'El cliente eliminó su cuenta.', alNegocio: true);
+            Cita::where('cliente_id', $user->id)->update(['cliente_nombre' => 'Usuario eliminado', 'cliente_telefono' => null]);
 
             $user->negocios()->detach();
             $user->invitacionesTrabajo()->delete();

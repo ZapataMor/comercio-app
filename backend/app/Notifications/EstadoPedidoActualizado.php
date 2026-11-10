@@ -35,9 +35,7 @@ class EstadoPedidoActualizado extends Notification implements ShouldQueue
     ];
 
     /** @param array{0: string, 1: string}|null $texto  Reemplaza el texto del estado. */
-    public function __construct(public Pedido $pedido, public ?array $texto = null)
-    {
-    }
+    public function __construct(public Pedido $pedido, public ?array $texto = null) {}
 
     public function via(object $notifiable): array
     {
@@ -51,7 +49,7 @@ class EstadoPedidoActualizado extends Notification implements ShouldQueue
             ?? ['Tu pedido se actualizó', $this->pedido->estadoLabel()];
 
         // Para no tener que abrir la app cuando llegue el domiciliario.
-        if (in_array($this->pedido->estado, Pedido::CON_CODIGO_ENTREGA, true) && $this->pedido->codigo_confirmacion) {
+        if ($notifiable->getKey() === $this->pedido->user_id && in_array($this->pedido->estado, Pedido::CON_CODIGO_ENTREGA, true) && $this->pedido->codigo_confirmacion) {
             $cuerpo = "Tu código de entrega es {$this->pedido->codigo_confirmacion}. Dáselo al domiciliario al recibirlo.";
         }
 
@@ -60,9 +58,11 @@ class EstadoPedidoActualizado extends Notification implements ShouldQueue
         ))
             ->android($this->androidAlertaAlta())
             ->data([
-            'tipo' => 'estado_pedido',
-            'pedido_id' => (string) $this->pedido->id,
-            'estado' => $this->pedido->estado,
-        ]);
+                'tipo' => $notifiable->getKey() === $this->pedido->user_id ? 'estado_pedido'
+                    : ($notifiable->getKey() === $this->pedido->domiciliario_id ? 'entrega_actualizada' : 'pedido_negocio_actualizado'),
+                'pedido_id' => (string) $this->pedido->id,
+                'negocio_id' => (string) $this->pedido->negocio_id,
+                'estado' => $this->pedido->estado,
+            ]);
     }
 }

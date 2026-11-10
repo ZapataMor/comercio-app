@@ -432,9 +432,8 @@ export default function LoginScreen({ navigation }: Props) {
   const modo = useModoVitrina();
   const p = PALETA[modo];
   const e = ESTILOS[modo];
-  // Prellenado con el usuario demo para probar rápido.
-  const [email, setEmail] = useState('comerciante@demo.co');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errores, setErrores] = useState<FieldErrors>({});
@@ -782,7 +781,6 @@ export default function LoginScreen({ navigation }: Props) {
                 <TouchableOpacity onPress={() => navigation.navigate('Register')} disabled={cargando}>
                   <Text style={[styles.registro, e.textoAcento]}>¿No tienes cuenta? Regístrate</Text>
                 </TouchableOpacity>
-                <Text style={[styles.hint, e.hint]}>Demo · comerciante@demo.co · password123</Text>
               </Animated.View>
             </Animated.View>
           </View>

@@ -8,6 +8,8 @@ import {
 } from 'react-native';
 import {
   confirmarEntrega,
+  clienteNoEncontrado,
+  registrarLlegada,
   getDisponibles,
   getMiReputacion,
   getMisEntregas,
@@ -31,6 +33,7 @@ import { publicarTurno } from './HeaderTurno';
 import Icon, { IconName } from './Icon';
 import { abrirComoLlegar } from './Mapa';
 import MinutosRecogida from './MinutosRecogida';
+import ReportarPedido from './ReportarPedido';
 
 /** Lo que "Mis entregas" le pide al panel: recargar al deslizar hacia abajo. */
 export type PanelDomiciliarioRef = { recargar: () => Promise<void> };
@@ -158,6 +161,24 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
     }
   }
 
+  async function onLlegada(id: number) {
+    setAvanzando(id);
+    try { await registrarLlegada(token, id); await actualizarAnimado(); toast.info('Llegada registrada', 'Contacta al cliente. Después de 5 minutos podrás marcar Cliente no encontrado.'); }
+    catch (e) { toast.error('No se pudo registrar', e instanceof Error ? e.message : 'Error'); }
+    finally { setAvanzando(null); }
+  }
+
+  function onClienteAusente(pedido: Pedido) {
+    confirmar({ icono: 'alerta', titulo: '¿Cliente no encontrado?',
+      texto: 'Avisaremos al cliente y al comercio. Debes devolver el pedido al comercio y esperar a que confirmen la devolución.',
+      textoBoton: 'Cliente no encontrado', textoCancelar: 'Seguir intentando',
+      accion: async () => {
+        try { await clienteNoEncontrado(token, pedido.id); await actualizarAnimado(); }
+        catch (e) { toast.error('No se pudo reportar', e instanceof Error ? e.message : 'Error'); }
+      },
+    });
+  }
+
   /** Si el código no es correcto, el error lo muestra el mismo campo. */
   async function onEntregar(id: number, codigo: string) {
     await confirmarEntrega(token, id, codigo);
@@ -229,7 +250,7 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
                     style={styles.novedadLink}
                     onPress={() =>
                       abrirComoLlegar(
-                        p.estado !== 'tomado'
+                        !['tomado', 'devolviendo'].includes(p.estado)
                           ? `${p.direccion_entrega}, Maicao, La Guajira`
                           : p.negocio?.lat != null && p.negocio?.lng != null
                             ? { lat: p.negocio.lat, lng: p.negocio.lng }
@@ -238,13 +259,13 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
                     }>
                     <Icon name="ubicacion" size={14} color={c.goldText} />
                     <Text style={styles.novedadLinkTxt}>
-                      {p.estado === 'tomado' ? 'Cómo llegar al negocio' : 'Cómo llegar al cliente'}
+                      {['tomado', 'devolviendo'].includes(p.estado) ? 'Cómo llegar al negocio' : 'Cómo llegar al cliente'}
                     </Text>
                   </PressableScale>
                   <View style={[styles.linea, styles.fila]}>
                     <Icon name="tarjeta" size={14} color={c.text} />
                     <Text style={styles.linea}>
-                      {p.cobrar > 0
+                      {p.estado === 'devolviendo' ? 'Devuelve el pedido al comercio. Espera su confirmación para cerrar la entrega.' : p.cobrar > 0
                         ? `Cobrar al cliente: ${cop(p.cobrar)} en efectivo`
                         : 'Pagado por transferencia: no cobres nada'}
                     </Text>
@@ -253,7 +274,7 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
                     Productos {cop(p.subtotal ?? p.total)} · Domicilio {cop(p.costo_domicilio ?? 0)}
                   </Text>
                   {/* Antes de recoger se coordina con el negocio; después, con el cliente. */}
-                  {p.estado === 'tomado' ? (
+                  {['tomado', 'devolviendo'].includes(p.estado) ? (
                     <BotonesContacto
                       telefono={p.negocio?.telefono}
                       mensaje={`Hola, soy el domiciliario de Vitrina que va por el pedido #${p.codigo}.`}
@@ -267,6 +288,16 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
                     />
                   )}
                   <Novedad pedido={p} onReportada={() => cargar()} />
+                  {p.estado === 'en_camino' && (!p.llegada_at ? (
+                    <Boton icon="ubicacion" texto="Llegué al destino" cargando={avanzando === p.id} onPress={() => onLlegada(p.id)} />
+                  ) : <>
+                    {(p.segundos_para_reportar_ausencia ?? 300) > 0 && <Text style={styles.lineaSub}>Contacta al cliente. Podrás reportar su ausencia en {Math.ceil((p.segundos_para_reportar_ausencia ?? 300) / 60)} min.</Text>}
+                    <PressableScale style={styles.soltar} disabled={p.segundos_para_reportar_ausencia !== 0} onPress={() => onClienteAusente(p)}>
+                      <Text style={styles.soltarTxt}>Cliente no encontrado</Text>
+                    </PressableScale>
+                  </>)}
+                  {p.estado === 'devolviendo' && <Text style={styles.prometido}>Devolución pendiente: el comercio debe confirmar que recibió el pedido.</Text>}
+                  <ReportarPedido id={p.id} objetivos={['cliente', 'negocio']} />
                   {/* El negocio confirma la recogida escribiendo este código. */}
                   {p.estado === 'tomado' && !!p.codigo_recogida && (
                     <VerCodigo

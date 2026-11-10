@@ -210,6 +210,9 @@ export default function EquipoScreen({ navigation }: Props) {
       refreshControl={
         <RefreshControl refreshing={refrescando} onRefresh={refrescar} colors={[c.accent]} tintColor={c.accent} />
       }>
+      {esPropietario && <TouchableOpacity onPress={() => navigation.navigate('AgendaNegocio', { negocioId: negocioId! })}>
+        <Text style={styles.vacioTxt}>Antes de retirar a un trabajador con citas, reasígnalas en la agenda. Abrir agenda →</Text>
+      </TouchableOpacity>}
       <Text style={styles.negocio}>{negocio.nombre}</Text>
 
       {esPropietario && (

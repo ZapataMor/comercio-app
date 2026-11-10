@@ -6,9 +6,11 @@
 import React from 'react';
 import { Text } from 'react-native';
 import ReactTestRenderer, { act } from 'react-test-renderer';
-import { crearPedido, getCatalogo } from '../src/api';
+import { crearPedido, getCatalogo, getTarifaDomicilio } from '../src/api';
 import { ConfirmacionProvider } from '../src/components/Confirmacion';
 import CheckoutScreen from '../src/screens/CheckoutScreen';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { PedidoPendienteProvider } from '../src/PedidoPendienteContext';
 
 jest.mock('../src/AuthContext', () => ({
   useAuth: () => ({ auth: { token: 't', user: { id: 7, telefono: '300' } }, actualizarUsuario: jest.fn() }),
@@ -31,6 +33,7 @@ jest.mock('../src/api', () => ({
   getCatalogo: jest.fn(),
   getClienteDirecciones: jest.fn(async () => [mockDireccion]),
   getTarifaDomicilio: jest.fn(async () => 4000),
+  getPedido: jest.fn(async () => ({ estado: 'pendiente' })),
 }));
 
 const mockToast = { exito: jest.fn(), error: jest.fn(), info: jest.fn() };
@@ -46,7 +49,9 @@ async function montar() {
   await act(async () => {
     raiz = ReactTestRenderer.create(
       <ConfirmacionProvider>
+        <PedidoPendienteProvider>
         <CheckoutScreen navigation={navigation as any} route={{} as any} />
+        </PedidoPendienteProvider>
       </ConfirmacionProvider>,
     );
   });
@@ -66,9 +71,10 @@ async function tocar(inicio: string) {
   });
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   jest.clearAllMocks();
-  mockCrear.mockResolvedValue(undefined);
+  await AsyncStorage.clear();
+  mockCrear.mockResolvedValue(55);
 });
 
 afterEach(() => {
@@ -121,5 +127,25 @@ test('si no se puede consultar la tienda, el pedido sigue', async () => {
 
   await tocar('Confirmar pedido');
 
+  expect(mockCrear).toHaveBeenCalledTimes(1);
+});
+
+test('si no carga la tarifa, no muestra un total incompleto ni permite confirmar', async () => {
+  (getTarifaDomicilio as jest.Mock).mockRejectedValueOnce(new Error('Sin conexión'));
+  await montar();
+  expect(textos()).toContain('Pendiente de tarifa');
+  const botones = raiz.root.findAll(n => n.props.onPress && n.props.disabled === true);
+  expect(botones.length).toBeGreaterThan(0);
+  await tocar('Confirmar pedido');
+  expect(mockCrear).not.toHaveBeenCalled();
+});
+
+test('si se pierde la red al confirmar, el formulario desaparece mientras se reintenta el mismo envío', async () => {
+  mockCatalogo.mockResolvedValue({ negocio: { nombre: 'Arepas Ana' }, productos: [] });
+  mockCrear.mockRejectedValue(new Error('Sin conexión'));
+  await montar();
+  await tocar('Confirmar pedido');
+  expect(textos()).toContain('Enviando tu pedido');
+  expect(textos().some(t => t.startsWith('Confirmar pedido'))).toBe(false);
   expect(mockCrear).toHaveBeenCalledTimes(1);
 });

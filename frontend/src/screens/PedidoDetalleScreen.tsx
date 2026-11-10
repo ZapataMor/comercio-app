@@ -13,6 +13,8 @@ import { haceCuanto, MapaSeguimiento, NotaEnVivo } from '../components/Mapa';
 import MotivoCancelacion from '../components/MotivoCancelacion';
 import { NivelBadge } from '../components/Reputacion';
 import ResenarPedido from '../components/ResenarPedido';
+import AjustarPedido from '../components/AjustarPedido';
+import ReportarPedido from '../components/ReportarPedido';
 import { messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
@@ -29,6 +31,7 @@ const LABEL: Record<string, string> = {
   recogido: 'Recogido',
   en_camino: 'En camino',
   entregado: 'Entregado',
+  devolviendo: 'Devolviendo al comercio',
 };
 
 function cop(n: number) {
@@ -89,6 +92,7 @@ export default function PedidoDetalleScreen({ route }: Props) {
   const [cargando, setCargando] = useState(true);
   const [cancelando, setCancelando] = useState(false);
   const [enviandoCancelacion, setEnviandoCancelacion] = useState(false);
+  const [ajustando, setAjustando] = useState(false);
 
   async function confirmarCancelacion(motivo: string) {
     setEnviandoCancelacion(true);
@@ -144,6 +148,17 @@ export default function PedidoDetalleScreen({ route }: Props) {
       // Aire abajo para la barra flotante fija (Carrito / Mis pedidos).
       contentContainerStyle={{ padding: 16, paddingBottom: 110 }}>
       <Text style={styles.titulo}>Pedido #{pedido.codigo}</Text>
+      {pedido.estado === 'devolviendo' && <View style={styles.card}>
+        <Text style={styles.cardTitulo}>{pedido.cliente_no_encontrado_at ? 'Cliente no encontrado' : 'Pedido en devolución'}</Text>
+        <Text style={styles.lineaTxt}>El domiciliario devuelve el pedido al comercio. Se cerrará cuando el comercio confirme la devolución.</Text>
+      </View>}
+      {!!pedido.faltante_motivo && pedido.estado === 'aceptado' && <View style={styles.card}>
+        <Text style={styles.cardTitulo}>Hay un producto o ingrediente agotado</Text>
+        <Text style={styles.lineaTxt}>{pedido.faltante_motivo}</Text>
+        <TouchableOpacity onPress={() => setAjustando(true)}><Text style={styles.cancelarTxt}>Cambiar productos o ingredientes</Text></TouchableOpacity>
+        <TouchableOpacity onPress={() => setCancelando(true)}><Text style={styles.cancelarTxt}>Cancelar pedido</Text></TouchableOpacity>
+      </View>}
+      <AjustarPedido pedido={pedido} visible={ajustando} onCerrar={() => setAjustando(false)} onGuardado={() => cargarPedido()} />
       <View style={[styles.sub, styles.fila]}>
         <Icon name="tienda" size={14} color={c.muted} />
         <Text style={styles.sub}>{pedido.negocio}</Text>
@@ -163,6 +178,7 @@ export default function PedidoDetalleScreen({ route }: Props) {
 
       {/* Estrellas y comentario públicos de la tienda y de lo que compró. */}
       <ResenarPedido pedido={pedido} onGuardado={() => cargarPedido()} />
+      <ReportarPedido id={pedido.id} objetivos={pedido.domiciliario ? ['negocio', 'domiciliario'] : ['negocio']} />
 
       {/* Cancelado: en vez de la línea de tiempo, quién y por qué. */}
       {pedido.estado === 'cancelado' ? (
@@ -176,7 +192,11 @@ export default function PedidoDetalleScreen({ route }: Props) {
               ? `${pedido.negocio ?? 'El negocio'} no recibió tu pedido`
               : pedido.cancelado_por === 'negocio'
                 ? `${pedido.negocio ?? 'El negocio'} no pudo atenderlo`
-                : 'Lo cancelaste tú'}
+                : pedido.cancelado_por === 'administrador'
+                  ? 'Vitrina cerró tu pedido'
+                  : pedido.cancelado_por === 'cliente_no_encontrado'
+                    ? 'El comercio recibió la devolución porque no fue posible encontrarte'
+                    : 'Lo cancelaste tú'}
             {pedido.motivo_cancelacion ? `: ${pedido.motivo_cancelacion}` : '.'}
           </Text>
           <Text style={styles.canceladoNota}>No se te cobra nada.</Text>
@@ -273,7 +293,7 @@ export default function PedidoDetalleScreen({ route }: Props) {
       <MotivoCancelacion
         visible={cancelando}
         titulo="Cancelar pedido"
-        explicacion="El negocio todavía no lo ha preparado. Cuéntale por qué lo cancelas (opcional)."
+        explicacion="Puedes cancelar antes de que el domiciliario salga en camino. Si ya lo recogió, tendrá que devolverlo al comercio. Cuéntanos el motivo (opcional)."
         motivos={pedido.motivos_cancelacion ?? []}
         textoBoton="Cancelar pedido"
         enviando={enviandoCancelacion}

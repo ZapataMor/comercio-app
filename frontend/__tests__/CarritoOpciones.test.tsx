@@ -89,6 +89,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+  act(() => raiz?.unmount());
   jest.useRealTimers();
 });
 
@@ -424,7 +425,7 @@ test('lo que está saliendo no se guarda en el teléfono', async () => {
   expect(guardado.items).toEqual([]);
 });
 
-test('un carrito guardado antes de las opciones sigue funcionando', async () => {
+test('un carrito antiguo sin fecha de vencimiento se descarta', async () => {
   await AsyncStorage.setItem(
     'carrito:7',
     JSON.stringify({
@@ -435,9 +436,5 @@ test('un carrito guardado antes de las opciones sigue funcionando', async () => 
   );
   const cart = await montar();
 
-  expect(cart.current.count).toBe(2);
-  act(() => {
-    cart.current.cambiar(lineaDe(cart), 1);
-  });
-  expect(cart.current.count).toBe(3);
+  expect(cart.current.count).toBe(0);
 });

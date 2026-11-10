@@ -50,6 +50,7 @@ test('el carrito sigue ahí al volver a abrir la app', async () => {
   const segunda = await montar();
   expect(segunda.cart.current.count).toBe(1);
   expect(segunda.cart.current.negocioNombre).toBe('Tienda A');
+  segunda.desmontar();
 });
 
 test('otra cuenta en el mismo teléfono no ve ese carrito', async () => {
@@ -62,4 +63,5 @@ test('otra cuenta en el mismo teléfono no ve ese carrito', async () => {
   mockUsuario = 8;
   const deLuis = await montar();
   expect(deLuis.cart.current.count).toBe(0);
+  deLuis.desmontar();
 });

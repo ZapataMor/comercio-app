@@ -159,6 +159,8 @@ export type Producto = {
   nombre: string;
   descripcion: string | null;
   precio: number;
+  precio_token?: string;
+  precio_vence_at?: string;
   tipo_venta?: string; // 'cantidad' | 'peso' | ...
   unidad_medida?: string; // 'unidad' | 'kg' | 'libra' | ...
   precio_formateado?: string; // ej. "$3.200 c/u" o "$8.900 / kg"
@@ -223,10 +225,13 @@ function firstValidationMessage(errors?: ApiValidationErrors): string | undefine
 export class ApiError extends Error {
   status: number;
   errors?: ApiValidationErrors;
-  constructor(message: string, status: number, errors?: ApiValidationErrors) {
+  /** Cuerpo de la respuesta, para los errores que traen datos (p. ej. el nuevo total). */
+  data?: any;
+  constructor(message: string, status: number, errors?: ApiValidationErrors, data?: any) {
     super(message);
     this.status = status;
     this.errors = errors;
+    this.data = data;
   }
 }
 
@@ -398,6 +403,8 @@ async function authGet(path: string, token: string): Promise<any> {
 /** POST/PUT autenticado con cuerpo JSON. */
 async function authSend(method: 'POST' | 'PUT' | 'DELETE', path: string, token: string, body?: any): Promise<any> {
   let res: Response;
+  const abortador = path === '/api/pedidos' ? new AbortController() : null;
+  const limite = abortador ? setTimeout(() => abortador.abort(), 15000) : null;
   try {
     res = await fetch(`${API_URL}${path}`, {
       method,
@@ -407,16 +414,19 @@ async function authSend(method: 'POST' | 'PUT' | 'DELETE', path: string, token: 
         Authorization: `Bearer ${token}`,
       },
       body: body ? JSON.stringify(body) : undefined,
+      ...(abortador ? { signal: abortador.signal } : {}),
     });
   } catch {
     throw new Error('No se pudo conectar con el servidor.');
+  } finally {
+    if (limite) clearTimeout(limite);
   }
   const data = await res.json().catch(() => ({} as any));
   if (!res.ok) {
     if (res.status === 401) onTokenRechazado?.(token);
     // Si hay errores de validación, mostramos el primero (más útil que el genérico).
     const errors = validationErrors(data);
-    throw new ApiError(firstValidationMessage(errors) ?? data?.message ?? 'Error en la petición.', res.status, errors);
+    throw new ApiError(firstValidationMessage(errors) ?? data?.message ?? 'Error en la petición.', res.status, errors, data);
   }
   return data;
 }
@@ -706,6 +716,8 @@ export async function eliminarProducto(token: string, negocioId: number, id: num
 
 /** Pedidos recibidos por un negocio mío. */
 export type ComercioPedido = {
+  faltante_motivo?: string | null;
+  puede_confirmar_devolucion?: boolean;
   id: number;
   /** Lo que ven las personas; el id solo sirve para las rutas. */
   codigo: string;
@@ -726,7 +738,7 @@ export type ComercioPedido = {
   domiciliario_reputacion?: Reputacion | null;
   cancelado_por?: CanceladoPor | null;
   motivo_cancelacion?: string | null;
-  /** Se puede rechazar (pendiente) o cancelar (aceptado, o listo sin domiciliario). */
+  /** El comercio puede cancelar antes de marcar listo, con motivo escrito. */
   puede_cancelar?: boolean;
   /** Ya pasó el tiempo libre: cancelarlo le baja la confiabilidad al negocio. */
   cancelar_penaliza?: boolean;
@@ -745,7 +757,7 @@ export type ComercioPedido = {
 export type DineroEstado = 'recibido' | 'incompleto' | 'no_recibido';
 
 /** Quién canceló un pedido; 'sistema': nadie del negocio respondió a tiempo. */
-export type CanceladoPor = 'cliente' | 'negocio' | 'sistema';
+export type CanceladoPor = 'cliente' | 'negocio' | 'sistema' | 'administrador' | 'cliente_no_encontrado';
 
 /** Qué pasó con un pedido cancelado, contado al equipo del negocio. */
 export function textoCancelacion(p: { cancelado_por?: CanceladoPor | null; motivo_cancelacion?: string | null }): string {
@@ -753,6 +765,8 @@ export function textoCancelacion(p: { cancelado_por?: CanceladoPor | null; motiv
     cliente: 'El cliente lo canceló',
     sistema: 'Venció: nadie lo aceptó a tiempo',
     negocio: 'Lo cancelaron ustedes',
+    administrador: 'Vitrina lo cerró',
+    cliente_no_encontrado: 'El cliente no fue encontrado; el comercio recibió la devolución',
   }[p.cancelado_por ?? 'negocio'];
   return p.motivo_cancelacion ? `${quien}: ${p.motivo_cancelacion}` : `${quien}.`;
 }
@@ -851,7 +865,7 @@ export function getResumenNegocio(token: string, negocioId: number): Promise<Res
   return authGet(`/api/negocios/${negocioId}/pedidos/resumen`, token);
 }
 
-/** Rechazar (pendiente) o cancelar (aceptado, o listo sin domiciliario) un pedido. */
+/** El comercio rechaza o cancela antes de marcar listo, con motivo obligatorio. */
 export async function cancelarPedidoNegocio(token: string, negocioId: number, id: number, motivo?: string): Promise<void> {
   await authSend('PUT', `/api/negocios/${negocioId}/pedidos/${id}/cancelar`, token, { motivo: motivo || null });
 }
@@ -1069,10 +1083,12 @@ export async function getRecetasPreferidas(token: string, negocioId: number): Pr
 // ---------- Admin ----------
 
 export type AdminStats = {
+  reportes_pendientes?: number;
   usuarios: number;
   negocios: number;
   negocios_activos: number;
   productos: number;
+  pedidos_en_curso?: number;
   servicios?: number;
   domiciliarios_vetados?: number;
   negocios_vetados?: number;
@@ -1128,6 +1144,44 @@ export async function getDomiciliariosMapa(token: string): Promise<DomiciliarioM
 
 export function getAdminStats(token: string): Promise<AdminStats> {
   return authGet('/api/admin/stats', token);
+}
+
+/** Un pedido visto por el administrador (para destrabar los que se atascan). */
+export type AdminPedido = {
+  id: number;
+  codigo: string;
+  estado: string;
+  estado_label: string;
+  fecha: string;
+  minutos_sin_cambios: number;
+  total: number;
+  metodo_pago: string;
+  direccion_entrega: string;
+  telefono_contacto: string | null;
+  negocio: string | null;
+  negocio_telefono: string | null;
+  cliente: string | null;
+  domiciliario: string | null;
+  domiciliario_telefono: string | null;
+  domiciliario_suspendido: boolean;
+  novedad: string | null;
+};
+
+/** Pedidos en curso, los más antiguos primero (20 por página). */
+export async function getAdminPedidos(token: string, pagina = 1): Promise<Pagina<AdminPedido>> {
+  const d = await authGet(`/api/admin/pedidos?page=${pagina}`, token);
+  return { items: d.pedidos ?? [], pagina: d.pagina, ultima_pagina: d.ultima_pagina, total: d.total };
+}
+
+/** Cierra a mano un pedido en curso; devuelve el mensaje del servidor. */
+export async function cerrarPedidoAdmin(
+  token: string,
+  id: number,
+  resultado: 'entregado' | 'cancelado',
+  motivo: string,
+): Promise<string> {
+  const d = await authSend('PUT', `/api/admin/pedidos/${id}/cerrar`, token, { resultado, motivo });
+  return d.message as string;
 }
 
 /** Usuarios de un rol, 30 por página, con búsqueda por nombre o correo. */
@@ -1305,6 +1359,8 @@ export type PedidoItem = {
 };
 
 export type Pedido = {
+  llegada_at?: string | null;
+  segundos_para_reportar_ausencia?: number | null;
   id: number;
   /** Lo que ven las personas; el id solo sirve para las rutas. */
   codigo: string;
@@ -1527,6 +1583,10 @@ export type CaritasPromedio = {
 };
 
 export type SeguimientoPedido = {
+  negocio_id?: number;
+  faltante_motivo?: string | null;
+  faltante_version?: string | null;
+  cliente_no_encontrado_at?: string | null;
   id: number;
   /** Lo que ven las personas; el id solo sirve para las rutas. */
   codigo: string;
@@ -1552,7 +1612,7 @@ export type SeguimientoPedido = {
   codigo_entrega?: string | null;
   cancelado_por?: CanceladoPor | null;
   motivo_cancelacion?: string | null;
-  /** El negocio aún no lo tiene listo: el cliente puede cancelarlo. */
+  /** El domiciliario aún no sale en camino: el cliente puede cancelar. */
   puede_cancelar?: boolean;
   motivos_cancelacion?: string[];
   domiciliario_reputacion?: Reputacion | null;
@@ -1561,7 +1621,7 @@ export type SeguimientoPedido = {
   negocio_ubicacion?: Coordenadas | null;
   /** Justificación del domiciliario si se está demorando. */
   novedad?: string | null;
-  items: (PedidoItem & { precio: number })[];
+  items: (PedidoItem & { precio: number; producto_id?: number | null; opciones?: OpcionesLinea })[];
   puede_calificar?: boolean;
   opciones_problemas?: { negocio: OpcionProblema[]; domiciliario: OpcionProblema[] } | null;
   aspectos_domiciliario?: AspectoCaritas[] | null;
@@ -1572,15 +1632,81 @@ export type SeguimientoPedido = {
 
 export type NuevoPedido = {
   negocio_id: number;
-  items: ({ producto_id: number; cantidad: number } & OpcionesLinea)[];
+  items: ({ producto_id: number; cantidad: number; precio_token?: string } & OpcionesLinea)[];
   metodo_pago: string;
   direccion_entrega: string;
   telefono_contacto: string;
+  /** Identifica el intento: reintentar con la misma no crea otro pedido. */
+  clave_intento?: string;
+  /** Total que vio el cliente; si ya cambió, el servidor responde TotalCambio. */
+  total_esperado?: number;
 };
 
 export async function crearPedido(token: string, body: NuevoPedido): Promise<number> {
   const d = await authSend('POST', '/api/pedidos', token, body);
+  if (!Number.isSafeInteger(d.id) || d.id <= 0) throw new Error('No se pudo comprobar la recepción del pedido. Se volverá a consultar el mismo envío.');
   return d.id as number;
+}
+
+export async function sincronizarCarrito(token: string, items: { producto_id: number; precio_token: string }[], venceAt: number | null): Promise<void> {
+  await authSend('PUT', '/api/carrito', token, { items, vence_at: venceAt == null ? null : Math.floor(venceAt / 1000) });
+}
+
+export type ObjetivoReporte = 'cliente' | 'negocio' | 'domiciliario';
+export type ReportePedido = {
+  id: number; pedido_id: number; codigo: string; objetivo: ObjetivoReporte; tipo: string;
+  motivo: string; fecha: string; resuelto: boolean; resolucion: string | null; estado_pedido: string;
+  cliente: string | null; cliente_id: number; negocio: string | null; negocio_id: number;
+  domiciliario: string | null; domiciliario_id: number | null;
+};
+export async function reportarPedido(token: string, id: number, objetivo: ObjetivoReporte, motivo: string): Promise<void> {
+  await authSend('POST', `/api/pedidos/${id}/reporte`, token, { objetivo, motivo });
+}
+export async function getReportesPedidos(token: string, pagina = 1, estado = 'pendientes'): Promise<Pagina<ReportePedido>> {
+  const d = await authGet(`/api/admin/reportes?page=${pagina}&estado=${estado}`, token);
+  return { items: d.reportes ?? [], pagina: d.pagina, ultima_pagina: d.ultima_pagina, total: d.total };
+}
+export async function resolverReportePedido(token: string, id: number, resolucion: string): Promise<void> {
+  await authSend('PUT', `/api/admin/reportes/${id}/resolver`, token, { resolucion });
+}
+export async function registrarLlegada(token: string, id: number): Promise<void> {
+  await authSend('PUT', `/api/domiciliario/pedidos/${id}/llegada`, token);
+}
+export async function clienteNoEncontrado(token: string, id: number): Promise<void> {
+  await authSend('PUT', `/api/domiciliario/pedidos/${id}/cliente-no-encontrado`, token);
+}
+export async function confirmarDevolucion(token: string, negocioId: number, id: number): Promise<void> {
+  await authSend('PUT', `/api/negocios/${negocioId}/pedidos/${id}/devolucion`, token);
+}
+export async function informarFaltante(token: string, negocioId: number, id: number, motivo: string): Promise<void> {
+  await authSend('PUT', `/api/negocios/${negocioId}/pedidos/${id}/faltante`, token, { motivo });
+}
+export async function ajustarMiPedido(token: string, id: number, items: NuevoPedido['items'], total: number, version: string): Promise<void> {
+  await authSend('PUT', `/api/pedidos/${id}/ajuste`, token, { items, total_esperado: total, faltante_version: version });
+}
+export async function reasignarCita(token: string, negocioId: number, id: number, profesionalId: number): Promise<Cita> {
+  const d = await authSend('PUT', `/api/negocios/${negocioId}/citas/${id}/reasignar`, token, { profesional_id: profesionalId });
+  return d.cita;
+}
+export async function eliminarNegocio(token: string, negocioId: number): Promise<void> {
+  await authSend('DELETE', `/api/negocios/${negocioId}`, token);
+}
+
+/** Lo que responde el servidor cuando el total ya no es el que vio el cliente. */
+export type TotalCambio = {
+  total: number;
+  costo_domicilio: number;
+  precios: { producto_id: number; precio: number }[];
+};
+
+/** Si el error es "el total cambió", sus datos; si no, null. */
+export function totalCambio(e: unknown): TotalCambio | null {
+  return e instanceof ApiError && e.status === 409 && e.data?.codigo === 'total_cambio' ? (e.data as TotalCambio) : null;
+}
+
+/** Clave única de un intento de compra. */
+export function nuevaClaveIntento(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}${Math.random().toString(36).slice(2, 12)}`;
 }
 
 /** Mis pedidos (más recientes primero), 20 por página. */
@@ -1593,7 +1719,7 @@ export async function getPedido(token: string, id: number): Promise<SeguimientoP
   return authGet(`/api/pedidos/${id}`, token);
 }
 
-/** El cliente cancela su pedido (solo mientras el negocio no lo tenga listo). */
+/** El cliente cancela antes de en camino; si ya fue recogido, requiere devolución. */
 export async function cancelarMiPedido(token: string, id: number, motivo?: string): Promise<void> {
   await authSend('POST', `/api/pedidos/${id}/cancelar`, token, { motivo: motivo || null });
 }
@@ -1603,7 +1729,11 @@ export async function cancelarMiPedido(token: string, id: number, motivo?: strin
 /** Tarifa de domicilio vigente (COP), para mostrar el total en el checkout. */
 export async function getTarifaDomicilio(token: string): Promise<number> {
   const d = await authGet('/api/ajustes', token);
-  return Number(d.tarifa_domicilio ?? 0);
+  const tarifa = Number(d.tarifa_domicilio);
+  if (!['string', 'number'].includes(typeof d.tarifa_domicilio) || String(d.tarifa_domicilio).trim() === '' || !Number.isFinite(tarifa) || tarifa < 0) {
+    throw new Error('No se pudo consultar una tarifa de domicilio válida.');
+  }
+  return tarifa;
 }
 
 /** Admin: cambiar la tarifa de domicilio (aplica a los pedidos nuevos). */

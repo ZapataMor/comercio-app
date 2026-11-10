@@ -107,13 +107,13 @@ class Negocio extends Model
     /** ¿Este usuario es miembro ACTIVO del negocio (cualquier rol)? */
     public function esMiembroActivo(User $user): bool
     {
-        return $this->miembrosActivos()->whereKey($user->id)->exists();
+        return ! $this->archivado_at && $this->miembrosActivos()->whereKey($user->id)->exists();
     }
 
     /** ¿Este usuario es propietario activo del negocio? */
     public function esPropietario(User $user): bool
     {
-        return $this->miembrosActivos()
+        return ! $this->archivado_at && $this->miembrosActivos()
             ->wherePivot('rol', self::ROL_PROPIETARIO)
             ->whereKey($user->id)
             ->exists();

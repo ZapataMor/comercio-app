@@ -10,8 +10,10 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends Controller
 {
@@ -148,6 +150,8 @@ class AuthController extends Controller
                 ]);
             }
             $user->password = $data['password']; // se hashea solo (cast 'hashed')
+
+            $user->remember_token = Str::random(60);
         }
 
         $user->name = $data['name'];
@@ -165,6 +169,16 @@ class AuthController extends Controller
             $user->telefono = $data['telefono'];
         }
         $user->save();
+
+        if (! empty($data['password'])) {
+            $actual = $user->currentAccessToken();
+            $user->tokens()->when($actual instanceof PersonalAccessToken, fn ($q) => $q->whereKeyNot($actual->getKey()))->delete();
+            if (config('session.driver') === 'database') {
+                DB::connection(config('session.connection'))->table(config('session.table', 'sessions'))
+                    ->where('user_id', $user->id)
+                    ->when($request->hasSession(), fn ($q) => $q->where('id', '!=', $request->session()->getId()))->delete();
+            }
+        }
 
         // Mantener sincronizada la ubicación principal del cliente con su perfil.
         if ($esCliente && ! empty($data['direccion']) && ! empty($data['barrio'])) {
@@ -229,17 +243,17 @@ class AuthController extends Controller
             return response()->json(['message' => 'Tu cuenta no es de domiciliario.'], 409);
         }
 
-        if (UbicacionDomiciliario::tieneEntregaEnCurso($user)) {
-            return response()->json(['message' => 'Tienes entregas en curso. Termínalas antes de dejar de ser domiciliario.'], 409);
-        }
-
-        $user->removeRole('domiciliario');
-        if (! $user->hasRole('usuario')) {
-            $user->assignRole('usuario');
-        }
-        // Fuera de turno y fuera del mapa.
-        $user->forceFill(['en_turno' => false])->save();
-        UbicacionDomiciliario::borrar($user);
+        DB::transaction(function () use ($user) {
+            $user = User::lockForUpdate()->findOrFail($user->id);
+            abort_if(UbicacionDomiciliario::tieneEntregaEnCurso($user), 409, 'Tienes entregas en curso. Termínalas antes de dejar de ser domiciliario.');
+            $user->removeRole('domiciliario');
+            if (! $user->hasRole('usuario')) {
+                $user->assignRole('usuario');
+            }
+            $user->forceFill(['en_turno' => false])->save();
+            UbicacionDomiciliario::borrar($user);
+        });
+        $user->unsetRelation('roles');
 
         return response()->json([
             'message' => 'Ya no eres domiciliario. Sigues siendo cliente.',

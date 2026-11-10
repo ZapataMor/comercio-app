@@ -4,12 +4,15 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Negocio;
+use App\Models\PedidoReporte;
 use App\Models\Producto;
 use App\Models\User;
+use App\Support\UbicacionDomiciliario;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 /**
@@ -17,6 +20,27 @@ use Illuminate\Validation\Rule;
  */
 class AdminController extends Controller
 {
+    public function reportes(Request $request): View
+    {
+        $estado = $request->validate(['estado' => ['sometimes', Rule::in(['pendientes', 'resueltos', 'todos'])]])['estado'] ?? 'pendientes';
+        $reportes = PedidoReporte::with(['pedido.cliente', 'pedido.negocio', 'pedido.domiciliario'])
+            ->when($estado !== 'todos', fn ($q) => $estado === 'resueltos' ? $q->whereNotNull('resuelto_at') : $q->whereNull('resuelto_at'))
+            ->oldest()->orderBy('id')->paginate(20)->withQueryString();
+
+        return view('admin.reportes', compact('reportes', 'estado'));
+    }
+
+    public function resolverReporte(Request $request, int $id): RedirectResponse
+    {
+        $datos = $request->validate(['resolucion' => ['required', 'string', 'min:5', 'max:1000']]);
+        PedidoReporte::findOrFail($id);
+        $cambio = PedidoReporte::whereKey($id)->whereNull('resuelto_at')->update([
+            'resuelto_at' => now(), 'resuelto_por' => $request->user()->id, 'resolucion' => trim($datos['resolucion']),
+        ]);
+
+        return $cambio ? back()->with('ok', 'Reporte atendido.') : back()->with('error', 'Este reporte ya fue atendido.');
+    }
+
     private const ROLES = ['administrador', 'usuario', 'domiciliario'];
 
     /** Tablero con números generales. */
@@ -103,7 +127,24 @@ class AdminController extends Controller
             return back()->with('error', 'No puedes quitarte tu propio rol de administrador.');
         }
 
-        $usuario->syncRoles(User::rolesDelTipo($datos['rol']));
+        $bloqueado = DB::transaction(function () use ($usuario, $datos) {
+            $usuario = User::lockForUpdate()->findOrFail($usuario->id);
+            if ($datos['rol'] !== 'domiciliario' && UbicacionDomiciliario::tieneEntregaEnCurso($usuario)) {
+                return true;
+            }
+            $usuario->syncRoles(User::rolesDelTipo($datos['rol']));
+            if ($datos['rol'] !== 'domiciliario') {
+                $usuario->forceFill(['en_turno' => false])->save();
+                UbicacionDomiciliario::borrar($usuario);
+            }
+
+            return false;
+        });
+        if ($bloqueado) {
+            $mensaje = 'Tiene una recogida, entrega o devolución en curso. Debe terminarla antes de quitar el rol.';
+
+            return $request->expectsJson() ? response()->json(['message' => $mensaje], 409) : back()->with('error', $mensaje);
+        }
 
         if ($request->expectsJson()) {
             return response()->json(['message' => 'Rol actualizado.']);
