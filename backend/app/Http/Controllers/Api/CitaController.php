@@ -20,7 +20,7 @@ class CitaController extends Controller
 {
     public function disponibilidad(Request $request, Negocio $negocio): JsonResponse
     {
-        abort_if($negocio->archivado_at || $negocio->estaVetado(), 404);
+        abort_if($negocio->archivado_at || $negocio->desactivado_at || $negocio->estaVetado(), 404);
         $d = $request->validate([
             'fecha' => ['required', 'date_format:Y-m-d', 'after_or_equal:today', 'before_or_equal:'.now()->addDays(90)->format('Y-m-d')],
             'servicio_id' => ['required', 'integer'], 'profesional_id' => ['nullable', 'integer'],

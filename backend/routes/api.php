@@ -118,6 +118,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // Datos del negocio: solo el propietario los edita.
         Route::put('/', [NegocioController::class, 'update']);
         Route::delete('/', [NegocioController::class, 'destroy']);
+        Route::put('/desactivacion', [NegocioController::class, 'desactivacion']);
 
         Route::get('/servicios', [ServicioController::class, 'index']);
         Route::post('/servicios', [ServicioController::class, 'store']);

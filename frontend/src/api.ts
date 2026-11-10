@@ -108,6 +108,7 @@ export type Negocio = {
   barrio?: string | null;
   telefono: string | null;
   activo: boolean;
+  desactivado?: boolean;
   estado_texto?: 'Abierto' | 'Cerrado' | 'Almorzando';
   imagen?: string | null; // ruta relativa "/storage/negocios/x.jpg"
   /** Minutos que el negocio promete tardar en tener listo un pedido. */
@@ -1713,6 +1714,11 @@ export async function reasignarCita(token: string, negocioId: number, id: number
 }
 export async function eliminarNegocio(token: string, negocioId: number): Promise<void> {
   await authSend('DELETE', `/api/negocios/${negocioId}`, token);
+}
+
+export async function desactivarNegocio(token: string, negocioId: number, desactivado: boolean): Promise<Negocio> {
+  const d = await authSend('PUT', `/api/negocios/${negocioId}/desactivacion`, token, { desactivado });
+  return d.negocio;
 }
 
 /** Lo que responde el servidor cuando el total ya no es el que vio el cliente. */

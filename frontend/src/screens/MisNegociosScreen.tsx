@@ -150,7 +150,7 @@ export default function MisNegociosScreen({ navigation }: Props) {
                   <Text style={styles.itemTitulo}>{n.nombre}</Text>
                   <View style={styles.fila}>
                     <Text style={styles.rol}>{n.rol === 'propietario' ? 'Propietario' : 'Trabajador'}</Text>
-                <Text style={styles.itemSub}>{n.estado_texto ?? (n.activo ? 'Abierto' : 'Cerrado')}</Text>
+                <Text style={styles.itemSub}>{n.desactivado ? 'Desactivado' : n.estado_texto ?? (n.activo ? 'Abierto' : 'Cerrado')}</Text>
                   </View>
                 </View>
                 {esActivo ? (

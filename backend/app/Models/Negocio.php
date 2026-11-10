@@ -51,6 +51,7 @@ class Negocio extends Model
             'cierre_ajustado' => 'datetime',
             'cierre_preguntado' => 'datetime',
             'archivado_at' => 'datetime',
+            'desactivado_at' => 'datetime',
             'lat' => 'float',
             'lng' => 'float',
         ];

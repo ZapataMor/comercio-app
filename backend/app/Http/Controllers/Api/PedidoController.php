@@ -67,7 +67,7 @@ class PedidoController extends Controller
         // archivado porque su único dueño eliminó la cuenta).
         $negocio = Negocio::where('activo', true)
             ->whereNull('vetado_at')
-            ->whereNull('archivado_at')
+            ->whereNull('archivado_at')->whereNull('desactivado_at')
             ->find($datos['negocio_id']);
         if (! $negocio) {
             return response()->json(['message' => 'Ese negocio no está disponible.'], 422);
@@ -155,7 +155,7 @@ class PedidoController extends Controller
     {
         return DB::transaction(function () use ($request, $negocio, $datos, $productos, $subtotal, $domicilio) {
             $negocio = Negocio::whereKey($negocio->id)->lockForUpdate()->firstOrFail();
-            abort_if($negocio->archivado_at || ! $negocio->activo, 409, 'El negocio ya no está disponible.');
+            abort_if($negocio->archivado_at || $negocio->desactivado_at || ! $negocio->activo, 409, 'El negocio ya no está disponible.');
             $cliente = User::whereKey($request->user()->id)->lockForUpdate()->firstOrFail();
             abort_if($cliente->eliminado_at || $cliente->suspendido_at, 403, 'Tu cuenta no está habilitada para hacer pedidos.');
             $pedido = Pedido::create([

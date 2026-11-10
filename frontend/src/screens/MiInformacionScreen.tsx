@@ -3,8 +3,8 @@
  *
  * Se abre desde el menú de "Mi perfil" (ícono de usuario de la topbar).
  * Primero muestra la información en modo lectura y, con "Editar información",
- * pasa al formulario (datos, dirección y cambio de contraseña opcional). Es la
- * persona, no el negocio: los negocios se administran en "Mis negocios".
+ * pasa al formulario (datos, dirección y cambio de contraseña opcional).
+ * Desde este perfil el dueño también desactiva, reactiva o elimina sus negocios.
  * Al final de la vista de lectura están "Dejar de ser domiciliario" (solo
  * para el domiciliario) y "Eliminar mi cuenta".
  */
@@ -21,7 +21,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { actualizarPerfil, dejarDeSerDomiciliario, eliminarCuenta, Usuario } from '../api';
+import { actualizarPerfil, dejarDeSerDomiciliario, desactivarNegocio, eliminarCuenta, eliminarNegocio, Negocio, Usuario } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import BarrioSelect from '../components/BarrioSelect';
@@ -43,7 +43,37 @@ export default function MiInformacionScreen(_props: Props) {
   const toast = useToast();
   const confirmar = useConfirmar();
   const user = auth!.user;
-  const { codigoPublico } = useNegocio();
+  const { codigoPublico, negocios, recargar } = useNegocio();
+  const [gestionandoNegocio, setGestionandoNegocio] = useState<number | null>(null);
+
+  function gestionarNegocio(n: Negocio, eliminar: boolean) {
+    const desactivar = !n.desactivado;
+    confirmar({
+      icono: eliminar ? 'basura' : 'tienda',
+      titulo: eliminar ? `¿Eliminar ${n.nombre}?` : `¿${desactivar ? 'Desactivar' : 'Reactivar'} ${n.nombre}?`,
+      texto: eliminar
+        ? 'Se borrarán definitivamente todos los datos del negocio: productos, servicios, pedidos, citas, reseñas, equipo e imágenes. No se puede deshacer. Primero debes terminar o cancelar los pedidos activos; las entregas en camino deben finalizar. Se avisará a los clientes con citas futuras.'
+        : desactivar
+          ? 'Dejará de aparecer a los clientes y no recibirá nuevos pedidos ni solicitudes de cita. Se conservarán todos sus datos y podrás reactivarlo desde aquí. Debes seguir atendiendo los pedidos y las citas existentes.'
+          : 'El negocio volverá a aparecer a los clientes con su catálogo y su horario habitual.',
+      textoBoton: eliminar ? 'Eliminar definitivamente' : desactivar ? 'Desactivar temporalmente' : 'Reactivar negocio',
+      textoCancelar: 'Cancelar',
+      peligro: eliminar,
+      accion: async () => {
+        setGestionandoNegocio(n.id);
+        try {
+          if (eliminar) await eliminarNegocio(auth!.token, n.id);
+          else await desactivarNegocio(auth!.token, n.id, desactivar);
+          await recargar();
+          toast.exito(eliminar ? 'Negocio eliminado definitivamente' : desactivar ? 'Negocio desactivado' : 'Negocio reactivado');
+        } catch (e) {
+          toast.error('No se pudo cambiar el negocio', messageFromError(e));
+        } finally {
+          setGestionandoNegocio(null);
+        }
+      },
+    });
+  }
 
   const esCliente = user.roles.includes('usuario');
   const esDomiciliario = user.roles.includes('domiciliario');
@@ -252,6 +282,32 @@ export default function MiInformacionScreen(_props: Props) {
                 ultimo
               />
             </View>
+          </FadeInView>
+        )}
+
+        {negocios.filter(n => n.rol === 'propietario').length > 0 && (
+          <FadeInView delay={100}>
+            <Text style={styles.seccion}>Mis negocios</Text>
+            {negocios.filter(n => n.rol === 'propietario').map(n => (
+              <View key={n.id} style={[styles.tarjeta, styles.tarjetaNegocio]}>
+                <Text style={styles.datoValor}>{n.nombre}</Text>
+                <Text style={styles.datoEtiqueta}>
+                  {n.desactivado ? 'Desactivado · Oculto para los clientes' : 'Visible para los clientes'}
+                </Text>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  disabled={gestionandoNegocio !== null}
+                  onPress={() => gestionarNegocio(n, false)}>
+                  <Text style={styles.dejarTxt}>{n.desactivado ? 'Reactivar negocio' : 'Desactivar temporalmente'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  disabled={gestionandoNegocio !== null}
+                  onPress={() => gestionarNegocio(n, true)}>
+                  <Text style={styles.eliminarTxt}>Eliminar negocio definitivamente</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
           </FadeInView>
         )}
 
@@ -510,6 +566,7 @@ const useStyles = makeStyles((c, shadow) => ({
   seccion: { fontSize: 16, fontFamily: font.displaySemi, color: c.textStrong, marginTop: 14, marginBottom: 8 },
   ayuda: { color: c.muted, fontSize: 12, fontFamily: font.regular, marginTop: -4, marginBottom: 8 },
   tarjeta: { backgroundColor: c.surface, borderRadius: radius.lg, padding: 16, ...shadow.soft },
+  tarjetaNegocio: { marginBottom: 12 },
   // Vista de solo lectura
   dato: {
     flexDirection: 'row', alignItems: 'center', gap: 12,

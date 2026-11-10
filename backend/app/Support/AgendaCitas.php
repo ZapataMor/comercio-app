@@ -60,7 +60,7 @@ class AgendaCitas
         return DB::transaction(function () use ($negocio, $usuario, $datos, $presencial) {
             // Todos los escritores de la agenda toman estos bloqueos en el mismo orden.
             $negocio = Negocio::lockForUpdate()->findOrFail($negocio->id);
-            abort_if($negocio->archivado_at || $negocio->estaVetado(), 404, 'Negocio no disponible.');
+            abort_if($negocio->archivado_at || (! $presencial && $negocio->desactivado_at) || $negocio->estaVetado(), 404, 'Negocio no disponible.');
             if ($presencial) {
                 abort_unless($negocio->esMiembroActivo($usuario), 403);
             }

@@ -421,7 +421,7 @@ test('el cliente recibe un aviso si cambia el precio de un producto de su carrit
     Notification::assertNotSentTo($cliente, PrecioProductoActualizado::class);
 });
 
-test('el negocio no se elimina con pedidos activos y desaparece del catálogo al archivarlo', function () {
+test('el negocio no se elimina con pedidos activos y desaparece al borrarlo definitivamente', function () {
     [$dueno, $negocio] = limNegocio();
     $pedido = limPedido(limPersona(), $negocio, 'aceptado');
     Sanctum::actingAs($dueno);
@@ -430,7 +430,7 @@ test('el negocio no se elimina con pedidos activos y desaparece del catálogo al
     $this->deleteJson("/api/negocios/{$negocio->id}")->assertOk();
     $this->getJson('/api/negocios/mios')->assertJsonCount(0, 'negocios');
     $this->getJson("/api/negocios/{$negocio->id}")->assertNotFound();
-    $this->putJson("/api/negocios/{$negocio->id}", ['nombre' => 'Reabierto'])->assertForbidden();
+    $this->putJson("/api/negocios/{$negocio->id}", ['nombre' => 'Reabierto'])->assertNotFound();
 });
 
 test('los reportes requieren participación en el pedido y solo el administrador los resuelve', function () {

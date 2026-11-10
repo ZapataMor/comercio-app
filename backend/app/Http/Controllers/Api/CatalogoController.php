@@ -36,7 +36,7 @@ class CatalogoController extends Controller
             // Los vetados por baja confiabilidad y los archivados (su único
             // dueño eliminó la cuenta) no se muestran.
             ->whereNull('vetado_at')
-            ->whereNull('archivado_at')
+            ->whereNull('archivado_at')->whereNull('desactivado_at')
             ->with('tiposNegocio')
             ->withCount(['productos' => fn ($q) => $q->where('disponible', true), 'servicios' => fn ($q) => $q->where('disponible', true)]);
         $seccion = $request->validate(['seccion' => ['sometimes', 'in:productos,servicios']])['seccion'] ?? null;
@@ -115,7 +115,7 @@ class CatalogoController extends Controller
     {
         $negocios = Negocio::query()
             ->whereNull('vetado_at')
-            ->whereNull('archivado_at')
+            ->whereNull('archivado_at')->whereNull('desactivado_at')
             ->whereNotNull('lat')
             ->whereNotNull('lng')
             ->with('tiposNegocio')
@@ -144,7 +144,7 @@ class CatalogoController extends Controller
         $seccion = $request->validate(['seccion' => ['sometimes', 'in:productos,servicios']])['seccion'] ?? null;
         $tipos = TipoNegocio::query()
             ->whereHas('negocios', function ($q) use ($seccion) {
-                $q->whereNull('vetado_at')->whereNull('archivado_at');
+                $q->whereNull('vetado_at')->whereNull('archivado_at')->whereNull('desactivado_at');
                 if ($seccion) {
                     $q->whereHas($seccion, fn ($items) => $items->where('disponible', true));
                 }
@@ -194,7 +194,7 @@ class CatalogoController extends Controller
         $productos = Producto::query()
             ->where('disponible', true)
             ->whereHas('negocio', function ($q) use ($tipoNegocioId) {
-                $q->whereNull('vetado_at')->whereNull('archivado_at');
+                $q->whereNull('vetado_at')->whereNull('archivado_at')->whereNull('desactivado_at');
                 if ($tipoNegocioId) {
                     $q->whereHas('tiposNegocio', fn ($t) => $t->where('tipos_negocio.id', $tipoNegocioId));
                 }
@@ -240,7 +240,7 @@ class CatalogoController extends Controller
      */
     public function estado(int $id): JsonResponse
     {
-        $negocio = Negocio::whereNull('vetado_at')->whereNull('archivado_at')->find($id);
+        $negocio = Negocio::whereNull('vetado_at')->whereNull('archivado_at')->whereNull('desactivado_at')->find($id);
 
         if (! $negocio) {
             return response()->json(['message' => 'Negocio no encontrado.'], 404);
@@ -256,7 +256,7 @@ class CatalogoController extends Controller
     /** Detalle de un negocio + sus productos disponibles. */
     public function show(int $id): JsonResponse
     {
-        $negocio = Negocio::with('tiposNegocio')->whereNull('vetado_at')->whereNull('archivado_at')->find($id);
+        $negocio = Negocio::with('tiposNegocio')->whereNull('vetado_at')->whereNull('archivado_at')->whereNull('desactivado_at')->find($id);
 
         if (! $negocio) {
             return response()->json(['message' => 'Negocio no encontrado.'], 404);

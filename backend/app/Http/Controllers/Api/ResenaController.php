@@ -21,7 +21,7 @@ class ResenaController extends Controller
      */
     public function index(Request $request, int $id): JsonResponse
     {
-        $negocio = Negocio::whereNull('vetado_at')->whereNull('archivado_at')->find($id);
+        $negocio = Negocio::whereNull('vetado_at')->whereNull('archivado_at')->whereNull('desactivado_at')->find($id);
 
         if (! $negocio) {
             return response()->json(['message' => 'Negocio no encontrado.'], 404);

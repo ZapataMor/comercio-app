@@ -4,11 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\NegocioResource;
 use App\Models\Barrio;
-use App\Models\Cita;
 use App\Models\Negocio;
-use App\Models\Pedido;
 use App\Models\TipoNegocio;
-use App\Support\AgendaCitas;
+use App\Support\EliminarNegocio;
 use App\Support\HorarioNegocio;
 use App\Support\Reputacion;
 use Illuminate\Http\JsonResponse;
@@ -27,15 +25,26 @@ class NegocioController extends Controller
 {
     public function destroy(Request $request, Negocio $negocio): JsonResponse
     {
-        DB::transaction(function () use ($request, $negocio) {
+        EliminarNegocio::ejecutar($negocio, $request->user());
+
+        return response()->json(['message' => 'Negocio y todos sus datos eliminados definitivamente.']);
+    }
+
+    public function desactivacion(Request $request, Negocio $negocio): JsonResponse
+    {
+        // La desactivación y el borrado se reservan al dueño, incluso si un
+        // trabajador tiene permiso para administrar el resto del negocio.
+        abort_unless($negocio->esPropietario($request->user()), 403);
+        $datos = $request->validate(['desactivado' => ['required', 'boolean']]);
+        $negocio = DB::transaction(function () use ($request, $negocio, $datos) {
             $negocio = Negocio::lockForUpdate()->findOrFail($negocio->id);
             abort_unless($negocio->esPropietario($request->user()), 403);
-            abort_if($negocio->pedidos()->whereIn('estado', Pedido::EN_CURSO)->exists(), 409, 'Termina o cancela los pedidos activos antes de eliminar el negocio. Los pedidos en camino deben finalizar su entrega o devolución.');
-            $negocio->forceFill(['activo' => false, 'archivado_at' => now()])->save();
-            AgendaCitas::cancelarFuturas(Cita::where('negocio_id', $negocio->id), 'El negocio cerró.');
+            $negocio->forceFill(['desactivado_at' => $datos['desactivado'] ? ($negocio->desactivado_at ?? now()) : null])->save();
+
+            return $negocio;
         });
 
-        return response()->json(['message' => 'Negocio eliminado. Conservamos el historial de pedidos.']);
+        return response()->json(['negocio' => $this->conRol($negocio, Negocio::ROL_PROPIETARIO)]);
     }
 
     /**
@@ -116,6 +125,7 @@ class NegocioController extends Controller
 
         $cierres = $request->user()->negociosActivos()
             ->whereNotNull('negocios.horario')
+            ->whereNull('negocios.desactivado_at')
             ->get()
             ->filter(fn (Negocio $n) => $n->puede($request->user(), 'cambiar_estado'))
             ->map(function (Negocio $negocio) use ($ahora) {

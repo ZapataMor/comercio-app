@@ -33,6 +33,7 @@ class NegocioResource extends JsonResource
             'barrio' => $this->barrio,
             'telefono' => $this->telefono,
             'activo' => $this->activo,
+            'desactivado' => $this->desactivado_at !== null,
             'estado_texto' => HorarioNegocio::estadoTexto($this->resource),
             // Ruta relativa servida por el symlink storage (ej "/storage/negocios/x.jpg")
             // o null. La app le antepone la API_URL para formar la URL completa.
