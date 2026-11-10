@@ -8,9 +8,12 @@
  */
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Modal, Switch, RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
+  actualizarPermisosMiembro,
+  PermisosNegocio,
+  tienePermiso,
   cancelarInvitacion,
   getEquipo,
   InvitacionEnviada,
@@ -31,6 +34,14 @@ import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 
+const SIN_PERMISOS: PermisosNegocio = { modificar_inventario: false, gestionar_pedidos: false, cambiar_estado: false, administrador: false };
+const PERMISOS: { clave: keyof PermisosNegocio; titulo: string; detalle: string }[] = [
+  { clave: 'modificar_inventario', titulo: 'Modificar inventario', detalle: 'Añadir, editar, desactivar o eliminar productos, servicios y categorías.' },
+  { clave: 'gestionar_pedidos', titulo: 'Manejar pedidos', detalle: 'Aceptar, rechazar, marcar listos y seguir todo el flujo del domicilio.' },
+  { clave: 'cambiar_estado', titulo: 'Abrir y cerrar el negocio', detalle: 'Cambiar el estado y confirmar el cierre del negocio.' },
+  { clave: 'administrador', titulo: 'Administrador del negocio', detalle: 'Puede hacer todo, editar la información y administrar el equipo. Nunca puede modificar ni retirar al dueño.' },
+];
+
 type Props = NativeStackScreenProps<RootStackParamList, 'Equipo'>;
 
 export default function EquipoScreen({ navigation }: Props) {
@@ -42,6 +53,11 @@ export default function EquipoScreen({ navigation }: Props) {
   const confirmar = useConfirmar();
   const { negocio, esPropietario, recargar } = useNegocio();
   const negocioId = negocio?.id ?? null;
+  const administra = tienePermiso(negocio, 'administrador');
+  const [permisosInvitacion, setPermisosInvitacion] = useState<PermisosNegocio>({ ...SIN_PERMISOS });
+  const [seleccionado, setSeleccionado] = useState<MiembroNegocio | null>(null);
+  const [permisos, setPermisos] = useState<PermisosNegocio>({ ...SIN_PERMISOS });
+  const [guardando, setGuardando] = useState(false);
 
   const [miembros, setMiembros] = useState<MiembroNegocio[]>([]);
   const [pendientes, setPendientes] = useState<InvitacionEnviada[]>([]);
@@ -54,6 +70,17 @@ export default function EquipoScreen({ navigation }: Props) {
   const [errorCodigo, setErrorCodigo] = useState<string | undefined>();
   const [buscando, setBuscando] = useState(false);
   const [invitando, setInvitando] = useState(false);
+
+  useEffect(() => {
+    setSeleccionado(null);
+    setCodigo('');
+    setEncontrado(null);
+    setErrorCodigo(undefined);
+    setPermisosInvitacion({ ...SIN_PERMISOS });
+    setMiembros([]);
+    setPendientes([]);
+    setCargando(true);
+  }, [negocioId]);
 
   const cargar = useCallback(async () => {
     if (!negocioId) {
@@ -109,7 +136,8 @@ export default function EquipoScreen({ navigation }: Props) {
     }
     setInvitando(true);
     try {
-      const mensaje = await invitarTrabajador(token, negocioId, encontrado.codigo_publico);
+      const mensaje = await invitarTrabajador(token, negocioId, encontrado.codigo_publico, permisosInvitacion);
+      setPermisosInvitacion({ ...SIN_PERMISOS });
       toast.exito('Invitación enviada', mensaje);
       setCodigo('');
       setEncontrado(null);
@@ -159,6 +187,8 @@ export default function EquipoScreen({ navigation }: Props) {
           await quitarMiembro(token, negocioId, m.id);
           toast.exito('Listo', `${m.name} ya no hace parte del negocio.`);
           setMiembros(lista => lista.filter(x => x.id !== m.id));
+          setSeleccionado(null);
+          await recargar();
         } catch (e) {
           toast.error('No se pudo quitar', messageFromError(e, 'Error'));
         }
@@ -190,6 +220,26 @@ export default function EquipoScreen({ navigation }: Props) {
     });
   }
 
+  function selectorPermisos(valor: PermisosNegocio, cambiar: (p: PermisosNegocio) => void, editable: boolean) {
+    return <View>{PERMISOS.map(p => <View key={p.clave} style={styles.permiso}>
+      <View style={{ flex: 1 }}><Text style={styles.miembroNombre}>{p.titulo}</Text><Text style={styles.ayuda}>{p.detalle}</Text></View>
+      <Switch accessibilityLabel={p.titulo} value={valor.administrador || valor[p.clave]} disabled={!editable || (valor.administrador && p.clave !== 'administrador')} onValueChange={v => cambiar({ ...valor, [p.clave]: v })} />
+    </View>)}</View>;
+  }
+
+  async function guardarPermisos() {
+    if (!seleccionado || !negocioId) return;
+    setGuardando(true);
+    try {
+      await actualizarPermisosMiembro(token, negocioId, seleccionado.id, permisos);
+      setSeleccionado(null);
+      await Promise.all([cargar(), recargar()]);
+      toast.exito('Permisos actualizados');
+    } catch (e) {
+      toast.error('No se pudieron guardar los permisos', messageFromError(e));
+    } finally { setGuardando(false); }
+  }
+
   if (!negocio) {
     return (
       <View style={styles.centro}>
@@ -203,6 +253,7 @@ export default function EquipoScreen({ navigation }: Props) {
   }
 
   return (
+    <>
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
@@ -210,12 +261,12 @@ export default function EquipoScreen({ navigation }: Props) {
       refreshControl={
         <RefreshControl refreshing={refrescando} onRefresh={refrescar} colors={[c.accent]} tintColor={c.accent} />
       }>
-      {esPropietario && <TouchableOpacity onPress={() => navigation.navigate('AgendaNegocio', { negocioId: negocioId! })}>
+      {administra && <TouchableOpacity onPress={() => navigation.navigate('AgendaNegocio', { negocioId: negocioId! })}>
         <Text style={styles.vacioTxt}>Antes de retirar a un trabajador con citas, reasígnalas en la agenda. Abrir agenda →</Text>
       </TouchableOpacity>}
       <Text style={styles.negocio}>{negocio.nombre}</Text>
 
-      {esPropietario && (
+      {administra && (
         <FadeInView style={styles.tarjeta}>
           <Text style={styles.tarjetaTitulo}>Invitar a un trabajador</Text>
           <Text style={styles.ayuda}>
@@ -248,6 +299,7 @@ export default function EquipoScreen({ navigation }: Props) {
               <Text style={styles.confirmarTxt}>
                 ¿Invitar a <Text style={styles.confirmarNombre}>{encontrado.name}</Text>?
               </Text>
+              {selectorPermisos(permisosInvitacion, setPermisosInvitacion, !invitando)}
               <PressableScale style={styles.invitarBtn} onPress={invitar} disabled={invitando}>
                 {invitando ? (
                   <ActivityIndicator color={c.onBrand} />
@@ -262,7 +314,7 @@ export default function EquipoScreen({ navigation }: Props) {
 
       <Text style={styles.seccion}>Miembros ({miembros.length})</Text>
       {miembros.map((m, i) => (
-        <FadeInView key={m.id} delay={i * 40} style={styles.miembro}>
+        <FadeInView key={m.id} delay={i * 40}><TouchableOpacity accessibilityRole="button" accessibilityLabel={`Ver información y permisos de ${m.name}`} style={styles.miembro} onPress={() => { setSeleccionado(m); setPermisos(m.permisos ?? { ...SIN_PERMISOS }); }}>
           <Icon name="usuario" size={20} color={c.accent} style={styles.miembroIcono} />
           <View style={styles.miembroTexto}>
             <Text style={styles.miembroNombre}>
@@ -270,19 +322,19 @@ export default function EquipoScreen({ navigation }: Props) {
               {m.es_yo ? ' (tú)' : ''}
             </Text>
             <Text style={styles.miembroRol}>
-              {m.rol === 'propietario' ? 'Propietario' : 'Trabajador'}
+              {m.rol === 'propietario' ? 'Propietario' : m.permisos?.administrador ? 'Administrador' : 'Trabajador'}
               {m.activo ? '' : ' · Suspendido'}
             </Text>
           </View>
-          {esPropietario && m.rol !== 'propietario' && (
+          {administra && m.rol !== 'propietario' && (
             <TouchableOpacity onPress={() => onQuitar(m)} hitSlop={8}>
               <Icon name="basura" size={18} color={c.danger} />
             </TouchableOpacity>
           )}
-        </FadeInView>
+        </TouchableOpacity></FadeInView>
       ))}
 
-      {esPropietario && pendientes.length > 0 && (
+      {administra && pendientes.length > 0 && (
         <>
           <Text style={styles.seccion}>Invitaciones pendientes</Text>
           {pendientes.map(inv => (
@@ -306,10 +358,29 @@ export default function EquipoScreen({ navigation }: Props) {
         </TouchableOpacity>
       )}
     </ScrollView>
+    <Modal visible={!!seleccionado} transparent animationType="fade" onRequestClose={() => { if (!guardando) setSeleccionado(null); }}>
+      <View style={styles.fondoModal}>
+        <ScrollView style={styles.modal} contentContainerStyle={{ padding: 20 }} keyboardShouldPersistTaps="handled">
+          <Text style={styles.tarjetaTitulo}>{seleccionado?.name}</Text>
+          <Text style={styles.ayuda}>{seleccionado?.rol === 'propietario' ? 'Propietario' : seleccionado?.permisos?.administrador ? 'Administrador' : 'Trabajador'} · {seleccionado?.activo ? 'Activo' : 'Suspendido'}</Text>
+          {!!seleccionado?.codigo_publico && <Text style={styles.ayuda}>Código: #{seleccionado.codigo_publico}</Text>}
+          <Text style={styles.seccion}>Permisos</Text>
+          {selectorPermisos(permisos, setPermisos, administra && seleccionado?.rol !== 'propietario' && !guardando)}
+          {administra && seleccionado?.rol !== 'propietario' && <TouchableOpacity disabled={guardando} style={styles.invitarBtn} onPress={guardarPermisos}>
+            {guardando ? <ActivityIndicator color={c.onBrand} /> : <Text style={styles.invitarTxt}>Guardar permisos</Text>}
+          </TouchableOpacity>}
+          <TouchableOpacity disabled={guardando} style={styles.salir} onPress={() => setSeleccionado(null)}><Text style={styles.vacioTxt}>Cerrar</Text></TouchableOpacity>
+        </ScrollView>
+      </View>
+    </Modal>
+    </>
   );
 }
 
 const useStyles = makeStyles((c, shadow) => ({
+  fondoModal: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
+  modal: { flexGrow: 0, maxHeight: '90%', backgroundColor: c.surface, borderRadius: radius.lg },
+  permiso: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
   container: { flex: 1, backgroundColor: c.bg },
   content: { padding: 20, paddingBottom: 60 },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg, padding: 20 },

@@ -74,12 +74,13 @@ test('mientras llega la lista, el comerciante espera y no ve el acceso de client
 
 test('si la lista no llegó, el refresco la pide de nuevo', async () => {
   await montar([NEGOCIO]);
+  const cargasAlEntrar = mockContexto.recargar.mock.calls.length;
 
   await act(async () => {
     refrescar();
   });
 
-  expect(mockContexto.recargar).toHaveBeenCalledTimes(1);
+  expect(mockContexto.recargar).toHaveBeenCalledTimes(cargasAlEntrar + 1);
 });
 
 test('con la lista cargada se ven sus accesos, sin indicador', async () => {

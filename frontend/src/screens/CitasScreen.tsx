@@ -17,6 +17,7 @@ import {
   getCitas,
   getServicios,
   Servicio,
+  tienePermiso,
   getEquipo,
   MiembroNegocio,
   reasignarCita,
@@ -67,7 +68,7 @@ export default function CitasScreen({ route, navigation }: Props) {
   const [porReasignar, setPorReasignar] = useState<Cita | null>(null);
   const [equipo, setEquipo] = useState<MiembroNegocio[]>([]);
   const [errorReasignar, setErrorReasignar] = useState('');
-  const propietario = negocios.find(n => n.id === negocioId)?.rol === 'propietario';
+  const propietario = tienePermiso(negocios.find(n => n.id === negocioId), 'administrador');
   const consulta = useRef(0);
   const cargar = useCallback(
     async (pag = 1) => {

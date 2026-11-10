@@ -94,7 +94,7 @@ class Negocio extends Model
     public function miembros(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'negocio_user')
-            ->withPivot(['rol', 'activo'])
+            ->withPivot(['rol', 'activo', ...self::PERMISOS])
             ->withTimestamps();
     }
 
@@ -117,6 +117,28 @@ class Negocio extends Model
             ->wherePivot('rol', self::ROL_PROPIETARIO)
             ->whereKey($user->id)
             ->exists();
+    }
+
+    public const PERMISOS = ['modificar_inventario', 'gestionar_pedidos', 'cambiar_estado', 'administrador'];
+
+    public function permisosPara(User $user): array
+    {
+        $miembro = ! $this->archivado_at ? $this->miembrosActivos()->whereKey($user->id)->first() : null;
+        $admin = $miembro && ($miembro->pivot->rol === self::ROL_PROPIETARIO || $miembro->pivot->administrador);
+
+        return collect(self::PERMISOS)->mapWithKeys(fn ($permiso) => [
+            $permiso => (bool) ($miembro && ($admin || $miembro->pivot->$permiso)),
+        ])->all();
+    }
+
+    public function puede(User $user, string $permiso): bool
+    {
+        return $this->permisosPara($user)[$permiso] ?? false;
+    }
+
+    public function administra(User $user): bool
+    {
+        return $this->puede($user, 'administrador');
     }
 
     /** Invitaciones de trabajo enviadas por este negocio. */

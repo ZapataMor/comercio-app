@@ -23,7 +23,12 @@ class InvitacionTrabajo extends Model
 
     public const RECHAZADA = 'rechazada';
 
-    protected $fillable = ['negocio_id', 'user_id', 'invitado_por', 'estado'];
+    protected $fillable = ['negocio_id', 'user_id', 'invitado_por', 'estado', ...Negocio::PERMISOS];
+
+    protected function casts(): array
+    {
+        return array_fill_keys(Negocio::PERMISOS, 'boolean');
+    }
 
     public function negocio(): BelongsTo
     {

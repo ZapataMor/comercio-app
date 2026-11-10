@@ -7,6 +7,7 @@ use App\Models\InvitacionTrabajo;
 use App\Models\Negocio;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Invitaciones de trabajo DEL LADO DEL INVITADO: ver las pendientes,
@@ -36,17 +37,21 @@ class InvitacionController extends Controller
     /** Aceptar: me convierto en trabajador activo del negocio. */
     public function aceptar(Request $request, int $id): JsonResponse
     {
-        $invitacion = $this->pendienteDe($request, $id);
+        $invitacion = DB::transaction(function () use ($request, $id) {
+            $invitacion = $this->pendienteDe($request, $id);
+            abort_unless($invitacion, 404, 'Invitación no encontrada.');
+            $negocio = Negocio::lockForUpdate()->findOrFail($invitacion->negocio_id);
+            $invitacion->refresh();
+            abort_unless($invitacion->estado === InvitacionTrabajo::PENDIENTE && ! $negocio->archivado_at, 409);
+            abort_if($negocio->miembros()->whereKey($request->user()->id)->exists(), 409, 'Ya haces parte del negocio.');
+            $negocio->miembros()->attach($request->user()->id, [
+                'rol' => Negocio::ROL_TRABAJADOR, 'activo' => true,
+                ...$invitacion->only(Negocio::PERMISOS),
+            ]);
+            $invitacion->update(['estado' => InvitacionTrabajo::ACEPTADA]);
 
-        if (! $invitacion) {
-            return response()->json(['message' => 'Invitación no encontrada.'], 404);
-        }
-
-        $invitacion->negocio->miembros()->syncWithoutDetaching([
-            $request->user()->id => ['rol' => Negocio::ROL_TRABAJADOR, 'activo' => true],
-        ]);
-
-        $invitacion->update(['estado' => InvitacionTrabajo::ACEPTADA]);
+            return $invitacion;
+        });
 
         return response()->json([
             'message' => "Ahora haces parte de {$invitacion->negocio->nombre}.",

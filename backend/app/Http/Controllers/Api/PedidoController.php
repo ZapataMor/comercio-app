@@ -135,7 +135,7 @@ class PedidoController extends Controller
 
         // Avisa a TODO el equipo del negocio (propietarios y trabajadores
         // activos) que entró un pedido nuevo.
-        $miembros = $negocio->miembrosActivos()->get();
+        $miembros = $negocio->miembrosActivos()->get()->filter(fn ($m) => $negocio->puede($m, 'gestionar_pedidos'));
         if ($miembros->isNotEmpty()) {
             Push::enviar($miembros, new NuevoPedidoParaComercio($pedido));
         }

@@ -4,6 +4,17 @@ import type { OpcionesLinea } from './opcionesProducto';
 /** Rol de una persona DENTRO de un negocio (no es un rol global). */
 export type RolNegocio = 'propietario' | 'trabajador';
 
+export type PermisosNegocio = {
+  modificar_inventario: boolean;
+  gestionar_pedidos: boolean;
+  cambiar_estado: boolean;
+  administrador: boolean;
+};
+
+export function tienePermiso(negocio: Negocio | null | undefined, permiso: keyof PermisosNegocio): boolean {
+  return !!negocio && (negocio.rol === 'propietario' || !!negocio.permisos?.administrador || !!negocio.permisos?.[permiso]);
+}
+
 export type Usuario = {
   id: number;
   /** Nombre(s). Los apellidos van aparte. */
@@ -85,6 +96,7 @@ export type EventoReputacion = {
 };
 
 export type Negocio = {
+  permisos?: PermisosNegocio;
   id: number;
   nombre: string;
   descripcion: string | null;
@@ -892,6 +904,8 @@ export type ReputacionDetalle = {
 // ---------- Equipo del negocio (miembros e invitaciones enviadas) ----------
 
 export type MiembroNegocio = {
+  codigo_publico?: string | null;
+  permisos: PermisosNegocio;
   id: number;
   name: string;
   rol: RolNegocio;
@@ -923,8 +937,8 @@ export async function resolverCodigo(
 }
 
 /** Invita por código (solo propietario). Devuelve el mensaje del backend. */
-export async function invitarTrabajador(token: string, negocioId: number, codigo: string): Promise<string> {
-  const d = await authSend('POST', `/api/negocios/${negocioId}/invitar`, token, { codigo });
+export async function invitarTrabajador(token: string, negocioId: number, codigo: string, permisos: PermisosNegocio): Promise<string> {
+  const d = await authSend('POST', `/api/negocios/${negocioId}/invitar`, token, { codigo, permisos });
   return d.message as string;
 }
 
@@ -1817,4 +1831,8 @@ export async function cancelarCita(token: string, id: number): Promise<Cita> {
 }
 export async function registrarLlegadaCita(token: string, negocioId: number, id: number): Promise<Cita> {
   return (await authSend('POST', `/api/negocios/${negocioId}/citas/${id}/llegada`, token)).cita;
+}
+
+export async function actualizarPermisosMiembro(token: string, negocioId: number, userId: number, permisos: PermisosNegocio): Promise<void> {
+  await authSend('PUT', `/api/negocios/${negocioId}/miembros/${userId}/permisos`, token, { permisos });
 }

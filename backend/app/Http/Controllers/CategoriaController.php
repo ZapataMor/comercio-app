@@ -21,7 +21,7 @@ class CategoriaController extends Controller
      */
     public function index(Request $request, Negocio $negocio): AnonymousResourceCollection|JsonResponse
     {
-        if (! $negocio->esMiembroActivo($request->user())) {
+        if (! $negocio->puede($request->user(), 'modificar_inventario')) {
             return $this->sinAcceso();
         }
 
@@ -37,7 +37,7 @@ class CategoriaController extends Controller
      */
     public function store(Request $request, Negocio $negocio): JsonResponse
     {
-        if (! $negocio->esMiembroActivo($request->user())) {
+        if (! $negocio->puede($request->user(), 'modificar_inventario')) {
             return $this->sinAcceso();
         }
 
@@ -59,7 +59,7 @@ class CategoriaController extends Controller
      */
     public function update(Request $request, Negocio $negocio, int $id): JsonResponse
     {
-        if (! $negocio->esMiembroActivo($request->user())) {
+        if (! $negocio->puede($request->user(), 'modificar_inventario')) {
             return $this->sinAcceso();
         }
 
@@ -89,7 +89,7 @@ class CategoriaController extends Controller
      */
     public function destroy(Request $request, Negocio $negocio, int $id): JsonResponse
     {
-        if (! $negocio->esMiembroActivo($request->user())) {
+        if (! $negocio->puede($request->user(), 'modificar_inventario')) {
             return $this->sinAcceso();
         }
 

@@ -36,7 +36,7 @@ class TrabajadorController extends Controller
             return $this->sinAcceso();
         }
 
-        $data = $request->validate(['codigo' => ['required', 'string', 'max:12']]);
+        $data = $request->validate(['codigo' => ['required', 'string', 'max:12']] + $this->reglasPermisos());
 
         $usuario = $this->porCodigo($data['codigo']);
 
@@ -64,6 +64,8 @@ class TrabajadorController extends Controller
                 'name' => $m->nombre_completo,
                 'rol' => $m->pivot->rol,
                 'activo' => (bool) $m->pivot->activo,
+                'codigo_publico' => $m->codigo_publico,
+                'permisos' => $negocio->permisosPara($m),
                 'es_yo' => $m->id === $request->user()->id,
             ]);
 
@@ -87,11 +89,11 @@ class TrabajadorController extends Controller
      */
     public function invitar(Request $request, Negocio $negocio): JsonResponse
     {
-        if (! $negocio->esPropietario($request->user())) {
-            return $this->sinAcceso('Solo el propietario puede invitar trabajadores.');
+        if (! $negocio->administra($request->user())) {
+            return $this->sinAcceso('Solo el propietario o un administrador pueden invitar trabajadores.');
         }
 
-        $data = $request->validate(['codigo' => ['required', 'string', 'max:12']]);
+        $data = $request->validate(['codigo' => ['required', 'string', 'max:12']] + $this->reglasPermisos());
 
         $usuario = $this->porCodigo($data['codigo']);
 
@@ -120,6 +122,7 @@ class TrabajadorController extends Controller
             'user_id' => $usuario->id,
             'invitado_por' => $request->user()->id,
             'estado' => InvitacionTrabajo::PENDIENTE,
+            ...$this->datosPermisos($data),
         ]);
 
         // El invitado decide: la invitación no lo vincula hasta que acepte.
@@ -133,8 +136,8 @@ class TrabajadorController extends Controller
     /** Cancelar una invitación pendiente. Solo el propietario. */
     public function cancelarInvitacion(Request $request, Negocio $negocio, int $id): JsonResponse
     {
-        if (! $negocio->esPropietario($request->user())) {
-            return $this->sinAcceso('Solo el propietario puede cancelar invitaciones.');
+        if (! $negocio->administra($request->user())) {
+            return $this->sinAcceso('Solo el propietario o un administrador pueden cancelar invitaciones.');
         }
 
         $borradas = $negocio->invitaciones()
@@ -155,8 +158,8 @@ class TrabajadorController extends Controller
      */
     public function quitarMiembro(Request $request, Negocio $negocio, int $userId): JsonResponse
     {
-        if (! $negocio->esPropietario($request->user())) {
-            return $this->sinAcceso('Solo el propietario puede gestionar el equipo.');
+        if (! $negocio->administra($request->user())) {
+            return $this->sinAcceso('Solo el propietario o un administrador pueden gestionar el equipo.');
         }
 
         $miembro = $negocio->miembros()->whereKey($userId)->first();
@@ -171,7 +174,8 @@ class TrabajadorController extends Controller
 
         DB::transaction(function () use ($negocio, $request, $userId) {
             $negocio = Negocio::lockForUpdate()->findOrFail($negocio->id);
-            abort_unless($negocio->esPropietario($request->user()), 403);
+            abort_unless($negocio->administra($request->user()), 403);
+            abort_if($negocio->miembros()->whereKey($userId)->first()?->pivot->rol === Negocio::ROL_PROPIETARIO, 422, 'No puedes quitar a un propietario.');
             $this->exigirSinCitas($negocio, $userId);
             $negocio->miembros()->detach($userId);
         });
@@ -200,6 +204,32 @@ class TrabajadorController extends Controller
         });
 
         return response()->json(['message' => 'Saliste del negocio.']);
+    }
+
+    public function actualizarPermisos(Request $request, Negocio $negocio, int $userId): JsonResponse
+    {
+        $datos = $request->validate($this->reglasPermisos());
+        DB::transaction(function () use ($request, $negocio, $userId, $datos) {
+            $negocio = Negocio::lockForUpdate()->findOrFail($negocio->id);
+            abort_unless($negocio->administra($request->user()), 403);
+            $miembro = $negocio->miembros()->whereKey($userId)->first();
+            abort_unless($miembro, 404);
+            abort_if($miembro->pivot->rol === Negocio::ROL_PROPIETARIO, 422, 'No puedes modificar al propietario.');
+            $negocio->miembros()->updateExistingPivot($userId, $this->datosPermisos($datos));
+        });
+
+        return response()->json(['message' => 'Permisos actualizados.']);
+    }
+
+    private function reglasPermisos(): array
+    {
+        return ['permisos' => ['sometimes', 'array:'.implode(',', Negocio::PERMISOS)]]
+            + collect(Negocio::PERMISOS)->mapWithKeys(fn ($p) => ['permisos.'.$p => ['required_with:permisos', 'boolean']])->all();
+    }
+
+    private function datosPermisos(array $datos): array
+    {
+        return $datos['permisos'] ?? ['modificar_inventario' => false, 'gestionar_pedidos' => false, 'cambiar_estado' => false, 'administrador' => false];
     }
 
     // ---------- Helpers privados ----------

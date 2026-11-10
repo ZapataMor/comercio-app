@@ -52,6 +52,7 @@ class NegocioController extends Controller
             ->get()
             ->map(fn (Negocio $n) => (new NegocioResource($n))->resolve() + [
                 'rol' => $n->pivot->rol,
+                'permisos' => $n->permisosPara($user),
             ]);
 
         return response()->json([
@@ -114,9 +115,9 @@ class NegocioController extends Controller
         $ahora = now();
 
         $cierres = $request->user()->negociosActivos()
-            ->wherePivot('rol', Negocio::ROL_PROPIETARIO)
             ->whereNotNull('negocios.horario')
             ->get()
+            ->filter(fn (Negocio $n) => $n->puede($request->user(), 'cambiar_estado'))
             ->map(function (Negocio $negocio) use ($ahora) {
                 $cierre = HorarioNegocio::cierreSinConfirmar($negocio, $ahora);
 
@@ -139,8 +140,8 @@ class NegocioController extends Controller
      */
     public function confirmarCierre(Request $request, Negocio $negocio): JsonResponse
     {
-        if (! $negocio->esPropietario($request->user())) {
-            return response()->json(['message' => 'Solo el propietario abre y cierra el negocio.'], 403);
+        if (! $negocio->puede($request->user(), 'cambiar_estado')) {
+            return response()->json(['message' => 'No tienes permiso para abrir o cerrar el negocio.'], 403);
         }
 
         $datos = $request->validate(
@@ -210,8 +211,11 @@ class NegocioController extends Controller
      */
     public function update(Request $request, Negocio $negocio): JsonResponse
     {
-        if (! $negocio->esPropietario($request->user())) {
-            return $this->sinAcceso('Solo el propietario puede editar el negocio.');
+        if (! $negocio->administra($request->user())) {
+            if (! $negocio->puede($request->user(), 'cambiar_estado') || ! $request->exists('activo')
+                || array_diff(array_keys($request->all()), ['activo', '_method'])) {
+                return $this->sinAcceso('No tienes permiso para editar la información del negocio.');
+            }
         }
 
         $this->horarioDesdeJson($request);
@@ -258,7 +262,7 @@ class NegocioController extends Controller
         $this->guardarImagen($request, $negocio);
 
         return response()->json([
-            'negocio' => $this->conRol($negocio, Negocio::ROL_PROPIETARIO),
+            'negocio' => $this->conRol($negocio, $negocio->miembros()->whereKey($request->user()->id)->first()?->pivot->rol),
         ]);
     }
 
@@ -300,7 +304,7 @@ class NegocioController extends Controller
     /** Resource del negocio + el rol del usuario en él (para la app). */
     private function conRol(Negocio $negocio, ?string $rol): array
     {
-        return (new NegocioResource($negocio->load('tiposNegocio')))->resolve() + ['rol' => $rol];
+        return (new NegocioResource($negocio->load('tiposNegocio')))->resolve() + ['rol' => $rol, 'permisos' => $negocio->permisosPara(request()->user())];
     }
 
     private function sinAcceso(string $mensaje = 'No tienes acceso a este negocio.'): JsonResponse

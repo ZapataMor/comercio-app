@@ -161,6 +161,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/resolver-codigo', [TrabajadorController::class, 'resolverCodigo']);
         Route::post('/invitar', [TrabajadorController::class, 'invitar']);
         Route::delete('/invitaciones/{id}', [TrabajadorController::class, 'cancelarInvitacion']);
+        Route::put('/miembros/{userId}/permisos', [TrabajadorController::class, 'actualizarPermisos']);
         Route::delete('/miembros/{userId}', [TrabajadorController::class, 'quitarMiembro']);
         Route::post('/salir', [TrabajadorController::class, 'salir']);
     });

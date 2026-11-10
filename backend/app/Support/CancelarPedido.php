@@ -93,6 +93,9 @@ class CancelarPedido
             if ($quien === self::POR_SISTEMA || $quien === self::POR_NEGOCIO) {
                 PedidoReporte::registrar($actual, 'negocio', $quien === self::POR_SISTEMA ? 'sin_aceptar' : 'cancelacion_comercio', $motivo ?: 'El comercio no aceptó el pedido dentro del tiempo establecido.');
             }
+            if ($quien === self::POR_SISTEMA && $actual->negocio) {
+                Reputacion::registrar(Reputacion::NEGOCIO, $actual->negocio, 'pedido_vencido', $actual);
+            }
 
             return $resultado;
         });

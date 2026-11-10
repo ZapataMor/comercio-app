@@ -3,7 +3,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, ScrollView, Text, View } from 'react-native';
 import { detenerAlarma } from '../alarmaPedidos';
-import { aceptarPedido, ComercioPedido, confirmarRecogida, getCitas, getPedidosComercio, getServicios } from '../api';
+import { tienePermiso, aceptarPedido, ComercioPedido, confirmarRecogida, getCitas, getPedidosComercio, getServicios } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import BotonMantener from '../components/BotonMantener';
@@ -106,7 +106,7 @@ function EtiquetaEstado({ abierto, texto }: { abierto: boolean; texto?: string }
  */
 function HeaderEstadoNegocio() {
   const styles = useStyles();
-  const { negocio, setAbierto, esPropietario } = useNegocio();
+  const { negocio, setAbierto } = useNegocio();
   const toast = useToast();
   const [cambiando, setCambiando] = useState(false);
 
@@ -115,7 +115,7 @@ function HeaderEstadoNegocio() {
   }
 
   // Solo el propietario abre/cierra el negocio; el trabajador solo ve el estado.
-  if (!esPropietario) {
+  if (!tienePermiso(negocio, 'cambiar_estado')) {
     return <EtiquetaEstado abierto={negocio.activo} texto={negocio.estado_texto} />;
   }
 
@@ -273,6 +273,8 @@ export default function HomeScreen({ navigation }: Props) {
     });
   }, [navigation, styles, esDomiciliario]);
 
+  useFocusEffect(useCallback(() => { recargar(); }, [recargar]));
+
   const cargarPedidos = useCallback(() => {
     if (!negocioId) {
       setPedidos([]);
@@ -280,9 +282,9 @@ export default function HomeScreen({ navigation }: Props) {
       return;
     }
 
-    getPedidosComercio(token, negocioId)
-      .then(setPedidos)
-      .catch(() => {});
+    if (tienePermiso(negocio, 'gestionar_pedidos')) {
+      getPedidosComercio(token, negocioId).then(setPedidos).catch(() => {});
+    } else { setPedidos([]); }
     getServicios(token, negocioId)
       .then(servicios => {
         if (negocioIdActual.current !== negocioId) return;
@@ -293,7 +295,7 @@ export default function HomeScreen({ navigation }: Props) {
         });
       })
       .catch(() => {});
-  }, [negocioId, token]);
+  }, [negocioId, token, negocio]);
 
   // Al cambiar de negocio no se muestran los pedidos del anterior.
   useEffect(() => { setPedidos([]); setCitasPendientes(0); }, [negocioId]);
@@ -350,8 +352,10 @@ export default function HomeScreen({ navigation }: Props) {
     { icono: 'negocios', titulo: 'Mis negocios', abrir: () => navigation.navigate('MisNegocios') },
     ...(negocio
       ? ([
-          { icono: 'caja', titulo: 'Mis productos', abrir: () => navigation.navigate('MisProductos') },
-          { icono: 'calendario', titulo: 'Mis servicios', abrir: () => navigation.navigate('MisServicios') },
+          ...(tienePermiso(negocio, 'modificar_inventario') ? [
+            { icono: 'caja', titulo: 'Mis productos', abrir: () => navigation.navigate('MisProductos') },
+            { icono: 'calendario', titulo: 'Mis servicios', abrir: () => navigation.navigate('MisServicios') },
+          ] satisfies Acceso[] : []),
           { icono: 'lista', titulo: 'Pedidos y ventas', abrir: () => navigation.navigate('PedidosNegocio') },
           { icono: 'usuarios', titulo: 'Equipo', abrir: () => navigation.navigate('Equipo') },
           ...(tieneServicios ? [{ icono: 'calendario', titulo: 'Agenda de citas', abrir: () => navigation.navigate('AgendaNegocio', { negocioId: negocio.id }) } satisfies Acceso] : []),
@@ -381,7 +385,7 @@ export default function HomeScreen({ navigation }: Props) {
           </PressableScale>}
 
           {/* Pedidos en espera del negocio activo, directamente en el Inicio. */}
-          {negocio && (
+          {negocio && tienePermiso(negocio, 'gestionar_pedidos') && (
             <>
               <Text style={styles.seccion}>
                 Pedidos en espera{enEspera.length > 0 ? ` (${enEspera.length})` : ''}

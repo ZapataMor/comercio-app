@@ -187,12 +187,12 @@ class CitaController extends Controller
 
     public function reasignar(Request $request, Negocio $negocio, int $id): JsonResponse
     {
-        abort_unless($negocio->esPropietario($request->user()), 403);
+        abort_unless($negocio->administra($request->user()), 403);
         $datos = $request->validate(['profesional_id' => ['required', 'integer']]);
         AgendaCitas::vencer(negocioId: $negocio->id);
         $cita = DB::transaction(function () use ($request, $negocio, $id, $datos) {
             $negocio = Negocio::lockForUpdate()->findOrFail($negocio->id);
-            abort_unless($negocio->esPropietario($request->user()), 403);
+            abort_unless($negocio->administra($request->user()), 403);
             $cita = Cita::where('negocio_id', $negocio->id)->findOrFail($id);
             User::whereIn('id', [$cita->profesional_id, $datos['profesional_id']])->orderBy('id')->lockForUpdate()->get();
             $cita = Cita::lockForUpdate()->findOrFail($id);

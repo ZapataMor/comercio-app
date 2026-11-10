@@ -17,7 +17,7 @@ class PedidoIncidenciaController extends Controller
 {
     public function faltante(Request $request, Negocio $negocio, int $id): JsonResponse
     {
-        abort_unless($negocio->esMiembroActivo($request->user()), 403);
+        abort_unless($negocio->puede($request->user(), 'gestionar_pedidos'), 403);
         $datos = $request->validate(['motivo' => ['required', 'string', 'min:5', 'max:1000']]);
         $pedido = DB::transaction(function () use ($negocio, $id, $datos) {
             Negocio::whereKey($negocio->id)->lockForUpdate()->firstOrFail();
@@ -84,7 +84,7 @@ class PedidoIncidenciaController extends Controller
 
     public function devolucion(Request $request, Negocio $negocio, int $id): JsonResponse
     {
-        abort_unless($negocio->esMiembroActivo($request->user()), 403);
+        abort_unless($negocio->puede($request->user(), 'gestionar_pedidos'), 403);
         $pedido = $negocio->pedidos()->findOrFail($id);
         $cambio = Pedido::whereKey($id)->where('estado', 'devolviendo')->update([
             'estado' => 'cancelado', 'devuelto_at' => now(), 'devolucion_confirmada_por' => $request->user()->id,

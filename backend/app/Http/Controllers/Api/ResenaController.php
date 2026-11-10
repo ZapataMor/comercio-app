@@ -40,7 +40,7 @@ class ResenaController extends Controller
         $pagina = (clone $resenas)->with('user')->latest()->latest('id')->paginate(20);
 
         $yo = $request->user();
-        $esPropietario = $negocio->esPropietario($yo);
+        $esPropietario = $negocio->administra($yo);
         $reportadas = ResenaReporte::where('user_id', $yo->id)
             ->whereIn('resena_id', collect($pagina->items())->pluck('id'))
             ->pluck('resena_id')
@@ -141,7 +141,7 @@ class ResenaController extends Controller
             return response()->json(['message' => 'Reseña no encontrada.'], 404);
         }
 
-        if (! $resena->negocio->esPropietario($request->user())) {
+        if (! $resena->negocio->administra($request->user())) {
             return response()->json(['message' => 'Solo el propietario de la tienda puede responder.'], 403);
         }
 

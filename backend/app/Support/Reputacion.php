@@ -43,6 +43,7 @@ class Reputacion
      */
     public const MOTIVOS = [
         self::NEGOCIO => [
+            'pedido_vencido' => [-5, 'Dejó vencer un pedido sin responder', false],
             'preparacion_a_tiempo' => [1, 'Tuvo el pedido listo a tiempo', false],
             'cliente_conforme' => [2, 'El cliente quedó conforme', false],
             'preparacion_tarde' => [-3, 'Se pasó de su tiempo de preparación', false],

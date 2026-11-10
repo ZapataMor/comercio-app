@@ -41,7 +41,7 @@ Artisan::command('negocios:preguntar-cierre', function () {
             }
 
             $negocio->forceFill(['cierre_preguntado' => $cierre])->save();
-            $duenos = $negocio->miembrosActivos()->wherePivot('rol', Negocio::ROL_PROPIETARIO)->get();
+            $duenos = $negocio->miembrosActivos()->get()->filter(fn ($m) => $negocio->puede($m, 'cambiar_estado'));
             Push::enviar($duenos, new PreguntaCierreNegocio($negocio, HorarioNegocio::hora($cierre->format('H:i'))));
             $preguntados++;
         });

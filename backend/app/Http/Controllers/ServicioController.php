@@ -13,7 +13,7 @@ class ServicioController extends Controller
 {
     private function autorizar(Request $request, Negocio $negocio): void
     {
-        abort_unless($negocio->esMiembroActivo($request->user()), 403, 'No tienes acceso a este negocio.');
+        abort_unless(($request->isMethod('get') ? $negocio->esMiembroActivo($request->user()) : $negocio->puede($request->user(), 'modificar_inventario')), 403, 'No tienes acceso a este negocio.');
     }
 
     private function datos(Request $request, ?Servicio $servicio = null): array

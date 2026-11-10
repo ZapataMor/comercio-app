@@ -1,6 +1,7 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { tienePermiso } from '../api';
 import { useAuth } from '../AuthContext';
 import { useNegocio } from '../NegocioContext';
 import CatalogoServicios from '../components/CatalogoServicios';
@@ -26,6 +27,9 @@ export default function MisServiciosScreen({ navigation }: Props) {
         <Text style={styles.botonTexto}>Crear mi negocio</Text>
       </PressableScale>
     </View>;
+  }
+  if (!tienePermiso(negocio, 'modificar_inventario')) {
+    return <View style={styles.vacio}><Text style={styles.texto}>No tienes permiso para modificar el inventario.</Text></View>;
   }
   return <ScrollView style={styles.container} contentContainerStyle={styles.contenido} keyboardShouldPersistTaps="handled">
     <CatalogoServicios key={negocio.id} token={auth!.token} negocioId={negocio.id} />

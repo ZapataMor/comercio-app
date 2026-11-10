@@ -27,6 +27,7 @@ import {
   imagenUrl,
   Producto,
   TipoProducto,
+  tienePermiso,
 } from '../api';
 import { useAuth } from '../AuthContext';
 import { useNegocio } from '../NegocioContext';
@@ -80,6 +81,7 @@ export default function MisProductosScreen({ navigation }: Props) {
   // Catálogo del negocio ACTIVO (una persona puede gestionar varios).
   const { negocio, cargando: cargandoNegocio } = useNegocio();
   const negocioId = negocio?.id ?? null;
+  const puedeInventario = tienePermiso(negocio, 'modificar_inventario');
 
   const [productos, setProductos] = useState<Producto[]>([]);
   const [tipos, setTipos] = useState<TipoProducto[]>([]);
@@ -170,7 +172,8 @@ export default function MisProductosScreen({ navigation }: Props) {
   // actualiza en su sitio sin taparla.
   const cargar = useCallback(
     (modo: 'carga' | 'refresco' | 'silencioso' = 'carga') => {
-      if (!negocioId) {
+      if (!negocioId || !puedeInventario) {
+        setProductos([]);
         setCargando(false);
         return;
       }
@@ -188,7 +191,7 @@ export default function MisProductosScreen({ navigation }: Props) {
           setRefrescando(false);
         });
     },
-    [token, negocioId, toast],
+    [token, negocioId, toast, puedeInventario],
   );
 
   useEffect(() => cargar(), [cargar]);
@@ -248,6 +251,9 @@ export default function MisProductosScreen({ navigation }: Props) {
       return;
     }
     const precioNum = Number(precio);
+    if (!Number.isSafeInteger(precioNum) || precioNum <= 0) {
+      setErrores({ precio: 'El precio debe ser mayor que 0 pesos.' }); return;
+    }
     const u = UNIDADES.find(x => x.value === unidad)!;
     // Atributos limpios: sin espacios sobrantes, vacíos ni repetidos.
     const atributosLimpios = [...new Set(atributos.map(a => a.trim()).filter(Boolean))];
@@ -326,6 +332,10 @@ export default function MisProductosScreen({ navigation }: Props) {
       </View>
     );
   }
+  if (!puedeInventario) {
+    return <View style={styles.sinNegocio}><Text style={styles.sinNegocioTxt}>No tienes permiso para modificar el inventario.</Text></View>;
+  }
+
   if (cargando) {
     return <ActivityIndicator size="large" color={c.accent} style={{ marginTop: 40 }} />;
   }

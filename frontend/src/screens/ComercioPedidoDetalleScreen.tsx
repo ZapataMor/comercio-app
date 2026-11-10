@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { detenerAlarma } from '../alarmaPedidos';
 import {
+  tienePermiso,
   aceptarPedido,
   cancelarPedidoNegocio,
   ComercioPedido,
@@ -51,19 +52,20 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
   const token = auth!.token;
   const toast = useToast();
   const confirmar = useConfirmar();
-  const { negocio } = useNegocio();
+  const { negocio, negocios } = useNegocio();
   // Desde un push el pedido puede ser de un negocio que no es el activo.
   const negocioId = route.params.negocioId ?? negocio?.id ?? null;
+  const puedePedidos = tienePermiso(negocios?.find(n => n.id === negocioId) ?? (negocio?.id === negocioId ? negocio : null), 'gestionar_pedidos');
   const [pedido, setPedido] = useState<ComercioPedido | null>(route.params.pedido ?? null);
   const [cargando, setCargando] = useState(!route.params.pedido);
   const [enviando, setEnviando] = useState(false);
   const pedidoId = route.params.pedido?.id ?? route.params.pedidoId ?? null;
 
   const recargar = useCallback(async () => {
-    if (pedidoId && negocioId) {
+    if (puedePedidos && pedidoId && negocioId) {
       setPedido(await getPedidoNegocio(token, negocioId, pedidoId));
     }
-  }, [negocioId, pedidoId, token]);
+  }, [negocioId, pedidoId, token, puedePedidos]);
 
   // Puede venir de una lista vieja o de un push: se trae el estado real.
   useEffect(() => {
@@ -201,6 +203,10 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
       peligro: true,
       accion: () => enviarDinero(estado),
     });
+  }
+
+  if (!puedePedidos) {
+    return <View style={styles.centro}><Text>No tienes permiso para manejar los pedidos de este negocio.</Text></View>;
   }
 
   if (cargando) {

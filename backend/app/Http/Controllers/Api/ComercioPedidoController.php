@@ -40,7 +40,7 @@ class ComercioPedidoController extends Controller
      */
     public function porAceptar(Request $request): JsonResponse
     {
-        $negocios = $request->user()->negociosActivos()->pluck('negocios.id');
+        $negocios = $request->user()->negociosActivos()->get()->filter(fn (Negocio $n) => $n->puede($request->user(), 'gestionar_pedidos'))->pluck('id');
 
         $pedidos = Pedido::whereIn('negocio_id', $negocios)
             ->where('estado', 'pendiente')
@@ -70,7 +70,7 @@ class ComercioPedidoController extends Controller
      */
     public function index(Request $request, Negocio $negocio): JsonResponse
     {
-        if (! $negocio->esMiembroActivo($request->user())) {
+        if (! $negocio->puede($request->user(), 'gestionar_pedidos')) {
             return $this->sinAcceso();
         }
 
@@ -108,7 +108,7 @@ class ComercioPedidoController extends Controller
     /** Un pedido del negocio (p. ej. al abrirlo desde un push). */
     public function show(Request $request, Negocio $negocio, int $id): JsonResponse
     {
-        if (! $negocio->esMiembroActivo($request->user())) {
+        if (! $negocio->puede($request->user(), 'gestionar_pedidos')) {
             return $this->sinAcceso();
         }
 
@@ -148,7 +148,7 @@ class ComercioPedidoController extends Controller
      */
     public function cancelar(Request $request, Negocio $negocio, int $id): JsonResponse
     {
-        if (! $negocio->esMiembroActivo($request->user())) {
+        if (! $negocio->puede($request->user(), 'gestionar_pedidos')) {
             return $this->sinAcceso();
         }
 
@@ -223,7 +223,7 @@ class ComercioPedidoController extends Controller
      */
     public function aceptar(Request $request, Negocio $negocio, int $id): JsonResponse
     {
-        if (! $negocio->esMiembroActivo($request->user())) {
+        if (! $negocio->puede($request->user(), 'gestionar_pedidos')) {
             return $this->sinAcceso();
         }
 
@@ -249,7 +249,7 @@ class ComercioPedidoController extends Controller
     /** Marcar un pedido aceptado como "listo" (lo verán los domiciliarios). */
     public function marcarListo(Request $request, Negocio $negocio, int $id): JsonResponse
     {
-        if (! $negocio->esMiembroActivo($request->user())) {
+        if (! $negocio->puede($request->user(), 'gestionar_pedidos')) {
             return $this->sinAcceso();
         }
 
@@ -294,7 +294,7 @@ class ComercioPedidoController extends Controller
      */
     public function recogido(Request $request, Negocio $negocio, int $id): JsonResponse
     {
-        if (! $negocio->esMiembroActivo($request->user())) {
+        if (! $negocio->puede($request->user(), 'gestionar_pedidos')) {
             return $this->sinAcceso();
         }
 
@@ -344,7 +344,7 @@ class ComercioPedidoController extends Controller
      */
     public function confirmarDinero(Request $request, Negocio $negocio, int $id): JsonResponse
     {
-        if (! $negocio->esMiembroActivo($request->user())) {
+        if (! $negocio->puede($request->user(), 'gestionar_pedidos')) {
             return $this->sinAcceso();
         }
 

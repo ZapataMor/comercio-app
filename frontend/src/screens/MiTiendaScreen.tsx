@@ -21,7 +21,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { ClaveHorario, Coordenadas, DiaSemana, HorarioSemana, imagenUrl, Negocio, eliminarNegocio } from '../api';
+import { tienePermiso, ClaveHorario, Coordenadas, DiaSemana, HorarioSemana, imagenUrl, Negocio, eliminarNegocio } from '../api';
 import { useAuth } from '../AuthContext';
 import { useConfirmar } from '../components/Confirmacion';
 import { FadeInView, PressableScale } from '../components/anim';
@@ -312,7 +312,7 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
             icono="casa"
             etiqueta="Barrio"
             valor={negocio.barrio}
-            vacio={esPropietario ? 'Falta: agrégalo en "Editar información"' : undefined}
+            vacio={tienePermiso(negocioActivo, 'administrador') ? 'Falta: agrégalo en "Editar información"' : undefined}
           />
           <Fila
             icono="mapa"
@@ -348,13 +348,13 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
           )}
         </FadeInView>
 
-        {esPropietario ? (
+        {tienePermiso(negocioActivo, 'administrador') ? (
           <PressableScale style={styles.boton} onPress={() => empezarEdicion(negocio)}>
             <Text style={styles.botonTexto}>Editar información</Text>
           </PressableScale>
         ) : (
           <Text style={styles.notaTrabajador}>
-            Eres trabajador de este negocio: solo el propietario puede editar su información.
+            Eres trabajador de este negocio: necesitas permiso de administrador para editar su información.
           </Text>
         )}
         {esPropietario && <TouchableOpacity onPress={() => confirmar({

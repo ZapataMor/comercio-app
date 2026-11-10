@@ -9,6 +9,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, Text, TouchableOpacity, View } from 'react-native';
 import {
+  tienePermiso,
   ComercioPedido,
   getPedidosNegocio,
   getResumenNegocio,
@@ -45,6 +46,7 @@ export default function PedidosNegocioScreen({ navigation }: Props) {
   const toast = useToast();
   const { negocio } = useNegocio();
   const negocioId = negocio?.id ?? null;
+  const puedePedidos = tienePermiso(negocio, 'gestionar_pedidos');
 
   const [grupo, setGrupo] = useState<GrupoPedidos>('en_espera');
   const [pedidos, setPedidos] = useState<ComercioPedido[]>([]);
@@ -64,7 +66,7 @@ export default function PedidosNegocioScreen({ navigation }: Props) {
       if (modo === 'refrescar') setRefrescando(true);
       try {
         const [lista, res] = await Promise.all([
-          getPedidosNegocio(token, negocioId, grupo, 1),
+          puedePedidos ? getPedidosNegocio(token, negocioId, grupo, 1) : Promise.resolve({ pedidos: [], pagina: 1, ultima_pagina: 1 }),
           getResumenNegocio(token, negocioId),
         ]);
         if (id !== consulta.current) return;
@@ -81,7 +83,7 @@ export default function PedidosNegocioScreen({ navigation }: Props) {
         }
       }
     },
-    [grupo, negocioId, toast, token],
+    [grupo, negocioId, toast, token, puedePedidos],
   );
 
   // Al cambiar de pestaña se empieza de cero.
@@ -98,7 +100,7 @@ export default function PedidosNegocioScreen({ navigation }: Props) {
   );
 
   async function cargarMas() {
-    if (!negocioId || !hayMas || cargandoMas || cargando) return;
+    if (!puedePedidos || !negocioId || !hayMas || cargandoMas || cargando) return;
     const id = consulta.current;
     setCargandoMas(true);
     try {
@@ -139,7 +141,7 @@ export default function PedidosNegocioScreen({ navigation }: Props) {
           )}
         </FadeInView>
       )}
-      <View style={styles.pestanas}>
+      {puedePedidos && <View style={styles.pestanas}>
         {PESTANAS.map(p => (
           <TouchableOpacity
             key={p.grupo}
@@ -148,7 +150,7 @@ export default function PedidosNegocioScreen({ navigation }: Props) {
             <Text style={[styles.pestanaTxt, grupo === p.grupo && styles.pestanaTxtActiva]}>{p.titulo}</Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </View>}
     </>
   );
 
@@ -167,7 +169,7 @@ export default function PedidosNegocioScreen({ navigation }: Props) {
           <ActivityIndicator color={c.accent} style={styles.cargando} />
         ) : (
           <View style={styles.vacioBox}>
-            <Text style={styles.vacioTxt}>No hay pedidos aquí.</Text>
+            <Text style={styles.vacioTxt}>{puedePedidos ? 'No hay pedidos aquí.' : 'Puedes ver las ventas del día. Para manejar pedidos necesitas permiso.'}</Text>
           </View>
         )
       }
