@@ -6,28 +6,52 @@ import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 import { miUbicacion, pedirPermisoUbicacion } from '../ubicacion';
 import { PressableScale } from './anim';
-import Icon from './Icon';
-import { MAICAO, MapaRef, MapaVitrina, PinNegocio, vistaDe, ZOOM } from './Mapa';
+import Icon, { IconName } from './Icon';
+import { MAICAO, MapaRef, MapaVitrina, PinEntrega, PinNegocio, vistaDe, ZOOM } from './Mapa';
 
 type Props = {
   valor: Coordenadas | null;
   onCambiar: (valor: Coordenadas | null) => void;
   disabled?: boolean;
+  /** Qué se está ubicando: cambia los textos y el ícono del pin. */
+  tipo?: Tipo;
+};
+
+type Tipo = 'negocio' | 'entrega';
+
+const TEXTOS: Record<Tipo, { label: string; fijar: string; paraQue: string; ayuda: string; estoyAqui: string; icono: IconName }> = {
+  negocio: {
+    label: 'Ubicación en el mapa',
+    fijar: 'Fijar en el mapa',
+    paraQue: 'Así los clientes y los domiciliarios encuentran tu negocio.',
+    ayuda: 'Mueve el mapa hasta que el pin quede en la puerta de tu negocio.',
+    estoyAqui: 'Estoy en el negocio: usar mi ubicación',
+    icono: 'tienda',
+  },
+  entrega: {
+    label: 'Punto en el mapa (opcional)',
+    fijar: 'Marcar en el mapa',
+    paraQue: 'El domiciliario llega más fácil y verás en cuánto llega tu pedido.',
+    ayuda: 'Mueve el mapa hasta que el pin quede en la puerta donde recibes.',
+    estoyAqui: 'Estoy ahí: usar mi ubicación',
+    icono: 'casa',
+  },
 };
 
 /**
- * Ubicación del negocio en el mapa (formulario de Mi Tienda). Se fija
- * moviendo el mapa bajo un pin fijo en el centro, o con "Usar mi ubicación"
- * si la persona está en el local.
+ * Punto en el mapa de un negocio (Mi Tienda) o de una dirección de entrega
+ * (cliente). Se fija moviendo el mapa bajo un pin fijo en el centro, o con
+ * "usar mi ubicación" si la persona está en el sitio.
  */
-export default function SelectorUbicacion({ valor, onCambiar, disabled }: Props) {
+export default function SelectorUbicacion({ valor, onCambiar, disabled, tipo = 'negocio' }: Props) {
+  const t = TEXTOS[tipo];
   const { c } = useTheme();
   const styles = useStyles();
   const [abierto, setAbierto] = useState(false);
 
   return (
     <View style={styles.bloque}>
-      <Text style={styles.label}>Ubicación en el mapa</Text>
+      <Text style={styles.label}>{t.label}</Text>
       {valor ? (
         <>
           {/* Vista previa quieta: el dedo hace scroll del formulario, no del mapa. */}
@@ -38,7 +62,7 @@ export default function SelectorUbicacion({ valor, onCambiar, disabled }: Props)
               vista={vistaDe(valor, ZOOM.cuadra)}
               quieto
               recortado>
-              <PinNegocio punto={valor} nombre="Mi negocio" />
+              {tipo === 'entrega' ? <PinEntrega punto={valor} /> : <PinNegocio punto={valor} nombre="Mi negocio" />}
             </MapaVitrina>
           </View>
           <View style={styles.acciones}>
@@ -56,8 +80,8 @@ export default function SelectorUbicacion({ valor, onCambiar, disabled }: Props)
         <PressableScale style={styles.vacio} onPress={() => setAbierto(true)} disabled={disabled}>
           <Icon name="ubicacion" size={22} color={c.accent} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.vacioTitulo}>Fijar en el mapa</Text>
-            <Text style={styles.vacioSub}>Así los clientes y los domiciliarios encuentran tu negocio.</Text>
+            <Text style={styles.vacioTitulo}>{t.fijar}</Text>
+            <Text style={styles.vacioSub}>{t.paraQue}</Text>
           </View>
           <Icon name="chevron" size={18} color={c.chevron} />
         </PressableScale>
@@ -65,6 +89,7 @@ export default function SelectorUbicacion({ valor, onCambiar, disabled }: Props)
 
       {abierto && (
         <ModalMapa
+          tipo={tipo}
           inicial={valor}
           onCerrar={() => setAbierto(false)}
           onGuardar={punto => {
@@ -78,14 +103,17 @@ export default function SelectorUbicacion({ valor, onCambiar, disabled }: Props)
 }
 
 function ModalMapa({
+  tipo,
   inicial,
   onCerrar,
   onGuardar,
 }: {
+  tipo: Tipo;
   inicial: Coordenadas | null;
   onCerrar: () => void;
   onGuardar: (punto: Coordenadas) => void;
 }) {
+  const t = TEXTOS[tipo];
   const { c } = useTheme();
   const styles = useStyles();
   const toast = useToast();
@@ -130,7 +158,7 @@ function ModalMapa({
         {/* Pin fijo: el mapa se mueve debajo. La punta marca el punto exacto. */}
         <View style={styles.centroPin} pointerEvents="none">
           <View style={styles.pinGota}>
-            <Icon name="tienda" size={20} color={c.onAccent} />
+            <Icon name={t.icono} size={20} color={c.onAccent} />
           </View>
           <View style={styles.pinPunta} />
         </View>
@@ -140,7 +168,7 @@ function ModalMapa({
             <Icon name="cerrar" size={20} color={c.textStrong} />
           </TouchableOpacity>
           <View style={styles.ayuda}>
-            <Text style={styles.ayudaTxt}>Mueve el mapa hasta que el pin quede en la puerta de tu negocio.</Text>
+            <Text style={styles.ayudaTxt}>{t.ayuda}</Text>
           </View>
         </View>
 
@@ -153,7 +181,7 @@ function ModalMapa({
             ) : (
               <>
                 <Icon name="ubicacion" size={16} color={c.text} />
-                <Text style={styles.secundarioTxt}>Estoy en el negocio: usar mi ubicación</Text>
+                <Text style={styles.secundarioTxt}>{t.estoyAqui}</Text>
               </>
             )}
           </PressableScale>

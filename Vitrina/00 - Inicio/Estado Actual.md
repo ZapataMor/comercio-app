@@ -390,6 +390,13 @@ facturación): se dibuja con MapLibre sobre OpenStreetMap, con estilo propio de 
 pines y tarjeta, y el encuadre del seguimiento con datos de ejemplo. Falta verlo con un pedido real
 en camino y en iOS. Los negocios de demostración aún no tienen pin: cada uno lo fija en Mi Tienda.
 
+**Punto de entrega y tiempo estimado (2026-11-10).** El cliente puede marcar cada dirección en el
+mapa (opcional, en Mis direcciones y al pedir). El pedido guarda una copia del punto
+(`pedidos.entrega_lat/lng`) y, cuando el domiciliario va en camino, el seguimiento muestra «Llega en
+unos X min»: distancia en línea recta × 1,35 a 22 km/h más 1 min (`Support/TiempoEntrega.php`), sin
+servicios externos ni tráfico. El domiciliario abre «Cómo llegar» con ese punto exacto. Sin punto en
+la dirección todo sigue igual que antes, solo que sin tiempo estimado. Pruebas: `PuntoEntregaTest`.
+
 ---
 
 ## 10. Identidad visual y experiencia

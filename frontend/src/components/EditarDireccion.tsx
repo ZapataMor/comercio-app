@@ -2,12 +2,13 @@ import CamposDireccion from '../components/CamposDireccion';
 import { direccionValida, errorDireccion } from '../direccion';
 import React, { useState } from 'react';
 import { ActivityIndicator, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { ClienteDireccion, crearClienteDireccion, editarClienteDireccion } from '../api';
+import { ClienteDireccion, Coordenadas, crearClienteDireccion, editarClienteDireccion } from '../api';
 import { useAuth } from '../AuthContext';
 import { fieldErrorsFromError, messageFromError, FieldErrors } from '../formErrors';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import BarrioSelect from './BarrioSelect';
 import FieldError from './FieldError';
+import SelectorUbicacion from './SelectorUbicacion';
 
 export default function EditarDireccion({ direccion, onCerrar, onGuardada }: {
   direccion: ClienteDireccion | null; onCerrar: () => void; onGuardada: (d: ClienteDireccion) => void;
@@ -18,6 +19,9 @@ export default function EditarDireccion({ direccion, onCerrar, onGuardada }: {
   const [nombre, setNombre] = useState(direccion?.nombre ?? '');
   const [calle, setCalle] = useState(direccion?.direccion ?? '');
   const [barrio, setBarrio] = useState(direccion?.barrio ?? '');
+  const [punto, setPunto] = useState<Coordenadas | null>(
+    direccion?.lat != null && direccion?.lng != null ? { lat: direccion.lat, lng: direccion.lng } : null,
+  );
   const [guardando, setGuardando] = useState(false);
   const [errores, setErrores] = useState<FieldErrors>({});
   const [error, setError] = useState('');
@@ -30,7 +34,10 @@ export default function EditarDireccion({ direccion, onCerrar, onGuardada }: {
     if (Object.keys(campos).length) return;
     setGuardando(true);
     try {
-      const body = { nombre: nombre.trim() || null, direccion: calle.trim(), barrio: barrio.trim() };
+      const body = {
+        nombre: nombre.trim() || null, direccion: calle.trim(), barrio: barrio.trim(),
+        lat: punto?.lat ?? null, lng: punto?.lng ?? null,
+      };
       const guardada = direccion ? await editarClienteDireccion(auth.token, direccion.id, body)
         : await crearClienteDireccion(auth.token, body);
       if (guardada.es_principal) actualizarUsuario({ ...auth.user, direccion: guardada.direccion, barrio: guardada.barrio });
@@ -52,6 +59,8 @@ export default function EditarDireccion({ direccion, onCerrar, onGuardada }: {
       <Text style={styles.label}>Barrio</Text>
       <BarrioSelect disabled={guardando} valor={barrio} onSeleccionar={setBarrio} />
       <FieldError mensaje={errores.barrio} />
+      <View style={styles.mapa}><SelectorUbicacion tipo="entrega" valor={punto} onCambiar={setPunto} disabled={guardando} /></View>
+      <FieldError mensaje={errores.lat ?? errores.lng} />
       {!!error && <Text style={styles.error}>{error}</Text>}
       <TouchableOpacity style={styles.boton} disabled={guardando} onPress={guardar}>
         {guardando ? <ActivityIndicator color={c.onAccent} /> : <Text style={styles.botonTexto}>Guardar dirección</Text>}
@@ -71,4 +80,5 @@ const useStyles = makeStyles(c => ({
   botonTexto: { color: c.onAccent, fontFamily: font.bold },
   enlace: { color: c.accent, fontFamily: font.semibold, paddingVertical: 12 },
   error: { color: c.danger, fontFamily: font.regular },
+  mapa: { marginTop: 8 },
 }));

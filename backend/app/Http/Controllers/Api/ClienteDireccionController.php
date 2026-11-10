@@ -10,6 +10,12 @@ use Illuminate\Support\Facades\DB;
 
 class ClienteDireccionController extends Controller
 {
+    /** Punto en el mapa: opcional, pero latitud y longitud van juntas. */
+    private const REGLAS_PUNTO = [
+        'lat' => ['nullable', 'required_with:lng', 'numeric', 'between:-90,90'],
+        'lng' => ['nullable', 'required_with:lat', 'numeric', 'between:-180,180'],
+    ];
+
     public function index(Request $request): JsonResponse
     {
         $direcciones = $request->user()
@@ -32,6 +38,7 @@ class ClienteDireccionController extends Controller
             'nombre' => ['nullable', 'string', 'max:80'],
             'direccion' => ['required', 'string', 'max:255', new \App\Rules\Direccion],
             'barrio' => ['required', 'string', 'max:120'],
+            ...self::REGLAS_PUNTO,
         ]);
 
         // Barrio escrito a mano → sugerencia pendiente para el admin.
@@ -41,6 +48,8 @@ class ClienteDireccionController extends Controller
             'nombre' => $data['nombre'] ?? null,
             'direccion' => $data['direccion'],
             'barrio' => $data['barrio'],
+            'lat' => $data['lat'] ?? null,
+            'lng' => $data['lng'] ?? null,
             'es_principal' => false,
         ]);
 
@@ -55,8 +64,12 @@ class ClienteDireccionController extends Controller
             'nombre' => ['nullable', 'string', 'max:80'],
             'direccion' => ['required', 'string', 'max:255', new \App\Rules\Direccion],
             'barrio' => ['required', 'string', 'max:120'],
+            ...self::REGLAS_PUNTO,
         ]);
         Barrio::registrarSiEsNuevo($data['barrio'], $request->user()->id);
+        // Sin punto en la petición se quita el que hubiera: la app siempre lo envía.
+        $data['lat'] ??= null;
+        $data['lng'] ??= null;
         DB::transaction(function () use ($request, $direccion, $data) {
             $direccion->update($data);
             if ($direccion->es_principal) {
@@ -75,6 +88,8 @@ class ClienteDireccionController extends Controller
             'direccion' => $direccion->direccion,
             'barrio' => $direccion->barrio,
             'es_principal' => (bool) $direccion->es_principal,
+            'lat' => $direccion->lat,
+            'lng' => $direccion->lng,
         ];
     }
 }

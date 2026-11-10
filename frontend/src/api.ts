@@ -564,6 +564,18 @@ export type ClienteDireccion = {
   direccion: string;
   barrio: string;
   es_principal: boolean;
+  /** Punto en el mapa, si el cliente lo fijó (opcional). */
+  lat?: number | null;
+  lng?: number | null;
+};
+
+/** Lo que se envía al guardar una dirección; sin punto, lat y lng van en null. */
+export type DatosDireccion = {
+  direccion: string;
+  barrio: string;
+  nombre?: string | null;
+  lat?: number | null;
+  lng?: number | null;
 };
 
 export async function getClienteDirecciones(token: string): Promise<ClienteDireccion[]> {
@@ -573,14 +585,14 @@ export async function getClienteDirecciones(token: string): Promise<ClienteDirec
 
 export async function crearClienteDireccion(
   token: string,
-  body: { direccion: string; barrio: string; nombre?: string | null },
+  body: DatosDireccion,
 ): Promise<ClienteDireccion> {
   const d = await authSend('POST', '/api/cliente/direcciones', token, body);
   return d.direccion as ClienteDireccion;
 }
 
 export async function editarClienteDireccion(
-  token: string, id: number, body: { direccion: string; barrio: string; nombre?: string | null },
+  token: string, id: number, body: DatosDireccion,
 ): Promise<ClienteDireccion> {
   const d = await authSend('PUT', `/api/cliente/direcciones/${id}`, token, body);
   return d.direccion as ClienteDireccion;
@@ -1405,6 +1417,8 @@ export type Pedido = {
   /** "dd/mm/aaaa hh:mm" en que lo entregué (solo los entregados). */
   fecha_entrega?: string | null;
   direccion_entrega: string;
+  /** Punto exacto de la entrega, si el cliente lo fijó (solo mientras lo llevo). */
+  entrega_ubicacion?: Coordenadas | null;
   /** Solo cuando el pedido es mío y lo estoy llevando. */
   telefono_contacto: string | null;
   /** Justificación que reporté para una demora. */
@@ -1646,6 +1660,10 @@ export type SeguimientoPedido = {
   /** Dónde va el domiciliario (solo desde que recoge hasta que entrega). */
   domiciliario_ubicacion?: UbicacionEnVivo | null;
   negocio_ubicacion?: Coordenadas | null;
+  /** Mi puerta en el mapa, si la dirección del pedido tenía punto. */
+  entrega_ubicacion?: Coordenadas | null;
+  /** En cuánto llega el domiciliario (aprox., por distancia); solo en camino. */
+  minutos_estimados?: number | null;
   /** Justificación del domiciliario si se está demorando. */
   novedad?: string | null;
   items: (PedidoItem & { precio: number; producto_id?: number | null; opciones?: OpcionesLinea })[];
@@ -1662,6 +1680,8 @@ export type NuevoPedido = {
   items: ({ producto_id: number; cantidad: number; precio_token?: string } & OpcionesLinea)[];
   metodo_pago: string;
   direccion_entrega: string;
+  /** Dirección guardada elegida: el servidor copia de ahí el punto en el mapa. */
+  direccion_id?: number | null;
   telefono_contacto: string;
   /** Identifica el intento: reintentar con la misma no crea otro pedido. */
   clave_intento?: string;

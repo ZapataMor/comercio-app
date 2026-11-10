@@ -16,6 +16,7 @@ use App\Support\PrecioCarrito;
 use App\Support\Push;
 use App\Support\Reputacion;
 use App\Support\Resenas;
+use App\Support\TiempoEntrega;
 use App\Support\UbicacionDomiciliario;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
@@ -49,6 +50,8 @@ class PedidoController extends Controller
             'items.*.extra.*' => ['string', 'max:100'],
             'metodo_pago' => ['required', Rule::in(Pedido::METODOS_PAGO)],
             'direccion_entrega' => ['required', 'string', 'max:255'],
+            // Dirección guardada que eligió: de ahí sale el punto en el mapa.
+            'direccion_id' => ['sometimes', 'nullable', 'integer'],
             'telefono_contacto' => ['required', 'string', new \App\Rules\Telefono],
             // Identifica el intento de compra: reintentar con la misma clave
             // devuelve el pedido ya creado en vez de duplicarlo.
@@ -158,6 +161,11 @@ class PedidoController extends Controller
             abort_if($negocio->archivado_at || $negocio->desactivado_at || ! $negocio->activo, 409, 'El negocio ya no está disponible.');
             $cliente = User::whereKey($request->user()->id)->lockForUpdate()->firstOrFail();
             abort_if($cliente->eliminado_at || $cliente->suspendido_at, 403, 'Tu cuenta no está habilitada para hacer pedidos.');
+            // El punto se copia al pedido: si luego edita o borra la dirección,
+            // este pedido sigue yendo a donde se pidió.
+            $direccion = isset($datos['direccion_id'])
+                ? $cliente->clienteDirecciones()->find($datos['direccion_id'])
+                : null;
             $pedido = Pedido::create([
                 'negocio_id' => $negocio->id,
                 'user_id' => $request->user()->id,
@@ -165,6 +173,8 @@ class PedidoController extends Controller
                 'metodo_pago' => $datos['metodo_pago'],
                 'total' => 0,
                 'direccion_entrega' => $datos['direccion_entrega'],
+                'entrega_lat' => $direccion?->lat,
+                'entrega_lng' => $direccion?->lng,
                 'telefono_contacto' => $datos['telefono_contacto'],
                 // Lo que el negocio promete tardar HOY: con esto se mide si cumplió.
                 'minutos_preparacion' => $negocio->tiempo_preparacion,
@@ -282,6 +292,12 @@ class PedidoController extends Controller
                 : null,
             'negocio_ubicacion' => $pedido->negocio?->tieneUbicacion()
                 ? ['lat' => $pedido->negocio->lat, 'lng' => $pedido->negocio->lng]
+                : null,
+            // Su propia puerta en el mapa, y en cuánto llega el domiciliario
+            // (aproximado por distancia; solo cuando ya viene en camino).
+            'entrega_ubicacion' => $pedido->puntoEntrega(),
+            'minutos_estimados' => $pedido->estado === 'en_camino'
+                ? TiempoEntrega::minutos(UbicacionDomiciliario::de($pedido->domiciliario), $pedido->puntoEntrega())
                 : null,
             'items' => $pedido->items->map(fn ($i) => [
                 'producto_id' => $i->producto_id,

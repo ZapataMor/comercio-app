@@ -201,6 +201,23 @@ export function PinNegocio({ punto, nombre, imagen, abierto = true, seleccionado
   );
 }
 
+/** Marcador del punto de entrega: una casa en el color de acento. */
+export function PinEntrega({ punto, nombre = 'Punto de entrega' }: { punto: Coordenadas; nombre?: string }) {
+  const { c } = useTheme();
+  const styles = useStyles();
+
+  return (
+    <Marker lngLat={lngLat(punto)} anchor="bottom" style={styles.encima} accessibilityLabel={nombre}>
+      <View style={styles.pin}>
+        <View style={[styles.gota, styles.gotaEntrega]}>
+          <Icon name="casa" size={18} color={c.onAccent} />
+        </View>
+        <View style={[styles.punta, { borderTopColor: c.accent }]} />
+      </View>
+    </Marker>
+  );
+}
+
 /** Marcador del domiciliario: la moto en un círculo del color de acento. */
 export function PinDomiciliario({
   punto,
@@ -251,23 +268,26 @@ export function abrirComoLlegar(destino: Coordenadas | string) {
 const MARGEN_SEGUIMIENTO: Margen = { top: 70, right: 60, bottom: 50, left: 60 };
 
 /**
- * Mapa pequeño del seguimiento: el domiciliario (en vivo) y el negocio.
- * Encuadra a los dos cada vez que llega una posición nueva, hasta que la
+ * Mapa pequeño del seguimiento: el domiciliario (en vivo), el negocio y, si
+ * se conoce, la puerta de la entrega. Encuadra a todos cada vez que llega una posición nueva, hasta que la
  * persona mueve el mapa con el dedo.
  */
 export function MapaSeguimiento({
   domiciliario,
   negocio,
+  entrega,
   alto = 220,
 }: {
   domiciliario?: UbicacionEnVivo | null;
+  /** A dónde va el pedido. */
+  entrega?: Coordenadas | null;
   negocio?: { punto: Coordenadas; nombre: string; imagen?: string | null } | null;
   alto?: number;
 }) {
   const styles = useStyles();
   const mapa = useRef<MapaRef>(null);
   const tocado = useRef(false);
-  const puntos = [domiciliario, negocio?.punto].filter((p): p is Coordenadas => !!p);
+  const puntos = [domiciliario, negocio?.punto, entrega].filter((p): p is Coordenadas => !!p);
   const clave = puntos.map(p => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join('|');
 
   useEffect(() => {
@@ -289,6 +309,7 @@ export function MapaSeguimiento({
           tocado.current = true;
         }}>
         {!!negocio && <PinNegocio punto={negocio.punto} nombre={negocio.nombre} imagen={negocio.imagen} />}
+        {!!entrega && <PinEntrega punto={entrega} />}
         {!!domiciliario && <PinDomiciliario punto={domiciliario} />}
       </MapaVitrina>
     </View>
@@ -326,6 +347,7 @@ const useStyles = makeStyles((c, shadow) => ({
     ...shadow.soft,
   },
   gotaGrande: { width: 50, height: 50, borderRadius: 25 },
+  gotaEntrega: { backgroundColor: c.accent, borderColor: c.surface },
   foto: { width: '100%', height: '100%' },
   fotoCerrado: { opacity: 0.5 },
   punta: {

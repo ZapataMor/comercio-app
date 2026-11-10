@@ -2,6 +2,7 @@ import CamposDireccion from '../components/CamposDireccion';
 import { direccionValida, errorDireccion, telefonoValido, errorTelefono } from '../direccion';
 import { useFocusEffect } from '@react-navigation/native';
 import EditarDireccion from '../components/EditarDireccion';
+import SelectorUbicacion from '../components/SelectorUbicacion';
 import { textoCantidad } from '../cantidades';
 import { CommonActions } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -16,6 +17,7 @@ import {
 } from 'react-native';
 import {
   ClienteDireccion,
+  Coordenadas,
   crearClienteDireccion,
   getCatalogo,
   getClienteDirecciones,
@@ -61,6 +63,7 @@ export default function CheckoutScreen({ navigation }: Props) {
   const [nuevaDireccion, setNuevaDireccion] = useState('');
   const [nuevoBarrio, setNuevoBarrio] = useState('');
   const [nuevoNombre, setNuevoNombre] = useState('');
+  const [nuevoPunto, setNuevoPunto] = useState<Coordenadas | null>(null);
   const [editandoDireccion, setEditandoDireccion] = useState<ClienteDireccion | null>(null);
   // Telefono guardado en el perfil del cliente (se pidio al registrarse).
   const telefonoGuardado = auth?.user.telefono?.trim() || null;
@@ -215,14 +218,19 @@ export default function CheckoutScreen({ navigation }: Props) {
   async function enviarPedido(direccionEntrega: string) {
     setEnviando(true);
     try {
+      // De la dirección elegida sale el punto en el mapa que se copia al pedido.
+      let direccionId = typeof seleccion === 'number' ? seleccion : null;
       if (seleccion === 'nueva') {
         const guardada = await crearClienteDireccion(auth!.token, {
           nombre: nuevoNombre.trim() || null,
           direccion: nuevaDireccion.trim(),
           barrio: nuevoBarrio.trim(),
+          lat: nuevoPunto?.lat ?? null,
+          lng: nuevoPunto?.lng ?? null,
         });
         setDirecciones(prev => [guardada, ...prev]);
         setSeleccion(guardada.id);
+        direccionId = guardada.id;
       }
 
       // Se capturan antes de vaciar el carrito: se usan para rearmar la navegación.
@@ -234,6 +242,7 @@ export default function CheckoutScreen({ navigation }: Props) {
         items: cart.items.map(i => ({ producto_id: i.producto_id, cantidad: i.cantidad, precio_token: i.precio_token, ...i.opciones })),
         metodo_pago: pago,
         direccion_entrega: direccionEntrega,
+        direccion_id: direccionId,
         telefono_contacto: telefonoContacto,
         clave_intento: claveIntento.current,
         total_esperado: totalConDomicilio,
@@ -399,6 +408,9 @@ export default function CheckoutScreen({ navigation }: Props) {
             placeholder="Barrio"
           />
           <FieldError mensaje={errores.nuevoBarrio} />
+          <View style={styles.nuevoMapa}>
+            <SelectorUbicacion tipo="entrega" valor={nuevoPunto} onCambiar={setNuevoPunto} disabled={enviando} />
+          </View>
         </View>
       ) : null}
 
@@ -521,6 +533,7 @@ const useStyles = makeStyles((c, shadow) => ({
   ubicacionDetalleOn: { color: c.onAccent },
   editarDireccion: { color: c.accent, fontFamily: font.semibold, paddingVertical: 10, paddingHorizontal: 12 },
   nuevaBox: { marginBottom: 2 },
+  nuevoMapa: { marginTop: 10 },
   pagos: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   pago: { flex: 1, borderWidth: 1, borderColor: c.borderStrong, borderRadius: radius.md, paddingVertical: 14, alignItems: 'center', gap: 4, backgroundColor: c.surface },
   pagoOn: { borderColor: c.accent, backgroundColor: c.accentSoft },

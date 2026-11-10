@@ -377,6 +377,8 @@ class DomiciliarioController extends Controller
             'codigo_recogida' => $p->estado === 'tomado' ? $p->codigo_confirmacion : null,
             'fecha_entrega' => $p->entregado_at?->format('d/m/Y H:i'),
             'direccion_entrega' => $p->direccion_entrega,
+            // Punto exacto de la entrega, solo para quien lleva el pedido.
+            'entrega_ubicacion' => in_array($p->estado, Pedido::EN_RUTA, true) ? $p->puntoEntrega() : null,
             // El teléfono del cliente solo lo ve quien lleva el pedido.
             'telefono_contacto' => in_array($p->estado, Pedido::EN_RUTA, true) ? $p->telefono_contacto : null,
             'novedad' => $p->novedad,

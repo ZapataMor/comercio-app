@@ -251,7 +251,7 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
                     onPress={() =>
                       abrirComoLlegar(
                         !['tomado', 'devolviendo'].includes(p.estado)
-                          ? `${p.direccion_entrega}, Maicao, La Guajira`
+                          ? p.entrega_ubicacion ?? `${p.direccion_entrega}, Maicao, La Guajira`
                           : p.negocio?.lat != null && p.negocio?.lng != null
                             ? { lat: p.negocio.lat, lng: p.negocio.lng }
                             : `${p.negocio?.direccion ?? p.negocio?.nombre ?? ''}, Maicao, La Guajira`,

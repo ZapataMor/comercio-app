@@ -62,6 +62,8 @@ class Pedido extends Model
         'costo_domicilio',
         'total',
         'direccion_entrega',
+        'entrega_lat',
+        'entrega_lng',
         'telefono_contacto',
         'minutos_recogida',
         'minutos_preparacion',
@@ -90,6 +92,18 @@ class Pedido extends Model
         'ajustado_at',
     ];
 
+    /**
+     * Punto de entrega en el mapa, si el cliente lo fijó en su dirección.
+     *
+     * @return array{lat: float, lng: float}|null
+     */
+    public function puntoEntrega(): ?array
+    {
+        return $this->entrega_lat !== null && $this->entrega_lng !== null
+            ? ['lat' => $this->entrega_lat, 'lng' => $this->entrega_lng]
+            : null;
+    }
+
     /** Lo que el negocio dice del dinero de un pedido en efectivo. */
     public const DINERO_ESTADOS = ['recibido', 'incompleto', 'no_recibido'];
 
@@ -100,6 +114,8 @@ class Pedido extends Model
             'costo_domicilio' => 'decimal:2',
             'total' => 'decimal:2',
             'cancelado_at' => 'datetime',
+            'entrega_lat' => 'float',
+            'entrega_lng' => 'float',
             'minutos_recogida' => 'integer',
             'minutos_preparacion' => 'integer',
             'aceptado_at' => 'datetime',

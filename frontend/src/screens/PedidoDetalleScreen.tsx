@@ -256,10 +256,20 @@ export default function PedidoDetalleScreen({ route }: Props) {
       {enRuta && (
         <FadeInView delay={20} style={styles.card}>
           <Text style={styles.cardTitulo}>Tu pedido va en camino</Text>
+          {pedido.minutos_estimados != null && (
+            <View style={styles.llega}>
+              <Icon name="reloj" size={18} color={c.accent} />
+              <Text style={styles.llegaTxt}>
+                Llega en unos {pedido.minutos_estimados} min
+                <Text style={styles.llegaNota}>  · aprox., según la distancia</Text>
+              </Text>
+            </View>
+          )}
           {pedido.domiciliario_ubicacion ? (
             <>
               <MapaSeguimiento
                 domiciliario={pedido.domiciliario_ubicacion}
+                entrega={pedido.entrega_ubicacion}
                 negocio={
                   pedido.negocio_ubicacion
                     ? { punto: pedido.negocio_ubicacion, nombre: pedido.negocio ?? 'Negocio' }
@@ -364,6 +374,9 @@ const useStyles = makeStyles((c, shadow) => ({
   novedadTxt: { flex: 1, color: c.warning, fontSize: 13, fontFamily: font.medium },
   linea: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
   lineaTxt: { color: c.text, fontFamily: font.regular },
+  llega: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  llegaTxt: { flex: 1, color: c.textStrong, fontFamily: font.bold, fontSize: 16 },
+  llegaNota: { color: c.muted, fontFamily: font.regular, fontSize: 12 },
   lineaProducto: { flex: 1, marginRight: 12 },
   lineaDetalle: { color: c.muted, fontSize: 12, lineHeight: 17, marginTop: 1, fontFamily: font.regular },
   subtotalRow: {
