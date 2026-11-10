@@ -1,13 +1,20 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Text, TouchableOpacity, View } from 'react-native';
-import MapView from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DomiciliarioMapa, getDomiciliariosMapa, getNegociosMapa, imagenUrl, NegocioMapa } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import Icon from '../components/Icon';
-import { abrirComoLlegar, haceCuanto, MapaVitrina, PinDomiciliario, PinNegocio, regionDe } from '../components/Mapa';
+import {
+  abrirComoLlegar,
+  haceCuanto,
+  MapaRef,
+  MapaVitrina,
+  PinDomiciliario,
+  PinNegocio,
+  ZOOM,
+} from '../components/Mapa';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
@@ -34,7 +41,7 @@ export default function MapaScreen({ navigation, route }: Props) {
   // Solo el cliente tiene la pantalla de la tienda (catálogo y carrito).
   const puedeVerTienda = auth!.user.roles.includes('usuario');
 
-  const mapa = useRef<MapView>(null);
+  const mapa = useRef<MapaRef>(null);
   const [negocios, setNegocios] = useState<NegocioMapa[]>([]);
   const [domiciliarios, setDomiciliarios] = useState<DomiciliarioMapa[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -91,7 +98,7 @@ export default function MapaScreen({ navigation, route }: Props) {
       }
       setConPermiso(true);
       const punto = await miUbicacion();
-      mapa.current?.animateToRegion(regionDe(punto, 0.012), 600);
+      mapa.current?.irA(punto, ZOOM.zona);
     } catch (e) {
       toast.error('No se pudo ubicar', e instanceof Error ? e.message : 'Error');
     } finally {
@@ -107,7 +114,8 @@ export default function MapaScreen({ navigation, route }: Props) {
       <MapaVitrina
         ref={mapa}
         style={styles.lleno}
-        showsUserLocation={conPermiso}
+        miUbicacion={conPermiso}
+        creditos={{ bottom: abajo + (seleccion ? 170 : 0), left: 12 }}
         onPress={() => setSeleccion(null)}>
         {visibles.map(n => (
           <PinNegocio

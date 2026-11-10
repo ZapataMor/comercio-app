@@ -24,6 +24,8 @@ target 'ComercioApp' do
   )
 
   post_install do |installer|
+    # MapLibre (el mapa) trae su SDK nativo por Swift Package Manager.
+    $MLRN.post_install(installer)
     react_native_post_install(
       installer,
       config[:reactNativePath],

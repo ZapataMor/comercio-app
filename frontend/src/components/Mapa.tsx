@@ -1,92 +1,167 @@
 /**
- * Piezas del mapa de Vitrina (Google Maps en Android, Apple Maps en iOS).
+ * Piezas del mapa de Vitrina: MapLibre con las calles de OpenStreetMap (sin
+ * clave ni cuenta de Google; el estilo vive en estiloMapa.ts).
  *
  *  - <MapaVitrina>: el mapa con el estilo del modo (día/noche), centrado en
- *    Maicao por defecto.
+ *    Maicao por defecto. Se mueve con su ref: irA() y encuadrar().
  *  - <PinNegocio> / <PinDomiciliario>: marcadores con el look de la app.
  *  - abrirComoLlegar(): abre la ruta en la app de Google Maps (gratis: no
  *    usa la API de rutas, solo un enlace).
  *  - haceCuanto(): "ahora mismo" / "hace 40 s" / "hace 2 min".
  */
-import React, { Ref, useEffect, useRef, useState } from 'react';
-import { Image, Linking, Platform, Text, View } from 'react-native';
-import MapView, { MapStyleElement, MapViewProps, Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
+import {
+  Camera,
+  CameraRef,
+  LogManager,
+  Map as MapaNativo,
+  MapProps,
+  Marker,
+  NativeUserLocation,
+} from '@maplibre/maplibre-react-native';
+import React, { ReactNode, Ref, useEffect, useImperativeHandle, useRef } from 'react';
+import { Image, Linking, StyleProp, Text, View, ViewStyle } from 'react-native';
 import { Coordenadas, imagenUrl, UbicacionEnVivo } from '../api';
-import { Colores, font, makeStyles, paletas, radius, useTheme } from '../theme';
+import { font, makeStyles, radius, useTheme } from '../theme';
+import { ESTILOS_MAPA } from './estiloMapa';
 import Icon from './Icon';
 
+// Al mover el mapa se cancelan las descargas de lo que ya no se ve: no es un
+// fallo y no debe salir como advertencia.
+LogManager.onLog(e => e.tag === 'Mbgl-HttpRequest' && /cancel/i.test(e.message));
+
+/** Qué se ve del mapa: el punto del centro y qué tan cerca. */
+export type Vista = { centro: Coordenadas; zoom: number };
+
+/** Niveles de zoom con nombre (MapLibre: uno menos que el de Google). */
+export const ZOOM = { ciudad: 12.4, zona: 14, barrio: 15, cuadra: 16, puerta: 16.5 };
+
 /** Centro de Maicao, con el casco urbano a la vista. */
-export const MAICAO: Region = {
-  latitude: 11.3826,
-  longitude: -72.2432,
-  latitudeDelta: 0.05,
-  longitudeDelta: 0.05,
+export const MAICAO: Vista = { centro: { lat: 11.3826, lng: -72.2432 }, zoom: ZOOM.ciudad };
+
+/** Vista centrada en un punto (por defecto, zoom de barrio). */
+export function vistaDe(p: Coordenadas, zoom = ZOOM.barrio): Vista {
+  return { centro: p, zoom };
+}
+
+type Margen = { top: number; right: number; bottom: number; left: number };
+type Esquina = NonNullable<MapProps['attributionPosition']>;
+
+/** Lo que las pantallas pueden pedirle al mapa. */
+export type MapaRef = {
+  /** Lleva el centro a un punto, con animación. */
+  irA(p: Coordenadas, zoom?: number): void;
+  /** Encuadra varios puntos a la vez. */
+  encuadrar(puntos: Coordenadas[], margen?: Margen): void;
 };
 
-/** Región ajustada a un punto (zoom de barrio). */
-export function regionDe(p: Coordenadas, delta = 0.008): Region {
-  return { latitude: p.lat, longitude: p.lng, latitudeDelta: delta, longitudeDelta: delta };
+const lngLat = (p: Coordenadas): [number, number] => [p.lng, p.lat];
+
+/** Caja [oeste, sur, este, norte] que contiene los puntos. */
+function limitesDe(puntos: Coordenadas[]): [number, number, number, number] {
+  const lats = puntos.map(p => p.lat);
+  const lngs = puntos.map(p => p.lng);
+  return [Math.min(...lngs), Math.min(...lats), Math.max(...lngs), Math.max(...lats)];
 }
 
-/** Sin los negocios de Google: que resalten los de Vitrina. */
-const SIN_NEGOCIOS_DE_GOOGLE: MapStyleElement[] = [
-  { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
-  { featureType: 'poi', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-];
-
-/** Estilo nocturno con la paleta índigo/arena del kit de marca. */
-function estiloNoche(c: Colores): MapStyleElement[] {
-  return [
-    ...SIN_NEGOCIOS_DE_GOOGLE,
-    { elementType: 'geometry', stylers: [{ color: c.bg }] },
-    { elementType: 'labels.text.fill', stylers: [{ color: c.muted }] },
-    { elementType: 'labels.text.stroke', stylers: [{ color: c.header }] },
-    { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: c.border }] },
-    { featureType: 'poi', elementType: 'geometry', stylers: [{ color: c.surface }] },
-    { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#1E2A45' }] },
-    { featureType: 'road', elementType: 'geometry', stylers: [{ color: c.surface2 }] },
-    { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: c.header }] },
-    { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: c.borderStrong }] },
-    { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: c.text }] },
-    { featureType: 'transit', elementType: 'geometry', stylers: [{ color: c.surface }] },
-    { featureType: 'water', elementType: 'geometry', stylers: [{ color: c.header }] },
-  ];
-}
-
-const ESTILOS = { dia: SIN_NEGOCIOS_DE_GOOGLE, noche: estiloNoche(paletas.noche) };
-
-type MapaProps = MapViewProps & { ref?: Ref<MapView> };
+type MapaProps = {
+  ref?: Ref<MapaRef>;
+  style?: StyleProp<ViewStyle>;
+  /** Dónde arranca el mapa (por defecto, Maicao). */
+  vistaInicial?: Vista;
+  /** Si arranca encuadrando varios puntos, en vez de vistaInicial. */
+  encuadreInicial?: { puntos: Coordenadas[]; margen: Margen };
+  /** Vista fija: el mapa la sigue cada vez que cambia (vista previa). */
+  vista?: Vista;
+  /** Sin gestos: ni mover ni acercar. */
+  quieto?: boolean;
+  /** Muestra el punto de la persona (ya con el permiso concedido). */
+  miUbicacion?: boolean;
+  /** Mapa pequeño con esquinas redondeadas: se recorta al marco. */
+  recortado?: boolean;
+  /** Dónde va el botón de créditos del mapa (OpenStreetMap). */
+  creditos?: Esquina;
+  onPress?: () => void;
+  /** El mapa terminó de moverse: su nuevo centro. */
+  onMover?: (centro: Coordenadas) => void;
+  /** La persona empezó a mover el mapa con el dedo. */
+  onArrastrar?: () => void;
+  children?: ReactNode;
+};
 
 /** El mapa con el estilo del modo vigente; por defecto, Maicao. */
-export function MapaVitrina({ ref, ...props }: MapaProps) {
+export function MapaVitrina({
+  ref,
+  style,
+  vistaInicial = MAICAO,
+  encuadreInicial,
+  vista,
+  quieto,
+  miUbicacion,
+  recortado,
+  creditos = { bottom: 8, left: 8 },
+  onPress,
+  onMover,
+  onArrastrar,
+  children,
+}: MapaProps) {
   const { modo } = useTheme();
+  const camara = useRef<CameraRef>(null);
+
+  useImperativeHandle(ref, () => ({
+    irA: (p, zoom) => camara.current?.easeTo({ center: lngLat(p), zoom, duration: 600 }),
+    encuadrar: (puntos, margen) => {
+      if (puntos.length === 0) return;
+      camara.current?.fitBounds(limitesDe(puntos), { padding: margen, duration: 600, easing: 'ease' });
+    },
+  }));
+
+  const inicial = encuadreInicial
+    ? { bounds: limitesDe(encuadreInicial.puntos), padding: encuadreInicial.margen }
+    : { center: lngLat(vistaInicial.centro), zoom: vistaInicial.zoom };
+
   return (
-    <MapView
-      ref={ref}
-      provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-      customMapStyle={ESTILOS[modo]}
-      userInterfaceStyle={modo === 'noche' ? 'dark' : 'light'}
-      initialRegion={MAICAO}
-      toolbarEnabled={false}
-      showsMyLocationButton={false}
-      {...props}
-    />
+    <MapaNativo
+      style={style}
+      mapStyle={ESTILOS_MAPA[modo]}
+      androidView={recortado ? 'texture' : 'surface'}
+      dragPan={!quieto}
+      touchZoom={!quieto}
+      doubleTapZoom={!quieto}
+      doubleTapHoldZoom={!quieto}
+      // Siempre con el norte arriba y visto desde arriba: no hay brújula para volver.
+      touchRotate={false}
+      touchPitch={false}
+      logo={false}
+      compass={false}
+      attribution
+      attributionPosition={creditos}
+      onPress={onPress && (() => onPress())}
+      onRegionWillChange={onArrastrar && (e => e.nativeEvent.userInteraction && onArrastrar())}
+      onRegionDidChange={
+        onMover && (e => onMover({ lat: e.nativeEvent.center[1], lng: e.nativeEvent.center[0] }))
+      }>
+      <Camera
+        ref={camara}
+        initialViewState={inicial}
+        minZoom={5}
+        maxZoom={18.5}
+        {...(vista ? { center: lngLat(vista.centro), zoom: vista.zoom, duration: 0 } : null)}
+      />
+      {miUbicacion && <NativeUserLocation />}
+      {children}
+    </MapaNativo>
   );
 }
 
 /**
- * En Android el marcador personalizado es una "foto" de la vista: se vuelve a
- * tomar un momento cada vez que cambia algo (selección, modo, la imagen cargó).
+ * El toque en un pin también le llega al mapa (el evento sube): se corta
+ * aquí, o el mapa lo tomaría como un toque en vacío y quitaría la selección.
  */
-function useRedibujar(...deps: unknown[]): boolean {
-  const [redibujar, setRedibujar] = useState(true);
-  useEffect(() => {
-    setRedibujar(true);
-    const t = setTimeout(() => setRedibujar(false), 700);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
-  return redibujar;
+function alTocarPin(onPress: () => void) {
+  return (e: { stopPropagation(): void }) => {
+    e.stopPropagation();
+    onPress();
+  };
 }
 
 type PinNegocioProps = {
@@ -100,29 +175,22 @@ type PinNegocioProps = {
 
 /** Marcador de un negocio: su foto (o una tienda) en una gota con punta. */
 export function PinNegocio({ punto, nombre, imagen, abierto = true, seleccionado, onPress }: PinNegocioProps) {
-  const { c, modo } = useTheme();
+  const { c } = useTheme();
   const styles = useStyles();
   const uri = imagenUrl(imagen);
-  const [cargada, setCargada] = useState(false);
-  const redibujar = useRedibujar(seleccionado, modo, abierto, cargada, uri);
   const color = seleccionado ? c.accent : abierto ? c.brand : c.mutedSoft;
 
   return (
     <Marker
-      coordinate={{ latitude: punto.lat, longitude: punto.lng }}
-      anchor={{ x: 0.5, y: 1 }}
-      tracksViewChanges={redibujar}
-      zIndex={seleccionado ? 10 : abierto ? 2 : 1}
-      onPress={onPress}
+      lngLat={lngLat(punto)}
+      anchor="bottom"
+      style={seleccionado ? styles.encima : abierto ? styles.medio : styles.debajo}
+      onPress={onPress && alTocarPin(onPress)}
       accessibilityLabel={nombre}>
       <View style={styles.pin}>
         <View style={[styles.gota, seleccionado && styles.gotaGrande, { borderColor: color }]}>
           {uri ? (
-            <Image
-              source={{ uri }}
-              style={[styles.foto, !abierto && styles.fotoCerrado]}
-              onLoadEnd={() => setCargada(true)}
-            />
+            <Image source={{ uri }} style={[styles.foto, !abierto && styles.fotoCerrado]} />
           ) : (
             <Icon name="tienda" size={seleccionado ? 22 : 18} color={color} />
           )}
@@ -146,17 +214,15 @@ export function PinDomiciliario({
   apagado?: boolean;
   onPress?: () => void;
 }) {
-  const { c, modo } = useTheme();
+  const { c } = useTheme();
   const styles = useStyles();
-  const redibujar = useRedibujar(modo, apagado);
 
   return (
     <Marker
-      coordinate={{ latitude: punto.lat, longitude: punto.lng }}
-      anchor={{ x: 0.5, y: 0.5 }}
-      tracksViewChanges={redibujar}
-      zIndex={20}
-      onPress={onPress}
+      lngLat={lngLat(punto)}
+      anchor="center"
+      style={styles.arribaDeTodo}
+      onPress={onPress && alTocarPin(onPress)}
       accessibilityLabel={nombre ?? 'Domiciliario'}>
       <View style={[styles.moto, apagado && styles.motoApagada]}>
         <Icon name="moto" size={20} color={apagado ? c.text : c.onAccent} />
@@ -181,6 +247,9 @@ export function abrirComoLlegar(destino: Coordenadas | string) {
   Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${valor}&travelmode=driving`).catch(() => {});
 }
 
+/** Aire alrededor de los pines al encuadrarlos (el de arriba mide más). */
+const MARGEN_SEGUIMIENTO: Margen = { top: 70, right: 60, bottom: 50, left: 60 };
+
 /**
  * Mapa pequeño del seguimiento: el domiciliario (en vivo) y el negocio.
  * Encuadra a los dos cada vez que llega una posición nueva, hasta que la
@@ -196,33 +265,27 @@ export function MapaSeguimiento({
   alto?: number;
 }) {
   const styles = useStyles();
-  const mapa = useRef<MapView>(null);
+  const mapa = useRef<MapaRef>(null);
   const tocado = useRef(false);
   const puntos = [domiciliario, negocio?.punto].filter((p): p is Coordenadas => !!p);
   const clave = puntos.map(p => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join('|');
 
   useEffect(() => {
     if (tocado.current || puntos.length === 0) return;
-    if (puntos.length === 1) {
-      mapa.current?.animateToRegion(regionDe(puntos[0], 0.012), 600);
-    } else {
-      mapa.current?.fitToCoordinates(
-        puntos.map(p => ({ latitude: p.lat, longitude: p.lng })),
-        { edgePadding: { top: 70, right: 60, bottom: 50, left: 60 }, animated: true },
-      );
-    }
+    if (puntos.length === 1) mapa.current?.irA(puntos[0], ZOOM.zona);
+    else mapa.current?.encuadrar(puntos, MARGEN_SEGUIMIENTO);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clave]);
-
-  const inicial = puntos[0] ? regionDe(puntos[0], 0.012) : MAICAO;
 
   return (
     <View style={[styles.marco, { height: alto }]}>
       <MapaVitrina
         ref={mapa}
         style={styles.lleno}
-        initialRegion={inicial}
-        onPanDrag={() => {
+        recortado
+        vistaInicial={puntos[0] ? vistaDe(puntos[0], ZOOM.zona) : MAICAO}
+        encuadreInicial={puntos.length > 1 ? { puntos, margen: MARGEN_SEGUIMIENTO } : undefined}
+        onArrastrar={() => {
           tocado.current = true;
         }}>
         {!!negocio && <PinNegocio punto={negocio.punto} nombre={negocio.nombre} imagen={negocio.imagen} />}
@@ -245,6 +308,11 @@ export function NotaEnVivo({ texto }: { texto: string }) {
 }
 
 const useStyles = makeStyles((c, shadow) => ({
+  // Qué pin tapa a cuál: cerrado < abierto < seleccionado < domiciliario.
+  debajo: { zIndex: 1 },
+  medio: { zIndex: 2 },
+  encima: { zIndex: 10 },
+  arribaDeTodo: { zIndex: 20 },
   pin: { alignItems: 'center' },
   gota: {
     width: 40,

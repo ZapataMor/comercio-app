@@ -73,18 +73,14 @@ jest.mock('@react-native-community/geolocation', () => ({
 }));
 
 // El mapa es una vista nativa: en los tests basta con contenedores vacíos.
-jest.mock('react-native-maps', () => {
+jest.mock('@maplibre/maplibre-react-native', () => {
   const React = require('react');
   const { View } = require('react-native');
-  class MapView extends React.Component {
-    animateToRegion() {}
-    fitToCoordinates() {}
-    render() {
-      return React.createElement(View, this.props, this.props.children);
-    }
-  }
+  const Map = props => React.createElement(View, { style: props.style }, props.children);
   const Marker = props => React.createElement(View, null, props.children);
-  return { __esModule: true, default: MapView, Marker, PROVIDER_GOOGLE: 'google' };
+  const Nada = () => null;
+  const LogManager = { onLog: jest.fn() };
+  return { __esModule: true, Map, Marker, Camera: Nada, NativeUserLocation: Nada, LogManager };
 });
 
 jest.mock('@react-native-community/netinfo', () => require('@react-native-community/netinfo/jest/netinfo-mock.js'));

@@ -25,7 +25,7 @@ clara y el cliente no ve dónde va el domiciliario.
 - **Esfuerzo**: alto (mapas, geolocalización, tiempo real). Ya está listado como pendiente grande.
 
 ## ✅ Implementado (2026-10-30)
-- Mapa de negocios en **Explorar → Mapa** (Google Maps en Android, Apple Maps en iOS).
+- Mapa de negocios en **Explorar → Mapa** (MapLibre con calles de OpenStreetMap; antes Google Maps).
 - Cada negocio fija su pin en **Mi Tienda** (`negocios.lat/lng`).
 - El cliente ve al domiciliario en vivo en **Seguimiento** mientras está `recogido`/`en_camino`.
 - Pendiente: que el cliente fije un pin de entrega en el checkout (hoy sigue siendo dirección escrita).

@@ -20,10 +20,6 @@
         android:name="com.google.firebase.messaging.default_notification_channel_id"
         android:value="@string/default_notification_channel_id"
         tools:replace="android:value" />
-      <!-- Google Maps: la clave sale de MAPS_API_KEY (ver app/build.gradle). -->
-      <meta-data
-        android:name="com.google.android.geo.API_KEY"
-        android:value="${MAPS_API_KEY}" />
 
       <activity
         android:name=".MainActivity"

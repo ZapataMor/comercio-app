@@ -60,7 +60,7 @@ C:\dev\comercio-app\     repo git (GitHub: ZapataMor/comercio-app), rama main
 | Web (solo admin) | Blade + Tailwind CDN, sesión; más `/privacidad` y `/eliminar-cuenta` | `backend/routes/web.php` |
 | App móvil | React Native 0.86 · TypeScript · React Navigation | `frontend/` |
 | Push | Firebase Cloud Messaging + Notifee · `laravel-notification-channels/fcm` | `pushNotifications.ts`, `Support/Push.php` |
-| Mapas | `react-native-maps` (Google en Android, Apple en iOS) | `components/Mapa.tsx`, `MapaScreen.tsx` |
+| Mapas | MapLibre + calles de OpenStreetMap (OpenFreeMap), sin clave ni cuenta de Google | `components/Mapa.tsx`, `components/estiloMapa.ts`, `MapaScreen.tsx` |
 | Errores | Sentry en la API y en la app, apagado hasta poner los DSN | `DESPLIEGUE.md` §6 |
 | Pruebas | Pest (SQLite en memoria) · Jest | `backend/tests/Feature`, `frontend/__tests__` |
 | Cola y tareas | `queue:work` y `schedule:work` / cron | `iniciar-dev.bat`, `routes/console.php` |
@@ -381,12 +381,14 @@ de entregado. Se pueden enviar por partes y corregir. **No cambian el puntaje ni
 
 ---
 
-## 9. Mapa ✅ (código) · 🚧 (sin ver)
+## 9. Mapa ✅
 
 Negocios con pin en Explorar → Mapa, domiciliario en el seguimiento y el pedido, y domiciliarios en
-el mapa del admin. Todo funciona por datos y pruebas (`MapaTest`), pero **los mapas salen en blanco**
-hasta que Google apruebe el servicio: no es un fallo de la app. Cuando responda, hay que revisar en
-pantalla los mapas del comerciante y del cliente. Clave: `MAPS_API_KEY` (`ENTORNO.md` §6.1).
+el mapa del admin. Desde el 2026-11-10 el mapa ya no depende de Google (que rechazó la cuenta de
+facturación): se dibuja con MapLibre sobre OpenStreetMap, con estilo propio de día y de noche
+(`ENTORNO.md` §6.1). Visto en el emulador: selector de ubicación de Mi Tienda, mapa de negocios con
+pines y tarjeta, y el encuadre del seguimiento con datos de ejemplo. Falta verlo con un pedido real
+en camino y en iOS. Los negocios de demostración aún no tienen pin: cada uno lo fija en Mi Tienda.
 
 ---
 

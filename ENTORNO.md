@@ -327,42 +327,24 @@ New-NetFirewallRule -DisplayName "Laravel 8000" -Direction Inbound -Protocol TCP
 
 ---
 
-## 6.1 Google Maps (mapa de negocios y domiciliarios)
+## 6.1 Mapa (negocios y domiciliarios)
 
-Mostrar el mapa dentro de la app de Android es **gratis y sin límite** (Google lo llama
-*Mobile Native Dynamic Maps*). La app no usa servicios de pago (Geocoding, Directions, Places):
-el negocio fija su pin a mano, el domiciliario manda el GPS de su celular y "Cómo llegar" abre
-la app de Google Maps con un enlace.
+El mapa **no necesita clave, cuenta ni tarjeta**. Se dibuja con **MapLibre** (librería libre) sobre
+las calles de **OpenStreetMap**, que la app descarga de **OpenFreeMap** (gratis, sin registro).
+No hay nada que configurar: con internet en el celular o el emulador, el mapa sale.
 
-Lo único que hace falta es una **clave de API**:
+- **Estilo:** `frontend/src/components/estiloMapa.ts` pinta las calles con la paleta de la app
+  (día crema / noche índigo). Ahí mismo están las dos direcciones de donde salen el mapa y las
+  letras (`FUENTE` y `LETRAS`); para servirlo desde un archivo o un servidor propio solo se cambian
+  esas dos líneas.
+- **Lo que no usa:** ni Google Maps ni servicios de pago. El negocio fija su pin a mano, el
+  domiciliario manda el GPS de su celular y "Cómo llegar" abre la app de Google Maps con un enlace.
+- **Créditos:** el botón ⓘ del mapa muestra los de OpenStreetMap. Es obligatorio por su licencia:
+  no lo quites.
+- **Sin garantía de servicio:** OpenFreeMap es un servicio público sostenido con donaciones. Para
+  producción conviene servir el mapa de Maicao desde un servidor propio.
 
-1. Entra a <https://console.cloud.google.com> con la cuenta del proyecto. Puedes usar el **mismo
-   proyecto de Firebase** (todo proyecto de Firebase es también un proyecto de Google Cloud).
-2. Google pide una **cuenta de facturación** (tarjeta) aunque el mapa móvil no cobre. Ponle una
-   alerta de presupuesto de 1 USD en *Facturación → Presupuestos y alertas* para estar tranquilo.
-3. *APIs y servicios → Biblioteca* → habilita **Maps SDK for Android**.
-4. *APIs y servicios → Credenciales → Crear credenciales → Clave de API*. Luego edítala y
-   **restríngela**:
-   - *Restricciones de aplicación*: **Apps para Android** → paquete `com.comercioapp` + la huella
-     SHA-1 de la llave con que firmas. La de debug sale con:
-
-     ```powershell
-     keytool -list -v -keystore frontend\android\app\debug.keystore -alias androiddebugkey -storepass android -keypass android
-     ```
-
-     Para la versión de Play Store agrega también la SHA-1 de *Play Console → Integridad de la app*.
-   - *Restricciones de API*: solo **Maps SDK for Android**.
-5. Pon la clave en `frontend/android/local.properties` (ese archivo **no** va a Git):
-
-   ```
-   MAPS_API_KEY=AIza...tu_clave
-   ```
-
-   También vale la variable de entorno `MAPS_API_KEY`. Después recompila (`npm run android`).
-
-Sin clave la app compila y abre igual, pero el mapa sale en gris.
-
-> **iOS:** usa Apple Maps (gratis, sin clave). Solo falta `cd ios && pod install` en una Mac.
+> **iOS:** usa el mismo mapa. Falta `cd ios && pod install` en una Mac (sin probar todavía).
 
 ---
 
@@ -407,7 +389,7 @@ adb devices        # tu emulador o móvil aparece
 | `composer install`: *`lcobucci/jwt` requires ext-sodium -> it is missing from your system*  | Tu PHP no trae `sodium`. Si es Herd Lite (`.config\herd-lite`), cámbialo por Herd completo o el PHP de windows.php.net (ver 3.1). Para salir del paso: `composer install --ignore-platform-req=ext-sodium` (funciona porque Firebase firma con RS256, no con Ed25519) |
 | `composer install` dice *`Please run composer update`* por ext-sodium | No es un problema del `composer.lock`: **no ejecutes `composer update`**, falta la extensión en tu PHP |
 | `php artisan pail` no funciona                       | En Windows no hay `pcntl`; lee `backend/storage/logs/laravel.log` directamente              |
-| El mapa sale en gris (sin calles)                    | Falta `MAPS_API_KEY` en `frontend/android/local.properties`, o la clave está restringida a otro paquete/SHA-1 (ver 6.1). Recompila después de ponerla |
+| El mapa sale liso, sin calles                        | El celular o el emulador no tiene internet: las calles se descargan de OpenFreeMap (ver 6.1). Los pines sí salen porque vienen de la API |
 
 ---
 

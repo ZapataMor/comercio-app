@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Text, TouchableOpacity, View } from 'react-native';
-import MapView from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Coordenadas } from '../api';
 import { font, makeStyles, radius, useTheme } from '../theme';
@@ -8,7 +7,7 @@ import { useToast } from '../Toast';
 import { miUbicacion, pedirPermisoUbicacion } from '../ubicacion';
 import { PressableScale } from './anim';
 import Icon from './Icon';
-import { MAICAO, MapaVitrina, PinNegocio, regionDe } from './Mapa';
+import { MAICAO, MapaRef, MapaVitrina, PinNegocio, vistaDe, ZOOM } from './Mapa';
 
 type Props = {
   valor: Coordenadas | null;
@@ -35,12 +34,10 @@ export default function SelectorUbicacion({ valor, onCambiar, disabled }: Props)
           <View style={styles.preview} pointerEvents="none">
             <MapaVitrina
               style={styles.lleno}
-              region={regionDe(valor, 0.004)}
-              liteMode
-              scrollEnabled={false}
-              zoomEnabled={false}
-              rotateEnabled={false}
-              pitchEnabled={false}>
+              vistaInicial={vistaDe(valor, ZOOM.cuadra)}
+              vista={vistaDe(valor, ZOOM.cuadra)}
+              quieto
+              recortado>
               <PinNegocio punto={valor} nombre="Mi negocio" />
             </MapaVitrina>
           </View>
@@ -93,11 +90,11 @@ function ModalMapa({
   const styles = useStyles();
   const toast = useToast();
   const insets = useSafeAreaInsets();
-  const mapa = useRef<MapView>(null);
+  const mapa = useRef<MapaRef>(null);
   // Lo que queda bajo el pin del centro.
-  const [centro, setCentro] = useState<Coordenadas>(
-    inicial ?? { lat: MAICAO.latitude, lng: MAICAO.longitude },
-  );
+  const [centro, setCentro] = useState<Coordenadas>(inicial ?? MAICAO.centro);
+  // Alto del panel de abajo: los créditos del mapa van justo encima.
+  const [altoPanel, setAltoPanel] = useState(150);
   const [buscando, setBuscando] = useState(false);
   const [conPermiso, setConPermiso] = useState(false);
 
@@ -110,7 +107,7 @@ function ModalMapa({
       }
       setConPermiso(true);
       const punto = await miUbicacion();
-      mapa.current?.animateToRegion(regionDe(punto, 0.003), 600);
+      mapa.current?.irA(punto, ZOOM.puerta);
     } catch (e) {
       toast.error('No se pudo ubicar', e instanceof Error ? e.message : 'Error');
     } finally {
@@ -124,9 +121,10 @@ function ModalMapa({
         <MapaVitrina
           ref={mapa}
           style={styles.lleno}
-          initialRegion={inicial ? regionDe(inicial, 0.004) : MAICAO}
-          showsUserLocation={conPermiso}
-          onRegionChangeComplete={r => setCentro({ lat: r.latitude, lng: r.longitude })}
+          vistaInicial={inicial ? vistaDe(inicial, ZOOM.cuadra) : MAICAO}
+          miUbicacion={conPermiso}
+          creditos={{ bottom: altoPanel + 8, left: 8 }}
+          onMover={setCentro}
         />
 
         {/* Pin fijo: el mapa se mueve debajo. La punta marca el punto exacto. */}
@@ -146,7 +144,9 @@ function ModalMapa({
           </View>
         </View>
 
-        <View style={[styles.abajo, { paddingBottom: insets.bottom + 16 }]}>
+        <View
+          style={[styles.abajo, { paddingBottom: insets.bottom + 16 }]}
+          onLayout={e => setAltoPanel(e.nativeEvent.layout.height)}>
           <PressableScale style={styles.secundario} onPress={usarMiUbicacion} disabled={buscando}>
             {buscando ? (
               <ActivityIndicator color={c.text} />
