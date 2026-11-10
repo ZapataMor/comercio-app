@@ -154,9 +154,10 @@ class ImagenesDemoSeeder extends Seeder
             Storage::disk('public')->put($ruta, $respuesta->body());
         }
 
-        // Los platos especificos pueden usar el pool demo general de comida.
-        // No se usa una foto de otra familia para ropa, medicamentos, etc.
-        if ($rutas === [] && $soloLocales && $carpeta === 'productos' && in_array($grupo, [
+        // Los platos especificos pueden usar el pool demo general de comida
+        // (sin red o si el proveedor falla). No se usa una foto de otra
+        // familia para ropa, medicamentos, etc.
+        if ($rutas === [] && $carpeta === 'productos' && in_array($grupo, [
             'hamburger', 'hotdog', 'french-fries', 'barbecue', 'pizza', 'ribs',
             'chicken-wings', 'sandwich', 'shawarma', 'fried-plantain', 'arepa',
         ], true)) {
@@ -173,19 +174,27 @@ class ImagenesDemoSeeder extends Seeder
     {
         $texto = $this->normalizar(($categoria ?? '').' '.$nombre);
 
+        // El orden importa: "barberia" contiene "bar" y "Farma Express" es Droguería y Belleza.
         return match (true) {
             str_contains($texto, 'restaurante') || str_contains($texto, 'asadero') || str_contains($texto, 'comida') => 'restaurant',
             str_contains($texto, 'cafe') || str_contains($texto, 'cafeteria') => 'coffee-shop',
+            str_contains($texto, 'barberia') => 'barbershop',
             str_contains($texto, 'bar') => 'bar',
             str_contains($texto, 'helad') => 'ice-cream-shop',
             str_contains($texto, 'panader') => 'bakery',
             str_contains($texto, 'papeler') => 'stationery-store',
             str_contains($texto, 'ferreter') => 'hardware-store',
+            str_contains($texto, 'calzado') => 'shoe-store',
             str_contains($texto, 'ropa') || str_contains($texto, 'boutique') || str_contains($texto, 'moda') => 'clothing-store',
             str_contains($texto, 'frut') || str_contains($texto, 'verdura') => 'produce-store',
             str_contains($texto, 'carn') => 'butcher-shop',
             str_contains($texto, 'drogu') || str_contains($texto, 'farma') => 'pharmacy',
             str_contains($texto, 'licor') => 'liquor-store',
+            str_contains($texto, 'tecnolog') || str_contains($texto, 'celular') => 'electronics-store',
+            str_contains($texto, 'belleza') || str_contains($texto, 'cosmetic') => 'beauty-store',
+            str_contains($texto, 'mascota') || str_contains($texto, 'veterinari') => 'pet-store',
+            str_contains($texto, 'optica') => 'optician',
+            str_contains($texto, 'repuesto') || str_contains($texto, 'moto') => 'motorcycle-shop',
             default => 'grocery-store',
         };
     }
@@ -193,6 +202,31 @@ class ImagenesDemoSeeder extends Seeder
     private function grupoProducto(string $nombre, ?string $categoria, ?string $negocioCategoria): string
     {
         $texto = $this->normalizar($nombre.' '.($categoria ?? '').' '.($negocioCategoria ?? ''));
+
+        // Fuera de la comida, la foto sale del tipo de negocio: así un pantalón
+        // no recibe la foto de una panadería por contener "pan".
+        $porNegocio = match ($this->grupoNegocio($negocioCategoria, '')) {
+            'clothing-store' => 'clothing',
+            'shoe-store' => 'shoes',
+            'pharmacy' => 'pharmacy-product',
+            'stationery-store' => 'stationery',
+            'hardware-store' => 'tools',
+            'produce-store' => str_contains($texto, 'verdura') ? 'vegetables' : 'fruit',
+            'butcher-shop' => 'meat',
+            'liquor-store' => 'liquor',
+            'grocery-store' => 'groceries',
+            'electronics-store' => 'electronics',
+            'beauty-store' => 'cosmetics',
+            'pet-store' => 'pet-supplies',
+            'optician' => 'eyewear',
+            'barbershop' => 'grooming',
+            'motorcycle-shop' => 'motorcycle-parts',
+            default => null,
+        };
+
+        if ($porNegocio !== null) {
+            return $porNegocio;
+        }
 
         return match (true) {
             str_contains($texto, 'hamburguesa') => 'hamburger',
@@ -262,6 +296,20 @@ class ImagenesDemoSeeder extends Seeder
             'stationery' => 'stationery,school',
             'tools' => 'tools,hardware',
             'pharmacy-product' => 'medicine,pharmacy',
+            'shoe-store' => 'shoes,store',
+            'electronics-store' => 'smartphone,store',
+            'beauty-store' => 'cosmetics,store',
+            'pet-store' => 'petshop,dog',
+            'optician' => 'eyeglasses,optician',
+            'barbershop' => 'barbershop',
+            'motorcycle-shop' => 'motorcycle,repair',
+            'shoes' => 'shoes',
+            'electronics' => 'smartphone,gadget',
+            'cosmetics' => 'cosmetics,makeup',
+            'pet-supplies' => 'dog,pet',
+            'eyewear' => 'eyeglasses',
+            'grooming' => 'barber,grooming',
+            'motorcycle-parts' => 'motorcycle,parts',
             default => 'food,product',
         };
     }

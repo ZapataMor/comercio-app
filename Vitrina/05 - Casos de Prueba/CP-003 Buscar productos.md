@@ -17,7 +17,7 @@ actualizado: 2026-06-28
 |---|---|
 | Caso de uso | [[CU-002 Explorar catálogo]] |
 | Tipo | integración / manual |
-| Precondición | catálogo sembrado (`CatalogoDemoSeeder`) |
+| Precondición | catálogo sembrado (`NegociosDemoSeeder`) |
 
 ## Pasos
 1. Buscar un término que coincida por **nombre** de producto.

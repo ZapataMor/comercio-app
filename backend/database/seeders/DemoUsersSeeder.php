@@ -18,7 +18,7 @@ class DemoUsersSeeder extends Seeder
     {
         $usuarios = [
             ['administrador', 'Admin Demo', 'admin@demo.co'],
-            // Cliente que además administra "El Rincón Paisa" (ver CatalogoDemoSeeder).
+            // Dueño de "Panaderia La Espiga"; también administra "El Rincón Paisa" (ver NegociosDemoSeeder).
             ['usuario', 'Comerciante Demo', 'comerciante@demo.co'],
             // Cliente que además reparte.
             ['domiciliario', 'Domiciliario Demo', 'domiciliario@demo.co'],

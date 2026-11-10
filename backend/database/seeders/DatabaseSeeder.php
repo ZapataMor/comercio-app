@@ -23,16 +23,9 @@ class DatabaseSeeder extends Seeder
         // Usuarios de prueba (uno por rol, contraseña conocida) para desarrollo.
         $this->call(DemoUsersSeeder::class);
 
-        // Catálogo realista: 60+ negocios con categorías y productos.
-        $this->call(CatalogoDemoSeeder::class);
-
-        $this->call(ServiciosDemoSeeder::class);
-
-        // Tipo de cada producto e información: ingredientes, tallas, colores...
-        $this->call(OpcionesDemoSeeder::class);
-
-        // Carta propia de cada restaurante: hamburguesas, picadas, salchipapas...
-        $this->call(MenusRestaurantesDemoSeeder::class);
+        // Los 30 negocios demo: perfil, pin en el mapa, horario, catálogo
+        // (ingredientes, tallas, colores, usos...) y servicios con cita.
+        $this->call(NegociosDemoSeeder::class);
 
         // Clientes de prueba con reseñas de tiendas y productos.
         $this->call(ResenasDemoSeeder::class);

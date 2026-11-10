@@ -55,7 +55,7 @@ php artisan storage:link
 php artisan config:cache && php artisan route:cache && php artisan view:cache
 ```
 
-> ⚠️ En producción **NO** corras `DemoUsersSeeder` ni `CatalogoDemoSeeder` (crean cuentas con
+> ⚠️ En producción **NO** corras `DemoUsersSeeder` ni `NegociosDemoSeeder` (crean cuentas con
 > contraseña conocida). Crea el primer admin con `php artisan tinker`:
 > `$u = App\Models\User::create(['name'=>'...','email'=>'...','password'=>'...']); $u->assignRole('administrador');`
 
