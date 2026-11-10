@@ -23,7 +23,7 @@
             <div class="grid sm:grid-cols-2 gap-3">
                 <input name="username" value="{{ old('username') }}" required placeholder="Usuario" aria-label="Usuario" autocomplete="off" minlength="3" maxlength="50" pattern="[A-Za-z0-9][A-Za-z0-9_.-]*"
                        class="rounded-lg border border-slate-300 px-3 py-2">
-                <input name="password" type="password" required placeholder="Contraseña (mín. 8)" aria-label="Contraseña" autocomplete="new-password" minlength="8"
+                <input name="password" type="password" required placeholder="Contraseña (mín. 8)" aria-label="Contraseña" autocomplete="new-password" minlength="5"
                        class="rounded-lg border border-slate-300 px-3 py-2">
                 <select name="rol" class="rounded-lg border border-slate-300 px-3 py-2">
                     @foreach ($roles as $rol)

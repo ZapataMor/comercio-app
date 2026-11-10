@@ -82,7 +82,7 @@ test('un miembro suspendido pierde el acceso', function () {
 test('cualquier usuario crea un negocio y queda como propietario', function () {
     $user = actuarComo('usuario');
 
-    $this->postJson('/api/negocios', [
+    $this->postJson('/api/negocios', ['direccion' => 'Calle 1 #10-20',
         'nombre' => 'Donde Pepe',
         'categorias' => ['Restaurante', 'Comidas rápidas'],
         'barrio' => 'Centro',
@@ -106,7 +106,7 @@ test('cualquier usuario crea un negocio y queda como propietario', function () {
 test('crear un negocio exige la categoría (tipo de negocio)', function () {
     actuarComo('usuario');
 
-    $this->postJson('/api/negocios', ['nombre' => 'Sin Tipo', 'barrio' => 'Centro'])
+    $this->postJson('/api/negocios', ['direccion' => 'Calle 1 #10-20', 'nombre' => 'Sin Tipo', 'barrio' => 'Centro'])
         ->assertStatus(422)
         ->assertJsonValidationErrors('categoria');
 });
@@ -114,11 +114,11 @@ test('crear un negocio exige la categoría (tipo de negocio)', function () {
 test('crear un negocio exige el barrio, y uno nuevo queda sugerido al administrador', function () {
     $user = actuarComo('usuario');
 
-    $this->postJson('/api/negocios', ['nombre' => 'Sin Barrio', 'categorias' => ['Farmacia']])
+    $this->postJson('/api/negocios', ['direccion' => 'Calle 1 #10-20', 'nombre' => 'Sin Barrio', 'categorias' => ['Farmacia']])
         ->assertStatus(422)
         ->assertJsonValidationErrors('barrio');
 
-    $this->postJson('/api/negocios', ['nombre' => 'Droguería', 'categorias' => ['Farmacia'], 'barrio' => 'Villa Nueva'])
+    $this->postJson('/api/negocios', ['direccion' => 'Calle 1 #10-20', 'nombre' => 'Droguería', 'categorias' => ['Farmacia'], 'barrio' => 'Villa Nueva'])
         ->assertStatus(201);
     $this->assertDatabaseHas('barrios', ['nombre' => 'Villa Nueva', 'aprobado' => false, 'creado_por' => $user->id]);
 });
@@ -138,7 +138,7 @@ test('el propietario cambia el barrio del negocio', function () {
 test('una persona puede tener varios negocios', function () {
     comercianteConNegocio();
 
-    $this->postJson('/api/negocios', ['nombre' => 'Otro', 'categorias' => ['Farmacia'], 'barrio' => 'Centro'])
+    $this->postJson('/api/negocios', ['direccion' => 'Calle 1 #10-20', 'nombre' => 'Otro', 'categorias' => ['Farmacia'], 'barrio' => 'Centro'])
         ->assertStatus(201);
 
     $this->getJson('/api/negocios/mios')

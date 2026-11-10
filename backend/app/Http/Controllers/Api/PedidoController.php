@@ -49,7 +49,7 @@ class PedidoController extends Controller
             'items.*.extra.*' => ['string', 'max:100'],
             'metodo_pago' => ['required', Rule::in(Pedido::METODOS_PAGO)],
             'direccion_entrega' => ['required', 'string', 'max:255'],
-            'telefono_contacto' => ['required', 'string', 'max:30'],
+            'telefono_contacto' => ['required', 'string', new \App\Rules\Telefono],
             // Identifica el intento de compra: reintentar con la misma clave
             // devuelve el pedido ya creado en vez de duplicarlo.
             'clave_intento' => ['sometimes', 'nullable', 'string', 'min:8', 'max:64'],
@@ -76,7 +76,7 @@ class PedidoController extends Controller
         // Productos de ESTE negocio, disponibles, que estén en el pedido.
         $ids = collect($datos['items'])->pluck('producto_id');
         $productos = $negocio->productos()
-            ->where('disponible', true)
+            ->where('disponible', true)->where('precio', '>', 0)
             ->whereIn('id', $ids)
             ->with('tipoProducto')
             ->get()

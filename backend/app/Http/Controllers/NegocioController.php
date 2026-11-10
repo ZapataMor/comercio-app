@@ -85,9 +85,9 @@ class NegocioController extends Controller
             'categoria' => ['required_without:categorias', 'nullable', 'string', 'max:100'],
             'categorias' => ['required_without:categoria', 'array', 'min:1'],
             'categorias.*' => ['required', 'string', 'max:100', 'distinct'],
-            'direccion' => ['nullable', 'string', 'max:255'],
+            'direccion' => ['required', 'string', 'max:255', new \App\Rules\Direccion],
             'barrio' => ['required', 'string', 'max:100'],
-            'telefono' => ['nullable', 'string', 'max:30'],
+            'telefono' => ['nullable', 'string', new \App\Rules\Telefono],
             'activo' => ['sometimes', 'boolean'],
             // Tiempo promedio que promete para tener listo un pedido (minutos).
             'tiempo_preparacion' => ['sometimes', 'integer', 'min:5', 'max:180'],
@@ -236,9 +236,9 @@ class NegocioController extends Controller
             'categoria' => ['sometimes', 'required_without:categorias', 'nullable', 'string', 'max:100'],
             'categorias' => ['sometimes', 'array', 'min:1'],
             'categorias.*' => ['required', 'string', 'max:100', 'distinct'],
-            'direccion' => ['nullable', 'string', 'max:255'],
+            'direccion' => ['sometimes', 'required', 'string', 'max:255', new \App\Rules\Direccion],
             'barrio' => ['sometimes', 'required', 'string', 'max:100'],
-            'telefono' => ['nullable', 'string', 'max:30'],
+            'telefono' => ['nullable', 'string', new \App\Rules\Telefono],
             'activo' => ['sometimes', 'boolean'],
             // Tiempo promedio que promete para tener listo un pedido (minutos).
             'tiempo_preparacion' => ['sometimes', 'integer', 'min:5', 'max:180'],

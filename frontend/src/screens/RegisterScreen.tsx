@@ -1,3 +1,5 @@
+import CamposDireccion from '../components/CamposDireccion';
+import { direccionValida, errorDireccion, telefonoValido, errorTelefono } from '../direccion';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
 import {
@@ -65,9 +67,9 @@ export default function RegisterScreen({ navigation }: Props) {
     if (!apellidos.trim()) nuevosErrores.apellidos = 'El campo apellidos es obligatorio.';
     if (!email.trim()) nuevosErrores.email = 'El campo correo es obligatorio.';
     if (!password) nuevosErrores.password = 'El campo contrasena es obligatorio.';
-    if (!direccion.trim()) nuevosErrores.direccion = 'El campo direccion es obligatorio.';
+    if (!direccionValida(direccion)) nuevosErrores.direccion = errorDireccion;
     if (!barrio.trim()) nuevosErrores.barrio = 'El campo barrio es obligatorio.';
-    if (!telefono.trim()) nuevosErrores.telefono = 'El campo telefono es obligatorio.';
+    if (!telefonoValido(telefono)) nuevosErrores.telefono = errorTelefono;
     if (!aceptaTerminos) {
       nuevosErrores.acepta_terminos = 'Debes aceptar la política de privacidad para crear la cuenta.';
     }
@@ -75,8 +77,8 @@ export default function RegisterScreen({ navigation }: Props) {
       setErrores(nuevosErrores);
       return;
     }
-    if (password.length < 8) {
-      setErrores({ password: 'La contrasena debe tener al menos 8 caracteres.' });
+    if (password.length < 5) {
+      setErrores({ password: 'La contrasena debe tener al menos 5 caracteres.' });
       return;
     }
     if (password !== confirmar) {
@@ -183,7 +185,7 @@ export default function RegisterScreen({ navigation }: Props) {
               limpiarError('password');
             }}
             secureTextEntry
-            placeholder="Mínimo 8 caracteres"
+            placeholder="Mínimo 5 caracteres"
             placeholderTextColor={c.mutedSoft}
             editable={!cargando}
           />
@@ -205,17 +207,7 @@ export default function RegisterScreen({ navigation }: Props) {
           <FieldError mensaje={errores.confirmar} />
 
           <Text style={styles.label}>Direccion</Text>
-          <TextInput
-            style={styles.input}
-            value={direccion}
-            onChangeText={valor => {
-              setDireccion(valor);
-              limpiarError('direccion');
-            }}
-            placeholder="Calle, numero, referencia"
-            placeholderTextColor={c.mutedSoft}
-            editable={!cargando}
-          />
+          <CamposDireccion value={direccion} onChangeText={valor => { setDireccion(valor); limpiarError('direccion'); }} editable={!cargando} />
           <FieldError mensaje={errores.direccion} />
 
           <Text style={styles.label}>Barrio</Text>
@@ -234,11 +226,11 @@ export default function RegisterScreen({ navigation }: Props) {
             style={styles.input}
             value={telefono}
             onChangeText={valor => {
-              setTelefono(valor);
+              setTelefono(valor.replace(/[^0-9]/g, '').slice(0, 10));
               limpiarError('telefono');
             }}
-            keyboardType="phone-pad"
-            placeholder="300 123 4567"
+            keyboardType="number-pad" maxLength={10}
+            placeholder="3001234567"
             placeholderTextColor={c.mutedSoft}
             editable={!cargando}
           />

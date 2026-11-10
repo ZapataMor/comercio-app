@@ -1,3 +1,4 @@
+import EstadoConexion from './src/components/EstadoConexion';
 /**
  * Comercio — app móvil (React Native)
  * Navegación con React Navigation + sesión persistente (AsyncStorage).
@@ -337,6 +338,7 @@ function AppContenido() {
         <CartProvider>
           <SafeAreaProvider>
             <ToastProvider>
+              <EstadoConexion />
               {/* Diálogos de confirmación con el estilo de la app (useConfirmar). */}
               <ConfirmacionProvider>
                 <PedidoPendienteProvider>

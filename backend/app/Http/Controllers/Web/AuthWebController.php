@@ -27,7 +27,7 @@ class AuthWebController extends Controller
         $campo = $request->has('username') ? 'username' : 'email';
         $datos = $request->validate([
             $campo => ['required', 'string', 'max:255'],
-            'password' => ['required'],
+            'password' => ['present', 'string', 'min:1'],
         ]);
 
         $identificador = trim($datos[$campo]);

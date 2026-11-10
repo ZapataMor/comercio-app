@@ -1,3 +1,4 @@
+import { solicitar, ErrorRed } from './red';
 import { API_URL } from './config';
 import type { OpcionesLinea } from './opcionesProducto';
 
@@ -267,7 +268,7 @@ export function alRechazarToken(cb: ((token: string) => void) | null) {
 export async function login(email: string, password: string): Promise<LoginResponse> {
   let res: Response;
   try {
-    res = await fetch(`${API_URL}/api/login`, {
+    res = await solicitar(`${API_URL}/api/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -275,7 +276,8 @@ export async function login(email: string, password: string): Promise<LoginRespo
       },
       body: JSON.stringify({ email, password }),
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof ErrorRed) throw error;
     // Falla de red: el server no responde / URL mal / sin conexión.
     throw new Error('No se pudo conectar con el servidor. ¿Está corriendo la API?');
   }
@@ -309,7 +311,7 @@ export async function register(body: {
 }): Promise<LoginResponse> {
   let res: Response;
   try {
-    res = await fetch(`${API_URL}/api/register`, {
+    res = await solicitar(`${API_URL}/api/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
@@ -318,7 +320,8 @@ export async function register(body: {
         password_confirmation: body.password,
       }),
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof ErrorRed) throw error;
     throw new Error('No se pudo conectar con el servidor. ¿Está corriendo la API?');
   }
 
@@ -339,12 +342,13 @@ export async function register(body: {
 async function publicPost(path: string, body: any, porDefecto: string): Promise<string> {
   let res: Response;
   try {
-    res = await fetch(`${API_URL}${path}`, {
+    res = await solicitar(`${API_URL}${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(body),
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof ErrorRed) throw error;
     throw new Error('No se pudo conectar con el servidor.');
   }
   const data = await res.json().catch(() => ({} as any));
@@ -381,10 +385,11 @@ export type Barrio = { id: number; nombre: string };
 export async function getBarrios(): Promise<Barrio[]> {
   let res: Response;
   try {
-    res = await fetch(`${API_URL}/api/barrios`, {
+    res = await solicitar(`${API_URL}/api/barrios`, {
       headers: { Accept: 'application/json' },
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof ErrorRed) throw error;
     throw new Error('No se pudo conectar con el servidor.');
   }
   const data = await res.json().catch(() => ({} as any));
@@ -398,10 +403,11 @@ export async function getBarrios(): Promise<Barrio[]> {
 async function authGet(path: string, token: string): Promise<any> {
   let res: Response;
   try {
-    res = await fetch(`${API_URL}${path}`, {
+    res = await solicitar(`${API_URL}${path}`, {
       headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof ErrorRed) throw error;
     throw new Error('No se pudo conectar con el servidor.');
   }
   const data = await res.json().catch(() => ({} as any));
@@ -416,10 +422,8 @@ async function authGet(path: string, token: string): Promise<any> {
 /** POST/PUT autenticado con cuerpo JSON. */
 async function authSend(method: 'POST' | 'PUT' | 'DELETE', path: string, token: string, body?: any): Promise<any> {
   let res: Response;
-  const abortador = path === '/api/pedidos' ? new AbortController() : null;
-  const limite = abortador ? setTimeout(() => abortador.abort(), 15000) : null;
   try {
-    res = await fetch(`${API_URL}${path}`, {
+    res = await solicitar(`${API_URL}${path}`, {
       method,
       headers: {
         Accept: 'application/json',
@@ -427,12 +431,10 @@ async function authSend(method: 'POST' | 'PUT' | 'DELETE', path: string, token: 
         Authorization: `Bearer ${token}`,
       },
       body: body ? JSON.stringify(body) : undefined,
-      ...(abortador ? { signal: abortador.signal } : {}),
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof ErrorRed) throw error;
     throw new Error('No se pudo conectar con el servidor.');
-  } finally {
-    if (limite) clearTimeout(limite);
   }
   const data = await res.json().catch(() => ({} as any));
   if (!res.ok) {
@@ -484,12 +486,13 @@ async function authUpload(
 
   let res: Response;
   try {
-    res = await fetch(`${API_URL}${path}`, {
+    res = await solicitar(`${API_URL}${path}`, {
       method: 'POST', // siempre POST; el PUT real se simula con _method
       headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
       body: form,
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof ErrorRed) throw error;
     throw new Error('No se pudo conectar con el servidor.');
   }
   const data = await res.json().catch(() => ({} as any));

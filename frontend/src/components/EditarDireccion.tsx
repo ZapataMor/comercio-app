@@ -1,3 +1,5 @@
+import CamposDireccion from '../components/CamposDireccion';
+import { direccionValida, errorDireccion } from '../direccion';
 import React, { useState } from 'react';
 import { ActivityIndicator, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { ClienteDireccion, crearClienteDireccion, editarClienteDireccion } from '../api';
@@ -22,7 +24,7 @@ export default function EditarDireccion({ direccion, onCerrar, onGuardada }: {
   async function guardar() {
     if (!auth || guardando) return;
     const campos: FieldErrors = {};
-    if (!calle.trim()) campos.direccion = 'Escribe la dirección.';
+    if (!direccionValida(calle)) campos.direccion = errorDireccion;
     if (!barrio.trim()) campos.barrio = 'Elige o escribe el barrio.';
     setErrores(campos); setError('');
     if (Object.keys(campos).length) return;
@@ -45,7 +47,7 @@ export default function EditarDireccion({ direccion, onCerrar, onGuardada }: {
       <Text style={styles.ayuda}>Solo tú verás este nombre.</Text>
       <FieldError mensaje={errores.nombre} />
       <Text style={styles.label}>Dirección</Text>
-      <TextInput style={styles.input} value={calle} onChangeText={setCalle} maxLength={255} placeholder="Calle, número, referencia" placeholderTextColor={c.muted} editable={!guardando} />
+      <CamposDireccion value={calle} onChangeText={setCalle} editable={!guardando} />
       <FieldError mensaje={errores.direccion} />
       <Text style={styles.label}>Barrio</Text>
       <BarrioSelect disabled={guardando} valor={barrio} onSeleccionar={setBarrio} />

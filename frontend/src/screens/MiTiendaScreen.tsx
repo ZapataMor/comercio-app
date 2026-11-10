@@ -1,3 +1,5 @@
+import CamposDireccion from '../components/CamposDireccion';
+import { direccionValida, errorDireccion, telefonoValido, errorTelefono } from '../direccion';
 /**
  * Mi Tienda — los datos del negocio activo.
  *
@@ -181,6 +183,8 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
       setErrores({ barrio: 'Elige el barrio donde queda el negocio.' });
       return;
     }
+    if (!direccionValida(direccion)) { setErrores({ direccion: errorDireccion }); return; }
+    if (telefono && !telefonoValido(telefono)) { setErrores({ telefono: errorTelefono }); return; }
     const minutos = parseInt(tiempo, 10);
     if (!(minutos >= 5 && minutos <= 180)) {
       setErrores({ tiempo_preparacion: 'Pon un tiempo entre 5 y 180 minutos.' });
@@ -444,17 +448,7 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
         <View style={styles.seccion}>
           <Text style={styles.seccionTitulo}>Ubicación y contacto</Text>
           <Text style={styles.label}>Dirección</Text>
-          <TextInput
-            style={styles.input}
-            value={direccion}
-            onChangeText={valor => {
-              setDireccion(valor);
-              limpiarError('direccion');
-            }}
-            placeholder="Calle 12 #8-30, Maicao"
-            placeholderTextColor={c.mutedSoft}
-            editable={!guardando}
-          />
+          <CamposDireccion value={direccion} onChangeText={valor => { setDireccion(valor); limpiarError('direccion'); }} editable={!guardando} />
           <FieldError mensaje={errores.direccion} />
 
           <Text style={styles.label}>Barrio *</Text>
@@ -485,12 +479,12 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
             style={styles.input}
             value={telefono}
             onChangeText={valor => {
-              setTelefono(valor);
+              setTelefono(valor.replace(/[^0-9]/g, '').slice(0, 10));
               limpiarError('telefono');
             }}
             placeholder="3001234567"
             placeholderTextColor={c.mutedSoft}
-            keyboardType="phone-pad"
+            keyboardType="number-pad" maxLength={10}
             editable={!guardando}
           />
           <FieldError mensaje={errores.telefono} />

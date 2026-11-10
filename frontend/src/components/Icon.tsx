@@ -10,6 +10,7 @@ import { StyleProp, TextStyle, ViewStyle } from 'react-native';
 import { Circle, G, Path, Polyline, Rect, Svg } from 'react-native-svg';
 
 export type IconName =
+  | 'sin-internet'
   | 'casa'
   | 'tienda'
   | 'negocios'
@@ -44,6 +45,7 @@ export type IconName =
   | 'salir';
 
 const GLYPHS: Record<IconName, React.ReactNode> = {
+  'sin-internet': <><Path d="M2 2l20 20M3 8a16 16 0 0 1 18 0M6 12a10 10 0 0 1 12 0M9 16a5 5 0 0 1 6 0" /><Circle cx="12" cy="20" r="1" /></>,
   casa: (
     <>
       <Path d="M3 10.5 12 3l9 7.5" />

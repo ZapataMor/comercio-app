@@ -1,3 +1,5 @@
+import CamposDireccion from '../components/CamposDireccion';
+import { direccionValida, errorDireccion, telefonoValido, errorTelefono } from '../direccion';
 /**
  * Mi información — datos PERSONALES de la cuenta (cualquier rol).
  *
@@ -187,9 +189,11 @@ export default function MiInformacionScreen(_props: Props) {
     if (!nombre.trim()) nuevosErrores.name = 'El campo nombre es obligatorio.';
     if (!apellidos.trim()) nuevosErrores.apellidos = 'El campo apellidos es obligatorio.';
     if (!email.trim()) nuevosErrores.email = 'El campo correo es obligatorio.';
+    if (telefono && !telefonoValido(telefono)) nuevosErrores.telefono = errorTelefono;
+    if (direccion && !direccionValida(direccion)) nuevosErrores.direccion = errorDireccion;
     if (esCliente) {
-      if (!telefono.trim()) nuevosErrores.telefono = 'El campo teléfono es obligatorio.';
-      if (!direccion.trim()) nuevosErrores.direccion = 'El campo dirección es obligatorio.';
+      if (!telefonoValido(telefono)) nuevosErrores.telefono = errorTelefono;
+      if (!direccionValida(direccion)) nuevosErrores.direccion = errorDireccion;
       if (!barrio.trim()) nuevosErrores.barrio = 'El campo barrio es obligatorio.';
     }
     if (Object.keys(nuevosErrores).length > 0) {
@@ -209,8 +213,8 @@ export default function MiInformacionScreen(_props: Props) {
         setErrores({ confirmar: 'La nueva contrasena y su confirmacion deben ser iguales.' });
         return;
       }
-      if (passNueva.length < 8) {
-        setErrores({ password: 'La nueva contrasena debe tener al menos 8 caracteres.' });
+      if (passNueva.length < 5) {
+        setErrores({ password: 'La nueva contrasena debe tener al menos 5 caracteres.' });
         return;
       }
     }
@@ -427,12 +431,12 @@ export default function MiInformacionScreen(_props: Props) {
               style={styles.input}
               value={telefono}
               onChangeText={valor => {
-                setTelefono(valor);
+                setTelefono(valor.replace(/[^0-9]/g, '').slice(0, 10));
                 limpiarError('telefono');
               }}
               placeholder="Tu número de contacto"
               placeholderTextColor={c.mutedSoft}
-              keyboardType="phone-pad"
+              keyboardType="number-pad" maxLength={10}
               editable={!guardando}
             />
             <FieldError mensaje={errores.telefono} />
@@ -443,17 +447,7 @@ export default function MiInformacionScreen(_props: Props) {
           <Text style={styles.seccion}>Mi dirección</Text>
           <View style={styles.tarjeta}>
             <Text style={styles.label}>Dirección</Text>
-            <TextInput
-              style={styles.input}
-              value={direccion}
-              onChangeText={valor => {
-                setDireccion(valor);
-                limpiarError('direccion');
-              }}
-              placeholder="Calle, número, referencias"
-              placeholderTextColor={c.mutedSoft}
-              editable={!guardando}
-            />
+            <CamposDireccion value={direccion} onChangeText={valor => { setDireccion(valor); limpiarError('direccion'); }} editable={!guardando} />
             <FieldError mensaje={errores.direccion} />
             <Text style={styles.label}>Barrio</Text>
             <BarrioSelect
@@ -495,7 +489,7 @@ export default function MiInformacionScreen(_props: Props) {
                 setPassNueva(valor);
                 limpiarError('password');
               }}
-              placeholder="Mínimo 8 caracteres"
+              placeholder="Mínimo 5 caracteres"
               placeholderTextColor={c.mutedSoft}
               secureTextEntry
               editable={!guardando}

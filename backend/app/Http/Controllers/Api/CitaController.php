@@ -76,7 +76,7 @@ class CitaController extends Controller
             'fecha' => ['required', 'date_format:Y-m-d'], 'hora' => ['required', 'date_format:H:i'],
             'notas' => ['nullable', 'string', 'max:1000'],
             'cliente_nombre' => [$presencial ? 'required' : 'nullable', 'string', 'max:150'],
-            'cliente_telefono' => ['nullable', 'string', 'max:30'],
+            'cliente_telefono' => ['nullable', 'string', new \App\Rules\Telefono],
         ]);
         $cita = AgendaCitas::crear($negocio, $request->user(), $d, $presencial);
         if (! $presencial) {

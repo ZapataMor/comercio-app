@@ -1,3 +1,4 @@
+import { telefonoValido, errorTelefono } from '../direccion';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -84,6 +85,7 @@ export default function AgendarCitaScreen({ route, navigation }: Props) {
       setError('Escribe el nombre del cliente.');
       return;
     }
+    if (presencial && telefono && !telefonoValido(telefono)) { setError(errorTelefono); return; }
     setGuardando(true);
     setError('');
     try {
@@ -240,10 +242,10 @@ export default function AgendarCitaScreen({ route, navigation }: Props) {
             accessibilityLabel="Teléfono del cliente"
             style={styles.input}
             value={telefono}
-            onChangeText={setTelefono}
-            maxLength={30}
+            onChangeText={valor => setTelefono(valor.replace(/[^0-9]/g, '').slice(0, 10))}
+            maxLength={10}
             editable={!guardando}
-            keyboardType="phone-pad"
+            keyboardType="number-pad"
             placeholder="Teléfono (opcional)"
             placeholderTextColor={c.muted}
           />

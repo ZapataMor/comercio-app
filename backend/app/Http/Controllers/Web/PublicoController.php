@@ -30,7 +30,7 @@ class PublicoController extends Controller
     {
         $datos = $request->validate([
             'email' => ['required', 'email'],
-            'password' => ['required', 'string'],
+            'password' => ['present', 'string', 'min:1'],
         ]);
 
         $user = User::where('email', $datos['email'])->whereNull('eliminado_at')->first();

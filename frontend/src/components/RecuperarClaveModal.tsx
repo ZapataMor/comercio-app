@@ -84,7 +84,7 @@ export default function RecuperarClaveModal({ visible, emailInicial, onCerrar, o
   async function cambiarClave() {
     const nuevos: FieldErrors = {};
     if (!/^\d{6}$/.test(codigo)) nuevos.codigo = 'El código tiene 6 números.';
-    if (clave.length < 8) nuevos.password = 'La contraseña debe tener al menos 8 caracteres.';
+    if (clave.length < 5) nuevos.password = 'La contraseña debe tener al menos 5 caracteres.';
     else if (clave !== confirmar) nuevos.confirmar = 'Las contraseñas no coinciden.';
     if (Object.keys(nuevos).length) {
       setErrores(nuevos);
@@ -162,7 +162,7 @@ export default function RecuperarClaveModal({ visible, emailInicial, onCerrar, o
                     limpiar('password');
                   }}
                   secureTextEntry
-                  placeholder="Contraseña nueva (mínimo 8)"
+                  placeholder="Contraseña nueva (mínimo 5)"
                   placeholderTextColor={c.mutedSoft}
                   editable={!cargando}
                 />

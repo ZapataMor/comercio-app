@@ -86,3 +86,5 @@ jest.mock('react-native-maps', () => {
   const Marker = props => React.createElement(View, null, props.children);
   return { __esModule: true, default: MapView, Marker, PROVIDER_GOOGLE: 'google' };
 });
+
+jest.mock('@react-native-community/netinfo', () => require('@react-native-community/netinfo/jest/netinfo-mock.js'));

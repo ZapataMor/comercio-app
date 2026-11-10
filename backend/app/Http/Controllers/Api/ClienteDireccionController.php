@@ -30,7 +30,7 @@ class ClienteDireccionController extends Controller
 
         $data = $request->validate([
             'nombre' => ['nullable', 'string', 'max:80'],
-            'direccion' => ['required', 'string', 'max:255'],
+            'direccion' => ['required', 'string', 'max:255', new \App\Rules\Direccion],
             'barrio' => ['required', 'string', 'max:120'],
         ]);
 
@@ -53,7 +53,7 @@ class ClienteDireccionController extends Controller
         $direccion = $request->user()->clienteDirecciones()->findOrFail($id);
         $data = $request->validate([
             'nombre' => ['nullable', 'string', 'max:80'],
-            'direccion' => ['required', 'string', 'max:255'],
+            'direccion' => ['required', 'string', 'max:255', new \App\Rules\Direccion],
             'barrio' => ['required', 'string', 'max:120'],
         ]);
         Barrio::registrarSiEsNuevo($data['barrio'], $request->user()->id);

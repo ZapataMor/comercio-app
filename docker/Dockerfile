@@ -29,6 +29,7 @@ RUN npm run build
 
 FROM vendor AS runtime
 COPY --from=assets /build/public/build ./public/build
+COPY docker/php-fpm-timeout.conf /usr/local/etc/php-fpm.d/zz-timeout.conf
 COPY docker/php.ini /usr/local/etc/php/conf.d/production.ini
 COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/vitrina-entrypoint
 RUN php artisan storage:link && chown -R www-data:www-data storage bootstrap/cache

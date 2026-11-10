@@ -16,6 +16,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->trimStrings(except: ['password_actual']);
+
         // Alias del middleware de roles de Spatie,
         // para poder usar ->middleware('role:comerciante') en las rutas.
         $middleware->alias([
@@ -24,6 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Una cuenta suspendida por el admin pierde el acceso a la API al instante.
         $middleware->api(append: [
+            'throttle:api-ip',
             CuentaActiva::class,
         ]);
     })

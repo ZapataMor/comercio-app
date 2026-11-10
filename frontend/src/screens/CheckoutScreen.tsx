@@ -1,3 +1,5 @@
+import CamposDireccion from '../components/CamposDireccion';
+import { direccionValida, errorDireccion, telefonoValido, errorTelefono } from '../direccion';
 import { useFocusEffect } from '@react-navigation/native';
 import EditarDireccion from '../components/EditarDireccion';
 import { textoCantidad } from '../cantidades';
@@ -161,8 +163,8 @@ export default function CheckoutScreen({ navigation }: Props) {
       cargarTarifa();
       return;
     }
-    if (!telefonoContacto) {
-      setErrores({ telefono: 'El campo telefono de contacto es obligatorio.' });
+    if (!telefonoValido(telefonoContacto)) {
+      setErrores({ telefono: errorTelefono });
       return;
     }
 
@@ -170,7 +172,7 @@ export default function CheckoutScreen({ navigation }: Props) {
 
     if (seleccion === 'nueva') {
       const nuevosErrores: FieldErrors = {};
-      if (!nuevaDireccion.trim()) nuevosErrores.nuevaDireccion = 'El campo direccion es obligatorio.';
+      if (!direccionValida(nuevaDireccion)) nuevosErrores.nuevaDireccion = errorDireccion;
       if (!nuevoBarrio.trim()) nuevosErrores.nuevoBarrio = 'El campo barrio es obligatorio.';
       if (Object.keys(nuevosErrores).length > 0) {
         setErrores(nuevosErrores);
@@ -386,16 +388,7 @@ export default function CheckoutScreen({ navigation }: Props) {
         <View style={styles.nuevaBox}>
           <TextInput style={styles.input} value={nuevoNombre} onChangeText={setNuevoNombre} maxLength={80} placeholder="Nombre opcional: Mi casa, Trabajo…" placeholderTextColor={c.mutedSoft} />
           <Text style={styles.lineaDetalle}>Solo tú verás este nombre.</Text>
-          <TextInput
-            style={styles.input}
-            value={nuevaDireccion}
-            onChangeText={valor => {
-              setNuevaDireccion(valor);
-              limpiarError('nuevaDireccion');
-            }}
-            placeholder="Calle, numero, referencia"
-            placeholderTextColor={c.mutedSoft}
-          />
+          <CamposDireccion value={nuevaDireccion} onChangeText={setNuevaDireccion} />
           <FieldError mensaje={errores.nuevaDireccion} />
           <BarrioSelect
             valor={nuevoBarrio}
@@ -456,9 +449,9 @@ export default function CheckoutScreen({ navigation }: Props) {
 
       {usarOtroTelefono ? (
         <TextInput style={styles.input} value={telefono} onChangeText={valor => {
-          setTelefono(valor);
+          setTelefono(valor.replace(/[^0-9]/g, '').slice(0, 10));
           limpiarError('telefono');
-        }} placeholder="300 123 4567" placeholderTextColor={c.mutedSoft} keyboardType="phone-pad" />
+        }} placeholder="3001234567" placeholderTextColor={c.mutedSoft} keyboardType="number-pad" maxLength={10} />
       ) : null}
       <FieldError mensaje={errores.telefono} />
 

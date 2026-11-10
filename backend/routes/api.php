@@ -50,7 +50,7 @@ Route::post('/password/restablecer', [RecuperarClaveController::class, 'restable
 Route::get('/barrios', [BarrioController::class, 'index'])->middleware('throttle:publico');
 
 // Rutas que requieren un token Sanctum válido.
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'throttle:api-usuario'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 
     Route::get('/user', function (Request $request) {

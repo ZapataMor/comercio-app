@@ -32,10 +32,10 @@ class AuthController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'apellidos' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
-            'direccion' => ['required', 'string', 'max:255'],
+            'password' => ['present', 'string', 'min:5', 'confirmed'],
+            'direccion' => ['required', 'string', 'max:255', new \App\Rules\Direccion],
             'barrio' => ['required', 'string', 'max:120'],
-            'telefono' => ['required', 'string', 'max:30'],
+            'telefono' => ['required', 'string', new \App\Rules\Telefono],
             // Autorización previa del tratamiento de datos (Ley 1581 de 2012).
             'acepta_terminos' => ['accepted'],
         ], [
@@ -85,7 +85,7 @@ class AuthController extends Controller
     {
         $data = $request->validate([
             'email' => ['required', 'string', 'email'],
-            'password' => ['required', 'string'],
+            'password' => ['present', 'string', 'min:1'],
         ]);
 
         $user = User::where('email', $data['email'])->first();
@@ -135,12 +135,12 @@ class AuthController extends Controller
             // Opcional aquí: las cuentas creadas antes (o por un admin) pueden no tenerlos.
             'apellidos' => ['sometimes', 'nullable', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
-            'password' => ['sometimes', 'nullable', 'string', 'min:8', 'confirmed'],
-            'password_actual' => ['required_with:password', 'nullable', 'string'],
+            'password' => ['sometimes', 'nullable', 'string', 'min:5', 'confirmed'],
+            'password_actual' => ['exclude_without:password', 'present', 'string', 'min:1'],
             // Datos de contacto: obligatorios para clientes, opcionales para el resto.
-            'direccion' => [$esCliente ? 'required' : 'sometimes', 'nullable', 'string', 'max:255'],
+            'direccion' => [$esCliente ? 'required' : 'sometimes', 'nullable', 'string', 'max:255', new \App\Rules\Direccion],
             'barrio' => [$esCliente ? 'required' : 'sometimes', 'nullable', 'string', 'max:120'],
-            'telefono' => [$esCliente ? 'required' : 'sometimes', 'nullable', 'string', 'max:30'],
+            'telefono' => [$esCliente ? 'required' : 'sometimes', 'nullable', 'string', new \App\Rules\Telefono],
         ]);
 
         if (! empty($data['password'])) {

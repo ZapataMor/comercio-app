@@ -164,7 +164,7 @@ export default function AdminUsuariosScreen() {
     const nuevosErrores: FieldErrors = {};
     if (!nombre.trim()) nuevosErrores.name = 'El campo nombre es obligatorio.';
     if (!email.trim()) nuevosErrores.email = 'El campo correo es obligatorio.';
-    if (!password) nuevosErrores.password = 'El campo contrasena es obligatorio.';
+    if (password.length < 5) nuevosErrores.password = 'La contraseña debe tener al menos 5 caracteres.';
     if (!formRol) nuevosErrores.rol = 'Selecciona un rol.';
     if (Object.keys(nuevosErrores).length > 0) {
       setErrores(nuevosErrores);

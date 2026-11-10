@@ -131,7 +131,7 @@ class AdminController extends Controller
         $datos = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:8'],
+            'password' => ['present', 'string', 'min:5'],
             'rol' => ['required', Rule::in(self::ROLES)],
         ]);
 

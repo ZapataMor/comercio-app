@@ -62,7 +62,7 @@ class RecuperarClaveController extends Controller
         $datos = $request->validate([
             'email' => ['required', 'string', 'email'],
             'codigo' => ['required', 'digits:6'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'password' => ['present', 'string', 'min:5', 'confirmed'],
         ]);
 
         $llave = $this->llaveIntentos($datos['email']);

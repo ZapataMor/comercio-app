@@ -65,7 +65,7 @@ function limPedido(User $cliente, Negocio $negocio, string $estado, ?User $domic
     return Pedido::create([
         'negocio_id' => $negocio->id, 'user_id' => $cliente->id, 'domiciliario_id' => $domiciliario?->id,
         'estado' => $estado, 'metodo_pago' => 'efectivo', 'subtotal' => 6000, 'costo_domicilio' => 0, 'total' => 6000,
-        'direccion_entrega' => 'Calle 1', 'telefono_contacto' => '300',
+        'direccion_entrega' => 'Calle 1 #10-20', 'telefono_contacto' => '300',
         // Único por pedido: el índice no admite dos códigos vigentes iguales.
         'codigo_confirmacion' => in_array($estado, Pedido::EN_RUTA, true) ? sprintf('%04d', 4321 + Pedido::count()) : null,
         'entregado_at' => $estado === 'entregado' ? now() : null,
@@ -84,12 +84,12 @@ test('un horario con días mal nombrados se rechaza', function () {
     Sanctum::actingAs(limPersona());
 
     $this->postJson('/api/negocios', [
-        'nombre' => 'Tienda', 'categoria' => 'Bar', 'barrio' => 'Centro',
+        'nombre' => 'Tienda', 'categoria' => 'Bar', 'barrio' => 'Centro', 'direccion' => 'Calle 1 #10-20',
         'horario' => ['lunes' => ['abre' => '08:00', 'cierra' => '18:00']],
     ])->assertStatus(422)->assertJsonValidationErrors('horario');
 
     $this->postJson('/api/negocios', [
-        'nombre' => 'Tienda', 'categoria' => 'Bar', 'barrio' => 'Centro',
+        'nombre' => 'Tienda', 'categoria' => 'Bar', 'barrio' => 'Centro', 'direccion' => 'Calle 1 #10-20',
         'horario' => ['lun' => ['abre' => '08:00', 'cierra' => '18:00']],
     ])->assertCreated();
 });
@@ -274,7 +274,7 @@ test('cambiar la contraseña cierra las demás sesiones y conserva la actual', f
     $actual = $user->createToken('api')->plainTextToken;
 
     $this->withToken($actual)->putJson('/api/perfil', [
-        'name' => 'Ana', 'email' => $user->email, 'direccion' => 'Calle 1', 'barrio' => 'Centro', 'telefono' => '3001234567',
+        'name' => 'Ana', 'email' => $user->email, 'direccion' => 'Calle 1 #10-20', 'barrio' => 'Centro', 'telefono' => '3001234567',
         'password' => 'OtraClave22', 'password_confirmation' => 'OtraClave22', 'password_actual' => 'ClaveSegura1',
     ])->assertOk();
 
@@ -474,7 +474,7 @@ test('cambiar la clave también cierra las sesiones web guardadas de ese usuario
     ]);
     config(['session.driver' => 'database']);
     $this->withToken($token)->putJson('/api/perfil', [
-        'name' => 'Ana', 'email' => $usuario->email, 'direccion' => 'Calle 1', 'barrio' => 'Centro', 'telefono' => '3001234567',
+        'name' => 'Ana', 'email' => $usuario->email, 'direccion' => 'Calle 1 #10-20', 'barrio' => 'Centro', 'telefono' => '3001234567',
         'password' => 'OtraClave22', 'password_confirmation' => 'OtraClave22', 'password_actual' => 'ClaveSegura1',
     ])->assertOk();
     $this->assertDatabaseMissing('sessions', ['id' => 'equipo-anterior']);

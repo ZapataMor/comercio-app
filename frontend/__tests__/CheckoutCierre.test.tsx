@@ -18,7 +18,7 @@ jest.mock('@react-navigation/native', () => ({
 }));
 
 jest.mock('../src/AuthContext', () => ({
-  useAuth: () => ({ auth: { token: 't', user: { id: 7, telefono: '300' } }, actualizarUsuario: jest.fn() }),
+  useAuth: () => ({ auth: { token: 't', user: { id: 7, telefono: '3001234567' } }, actualizarUsuario: jest.fn() }),
 }));
 
 jest.mock('../src/CartContext', () => ({

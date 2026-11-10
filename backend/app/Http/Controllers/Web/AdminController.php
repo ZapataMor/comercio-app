@@ -88,7 +88,7 @@ class AdminController extends Controller
         }
         $datos = $request->validate([
             'username' => ['required', 'string', 'min:3', 'max:50', 'regex:/\A[a-z0-9][a-z0-9_.-]*\z/', 'unique:users,username'],
-            'password' => ['required', 'string', 'min:8'],
+            'password' => ['present', 'string', 'min:5'],
             'rol' => ['required', Rule::in(self::ROLES)],
         ]);
 

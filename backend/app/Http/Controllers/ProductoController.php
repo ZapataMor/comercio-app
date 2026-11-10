@@ -164,7 +164,7 @@ class ProductoController extends Controller
             'descripcion' => ['nullable', 'string'],
             // Precio en pesos colombianos, SIN puntos ni comas (entero).
             // Se entiende "por unidad_medida" (por unidad, por kg, por litro...).
-            'precio' => [$requerido, 'integer', 'min:0'],
+            'precio' => [$requerido, 'integer', 'min:1'],
             // Tipo global del producto (Comida, Medicamento...): obligatorio
             // al crear; define qué atributos pide la app.
             'tipo_producto_id' => [$requerido, Rule::exists('tipos_producto', 'id')],

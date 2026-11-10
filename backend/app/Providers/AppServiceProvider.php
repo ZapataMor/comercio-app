@@ -36,6 +36,16 @@ class AppServiceProvider extends ServiceProvider
      */
     private function limitesDeIntentos(): void
     {
+        $respuesta = fn (Request $r, array $headers) => response()->json([
+            'message' => 'Has realizado demasiadas solicitudes. Espera un minuto e inténtalo de nuevo.',
+        ], 429, $headers);
+        RateLimiter::for('api-ip', fn (Request $r) => Limit::perMinute(300)
+            ->by('ip|'.$r->ip())->response($respuesta));
+        RateLimiter::for('api-usuario', fn (Request $r) => [
+            Limit::perMinute(120)->by('usuario|'.$r->user()->id)->response($respuesta),
+            Limit::perMinute($r->isMethod('GET') ? 120 : 40)
+                ->by(($r->isMethod('GET') ? 'lectura|' : 'escritura|').$r->user()->id)->response($respuesta),
+        ]);
         $correo = fn (Request $r) => mb_strtolower((string) $r->input('email'));
 
         // Login y registro (API y web): 6 por minuto por correo e IP.

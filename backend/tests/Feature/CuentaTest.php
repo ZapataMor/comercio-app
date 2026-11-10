@@ -19,7 +19,7 @@ function clienteCuenta(): User
     $user = User::factory()->create([
         'password' => 'clave-actual',
         'telefono' => '3001112233',
-        'direccion' => 'Calle 1',
+        'direccion' => 'Calle 1 #10-20',
         'barrio' => 'Centro',
     ]);
     $user->assignRole('usuario');
@@ -32,7 +32,7 @@ function datosRegistro(array $extra = []): array
     return [
         'name' => 'Ana', 'apellidos' => 'Pérez', 'email' => 'ana@correo.com',
         'password' => 'password123', 'password_confirmation' => 'password123',
-        'direccion' => 'Calle 1', 'barrio' => 'Centro', 'telefono' => '3001234567',
+        'direccion' => 'Calle 1 #10-20', 'barrio' => 'Centro', 'telefono' => '3001234567',
     ] + $extra;
 }
 
@@ -67,9 +67,9 @@ test('eliminar la cuenta anonimiza los datos y conserva los pedidos', function (
     $negocio = User::factory()->create()->negocio()->create(['nombre' => 'Tienda', 'activo' => true]);
     $pedido = $negocio->pedidos()->create([
         'user_id' => $user->id, 'estado' => 'entregado', 'metodo_pago' => 'efectivo',
-        'total' => 1000, 'direccion_entrega' => 'Calle 1', 'telefono_contacto' => '3001112233',
+        'total' => 1000, 'direccion_entrega' => 'Calle 1 #10-20', 'telefono_contacto' => '3001112233',
     ]);
-    $user->clienteDirecciones()->create(['direccion' => 'Calle 1', 'barrio' => 'Centro', 'es_principal' => true]);
+    $user->clienteDirecciones()->create(['direccion' => 'Calle 1 #10-20', 'barrio' => 'Centro', 'es_principal' => true]);
     $user->deviceTokens()->create(['token' => 'tok-1', 'plataforma' => 'android']);
     Sanctum::actingAs($user);
 
@@ -94,7 +94,7 @@ test('no se puede eliminar la cuenta con un pedido en curso', function () {
     $negocio = User::factory()->create()->negocio()->create(['nombre' => 'Tienda', 'activo' => true]);
     $negocio->pedidos()->create([
         'user_id' => $user->id, 'estado' => 'pendiente', 'metodo_pago' => 'efectivo',
-        'total' => 1000, 'direccion_entrega' => 'Calle 1', 'telefono_contacto' => '300',
+        'total' => 1000, 'direccion_entrega' => 'Calle 1 #10-20', 'telefono_contacto' => '300',
     ]);
     Sanctum::actingAs($user);
 

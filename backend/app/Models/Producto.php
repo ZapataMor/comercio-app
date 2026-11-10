@@ -12,6 +12,17 @@ class Producto extends Model
 
     protected $table = 'productos';
 
+    protected static function booted(): void
+    {
+        static::saving(function (Producto $producto) {
+            if ((float) $producto->precio <= 0) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'precio' => 'El precio del producto debe ser mayor que 0 pesos.',
+                ]);
+            }
+        });
+    }
+
     /** Valores por defecto a nivel de modelo (coinciden con la migración). */
     protected $attributes = [
         'disponible' => true,

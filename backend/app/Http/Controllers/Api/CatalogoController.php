@@ -192,7 +192,7 @@ class CatalogoController extends Controller
         $like = '%'.$texto.'%';
 
         $productos = Producto::query()
-            ->where('disponible', true)
+            ->where('disponible', true)->where('precio', '>', 0)
             ->whereHas('negocio', function ($q) use ($tipoNegocioId) {
                 $q->whereNull('vetado_at')->whereNull('archivado_at')->whereNull('desactivado_at');
                 if ($tipoNegocioId) {
@@ -263,7 +263,7 @@ class CatalogoController extends Controller
         }
 
         $productos = $negocio->productos()
-            ->where('disponible', true)
+            ->where('disponible', true)->where('precio', '>', 0)
             ->with(['categoria', 'tipoProducto'])
             ->orderBy('nombre')
             ->get();

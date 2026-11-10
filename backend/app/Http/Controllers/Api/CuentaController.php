@@ -18,7 +18,7 @@ class CuentaController extends Controller
     public function destroy(Request $request): JsonResponse
     {
         $request->validate([
-            'password' => ['required', 'string'],
+            'password' => ['present', 'string', 'min:1'],
         ]);
 
         $user = $request->user();

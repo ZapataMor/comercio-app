@@ -116,12 +116,12 @@ test('el cliente edita su direccion y su nombre opcional y sincroniza el perfil'
     ]);
     Sanctum::actingAs($user);
     $this->putJson("/api/cliente/direcciones/{$direccion->id}", [
-        'direccion' => 'Calle 20 carrera 2 este', 'barrio' => 'Centro', 'nombre' => 'Mi casa',
+        'direccion' => 'Calle 20 Carrera 2 este #10-20', 'barrio' => 'Centro', 'nombre' => 'Mi casa',
     ])->assertOk()->assertJsonPath('direccion.nombre', 'Mi casa');
     $this->getJson('/api/cliente/direcciones')->assertOk()->assertJsonPath('direcciones.0.nombre', 'Mi casa');
-    expect($user->fresh()->direccion)->toBe('Calle 20 carrera 2 este');
+    expect($user->fresh()->direccion)->toBe('Calle 20 Carrera 2 este #10-20');
     $this->putJson("/api/cliente/direcciones/{$direccion->id}", [
-        'direccion' => 'Calle 20 carrera 2 este', 'barrio' => 'Centro', 'nombre' => null,
+        'direccion' => 'Calle 20 Carrera 2 este #10-20', 'barrio' => 'Centro', 'nombre' => null,
     ])->assertOk()->assertJsonPath('direccion.nombre', null);
 });
 
@@ -142,8 +142,8 @@ test('el nombre es opcional al crear y no permite textos demasiado largos', func
     $user = User::factory()->create();
     $user->assignRole('usuario');
     Sanctum::actingAs($user);
-    $this->postJson('/api/cliente/direcciones', ['direccion' => 'Calle 1', 'barrio' => 'Centro'])
+    $this->postJson('/api/cliente/direcciones', ['direccion' => 'Calle 1 #10-20', 'barrio' => 'Centro'])
         ->assertCreated()->assertJsonPath('direccion.nombre', null);
-    $this->postJson('/api/cliente/direcciones', ['direccion' => 'Calle 2', 'barrio' => 'Centro', 'nombre' => str_repeat('a', 81)])
+    $this->postJson('/api/cliente/direcciones', ['direccion' => 'Calle 2 #10-20', 'barrio' => 'Centro', 'nombre' => str_repeat('a', 81)])
         ->assertUnprocessable()->assertJsonValidationErrors('nombre');
 });

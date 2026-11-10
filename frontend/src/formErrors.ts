@@ -49,7 +49,7 @@ export function friendlyFieldMessage(field: string, message: string) {
     return 'Escribe un correo valido, por ejemplo nombre@correo.com.';
   }
   if (key === 'password' && (text.includes('min') || text.includes('8'))) {
-    return 'La contrasena debe tener al menos 8 caracteres.';
+    return 'La contrasena debe tener al menos 5 caracteres.';
   }
   if (key === 'password' && text.includes('confirm')) {
     return 'La contrasena y su confirmacion deben ser iguales.';
