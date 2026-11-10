@@ -20,6 +20,7 @@ import {
   getEquipo,
   MiembroNegocio,
   reasignarCita,
+  registrarLlegadaCita,
 } from '../api';
 import { useAuth } from '../AuthContext';
 import { estadosCita, fechaCita } from '../citas';
@@ -137,6 +138,20 @@ export default function CitasScreen({ route, navigation }: Props) {
     try { setEquipo((await getEquipo(token, negocioId)).miembros.filter(m => m.id !== cita.profesional_id && m.activo)); }
     catch (e) { setErrorReasignar(messageFromError(e)); }
   }
+  async function registrarLlegada(cita: Cita) {
+    if (!negocioId || ocupado) return;
+    setOcupado(true);
+    try {
+      await registrarLlegadaCita(token, negocioId, cita.id);
+      toast.exito('Llegada registrada');
+      await cargar();
+    } catch (e) {
+      toast.error('No se pudo registrar la llegada', messageFromError(e));
+      await cargar();
+    } finally {
+      setOcupado(false);
+    }
+  }
   async function reasignar(profesionalId: number) {
     if (!negocioId || !porReasignar || ocupado) return;
     setOcupado(true);
@@ -193,8 +208,8 @@ export default function CitasScreen({ route, navigation }: Props) {
         <Text style={styles.titulo}>{gestion ? nombre : 'Mis citas'}</Text>
         <Text style={styles.detalle}>
           {gestion
-            ? 'Solicitudes de la app y citas presenciales en una sola agenda. Las solicitudes sin respuesta vencen en un máximo de una hora.'
-            : 'Una solicitud pendiente todavía necesita la confirmación del negocio. Aquí verás su respuesta.'}
+            ? 'Las solicitudes sin respuesta vencen en un máximo de una hora. Registra la llegada del cliente: después de 15 minutos de retraso, la cita se cancela automáticamente como No asistió.'
+            : 'Una solicitud pendiente necesita confirmación del negocio. Si pasan más de 15 minutos sin registrar tu llegada, la cita se cancelará y tendrás que solicitar una nueva.'}
         </Text>
         {gestion && !!negocioId && (
           <TouchableOpacity
@@ -270,6 +285,7 @@ export default function CitasScreen({ route, navigation }: Props) {
             )}
             {!!cita.notas && <Text style={styles.texto}>{cita.notas}</Text>}
             {!!cita.motivo && <Text style={styles.detalle}>{cita.motivo}</Text>}
+            {!!cita.llegada_at && <Text style={styles.detalle}>Llegada registrada</Text>}
             <View style={styles.acciones}>
               {gestion && propietario && ['pendiente', 'confirmada'].includes(cita.estado) && (
                 <TouchableOpacity disabled={ocupado} style={styles.secundario} onPress={() => elegirProfesional(cita)}>
@@ -300,8 +316,19 @@ export default function CitasScreen({ route, navigation }: Props) {
               )}
               {gestion && cita.estado === 'confirmada' && (
                 <>
+                  {!cita.llegada_at && (
+                    <TouchableOpacity disabled={ocupado} style={styles.boton} onPress={() => confirmar({
+                      icono: 'calendario',
+                      titulo: '¿El cliente ya llegó?',
+                      texto: 'Registra la llegada solo cuando el cliente esté presente para evitar la cancelación automática.',
+                      textoBoton: 'Registrar llegada',
+                      accion: () => registrarLlegada(cita),
+                    })}>
+                      <Text style={styles.botonTexto}>Registrar llegada</Text>
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity
-                    disabled={ocupado}
+                    disabled={ocupado || !cita.llegada_at}
                     style={styles.secundario}
                     onPress={() => confirmarAccion(cita, 'completada')}
                   >
@@ -330,6 +357,13 @@ export default function CitasScreen({ route, navigation }: Props) {
                     <Text style={styles.error}>Cancelar cita</Text>
                   </TouchableOpacity>
                 )}
+              {!gestion && cita.estado === 'no_asistio' && (
+                <TouchableOpacity style={styles.boton} onPress={() => navigation.navigate('Negocio', {
+                  id: cita.negocio_id, nombre: cita.negocio_nombre, seccion: 'servicios',
+                })}>
+                  <Text style={styles.botonTexto}>Solicitar nueva cita</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         ))}

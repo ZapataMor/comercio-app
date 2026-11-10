@@ -11,7 +11,7 @@ class Cita extends Model
 
     protected function casts(): array
     {
-        return ['inicio' => 'datetime', 'fin' => 'datetime', 'confirmar_antes_de' => 'datetime'];
+        return ['inicio' => 'datetime', 'fin' => 'datetime', 'confirmar_antes_de' => 'datetime', 'llegada_at' => 'datetime'];
     }
 
     public function negocio(): BelongsTo

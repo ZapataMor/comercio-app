@@ -32,4 +32,5 @@ export const estadosCita = {
   cancelada: 'Cancelada',
   vencida: 'Vencida sin confirmación',
   completada: 'Atendida',
+  no_asistio: 'No asistió',
 };

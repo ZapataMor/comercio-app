@@ -1792,9 +1792,10 @@ export async function eliminarServicio(token: string, negocioId: number, id: num
 export type Cita = {
   id: number; negocio_id: number; negocio_nombre: string; servicio_nombre: string;
   profesional_id: number | null; profesional_nombre: string; cliente_nombre: string; cliente_telefono: string | null;
-  estado: 'pendiente' | 'confirmada' | 'rechazada' | 'cancelada' | 'vencida' | 'completada';
+  estado: 'pendiente' | 'confirmada' | 'rechazada' | 'cancelada' | 'vencida' | 'completada' | 'no_asistio';
   origen: 'app' | 'presencial'; fecha: string; hora: string; hora_fin: string; fecha_fin: string;
   confirmar_antes_de: string | null; notas: string | null; motivo: string | null;
+  llegada_at: string | null;
 };
 export type DisponibilidadCitas = { fecha: string; profesional_id: number; profesionales: { id: number; nombre: string }[]; horas: string[]; duracion_minutos: number; mensaje: string | null };
 export type NuevaCita = { servicio_id: number; profesional_id: number; fecha: string; hora: string; notas?: string; cliente_nombre?: string; cliente_telefono?: string };
@@ -1813,4 +1814,7 @@ export async function actualizarCita(token: string, negocioId: number, id: numbe
 }
 export async function cancelarCita(token: string, id: number): Promise<Cita> {
   return (await authSend('POST', `/api/citas/${id}/cancelar`, token)).cita;
+}
+export async function registrarLlegadaCita(token: string, negocioId: number, id: number): Promise<Cita> {
+  return (await authSend('POST', `/api/negocios/${negocioId}/citas/${id}/llegada`, token)).cita;
 }

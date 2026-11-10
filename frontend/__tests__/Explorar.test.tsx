@@ -123,7 +123,7 @@ test('saluda por el primer nombre y separa abiertos de cerrados', async () => {
   const { textos } = await montar();
 
   expect(textos()).toEqual(
-    expect.arrayContaining(['Hola, Ana', 'Abiertos ahora', 'Cerrados por ahora', 'Cerrado']),
+    expect.arrayContaining(['Hola, Ana', 'Abiertos ahora', 'Cerrados por ahora']),
   );
 });
 
@@ -135,7 +135,7 @@ test('un negocio que cierra pasa a cerrados sin salir de la pantalla', async () 
   mockNegocios.mockResolvedValue(pagina([negocio(1, 'El Rincón'), negocio(2, 'La Fonda', false)]));
   await refrescar();
 
-  expect(textos()).toEqual(expect.arrayContaining(['Abiertos ahora', 'Cerrados por ahora', 'Cerrado']));
+  expect(textos()).toEqual(expect.arrayContaining(['Abiertos ahora', 'Cerrados por ahora']));
 });
 
 test('el refresco conserva las páginas ya cargadas', async () => {
@@ -197,10 +197,10 @@ test('un toque abre el catálogo, también si el negocio está cerrado', async (
   expect(navigation.navigate).toHaveBeenLastCalledWith('Negocio', { id: 2, nombre: 'La Fonda', seccion: 'productos' });
 });
 
-test('el descanso muestra Almorzando y no agrupa el negocio entre los cerrados', async () => {
+test('el descanso agrupa el negocio aparte y mantiene su tarjeta sin etiquetas', async () => {
   mockNegocios.mockResolvedValue(pagina([{ ...negocio(1, 'Salón', false), estado_texto: 'Almorzando' }]));
   const { textos, tocar, navigation } = await montar();
-  expect(textos()).toContain('Almorzando');
+  expect(textos()).not.toContain('Almorzando');
   expect(textos()).toContain('En descanso de almuerzo');
   expect(textos()).not.toContain('Cerrados por ahora');
   await tocar('Salón, almorzando');

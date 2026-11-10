@@ -71,3 +71,8 @@ Artisan::command('citas:vencer', function () {
     $this->info('Solicitudes de cita vencidas: '.AgendaCitas::vencer());
 })->purpose('Libera las solicitudes de cita sin respuesta en una hora');
 Schedule::command('citas:vencer')->everyMinute()->withoutOverlapping();
+
+Artisan::command('citas:cancelar-inasistencias', function () {
+    $this->info('Citas canceladas por inasistencia: '.AgendaCitas::cancelarInasistencias());
+})->purpose('Cancela y notifica las citas sin llegada después de 15 minutos');
+Schedule::command('citas:cancelar-inasistencias')->everyMinute()->withoutOverlapping();

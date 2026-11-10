@@ -7,6 +7,7 @@ import {
   getCitas,
   getDisponibilidadCitas,
   solicitarCita,
+  registrarLlegadaCita,
 } from '../src/api';
 import { errorHorario } from '../src/components/EditorHorario';
 import AgendarCitaScreen from '../src/screens/AgendarCitaScreen';
@@ -22,6 +23,7 @@ jest.mock('../src/api', () => ({
   getCitas: jest.fn(),
   actualizarCita: jest.fn(),
   cancelarCita: jest.fn(),
+  registrarLlegadaCita: jest.fn(),
 }));
 jest.mock('../src/NegocioContext', () => ({
   useNegocio: () => ({
@@ -247,9 +249,9 @@ const cita = {
   hora: '14:00',
   hora_fin: '15:00',
 };
-async function montarAgenda(gestion: boolean) {
+async function montarAgenda(gestion: boolean, cambios = {}) {
   (getCitas as jest.Mock).mockResolvedValue({
-    citas: [cita],
+    citas: [{ ...cita, ...cambios }],
     pagina: 1,
     ultima_pagina: 1,
   });
@@ -315,4 +317,21 @@ test('el cliente consulta y cancela su cita sin usar las acciones del negocio', 
   });
   expect(cancelarCita).toHaveBeenCalledWith('token', 12);
   expect(actualizarCita).not.toHaveBeenCalled();
+});
+
+test('el negocio registra la llegada de una cita confirmada', async () => {
+  await montarAgenda(true, { estado: 'confirmada', llegada_at: null });
+  await tocarTexto('Registrar llegada');
+  await act(async () => { await mockConfirmar.mock.calls[0][0].accion(); });
+  expect(registrarLlegadaCita).toHaveBeenCalledWith('token', 1, 12);
+});
+
+test('muestra No asistió y permite al cliente volver a los servicios para renovar', async () => {
+  await montarAgenda(false, { estado: 'no_asistio', motivo: 'Cita cancelada automáticamente.' });
+  expect(textos()).toContain('No asistió');
+  expect(textos()).toContain('Solicitar nueva cita');
+  expect(textos()).not.toContain('Cancelar cita');
+  await tocarTexto('Solicitar nueva cita');
+  const pantalla = raiz.root.findByType(CitasScreen);
+  expect(pantalla.props.navigation.navigate).toHaveBeenCalledWith('Negocio', { id: 1, nombre: 'Salón', seccion: 'servicios' });
 });

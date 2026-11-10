@@ -114,6 +114,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/citas', [CitaController::class, 'presencial']);
         Route::put('/citas/{id}', [CitaController::class, 'actualizar'])->whereNumber('id');
         Route::put('/citas/{id}/reasignar', [CitaController::class, 'reasignar']);
+        Route::post('/citas/{id}/llegada', [CitaController::class, 'llegada'])->whereNumber('id');
         // Datos del negocio: solo el propietario los edita.
         Route::put('/', [NegocioController::class, 'update']);
         Route::delete('/', [NegocioController::class, 'destroy']);

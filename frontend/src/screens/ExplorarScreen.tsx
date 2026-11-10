@@ -25,7 +25,6 @@ import {
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale, Skeleton } from '../components/anim';
 import Icon, { IconName } from '../components/Icon';
-import { NivelBadge } from '../components/Reputacion';
 import { PuntajeResenas } from '../components/Resenas';
 import { RootStackParamList } from '../navTypes';
 import { precioDe } from '../opcionesProducto';
@@ -367,7 +366,7 @@ export default function ExplorarScreen({ navigation, route }: Props) {
           case 'titulo':
             return <Text style={styles.seccion}>{item.texto}</Text>;
           case 'negocio':
-            return <CardNegocio item={item.negocio} index={index} onAbrir={abrirNegocio} seccion={seccion} />;
+            return <CardNegocio item={item.negocio} index={index} onAbrir={abrirNegocio} />;
           case 'negocioHallado':
             return (
               <FilaResultado
@@ -430,19 +429,14 @@ const CardNegocio = React.memo(function CardNegocio({
   item,
   index,
   onAbrir,
-  seccion,
 }: {
   item: NegocioLista;
   index: number;
   onAbrir: (n: NegocioLista) => void;
-  seccion: 'productos' | 'servicios';
 }) {
   const { c } = useTheme();
   const styles = useStyles();
   const img = imagenUrl(item.imagen);
-  const meta = metaNegocio(item, seccion === 'productos');
-  // "Nuevo" no distingue a nadie en la lista: solo se muestra el nivel ganado.
-  const conNivel = !!item.reputacion && item.reputacion.nivel !== 'nuevo';
 
   return (
     <FadeInView delay={Math.min(index, 6) * 45} style={styles.negocio}>
@@ -457,24 +451,12 @@ const CardNegocio = React.memo(function CardNegocio({
           ) : (
             <Icon name="tienda" size={38} color={c.mutedSoft} />
           )}
-          {!item.abierto && (
-            <>
-              <View style={styles.portadaVelo} />
-              <Text style={styles.sello}>{item.estado_texto ?? 'Cerrado'}</Text>
-            </>
-          )}
         </View>
 
         <View style={styles.negocioCabecera}>
           <Text style={styles.negocioNombre} numberOfLines={1}>{item.nombre}</Text>
-          {conNivel && <NivelBadge reputacion={item.reputacion} sinPuntaje />}
         </View>
         <PuntajeResenas resenas={item.resenas} style={styles.puntaje} />
-        {!!meta && <Text style={styles.meta} numberOfLines={1}>{meta}</Text>}
-        {/* Cerrado, lo que importa es cuándo vuelve a abrir. */}
-        {!item.abierto && !!item.horario_hoy && (
-          <Text style={styles.meta} numberOfLines={1}>{item.horario_hoy}</Text>
-        )}
       </PressableScale>
     </FadeInView>
   );

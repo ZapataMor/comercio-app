@@ -89,6 +89,7 @@ class CitaController extends Controller
     public function index(Request $request): JsonResponse
     {
         AgendaCitas::vencer(clienteId: $request->user()->id);
+        AgendaCitas::cancelarInasistencias(clienteId: $request->user()->id);
 
         return $this->lista(Cita::where('cliente_id', $request->user()->id));
     }
@@ -98,6 +99,7 @@ class CitaController extends Controller
         abort_unless($negocio->esMiembroActivo($request->user()), 403);
         $d = $request->validate(['fecha' => ['nullable', 'date_format:Y-m-d']]);
         AgendaCitas::vencer(negocioId: $negocio->id);
+        AgendaCitas::cancelarInasistencias(negocioId: $negocio->id);
 
         return $this->lista(Cita::where('negocio_id', $negocio->id)->when($d['fecha'] ?? null, fn ($q, $fecha) => $q->whereDate('inicio', $fecha)));
     }
@@ -116,6 +118,7 @@ class CitaController extends Controller
         abort_unless($negocio->esMiembroActivo($request->user()), 403);
         $d = $request->validate(['estado' => ['required', Rule::in(['confirmada', 'rechazada', 'cancelada', 'completada'])], 'motivo' => ['required_if:estado,rechazada,cancelada', 'nullable', 'string', 'max:500']]);
         AgendaCitas::vencer(negocioId: $negocio->id);
+        AgendaCitas::cancelarInasistencias(negocioId: $negocio->id);
         $cita = DB::transaction(function () use ($negocio, $request, $id, $d) {
             $negocio = Negocio::lockForUpdate()->findOrFail($negocio->id);
             abort_unless($negocio->esMiembroActivo($request->user()), 403);
@@ -132,8 +135,10 @@ class CitaController extends Controller
                 abort_if(AgendaCitas::ocupadas($cita->profesional_id)->whereKeyNot($cita->id)->where('inicio', '<', $cita->fin)->where('fin', '>', $cita->inicio)->lockForUpdate()->first(['id']) !== null, 409, 'El profesional ya tiene otra cita en ese horario.');
             }
             if ($d['estado'] === 'completada') {
+                abort_unless($cita->llegada_at, 422, 'Registra primero la llegada del cliente.');
                 abort_unless($cita->fin->lte(now()), 422, 'Todavía no termina la cita.');
             }
+            abort_if($cita->estado === 'confirmada' && ! $cita->llegada_at && $cita->inicio->lt(now()->subMinutes(AgendaCitas::MINUTOS_TOLERANCIA)), 409, 'La cita se canceló por inasistencia. Actualiza la agenda.');
             $cita->update(['estado' => $d['estado'], 'motivo' => $d['motivo'] ?? null]);
 
             return $cita;
@@ -156,6 +161,26 @@ class CitaController extends Controller
             return $cita;
         });
         AgendaCitas::avisar($cita, true);
+
+        return response()->json(['cita' => AgendaCitas::datos($cita)]);
+    }
+
+    public function llegada(Request $request, Negocio $negocio, int $id): JsonResponse
+    {
+        abort_unless($negocio->esMiembroActivo($request->user()), 403);
+        AgendaCitas::cancelarInasistencias(negocioId: $negocio->id);
+        $cita = DB::transaction(function () use ($request, $negocio, $id) {
+            $negocio = Negocio::lockForUpdate()->findOrFail($negocio->id);
+            abort_unless($negocio->esMiembroActivo($request->user()), 403);
+            $cita = Cita::where('negocio_id', $negocio->id)->lockForUpdate()->findOrFail($id);
+            abort_unless($cita->estado === 'confirmada', 409, 'Esta cita ya no permite registrar la llegada.');
+            if (! $cita->llegada_at) {
+                abort_unless(now()->gte($cita->inicio->copy()->startOfDay()) && $cita->inicio->gte(now()->subMinutes(AgendaCitas::MINUTOS_TOLERANCIA)), 422, 'Registra la llegada el día de la cita, dentro del tiempo de tolerancia.');
+                $cita->update(['llegada_at' => now()]);
+            }
+
+            return $cita;
+        });
 
         return response()->json(['cita' => AgendaCitas::datos($cita)]);
     }

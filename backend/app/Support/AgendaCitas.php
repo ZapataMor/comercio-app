@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 class AgendaCitas
 {
     public const MINUTOS_CONFIRMACION = 60;
+    public const MINUTOS_TOLERANCIA = 15;
 
     public static function ocupadas(int $profesional): Builder
     {
@@ -91,6 +92,30 @@ class AgendaCitas
         });
     }
 
+    public static function cancelarInasistencias(?int $negocioId = null, ?int $clienteId = null): int
+    {
+        $limite = now()->subMinutes(self::MINUTOS_TOLERANCIA);
+        $total = 0;
+        Cita::where('estado', 'confirmada')->whereNull('llegada_at')->where('inicio', '<', $limite)
+            ->when($negocioId, fn ($q) => $q->where('negocio_id', $negocioId))
+            ->when($clienteId, fn ($q) => $q->where('cliente_id', $clienteId))
+            ->chunkById(100, function ($citas) use (&$total, $limite) {
+                foreach ($citas as $cita) {
+                    $motivo = 'Cita cancelada automáticamente por no registrar la llegada dentro de los 15 minutos de tolerancia. Solicita una nueva cita para renovar tu reserva.';
+                    // Compite de forma atómica con el registro de llegada y otros cambios de estado.
+                    if (Cita::whereKey($cita->id)->where('estado', 'confirmada')->whereNull('llegada_at')
+                        ->where('inicio', '<', $limite)->update(['estado' => 'no_asistio', 'motivo' => $motivo, 'updated_at' => now()])) {
+                        $cita->estado = 'no_asistio';
+                        $cita->motivo = $motivo;
+                        self::avisar($cita);
+                        $total++;
+                    }
+                }
+            });
+
+        return $total;
+    }
+
     /**
      * Cancela las citas futuras (pendientes o confirmadas) de `$citas` y avisa
      * a la otra parte. Para cuando la cita ya no se puede cumplir: el profesional
@@ -139,6 +164,7 @@ class AgendaCitas
             'fecha' => $cita->inicio->format('Y-m-d'), 'hora' => $cita->inicio->format('H:i'),
             'hora_fin' => $cita->fin->format('H:i'), 'fecha_fin' => $cita->fin->format('Y-m-d'),
             'confirmar_antes_de' => $cita->confirmar_antes_de?->toIso8601String(),
+            'llegada_at' => $cita->llegada_at?->toIso8601String(),
             'notas' => $cita->notas, 'motivo' => $cita->motivo,
         ];
     }

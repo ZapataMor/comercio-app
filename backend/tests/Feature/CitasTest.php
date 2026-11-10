@@ -126,8 +126,64 @@ it('revalida cambios de horario al confirmar y no marca atendida una cita futura
     $this->negocio->update(['horario' => $h]);
     $this->putJson($this->ruta.'/citas/'.$id, ['estado' => 'confirmada'])->assertOk();
     $this->putJson($this->ruta.'/citas/'.$id, ['estado' => 'completada'])->assertUnprocessable();
+    Carbon::setTestNow('2026-11-09 14:00:00');
+    $this->postJson($this->ruta.'/citas/'.$id.'/llegada')->assertOk();
     Carbon::setTestNow('2026-11-09 15:00:00');
     $this->putJson($this->ruta.'/citas/'.$id, ['estado' => 'completada'])->assertOk();
+});
+
+it('cancela por inasistencia solo después de 15 minutos y avisa una única vez al cliente', function () {
+    $id = $this->postJson($this->ruta.'/solicitudes-cita', $this->datos)->assertCreated()->json('cita.id');
+    Sanctum::actingAs($this->dueno);
+    $this->putJson($this->ruta.'/citas/'.$id, ['estado' => 'confirmada'])->assertOk();
+    Notification::fake();
+    Carbon::setTestNow('2026-11-09 14:15:00');
+    $this->artisan('citas:cancelar-inasistencias')->assertSuccessful();
+    expect(Cita::find($id)->estado)->toBe('confirmada');
+    Notification::assertNothingSent();
+
+    Carbon::setTestNow('2026-11-09 14:15:01');
+    $this->artisan('citas:cancelar-inasistencias')->assertSuccessful();
+    $this->artisan('citas:cancelar-inasistencias')->assertSuccessful();
+    expect(Cita::find($id)->estado)->toBe('no_asistio')
+        ->and(\App\Support\AgendaCitas::ocupadas($this->dueno->id)->exists())->toBeFalse();
+    Notification::assertSentToTimes($this->cliente, CitaActualizada::class, 1);
+    Notification::assertSentTo($this->cliente, CitaActualizada::class, function ($aviso) {
+        $mensaje = $aviso->toFcm($this->cliente)->toArray();
+        expect($mensaje['notification']['title'])->toBe('Cita cancelada: no asistió')
+            ->and($mensaje['notification']['body'])->toContain('Solicita una nueva cita')
+            ->and($mensaje['data']['tipo'])->toBe('cita_cliente');
+        return true;
+    });
+    $this->postJson($this->ruta.'/citas/'.$id.'/llegada')->assertConflict();
+    $this->putJson($this->ruta.'/citas/'.$id, ['estado' => 'completada'])->assertConflict();
+});
+
+it('conserva una llegada registrada en el límite y permite completar la atención', function () {
+    Sanctum::actingAs($this->dueno);
+    $id = $this->postJson($this->ruta.'/citas', [...$this->datos, 'cliente_nombre' => 'Presencial'])->assertCreated()->json('cita.id');
+    Carbon::setTestNow('2026-11-09 14:15:00');
+    $llegada = $this->postJson($this->ruta.'/citas/'.$id.'/llegada')->assertOk()->json('cita.llegada_at');
+    expect($llegada)->not->toBeNull();
+    Carbon::setTestNow('2026-11-09 14:15:01');
+    $this->artisan('citas:cancelar-inasistencias')->assertSuccessful();
+    $this->postJson($this->ruta.'/citas/'.$id.'/llegada')->assertOk()->assertJsonPath('cita.llegada_at', $llegada);
+    expect(Cita::find($id)->estado)->toBe('confirmada');
+    Carbon::setTestNow('2026-11-09 15:00:00');
+    $this->putJson($this->ruta.'/citas/'.$id, ['estado' => 'completada'])->assertOk();
+});
+
+it('solo el equipo puede registrar llegadas de su negocio y solo para citas confirmadas', function () {
+    $id = $this->postJson($this->ruta.'/solicitudes-cita', $this->datos)->assertCreated()->json('cita.id');
+    $this->postJson($this->ruta.'/citas/'.$id.'/llegada')->assertForbidden();
+    Sanctum::actingAs($this->dueno);
+    $this->postJson($this->ruta.'/citas/'.$id.'/llegada')->assertConflict();
+    $otro = $this->dueno->negocio()->create(['nombre' => 'Otro negocio']);
+    $this->postJson('/api/negocios/'.$otro->id.'/citas/'.$id.'/llegada')->assertNotFound();
+    $this->putJson($this->ruta.'/citas/'.$id, ['estado' => 'confirmada'])->assertOk();
+    Carbon::setTestNow('2026-11-09 14:16:00');
+    Sanctum::actingAs($this->cliente);
+    $this->getJson('/api/citas')->assertOk()->assertJsonPath('citas.0.estado', 'no_asistio');
 });
 
 it('publica fotos, precio y duración del servicio y rechaza galerías ajenas', function () {
