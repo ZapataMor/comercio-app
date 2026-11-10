@@ -5,6 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getEstadoNegocio, imagenUrl } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
+import CantidadPeso from '../components/CantidadPeso';
+import { esPorPeso } from '../cantidades';
 import ChipsEleccion from '../components/ChipsEleccion';
 import { useFlyToCart } from '../components/FlyToCart';
 import Icon from '../components/Icon';
@@ -145,6 +147,7 @@ export default function ProductoScreen({ navigation, route }: Props) {
         {abierto ? (
           <>
             <View style={styles.cantidad}>
+              {esPorPeso(producto) ? <CantidadPeso cantidad={cantidad} unidad={producto.unidad_medida ?? 'kg'} onChange={setCantidad} /> : <>
               <PressableScale
                 style={[styles.cantidadBtn, cantidad === 1 && styles.cantidadBtnOff]}
                 disabled={cantidad === 1}
@@ -158,9 +161,11 @@ export default function ProductoScreen({ navigation, route }: Props) {
                 style={styles.cantidadBtn}
                 hitSlop={6}
                 accessibilityLabel="Agregar una unidad"
-                onPress={() => setCantidad(n => n + 1)}>
+                disabled={cantidad >= 99}
+                onPress={() => setCantidad(n => Math.min(99, n + 1))}>
                 <Icon name="mas" size={16} color={c.textStrong} strokeWidth={2.2} />
               </PressableScale>
+              </>}
             </View>
             <PressableScale style={styles.boton} onPress={onAgregar}>
               <Text style={styles.botonTxt}>Agregar · {cop(producto.precio * cantidad)}</Text>

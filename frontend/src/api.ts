@@ -556,6 +556,7 @@ export async function eliminarCuenta(token: string, password: string): Promise<v
 
 export type ClienteDireccion = {
   id: number;
+  nombre?: string | null;
   direccion: string;
   barrio: string;
   es_principal: boolean;
@@ -568,9 +569,16 @@ export async function getClienteDirecciones(token: string): Promise<ClienteDirec
 
 export async function crearClienteDireccion(
   token: string,
-  body: { direccion: string; barrio: string },
+  body: { direccion: string; barrio: string; nombre?: string | null },
 ): Promise<ClienteDireccion> {
   const d = await authSend('POST', '/api/cliente/direcciones', token, body);
+  return d.direccion as ClienteDireccion;
+}
+
+export async function editarClienteDireccion(
+  token: string, id: number, body: { direccion: string; barrio: string; nombre?: string | null },
+): Promise<ClienteDireccion> {
+  const d = await authSend('PUT', `/api/cliente/direcciones/${id}`, token, body);
   return d.direccion as ClienteDireccion;
 }
 
@@ -1368,6 +1376,7 @@ export async function eliminarDeviceToken(token: string, fcmToken: string): Prom
 export type PedidoItem = {
   nombre: string;
   cantidad: number;
+  unidad_medida?: string;
   /** Lo que eligió el cliente: "Talla M · Negro", "Sin lechuga · Extra queso". */
   detalle?: string | null;
 };

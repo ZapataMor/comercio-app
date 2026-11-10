@@ -346,11 +346,13 @@ export default function NegocioScreen({ navigation, route }: Props) {
     <Modal visible={!!servicioSeleccionado} transparent animationType="slide" onRequestClose={() => setServicioSeleccionado(null)}>
       <View style={styles.fondoDetalle}>
         <ScrollView style={styles.detalleServicio} contentContainerStyle={styles.detalleContenido}>
-          <PressableScale accessibilityLabel="Cerrar detalle del servicio" onPress={() => setServicioSeleccionado(null)}>
-            <Text style={styles.precio}>Cerrar</Text>
-          </PressableScale>
           {servicioSeleccionado && <>
-            <Text style={styles.titulo}>{servicioSeleccionado.nombre}</Text>
+            <View style={styles.cabeceraDetalle}>
+              <Text style={[styles.titulo, styles.tituloDetalle]}>{servicioSeleccionado.nombre}</Text>
+              <PressableScale style={styles.cerrarDetalle} accessibilityRole="button" accessibilityLabel="Cerrar detalle del servicio" onPress={() => setServicioSeleccionado(null)}>
+                <Icon name="cerrar" size={24} color={c.textStrong} />
+              </PressableScale>
+            </View>
             {!!servicioSeleccionado.galeria?.length && <ScrollView horizontal contentContainerStyle={styles.galeriaServicio}>
               {servicioSeleccionado.galeria.map((uri, i) => <Image key={`${uri}-${i}`} accessibilityLabel={`${servicioSeleccionado.nombre}, trabajo ${i + 1}`} source={{ uri: imagenUrl(uri)! }} style={styles.fotoTrabajo} resizeMode="cover" />)}
             </ScrollView>}
@@ -380,6 +382,9 @@ const useStyles = makeStyles((c, shadow) => ({
   fondoDetalle: { flex: 1, justifyContent: 'center', backgroundColor: '#0008', padding: 20 },
   detalleServicio: { flexGrow: 0, maxHeight: '90%', borderRadius: radius.lg, backgroundColor: c.bg },
   detalleContenido: { padding: 20, gap: 12 },
+  cabeceraDetalle: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  tituloDetalle: { flex: 1 },
+  cerrarDetalle: { flexShrink: 0, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   galeriaServicio: { gap: 10 },
   fotoTrabajo: { width: 220, height: 220, borderRadius: radius.md },
   portada: {

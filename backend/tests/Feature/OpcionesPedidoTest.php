@@ -48,6 +48,71 @@ function pedir(Negocio $negocio, array ...$items)
     ]);
 }
 
+test('los productos por peso conservan decimales, unidad y precio proporcional', function ($unidad, $cantidad) {
+    $producto = $this->negocio->productos()->create([
+        'nombre' => 'Arroz', 'precio' => 10000, 'tipo_venta' => 'peso', 'unidad_medida' => $unidad,
+    ]);
+    $id = pedir($this->negocio, ['producto_id' => $producto->id, 'cantidad' => $cantidad])->assertCreated()->json('id');
+    $item = $this->negocio->pedidos()->findOrFail($id)->items()->first();
+    expect($item->cantidad)->toBe((float) $cantidad)
+        ->and($item->unidad_medida)->toBe($unidad)
+        ->and($item->subtotal())->toBe(round(10000 * $cantidad, 2));
+    $this->getJson("/api/pedidos/{$id}")->assertOk()
+        ->assertJsonPath('items.0.cantidad', $cantidad)
+        ->assertJsonPath('items.0.unidad_medida', $unidad);
+})->with([['kg', 0.5], ['kg', 0.001], ['kg', 1.275], ['libra', 0.25]]);
+
+test('no se aceptan fracciones en productos por unidad', function () {
+    pedir($this->negocio, ['producto_id' => $this->hamburguesa->id, 'cantidad' => 0.5])
+        ->assertUnprocessable()->assertJsonValidationErrors('items');
+});
+
+test('el domiciliario recibe la direccion real y el peso pero no el nombre privado', function () {
+    Role::findOrCreate('domiciliario', 'web');
+    $producto = $this->negocio->productos()->create([
+        'nombre' => 'Arroz', 'precio' => 10000, 'tipo_venta' => 'peso', 'unidad_medida' => 'kg',
+    ]);
+    $id = pedir($this->negocio, ['producto_id' => $producto->id, 'cantidad' => 0.5])->assertCreated()->json('id');
+    $pedido = $this->negocio->pedidos()->findOrFail($id);
+    $direccion = $pedido->cliente->clienteDirecciones()->create([
+        'direccion' => 'Calle 1', 'barrio' => 'Centro', 'nombre' => 'Mi casa privada',
+    ]);
+    $this->putJson("/api/cliente/direcciones/{$direccion->id}", [
+        'direccion' => 'Calle 20', 'barrio' => 'Centro', 'nombre' => 'Trabajo privado',
+    ])->assertOk();
+    $domiciliario = User::factory()->create();
+    $domiciliario->assignRole('domiciliario');
+    $pedido->update(['estado' => 'tomado', 'domiciliario_id' => $domiciliario->id, 'tomado_at' => now()]);
+    Sanctum::actingAs($domiciliario);
+    $resp = $this->getJson('/api/domiciliario/entregas')->assertOk()
+        ->assertJsonPath('pedidos.0.direccion_entrega', 'Calle 1')
+        ->assertJsonPath('pedidos.0.items.0.cantidad', 0.5)
+        ->assertJsonPath('pedidos.0.items.0.unidad_medida', 'kg');
+    expect($resp->getContent())->not->toContain('Mi casa privada')->not->toContain('Trabajo privado');
+});
+
+test('el ajuste por faltantes conserva cantidades decimales y recalcula el total', function () {
+    $producto = $this->negocio->productos()->create([
+        'nombre' => 'Arroz', 'precio' => 10000, 'tipo_venta' => 'peso', 'unidad_medida' => 'kg',
+    ]);
+    $id = pedir($this->negocio, ['producto_id' => $producto->id, 'cantidad' => 1])->assertCreated()->json('id');
+    $pedido = $this->negocio->pedidos()->findOrFail($id);
+    $pedido->update(['estado' => 'aceptado', 'faltante_motivo' => 'Queda menos arroz', 'faltante_version' => 'peso-1']);
+    $this->putJson("/api/pedidos/{$id}/ajuste", [
+        'items' => [['producto_id' => $producto->id, 'cantidad' => 0.375]],
+        'total_esperado' => 3750 + (float) $pedido->costo_domicilio, 'faltante_version' => 'peso-1',
+    ])->assertOk();
+    expect($pedido->fresh()->items->first()->cantidad)->toBe(0.375)
+        ->and((float) $pedido->fresh()->subtotal)->toBe(3750.0);
+});
+
+test('el peso rechaza cantidades fuera del rango o con precisión excesiva', function ($cantidad) {
+    $producto = $this->negocio->productos()->create([
+        'nombre' => 'Arroz', 'precio' => 10000, 'tipo_venta' => 'peso', 'unidad_medida' => 'kg',
+    ]);
+    pedir($this->negocio, ['producto_id' => $producto->id, 'cantidad' => $cantidad])->assertUnprocessable();
+})->with([0, -0.5, 0.0001, 0.1234, 100]);
+
 test('la comida se pide sin ingredientes o con más de los que trae', function () {
     pedir($this->negocio, [
         'producto_id' => $this->hamburguesa->id,

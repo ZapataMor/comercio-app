@@ -38,6 +38,7 @@ export type RootStackParamList = {
   Resenas: { negocioId: number; titulo: string; productoId?: number };
   Carrito: undefined;
   Checkout: undefined;
+  MisDirecciones: undefined;
   MisPedidos: undefined;
   PedidoDetalle: { id: number };
   // Admin

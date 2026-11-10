@@ -107,3 +107,43 @@ test('el cliente puede agregar otra ubicacion', function () {
     expect($resp->json('direcciones'))->toHaveCount(2);
     expect($resp->json('direcciones.0.es_principal'))->toBeTrue();
 });
+
+test('el cliente edita su direccion y su nombre opcional y sincroniza el perfil', function () {
+    $user = User::factory()->create();
+    $user->assignRole('usuario');
+    $direccion = $user->clienteDirecciones()->create([
+        'direccion' => 'Calle anterior', 'barrio' => 'Centro', 'es_principal' => true,
+    ]);
+    Sanctum::actingAs($user);
+    $this->putJson("/api/cliente/direcciones/{$direccion->id}", [
+        'direccion' => 'Calle 20 carrera 2 este', 'barrio' => 'Centro', 'nombre' => 'Mi casa',
+    ])->assertOk()->assertJsonPath('direccion.nombre', 'Mi casa');
+    $this->getJson('/api/cliente/direcciones')->assertOk()->assertJsonPath('direcciones.0.nombre', 'Mi casa');
+    expect($user->fresh()->direccion)->toBe('Calle 20 carrera 2 este');
+    $this->putJson("/api/cliente/direcciones/{$direccion->id}", [
+        'direccion' => 'Calle 20 carrera 2 este', 'barrio' => 'Centro', 'nombre' => null,
+    ])->assertOk()->assertJsonPath('direccion.nombre', null);
+});
+
+test('no se puede consultar ni editar la direccion de otro cliente', function () {
+    $otro = User::factory()->create();
+    $direccion = $otro->clienteDirecciones()->create(['direccion' => 'Privada', 'barrio' => 'Centro', 'nombre' => 'Mi casa']);
+    $user = User::factory()->create();
+    $user->assignRole('usuario');
+    Sanctum::actingAs($user);
+    $this->getJson('/api/cliente/direcciones')->assertOk()->assertJsonCount(0, 'direcciones');
+    $this->putJson("/api/cliente/direcciones/{$direccion->id}", [
+        'direccion' => 'Otra', 'barrio' => 'Centro', 'nombre' => 'Trabajo',
+    ])->assertNotFound();
+    expect($direccion->fresh()->nombre)->toBe('Mi casa');
+});
+
+test('el nombre es opcional al crear y no permite textos demasiado largos', function () {
+    $user = User::factory()->create();
+    $user->assignRole('usuario');
+    Sanctum::actingAs($user);
+    $this->postJson('/api/cliente/direcciones', ['direccion' => 'Calle 1', 'barrio' => 'Centro'])
+        ->assertCreated()->assertJsonPath('direccion.nombre', null);
+    $this->postJson('/api/cliente/direcciones', ['direccion' => 'Calle 2', 'barrio' => 'Centro', 'nombre' => str_repeat('a', 81)])
+        ->assertUnprocessable()->assertJsonValidationErrors('nombre');
+});

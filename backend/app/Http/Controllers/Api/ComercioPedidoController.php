@@ -209,7 +209,7 @@ class ComercioPedidoController extends Controller
             'motivos_cancelacion' => CancelarPedido::MOTIVOS_NEGOCIO,
             'items' => $p->items->map(fn ($i) => [
                 'nombre' => $i->nombre,
-                'cantidad' => $i->cantidad,
+                'unidad_medida' => $i->unidad_medida, 'cantidad' => $i->cantidad,
                 // Talla, color o ingredientes: lo que el negocio debe preparar.
                 'detalle' => $i->detalle(),
             ]),

@@ -503,7 +503,7 @@ function DisponibleCard({ pedido, onTomar }: { pedido: Pedido; onTomar: () => vo
         <Text style={[styles.lineaSub, { flex: 1 }]}>{pedido.negocio?.direccion ?? 'Sin dirección'}</Text>
       </View>
       <Text style={styles.lineaSub}>
-        {pedido.items.reduce((s, i) => s + i.cantidad, 0)} producto(s) · Domicilio {cop(pedido.costo_domicilio ?? 0)} ·{' '}
+        {pedido.items.reduce((s, i) => s + (i.unidad_medida && i.unidad_medida !== 'unidad' ? 1 : i.cantidad), 0)} producto(s) · Domicilio {cop(pedido.costo_domicilio ?? 0)} ·{' '}
         {pedido.metodo_pago === 'efectivo' ? `cobras ${cop(pedido.cobrar)}` : 'ya pagado'}
       </Text>
       {/* Abre el modal para elegir en cuántos minutos lo recojo. */}

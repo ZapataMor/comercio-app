@@ -1,3 +1,4 @@
+import { textoCantidad } from '../cantidades';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
@@ -321,7 +322,7 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
           <Text style={styles.bloqueTitulo}>Productos</Text>
           {pedido.items.map((it, idx) => (
             <View key={idx} style={styles.itemRow}>
-              <Text style={styles.itemCant}>{it.cantidad}×</Text>
+              <Text style={styles.itemCant}>{textoCantidad(it)}</Text>
               <View style={styles.itemTexto}>
                 <Text style={styles.itemNombre}>{it.nombre}</Text>
                 {!!it.detalle && <Text style={styles.itemDetalle}>{it.detalle}</Text>}

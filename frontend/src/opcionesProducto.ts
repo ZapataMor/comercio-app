@@ -25,8 +25,8 @@ export const coloresDe = (p: Producto) => (esRopa(p) ? p.colores ?? [] : []);
 /** Información que solo se muestra (para qué sirve, características...). */
 export const informacionDe = (p: Producto) => (esComida(p) || esRopa(p) ? [] : p.atributos ?? []);
 
-/** No se puede agregar sin pasar por el detalle: hay que elegir talla o color. */
-export const pideEleccion = (p: Producto) => tallasDe(p).length > 0 || coloresDe(p).length > 0;
+/** El detalle permite elegir peso, talla o color antes de agregar. */
+export const pideEleccion = (p: Producto) => p.tipo_venta === 'peso' || tallasDe(p).length > 0 || coloresDe(p).length > 0;
 
 /** Precio para el cliente: la unidad solo se dice cuando no es por unidad ("/ kg"). */
 export function precioDe(p: Producto) {

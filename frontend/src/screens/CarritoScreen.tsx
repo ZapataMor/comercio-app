@@ -4,6 +4,8 @@ import { Animated, Easing, Image, ScrollView, Text, TouchableOpacity, View } fro
 import { imagenUrl } from '../api';
 import { CartItem, DURACION_RETIRO, useCart } from '../CartContext';
 import { FadeInView, PressableScale } from '../components/anim';
+import CantidadPeso from '../components/CantidadPeso';
+import { esPorPeso } from '../cantidades';
 import Icon from '../components/Icon';
 import PersonalizarLinea, { ModoHoja } from '../components/PersonalizarLinea';
 import { RootStackParamList } from '../navTypes';
@@ -60,7 +62,7 @@ type LineaProps = {
 function LineaCarrito({ item, onAjustar, onAgregarOtra }: LineaProps) {
   const { c } = useTheme();
   const styles = useStyles();
-  const { cambiar, quitar } = useCart();
+  const { cambiar, quitar, fijarCantidad } = useCart();
   const saliendo = !!item.saleEn;
   const uri = imagenUrl(item.imagen);
   const detalle = detalleOpciones(item.opciones);
@@ -111,6 +113,7 @@ function LineaCarrito({ item, onAjustar, onAgregarOtra }: LineaProps) {
             <Text style={styles.precio}>{cop(item.precio * item.cantidad)}</Text>
           )}
           <View style={styles.qtyRow}>
+            {esPorPeso(item) && !saliendo ? <CantidadPeso cantidad={item.cantidad} unidad={item.unidad_medida ?? 'kg'} onChange={n => fijarCantidad(item.linea, n)} /> : <>
             <PressableScale
               style={[styles.qtyBtn, saliendo && styles.qtyBtnOff]}
               disabled={saliendo}
@@ -127,6 +130,7 @@ function LineaCarrito({ item, onAjustar, onAgregarOtra }: LineaProps) {
               onPress={() => (preguntaAlSumar ? onAgregarOtra() : cambiar(item.linea, 1))}>
               <Icon name="mas" size={15} color={c.textStrong} strokeWidth={2.2} />
             </PressableScale>
+            </>}
           </View>
         </View>
       </View>

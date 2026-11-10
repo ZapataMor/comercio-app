@@ -1,3 +1,5 @@
+import CantidadPeso from './CantidadPeso';
+import { esPorPeso } from '../cantidades';
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { ajustarMiPedido, getCatalogo, Producto, SeguimientoPedido } from '../api';
@@ -33,7 +35,7 @@ export default function AjustarPedido({ pedido, visible, onCerrar, onGuardado }:
       setLineas(referencia.current.items.filter(i => i.producto_id).map((i, idx) => {
         const p = d.productos.find(v => v.id === i.producto_id);
         return { linea: `original-${idx}`, producto_id: i.producto_id!, nombre: i.nombre,
-          precio: i.precio, cantidad: i.cantidad, opciones: i.opciones,
+          precio: i.precio, cantidad: i.cantidad, opciones: i.opciones, tipo_venta: p?.tipo_venta, unidad_medida: i.unidad_medida ?? p?.unidad_medida,
           ingredientes: p ? ingredientesDe(p) : [], tallas: p ? tallasDe(p) : [], colores: p ? coloresDe(p) : [] };
       }));
     }).catch(e => { if (activo) setError(messageFromError(e)); }).finally(() => { if (activo) setCargando(false); });
@@ -47,10 +49,10 @@ export default function AjustarPedido({ pedido, visible, onCerrar, onGuardado }:
     const linea = `nueva-${Date.now()}-${Math.random()}`;
     const precioAnterior = pedido.items.find(i => i.producto_id === p.id)?.precio;
     setLineas(prev => [...prev, { linea, producto_id: p.id, nombre: p.nombre, precio: precioAnterior ?? p.precio,
-      cantidad: 1, opciones, ingredientes: ingredientesDe(p), tallas, colores }]);
+      cantidad: 1, tipo_venta: p.tipo_venta, unidad_medida: p.unidad_medida, opciones, ingredientes: ingredientesDe(p), tallas, colores }]);
     if (tallas.length || colores.length || ingredientesDe(p).length) setPersonalizar(linea);
   }
-  const total = lineas.reduce((s, i) => s + i.precio * i.cantidad, pedido.costo_domicilio);
+  const total = lineas.reduce((s, i) => s + Math.round(i.precio * i.cantidad * 100) / 100, pedido.costo_domicilio);
   const noDisponibles = lineas.some(i => !productos.some(p => p.id === i.producto_id && p.disponible));
   async function guardar() {
     if (!auth || enviando || !pedido.faltante_version) return;
@@ -72,9 +74,11 @@ export default function AjustarPedido({ pedido, visible, onCerrar, onGuardado }:
         {!productos.some(p => p.id === i.producto_id && p.disponible) && <Text style={styles.error}>Agotado. Quita este producto o elige otro.</Text>}
         {!!detalleOpciones(i.opciones) && <Text style={styles.texto}>{detalleOpciones(i.opciones)}</Text>}
         <View style={styles.fila}>
+          {esPorPeso(i) ? <CantidadPeso cantidad={i.cantidad} unidad={i.unidad_medida ?? 'kg'} disabled={enviando} onChange={n => setLineas(prev => prev.map(v => v.linea === i.linea ? { ...v, cantidad: n } : v))} /> : <>
           <TouchableOpacity disabled={enviando} onPress={() => setLineas(prev => prev.map(v => v.linea === i.linea ? { ...v, cantidad: Math.max(1, v.cantidad - 1) } : v))}><Text style={styles.enlace}>−</Text></TouchableOpacity>
           <Text style={styles.texto}>{i.cantidad}</Text>
           <TouchableOpacity disabled={enviando || i.cantidad >= 99} onPress={() => setLineas(prev => prev.map(v => v.linea === i.linea ? { ...v, cantidad: v.cantidad + 1 } : v))}><Text style={styles.enlace}>+</Text></TouchableOpacity>
+          </>}
           <TouchableOpacity disabled={enviando} onPress={() => setLineas(prev => prev.filter(v => v.linea !== i.linea))}><Text style={styles.error}>Quitar</Text></TouchableOpacity>
         </View>
         {!!(i.ingredientes?.length || i.tallas?.length || i.colores?.length) && <TouchableOpacity disabled={enviando} onPress={() => setPersonalizar(i.linea)}><Text style={styles.enlace}>Cambiar ingredientes u opciones</Text></TouchableOpacity>}

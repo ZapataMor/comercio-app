@@ -118,7 +118,7 @@ function Entregado({ pedido: p }: { pedido: Pedido }) {
   const { c, estadoColor } = useTheme();
   const styles = useStyles();
   const ec = estadoColor('entregado');
-  const productos = p.items.reduce((s, i) => s + i.cantidad, 0);
+  const productos = p.items.reduce((s, i) => s + (i.unidad_medida && i.unidad_medida !== 'unidad' ? 1 : i.cantidad), 0);
   return (
     <View style={styles.card}>
       <View style={styles.cardHead}>

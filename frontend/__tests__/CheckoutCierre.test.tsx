@@ -12,6 +12,11 @@ import CheckoutScreen from '../src/screens/CheckoutScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PedidoPendienteProvider } from '../src/PedidoPendienteContext';
 
+jest.mock('@react-navigation/native', () => ({
+  ...jest.requireActual('@react-navigation/native'),
+  useFocusEffect: (effect: () => void) => require('react').useEffect(effect, [effect]),
+}));
+
 jest.mock('../src/AuthContext', () => ({
   useAuth: () => ({ auth: { token: 't', user: { id: 7, telefono: '300' } }, actualizarUsuario: jest.fn() }),
 }));

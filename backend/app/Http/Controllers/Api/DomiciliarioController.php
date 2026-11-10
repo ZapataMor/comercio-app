@@ -391,7 +391,7 @@ class DomiciliarioController extends Controller
                 'lng' => $p->negocio->lng,
             ] : null,
             'cliente' => $p->relationLoaded('cliente') && $p->cliente ? ['name' => $p->cliente->nombre_completo] : null,
-            'items' => $p->items->map(fn ($i) => ['nombre' => $i->nombre, 'cantidad' => $i->cantidad]),
+            'items' => $p->items->map(fn ($i) => ['nombre' => $i->nombre, 'unidad_medida' => $i->unidad_medida, 'cantidad' => $i->cantidad]),
         ];
     }
 }

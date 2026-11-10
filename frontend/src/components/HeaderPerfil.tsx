@@ -64,6 +64,9 @@ function modulosPara(roles: string[], enNegocio: boolean, serDomiciliario: () =>
       ? { titulo: 'Comprar', icono: 'bolsa', abrir: () => navigationRef.navigate('Explorar') }
       : { titulo: 'Mis negocios', icono: 'tienda', abrir: () => navigationRef.navigate('MisNegocios') },
   ];
+  if (roles.includes('usuario')) {
+    modulos.push({ titulo: 'Mis direcciones', icono: 'ubicacion', abrir: () => navigationRef.navigate('MisDirecciones') });
+  }
   if (roles.includes('domiciliario')) {
     modulos.push({ titulo: 'Mis entregas', icono: 'moto', abrir: abrirEntregas });
   }

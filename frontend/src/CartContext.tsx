@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { Producto } from './api';
+import { cantidadValida, esPorPeso, redondearCantidad } from './cantidades';
 import { useAuth } from './AuthContext';
 import { animarDespliegue } from './components/anim';
 import { coloresDe, ingredientesDe, OpcionesLinea, tallasDe } from './opcionesProducto';
@@ -21,6 +22,8 @@ export type CartItem = {
   precioVigente?: number;
   precioAvisado?: number;
   cantidad: number;
+  tipo_venta?: string;
+  unidad_medida?: string;
   imagen?: string | null;
   opciones?: OpcionesLinea;
   // Copia de lo que se puede elegir: el carrito se edita sin volver al catálogo.
@@ -62,6 +65,7 @@ type CartContextType = {
   ) => void;
   /** Bajar de 1 la quita con su cuenta regresiva; subir una que sale la conserva. */
   cambiar: (linea: string, delta: number) => void;
+  fijarCantidad: (linea: string, cantidad: number) => void;
   /** Empieza la cuenta regresiva: en DURACION_RETIRO ms la línea desaparece. */
   quitar: (linea: string) => void;
   /**
@@ -113,6 +117,8 @@ function crearLinea(p: Producto, opciones?: OpcionesLinea, cantidad = 1): CartIt
     precio_token: p.precio_token,
     precio_vence_at: p.precio_vence_at,
     cantidad,
+    tipo_venta: p.tipo_venta,
+    unidad_medida: p.unidad_medida,
     imagen: p.imagen ?? null,
     opciones: limpias,
     ingredientes: ingredientesDe(p),
@@ -132,7 +138,7 @@ function sumarLinea(lineas: CartItem[], nueva: CartItem): CartItem[] {
       ? {
           ...i,
           ...(i.saleEn ? nueva : {}),
-          cantidad: i.saleEn ? nueva.cantidad : i.cantidad + nueva.cantidad,
+          cantidad: i.saleEn ? nueva.cantidad : Math.min(99, redondearCantidad(i.cantidad + nueva.cantidad)),
           saleEn: undefined,
         }
       : i,
@@ -274,7 +280,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const actual = lineas.find(i => i.linea === linea);
     if (!actual) return;
 
-    if (!actual.saleEn && actual.cantidad + delta < 1) {
+    if (!actual.saleEn && redondearCantidad(actual.cantidad + delta) < (esPorPeso(actual) ? 0.001 : 1)) {
       quitar(linea);
       return;
     }
@@ -285,9 +291,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         if (i.linea !== linea) return i;
         return i.saleEn
           ? { ...i, saleEn: undefined }
-          : { ...i, cantidad: i.cantidad + delta };
+          : { ...i, cantidad: Math.min(99, redondearCantidad(i.cantidad + delta)) };
       }),
     );
+  };
+
+  const fijarCantidad = (linea: string, cantidad: number) => {
+    setLineas(prev => prev.map(i => i.linea === linea && cantidadValida(cantidad, esPorPeso(i))
+      ? { ...i, cantidad: redondearCantidad(cantidad), saleEn: undefined } : i));
   };
 
   const personalizar = (linea: string, opciones: OpcionesLinea, unidades?: number) => {
@@ -327,9 +338,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const revisarPrecios = (productos: Producto[]) => {
     const precios = new Map(productos.map(p => [p.id, p.precio]));
+    const medidas = new Map(productos.map(p => [p.id, p]));
     setLineas(prev => {
       const nuevas = prev.map(i => precios.has(i.producto_id) && precios.get(i.producto_id) !== i.precioVigente
-        ? { ...i, precioVigente: precios.get(i.producto_id) } : i);
+        ? { ...i, precioVigente: precios.get(i.producto_id), tipo_venta: medidas.get(i.producto_id)?.tipo_venta, unidad_medida: medidas.get(i.producto_id)?.unidad_medida } : i);
       return nuevas.some((i, idx) => i !== prev[idx]) ? nuevas : prev;
     });
   };
@@ -347,8 +359,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setVenceEn(null);
   };
 
-  const count = items.reduce((s, i) => s + i.cantidad, 0);
-  const total = items.reduce((s, i) => s + i.precio * i.cantidad, 0);
+  const count = items.reduce((s, i) => s + (esPorPeso(i) ? 1 : i.cantidad), 0);
+  const total = items.reduce((s, i) => s + Math.round(i.precio * i.cantidad * 100) / 100, 0);
 
   return (
     <CartContext.Provider
@@ -366,6 +378,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         agregar,
         reemplazar,
         cambiar,
+        fijarCantidad,
         quitar,
         personalizar,
         sumarUnidad,

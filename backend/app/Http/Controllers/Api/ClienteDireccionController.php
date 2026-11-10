@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Barrio;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ClienteDireccionController extends Controller
 {
@@ -28,6 +29,7 @@ class ClienteDireccionController extends Controller
         }
 
         $data = $request->validate([
+            'nombre' => ['nullable', 'string', 'max:80'],
             'direccion' => ['required', 'string', 'max:255'],
             'barrio' => ['required', 'string', 'max:120'],
         ]);
@@ -36,6 +38,7 @@ class ClienteDireccionController extends Controller
         Barrio::registrarSiEsNuevo($data['barrio'], $request->user()->id);
 
         $direccion = $request->user()->clienteDirecciones()->create([
+            'nombre' => $data['nombre'] ?? null,
             'direccion' => $data['direccion'],
             'barrio' => $data['barrio'],
             'es_principal' => false,
@@ -44,10 +47,31 @@ class ClienteDireccionController extends Controller
         return response()->json(['direccion' => $this->map($direccion)], 201);
     }
 
+    public function update(Request $request, int $id): JsonResponse
+    {
+        abort_unless($request->user()->hasRole('usuario'), 403);
+        $direccion = $request->user()->clienteDirecciones()->findOrFail($id);
+        $data = $request->validate([
+            'nombre' => ['nullable', 'string', 'max:80'],
+            'direccion' => ['required', 'string', 'max:255'],
+            'barrio' => ['required', 'string', 'max:120'],
+        ]);
+        Barrio::registrarSiEsNuevo($data['barrio'], $request->user()->id);
+        DB::transaction(function () use ($request, $direccion, $data) {
+            $direccion->update($data);
+            if ($direccion->es_principal) {
+                $request->user()->update(['direccion' => $data['direccion'], 'barrio' => $data['barrio']]);
+            }
+        });
+
+        return response()->json(['direccion' => $this->map($direccion)]);
+    }
+
     private function map($direccion): array
     {
         return [
             'id' => $direccion->id,
+            'nombre' => $direccion->nombre,
             'direccion' => $direccion->direccion,
             'barrio' => $direccion->barrio,
             'es_principal' => (bool) $direccion->es_principal,

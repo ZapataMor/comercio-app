@@ -1,3 +1,4 @@
+import { textoCantidad } from '../cantidades';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -307,7 +308,7 @@ export default function PedidoDetalleScreen({ route }: Props) {
         {pedido.items.map((it, idx) => (
           <View key={idx} style={styles.linea}>
             <View style={styles.lineaProducto}>
-              <Text style={styles.lineaTxt}>{it.cantidad}× {it.nombre}</Text>
+              <Text style={styles.lineaTxt}>{textoCantidad(it)} {it.nombre}</Text>
               {!!it.detalle && <Text style={styles.lineaDetalle}>{it.detalle}</Text>}
             </View>
             <Text style={styles.lineaTxt}>{cop(it.precio * it.cantidad)}</Text>

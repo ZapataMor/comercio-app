@@ -176,6 +176,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/citas/{id}/cancelar', [CitaController::class, 'cancelar'])->whereNumber('id');
     Route::get('/cliente/direcciones', [ClienteDireccionController::class, 'index']);
     Route::post('/cliente/direcciones', [ClienteDireccionController::class, 'store']);
+    Route::put('/cliente/direcciones/{id}', [ClienteDireccionController::class, 'update']);
     Route::post('/pedidos', [ApiPedidoController::class, 'store']);
     Route::put('/carrito', [CarritoController::class, 'actualizar']);
     Route::get('/pedidos', [ApiPedidoController::class, 'index']);

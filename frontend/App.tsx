@@ -61,6 +61,7 @@ import AdminResenasScreen from './src/screens/AdminResenasScreen';
 import EntregasScreen from './src/screens/EntregasScreen';
 import PedidosEntregadosScreen from './src/screens/PedidosEntregadosScreen';
 import CarritoScreen from './src/screens/CarritoScreen';
+import MisDireccionesScreen from './src/screens/MisDireccionesScreen';
 import CheckoutScreen from './src/screens/CheckoutScreen';
 import MisPedidosScreen from './src/screens/MisPedidosScreen';
 import PedidoDetalleScreen from './src/screens/PedidoDetalleScreen';
@@ -169,6 +170,7 @@ function Navegacion() {
                   options={({ route }) => ({ title: route.params.negocioNombre })}
                 />
                 <Stack.Screen name="Carrito" component={CarritoScreen} options={{ title: 'Carrito' }} />
+                <Stack.Screen name="MisDirecciones" component={MisDireccionesScreen} options={{ title: 'Mis direcciones' }} />
                 <Stack.Screen name="Checkout" component={CheckoutScreen} options={{ title: 'Confirmar pedido' }} />
                 <Stack.Screen name="MisPedidos" component={MisPedidosScreen} options={{ title: 'Mis pedidos' }} />
                 <Stack.Screen name="PedidoDetalle" component={PedidoDetalleScreen} options={{ title: 'Seguimiento' }} />

@@ -7,6 +7,7 @@ use App\Models\Negocio;
 use App\Models\Pedido;
 use App\Notifications\EstadoPedidoActualizado;
 use App\Support\OpcionesPedido;
+use App\Support\CantidadPedido;
 use App\Support\Push;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -43,7 +44,7 @@ class PedidoIncidenciaController extends Controller
         $datos = $request->validate([
             'items' => ['required', 'array', 'min:1', 'max:99'],
             'items.*.producto_id' => ['required', 'integer'],
-            'items.*.cantidad' => ['required', 'integer', 'min:1', 'max:99'],
+            'items.*.cantidad' => ['required', 'numeric', 'min:0.001', 'max:99'],
             'items.*.talla' => ['nullable', 'string', 'max:100'], 'items.*.color' => ['nullable', 'string', 'max:100'],
             'items.*.sin' => ['nullable', 'array', 'max:30'], 'items.*.sin.*' => ['string', 'max:100'],
             'items.*.extra' => ['nullable', 'array', 'max:30'], 'items.*.extra.*' => ['string', 'max:100'],
@@ -63,13 +64,15 @@ class PedidoIncidenciaController extends Controller
                 $producto = $productos->get($item['producto_id']);
                 abort_unless($producto && $producto->disponible, 422, 'Uno de los productos ya no está disponible. Elige otro.');
                 abort_if($problema = OpcionesPedido::problema($producto, $item), 422, $problema ?? 'Opciones no disponibles.');
+                CantidadPedido::validar($producto, $item['cantidad']);
                 $lineas[] = [
+                    'unidad_medida' => $producto->unidad_medida,
                     'producto_id' => $producto->id, 'nombre' => $producto->nombre, 'cantidad' => $item['cantidad'],
                     'precio' => (float) ($anteriores->get($producto->id)?->precio ?? $producto->precio),
                     'opciones' => OpcionesPedido::normalizar($producto, $item),
                 ];
             }
-            $subtotal = collect($lineas)->sum(fn ($i) => $i['cantidad'] * $i['precio']);
+            $subtotal = collect($lineas)->sum(fn ($i) => round($i['cantidad'] * $i['precio'], 2));
             abort_if(abs($subtotal + (float) $pedido->costo_domicilio - $datos['total_esperado']) >= 0.01, 409, 'El total cambió. Revisa los productos antes de confirmar el cambio.');
             $pedido->items()->delete();
             $pedido->items()->createMany($lineas);

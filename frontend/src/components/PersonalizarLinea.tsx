@@ -1,3 +1,4 @@
+import { esPorPeso } from '../cantidades';
 /**
  * Hoja para ajustar una línea del carrito. En la comida, cada ingrediente que
  * trae el producto se deja normal, se quita o se pide con extra; en la ropa se
@@ -137,7 +138,7 @@ function Contenido({ item, modo, onCerrar, onGuardar }: { item: CartItem } & Omi
           )}
         </ScrollView>
 
-        {!agregando && item.cantidad > 1 && (
+        {!agregando && !esPorPeso(item) && item.cantidad > 1 && (
           <View style={styles.unidades}>
             <Text style={styles.unidadesTxt}>¿A cuántas se lo aplico?</Text>
             <View style={styles.contador}>

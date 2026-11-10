@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Notifications\NuevoPedidoParaComercio;
 use App\Support\CancelarPedido;
 use App\Support\OpcionesPedido;
+use App\Support\CantidadPedido;
 use App\Support\PrecioCarrito;
 use App\Support\Push;
 use App\Support\Reputacion;
@@ -36,7 +37,7 @@ class PedidoController extends Controller
             'negocio_id' => ['required', 'integer'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.producto_id' => ['required', 'integer'],
-            'items.*.cantidad' => ['required', 'integer', 'min:1', 'max:99'],
+            'items.*.cantidad' => ['required', 'numeric', 'min:0.001', 'max:99'],
             'items.*.precio_token' => ['sometimes', 'nullable', 'string', 'max:2048'],
             // Ropa y calzado.
             'items.*.talla' => ['nullable', 'string', 'max:100'],
@@ -87,6 +88,7 @@ class PedidoController extends Controller
                 return response()->json(['message' => 'Hay un producto que ya no está disponible.'], 422);
             }
 
+            CantidadPedido::validar($productos[$item['producto_id']], $item['cantidad']);
             $problema = OpcionesPedido::problema($productos[$item['producto_id']], $item);
             if ($problema) {
                 return response()->json(['message' => $problema], 422);
@@ -100,7 +102,7 @@ class PedidoController extends Controller
             $item['precio_reservado'] = PrecioCarrito::deItem($productos[$item['producto_id']], $item, $request->user()->id);
         }
         unset($item);
-        $subtotal = collect($datos['items'])->sum(fn ($item) => $item['precio_reservado'] * $item['cantidad']);
+        $subtotal = collect($datos['items'])->sum(fn ($item) => round($item['precio_reservado'] * $item['cantidad'], 2));
         $total = $subtotal + $domicilio;
 
         if (isset($datos['total_esperado']) && abs((float) $datos['total_esperado'] - $total) >= 0.01) {
@@ -176,6 +178,7 @@ class PedidoController extends Controller
                     'nombre' => $p->nombre,
                     'precio' => $item['precio_reservado'],
                     'cantidad' => $item['cantidad'],
+                    'unidad_medida' => $productos[$item['producto_id']]->unidad_medida,
                     'opciones' => OpcionesPedido::normalizar($p, $item),
                 ]);
             }
@@ -285,6 +288,7 @@ class PedidoController extends Controller
                 'opciones' => $i->opciones,
                 'nombre' => $i->nombre,
                 'cantidad' => $i->cantidad,
+                'unidad_medida' => $i->unidad_medida,
                 'precio' => (float) $i->precio,
                 'detalle' => $i->detalle(),
             ]),

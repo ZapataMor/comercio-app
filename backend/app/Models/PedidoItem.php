@@ -14,6 +14,7 @@ class PedidoItem extends Model
         'nombre',
         'precio',
         'cantidad',
+        'unidad_medida',
         'opciones',
     ];
 
@@ -21,7 +22,7 @@ class PedidoItem extends Model
     {
         return [
             'precio' => 'decimal:2',
-            'cantidad' => 'integer',
+            'cantidad' => 'float',
             'opciones' => 'array',
         ];
     }
@@ -29,7 +30,7 @@ class PedidoItem extends Model
     /** Subtotal de la línea (precio copiado × cantidad). */
     public function subtotal(): float
     {
-        return (float) $this->precio * $this->cantidad;
+        return round((float) $this->precio * $this->cantidad, 2);
     }
 
     /**

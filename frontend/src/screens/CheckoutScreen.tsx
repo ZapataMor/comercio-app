@@ -1,3 +1,6 @@
+import { useFocusEffect } from '@react-navigation/native';
+import EditarDireccion from '../components/EditarDireccion';
+import { textoCantidad } from '../cantidades';
 import { CommonActions } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -55,6 +58,8 @@ export default function CheckoutScreen({ navigation }: Props) {
   const [cargandoDirecciones, setCargandoDirecciones] = useState(true);
   const [nuevaDireccion, setNuevaDireccion] = useState('');
   const [nuevoBarrio, setNuevoBarrio] = useState('');
+  const [nuevoNombre, setNuevoNombre] = useState('');
+  const [editandoDireccion, setEditandoDireccion] = useState<ClienteDireccion | null>(null);
   // Telefono guardado en el perfil del cliente (se pidio al registrarse).
   const telefonoGuardado = auth?.user.telefono?.trim() || null;
   const [usarOtroTelefono, setUsarOtroTelefono] = useState(!telefonoGuardado);
@@ -107,7 +112,7 @@ export default function CheckoutScreen({ navigation }: Props) {
     });
   }
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     let activo = true;
 
     async function cargarDirecciones() {
@@ -117,7 +122,7 @@ export default function CheckoutScreen({ navigation }: Props) {
         if (!activo) return;
         setDirecciones(lista);
         const principal = lista.find(d => d.es_principal) ?? lista[0];
-        setSeleccion(principal?.id ?? 'nueva');
+        setSeleccion(prev => prev === 'nueva' || lista.some(d => d.id === prev) ? prev : principal?.id ?? 'nueva');
       } catch (e) {
         if (activo) {
           setSeleccion('nueva');
@@ -132,7 +137,7 @@ export default function CheckoutScreen({ navigation }: Props) {
     return () => {
       activo = false;
     };
-  }, [auth?.token, toast]);
+  }, [auth?.token, toast]));
 
   const ubicacionSeleccionada = useMemo(
     () => direcciones.find(d => d.id === seleccion) ?? null,
@@ -210,6 +215,7 @@ export default function CheckoutScreen({ navigation }: Props) {
     try {
       if (seleccion === 'nueva') {
         const guardada = await crearClienteDireccion(auth!.token, {
+          nombre: nuevoNombre.trim() || null,
           direccion: nuevaDireccion.trim(),
           barrio: nuevoBarrio.trim(),
         });
@@ -280,6 +286,7 @@ export default function CheckoutScreen({ navigation }: Props) {
   }
 
   return (
+    <>
     <ScrollView
       style={styles.container}
       contentContainerStyle={{ padding: 16, paddingBottom: 24 }}>
@@ -293,7 +300,7 @@ export default function CheckoutScreen({ navigation }: Props) {
           return (
             <View key={i.linea} style={styles.linea}>
               <View style={styles.lineaProducto}>
-                <Text style={styles.lineaTxt}>{i.cantidad}x {i.nombre}</Text>
+                <Text style={styles.lineaTxt}>{textoCantidad(i)} {i.nombre}</Text>
                 {!!detalle && <Text style={styles.lineaDetalle}>{detalle}</Text>}
               </View>
               <Text style={styles.lineaTxt}>{cop(i.precio * i.cantidad)}</Text>
@@ -329,8 +336,8 @@ export default function CheckoutScreen({ navigation }: Props) {
           {direcciones.map(d => {
             const activa = seleccion === d.id;
             return (
+              <View key={d.id}>
               <TouchableOpacity
-                key={d.id}
                 style={[styles.ubicacion, activa && styles.ubicacionOn]}
                 onPress={() => {
                   setSeleccion(d.id);
@@ -341,13 +348,15 @@ export default function CheckoutScreen({ navigation }: Props) {
                 </View>
                 <View style={styles.ubicacionTexto}>
                   <Text style={[styles.ubicacionTitulo, activa && styles.ubicacionTituloOn]}>
-                    {d.es_principal ? 'Direccion principal' : 'Otra ubicacion'}
+                    {d.nombre || (d.es_principal ? 'Direccion principal' : 'Otra ubicacion')}
                   </Text>
                   <Text style={[styles.ubicacionDetalle, activa && styles.ubicacionDetalleOn]}>
                     {textoUbicacion(d)}
                   </Text>
                 </View>
               </TouchableOpacity>
+              <TouchableOpacity onPress={() => setEditandoDireccion(d)} accessibilityLabel={`Editar ${d.nombre || d.direccion}`}><Text style={styles.editarDireccion}>Editar dirección</Text></TouchableOpacity>
+              </View>
             );
           })}
 
@@ -375,6 +384,8 @@ export default function CheckoutScreen({ navigation }: Props) {
 
       {seleccion === 'nueva' ? (
         <View style={styles.nuevaBox}>
+          <TextInput style={styles.input} value={nuevoNombre} onChangeText={setNuevoNombre} maxLength={80} placeholder="Nombre opcional: Mi casa, Trabajo…" placeholderTextColor={c.mutedSoft} />
+          <Text style={styles.lineaDetalle}>Solo tú verás este nombre.</Text>
           <TextInput
             style={styles.input}
             value={nuevaDireccion}
@@ -481,6 +492,11 @@ export default function CheckoutScreen({ navigation }: Props) {
         )}
       </PressableScale>
     </ScrollView>
+    {editandoDireccion && <EditarDireccion key={editandoDireccion.id} direccion={editandoDireccion} onCerrar={() => setEditandoDireccion(null)} onGuardada={d => {
+      setDirecciones(prev => prev.map(v => v.id === d.id ? d : v));
+      setEditandoDireccion(null);
+    }} />}
+    </>
   );
 }
 
@@ -510,6 +526,7 @@ const useStyles = makeStyles((c, shadow) => ({
   ubicacionTituloOn: { color: c.onAccent },
   ubicacionDetalle: { color: c.muted, fontFamily: font.regular, fontSize: 12, marginTop: 2 },
   ubicacionDetalleOn: { color: c.onAccent },
+  editarDireccion: { color: c.accent, fontFamily: font.semibold, paddingVertical: 10, paddingHorizontal: 12 },
   nuevaBox: { marginBottom: 2 },
   pagos: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   pago: { flex: 1, borderWidth: 1, borderColor: c.borderStrong, borderRadius: radius.md, paddingVertical: 14, alignItems: 'center', gap: 4, backgroundColor: c.surface },

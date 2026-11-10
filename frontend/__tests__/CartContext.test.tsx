@@ -50,6 +50,34 @@ test('agregar suma unidades y calcula count y total', () => {
   expect(cart.current.negocioNombre).toBe('Tienda A');
 });
 
+test('el peso conserva fracciones, redondea sumas y se edita sin quitar medios kilos', () => {
+  const cart = montarCarrito();
+  const arroz = { ...producto(10, 'Arroz', 10000), tipo_venta: 'peso', unidad_medida: 'kg' };
+  act(() => { cart.current.agregar(1, 'Tienda A', arroz, undefined, 0.1); });
+  act(() => { cart.current.agregar(1, 'Tienda A', arroz, undefined, 0.2); });
+  expect(cart.current.items[0].cantidad).toBe(0.3);
+  expect(cart.current.total).toBe(3000);
+  expect(cart.current.count).toBe(1);
+  const linea = cart.current.items[0].linea;
+  act(() => { cart.current.fijarCantidad(linea, 0.5); });
+  expect(cart.current.items[0].cantidad).toBe(0.5);
+  expect(cart.current.total).toBe(5000);
+  act(() => { cart.current.cambiar(linea, -0.25); });
+  expect(cart.current.items[0].cantidad).toBe(0.25);
+  act(() => { cart.current.fijarCantidad(linea, 0); });
+  expect(cart.current.items[0].cantidad).toBe(0.25);
+});
+
+test('no permite cantidades decimales en productos por unidad ni cantidades excesivas', () => {
+  const cart = montarCarrito();
+  act(() => { cart.current.agregar(1, 'Tienda A', producto(10, 'Pan', 2000)); });
+  const linea = cart.current.items[0].linea;
+  act(() => { cart.current.fijarCantidad(linea, 0.5); });
+  expect(cart.current.items[0].cantidad).toBe(1);
+  act(() => { cart.current.fijarCantidad(linea, 100); });
+  expect(cart.current.items[0].cantidad).toBe(1);
+});
+
 test('rechaza productos de otra tienda (carrito = 1 negocio)', () => {
   const cart = montarCarrito();
 
