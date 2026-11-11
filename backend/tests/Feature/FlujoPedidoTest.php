@@ -93,14 +93,17 @@ test('un pedido sin respuesta se cancela a los 5 minutos y se le avisa al client
     Notification::assertSentTo($negocio->user, PedidoCancelado::class);
 });
 
-test('vencer un pedido todavía no le baja la confiabilidad al negocio', function () {
+test('vencer un pedido le baja la confiabilidad al negocio', function () {
     $negocio = flujoNegocio();
     flujoPedido($negocio);
 
     $this->travel(6)->minutes();
     $this->artisan('pedidos:vencer')->assertSuccessful();
 
-    expect(ReputacionEvento::count())->toBe(0);
+    $evento = ReputacionEvento::sole();
+    expect($evento->motivo)->toBe('pedido_vencido')
+        ->and($evento->sujeto_id)->toBe($negocio->id)
+        ->and($evento->puntos)->toBeLessThan(0);
 });
 
 test('un pedido aceptado no vence', function () {

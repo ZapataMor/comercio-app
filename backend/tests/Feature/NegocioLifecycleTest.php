@@ -165,11 +165,17 @@ class NegocioLifecycleTest extends TestCase
         ReputacionEvento::create(['tipo' => 'negocio', 'sujeto_id' => $this->negocio->id, 'pedido_id' => $pedido->id, 'motivo' => 'prueba', 'puntos' => -1, 'origen' => 'sistema']);
         Sanctum::actingAs($this->dueno);
         $this->deleteJson($this->ruta())->assertOk();
-        foreach (['productos', 'servicios', 'categorias', 'pedidos', 'pedido_items', 'citas', 'invitaciones_trabajo',
+        foreach (['productos', 'servicios', 'categorias', 'citas', 'invitaciones_trabajo',
             'carrito_reservas', 'resenas', 'resena_reportes', 'resena_moderaciones',
-            'pedido_reportes', 'calificaciones', 'reputacion_eventos', 'negocio_tipo_negocio'] as $tabla) {
+            'reputacion_eventos', 'negocio_tipo_negocio'] as $tabla) {
             $this->assertDatabaseCount($tabla, 0);
         }
+        // El pedido terminado se conserva como historial del cliente y del
+        // domiciliario: queda sin negocio, con el nombre que tenía.
+        $this->assertDatabaseHas('pedidos', ['id' => $pedido->id, 'negocio_id' => null, 'negocio_nombre' => $this->negocio->nombre]);
+        $this->assertDatabaseHas('pedido_items', ['pedido_id' => $pedido->id, 'producto_id' => null, 'nombre' => 'Producto']);
+        $this->assertDatabaseCount('calificaciones', 1);
+        $this->assertDatabaseCount('pedido_reportes', 1);
         $this->assertDatabaseMissing('negocios', ['id' => $this->negocio->id]);
         $this->assertDatabaseMissing('negocio_user', ['negocio_id' => $this->negocio->id]);
         $this->assertDatabaseHas('negocios', ['id' => $otro->id]);

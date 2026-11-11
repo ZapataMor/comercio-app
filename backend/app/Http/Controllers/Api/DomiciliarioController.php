@@ -399,7 +399,10 @@ class DomiciliarioController extends Controller
                 // Para abrir "Cómo llegar" en Google Maps.
                 'lat' => $p->negocio->lat,
                 'lng' => $p->negocio->lng,
-            ] : null,
+            ] : ($p->negocio_nombre ? [
+                // El negocio fue eliminado: del historial solo queda su nombre.
+                'nombre' => $p->negocio_nombre, 'direccion' => null, 'telefono' => null, 'lat' => null, 'lng' => null,
+            ] : null),
             'cliente' => $p->relationLoaded('cliente') && $p->cliente ? ['name' => $p->cliente->nombre_completo] : null,
             'items' => $p->items->map(fn ($i) => ['nombre' => $i->nombre, 'unidad_medida' => $i->unidad_medida, 'cantidad' => $i->cantidad]),
         ];

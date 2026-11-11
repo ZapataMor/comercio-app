@@ -313,7 +313,9 @@ test('cliente ausente requiere cinco minutos desde la llegada y confirmación de
     $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}/devolucion")->assertForbidden();
     Sanctum::actingAs(limPersona('administrador'));
     $this->getJson('/api/admin/reportes')->assertOk()->assertJsonPath('reportes.0.objetivo', 'cliente')->assertJsonPath('total', 1);
-    $this->putJson("/api/admin/pedidos/{$pedido->id}/cerrar", ['resultado' => 'cancelado', 'motivo' => 'Cierre manual'])->assertStatus(409);
+    // Una devolución no se da por entregada; cerrarla como cancelada sí puede
+    // hacerlo el admin si el comercio no responde (tiene su propia prueba).
+    $this->putJson("/api/admin/pedidos/{$pedido->id}/cerrar", ['resultado' => 'entregado', 'motivo' => 'Cierre manual'])->assertStatus(409);
     Sanctum::actingAs($dueno);
     $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}/devolucion")->assertOk();
     $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}/devolucion")->assertStatus(409);
@@ -431,6 +433,62 @@ test('el negocio no se elimina con pedidos activos y desaparece al borrarlo defi
     $this->getJson('/api/negocios/mios')->assertJsonCount(0, 'negocios');
     $this->getJson("/api/negocios/{$negocio->id}")->assertNotFound();
     $this->putJson("/api/negocios/{$negocio->id}", ['nombre' => 'Reabierto'])->assertNotFound();
+});
+
+test('al eliminar un negocio, el cliente y el domiciliario conservan su historial de pedidos', function () {
+    [$dueno, $negocio] = limNegocio();
+    $cliente = limPersona();
+    $domiciliario = limPersona('domiciliario');
+    $pedido = limPedido($cliente, $negocio, 'entregado', $domiciliario);
+    $pedido->items()->create(['nombre' => 'Arepa', 'precio' => 3000, 'cantidad' => 2]);
+
+    Sanctum::actingAs($dueno);
+    $this->deleteJson("/api/negocios/{$negocio->id}")->assertOk();
+
+    expect($pedido->fresh())->negocio_id->toBeNull()->negocio_nombre->toBe('Tienda');
+
+    Sanctum::actingAs($cliente);
+    $this->getJson('/api/pedidos')->assertOk()->assertJsonCount(1, 'pedidos')->assertJsonPath('pedidos.0.negocio', 'Tienda');
+    $this->getJson("/api/pedidos/{$pedido->id}")->assertOk()
+        ->assertJsonPath('negocio', 'Tienda')->assertJsonPath('negocio_id', null)
+        ->assertJsonPath('items.0.nombre', 'Arepa')
+        ->assertJsonPath('puede_calificar', false)->assertJsonPath('puede_resenar', false);
+    $this->postJson("/api/pedidos/{$pedido->id}/resenas", ['tienda' => ['estrellas' => 5]])->assertStatus(409);
+
+    Sanctum::actingAs($domiciliario);
+    $this->getJson('/api/domiciliario/historial')->assertOk()->assertJsonPath('total', 1)->assertJsonPath('pedidos.0.negocio.nombre', 'Tienda');
+});
+
+test('confirmar la devolución de un cliente no encontrado guarda el motivo completo', function () {
+    [$dueno, $negocio] = limNegocio();
+    $pedido = limPedido(limPersona(), $negocio, 'devolviendo', limPersona('domiciliario'));
+    Sanctum::actingAs($dueno);
+
+    $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}/devolucion")->assertOk();
+
+    // 21 letras: la columna debe admitirlas (en MySQL antes fallaba).
+    expect($pedido->fresh())->estado->toBe('cancelado')->cancelado_por->toBe('cliente_no_encontrado');
+});
+
+test('el admin cierra una devolución que el comercio no confirma', function () {
+    [, $negocio] = limNegocio();
+    $domiciliario = limPersona('domiciliario');
+    $pedido = limPedido(limPersona(), $negocio, 'devolviendo', $domiciliario);
+    Sanctum::actingAs($admin = limPersona('administrador'));
+
+    $this->putJson("/api/admin/pedidos/{$pedido->id}/cerrar", ['resultado' => 'entregado', 'motivo' => 'No aplica'])->assertStatus(409);
+    $this->putJson("/api/admin/pedidos/{$pedido->id}/cerrar", ['resultado' => 'cancelado', 'motivo' => 'El comercio no responde'])
+        ->assertOk()->assertJsonPath('pedido.estado', 'cancelado');
+
+    expect($pedido->fresh())
+        ->cancelado_por->toBe('cliente_no_encontrado')
+        ->cerrado_por_admin_id->toBe($admin->id)
+        ->nota_admin->toBe('El comercio no responde')
+        ->devuelto_at->not->toBeNull();
+
+    // Ya sin nada pendiente, el domiciliario puede salir de turno.
+    Sanctum::actingAs($domiciliario);
+    $this->putJson('/api/domiciliario/turno', ['en_turno' => false])->assertOk();
 });
 
 test('los reportes requieren participación en el pedido y solo el administrador los resuelve', function () {

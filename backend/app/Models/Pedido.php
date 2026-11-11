@@ -228,7 +228,9 @@ class Pedido extends Model
 
         $entregado = $this->entregado_at ?? $this->updated_at;
 
-        return $entregado->gte(now()->subHours((int) config('reputacion.horas_para_calificar')))
+        // Si el negocio fue eliminado ya no hay a quién calificar.
+        return $this->negocio_id !== null
+            && $entregado->gte(now()->subHours((int) config('reputacion.horas_para_calificar')))
             && ! $this->esDelPropioEquipo();
     }
 
@@ -258,7 +260,8 @@ class Pedido extends Model
 
         $entregado = $this->entregado_at ?? $this->updated_at;
 
-        return $entregado->gte(now()->subDays((int) config('reputacion.dias_para_resenar')))
+        return $this->negocio_id !== null
+            && $entregado->gte(now()->subDays((int) config('reputacion.dias_para_resenar')))
             && ! $this->esDelPropioEquipo();
     }
 
@@ -293,6 +296,15 @@ class Pedido extends Model
     public function negocioVeDomiciliario(): bool
     {
         return in_array($this->estado, self::EN_RUTA, true) || $this->debeDineroAlNegocio();
+    }
+
+    /**
+     * Nombre del negocio para mostrar. Si el dueño lo eliminó, el pedido se
+     * conserva en el historial con el nombre que tenía (`negocio_nombre`).
+     */
+    public function nombreNegocio(): ?string
+    {
+        return $this->negocio?->nombre ?? $this->negocio_nombre;
     }
 
     // ---------- Relaciones ----------

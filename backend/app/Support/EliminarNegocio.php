@@ -32,8 +32,13 @@ class EliminarNegocio
             ReputacionEvento::where('tipo', Reputacion::NEGOCIO)->where('sujeto_id', $negocio->id)->delete();
             AgendaCitas::cancelarFuturas(Cita::where('negocio_id', $negocio->id), 'El negocio fue eliminado definitivamente.');
 
+            // Los pedidos ya terminados no se borran: son también el historial del
+            // cliente y del domiciliario. Quedan sin negocio, con el nombre que tenía.
+            Pedido::where('negocio_id', $negocio->id)->update(['negocio_nombre' => $negocio->nombre]);
+
             // Las claves foráneas borran catálogo (incluidos productos con
-            // soft delete), carritos, pedidos, citas, reseñas, equipo e invitaciones.
+            // soft delete), carritos, citas, reseñas, equipo e invitaciones, y
+            // desligan los pedidos.
             $negocio->delete();
             DB::afterCommit(fn () => Storage::disk('public')->delete($imagenes));
         });

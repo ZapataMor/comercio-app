@@ -7,6 +7,7 @@ use App\Models\Pedido;
 use App\Notifications\EstadoPedidoActualizado;
 use App\Notifications\PedidoCancelado;
 use App\Support\CancelarPedido;
+use App\Support\EnVivo;
 use App\Support\OfrecerPedido;
 use App\Support\Push;
 use Illuminate\Http\JsonResponse;
@@ -69,12 +70,18 @@ class AdminPedidoController extends Controller
         if (! $pedido) {
             return response()->json(['message' => 'Pedido no encontrado.'], 404);
         }
-        if ($pedido->estado === 'devolviendo') {
-            return response()->json(['message' => 'El comercio debe confirmar la devolución antes de cerrar este pedido.'], 409);
-        }
-
         $motivo = trim($datos['motivo']);
         $entregado = $datos['resultado'] === 'entregado';
+
+        // Devolución que el comercio no confirma: lo normal es que la confirme
+        // él, pero si no responde el pedido no puede quedarse abierto para
+        // siempre (bloquea al domiciliario y al propio negocio).
+        if ($pedido->estado === 'devolviendo') {
+            return $entregado
+                ? response()->json(['message' => 'Este pedido está en devolución al comercio: solo se puede cerrar como cancelado.'], 409)
+                : $this->cerrarDevolucion($request, $pedido, $motivo);
+        }
+
         $desde = $entregado ? Pedido::CON_CODIGO_ENTREGA : array_diff(Pedido::EN_CURSO, ['devolviendo']);
         $estabaOfrecido = $pedido->estado === 'listo';
 
@@ -114,6 +121,40 @@ class AdminPedidoController extends Controller
         ]);
     }
 
+    /**
+     * Cierra una devolución sin la confirmación del comercio. Conserva quién
+     * la originó (el cliente canceló o no fue encontrado) y deja la nota del admin.
+     */
+    private function cerrarDevolucion(Request $request, Pedido $pedido, string $motivo): JsonResponse
+    {
+        $afectados = Pedido::whereKey($pedido->id)->where('estado', 'devolviendo')->update([
+            'estado' => 'cancelado',
+            'cancelado_at' => now(),
+            'devuelto_at' => now(),
+            'cancelado_por' => $pedido->cancelado_por ?? 'cliente_no_encontrado',
+            'motivo_cancelacion' => $pedido->motivo_cancelacion ?? 'Cliente no encontrado. Vitrina cerró la devolución.',
+            'cerrado_por_admin_id' => $request->user()->id,
+            'nota_admin' => $motivo,
+            'codigo_confirmacion' => null,
+        ]);
+        if (! $afectados) {
+            return response()->json(['message' => 'Ese pedido ya terminó.'], 409);
+        }
+
+        $pedido->refresh();
+        EnVivo::pedido($pedido);
+
+        $aviso = new EstadoPedidoActualizado($pedido, ['Devolución cerrada', 'Vitrina cerró la devolución del pedido. El pedido quedó cerrado.']);
+        $destinatarios = collect([$pedido->cliente, $pedido->domiciliario])
+            ->merge($pedido->negocio?->miembrosActivos()->get() ?? [])
+            ->filter()->unique('id')->values();
+        if ($destinatarios->isNotEmpty()) {
+            Push::enviar($destinatarios, $aviso);
+        }
+
+        return response()->json(['message' => 'Devolución cerrada. Pedido cancelado.', 'pedido' => $this->map($pedido)]);
+    }
+
     private function map(Pedido $p): array
     {
         return [
@@ -128,7 +169,7 @@ class AdminPedidoController extends Controller
             'metodo_pago' => $p->metodo_pago,
             'direccion_entrega' => $p->direccion_entrega,
             'telefono_contacto' => $p->telefono_contacto,
-            'negocio' => $p->negocio?->nombre,
+            'negocio' => $p->nombreNegocio(),
             'negocio_telefono' => $p->negocio?->telefono,
             'cliente' => $p->cliente?->nombre_completo,
             'domiciliario' => $p->domiciliario?->nombre_completo,

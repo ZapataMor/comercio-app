@@ -261,6 +261,9 @@ test('el domiciliario entra y sale de turno', function () {
 
     $this->getJson('/api/domiciliario/disponibles')->assertJsonPath('en_turno', false);
     $this->putJson('/api/domiciliario/turno', ['en_turno' => true])->assertOk()->assertJsonPath('en_turno', true);
+    // El turno se guarda sobre una copia bloqueada del usuario; la siguiente
+    // petición real lo vuelve a leer de la base, y aquí se simula eso.
+    Sanctum::actingAs($domiciliario->fresh());
     $this->getJson('/api/domiciliario/disponibles')->assertJsonPath('en_turno', true);
     expect($domiciliario->fresh()->en_turno)->toBeTrue();
 });

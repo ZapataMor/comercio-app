@@ -54,7 +54,7 @@ export default function MiInformacionScreen(_props: Props) {
       icono: eliminar ? 'basura' : 'tienda',
       titulo: eliminar ? `¿Eliminar ${n.nombre}?` : `¿${desactivar ? 'Desactivar' : 'Reactivar'} ${n.nombre}?`,
       texto: eliminar
-        ? 'Se borrarán definitivamente todos los datos del negocio: productos, servicios, pedidos, citas, reseñas, equipo e imágenes. No se puede deshacer. Primero debes terminar o cancelar los pedidos activos; las entregas en camino deben finalizar. Se avisará a los clientes con citas futuras.'
+        ? 'Se borrarán definitivamente todos los datos del negocio: productos, servicios, citas, reseñas, equipo e imágenes, y ya no podrás ver sus pedidos. Los clientes y domiciliarios conservan su historial. No se puede deshacer. Primero debes terminar o cancelar los pedidos activos; las entregas en camino deben finalizar. Se avisará a los clientes con citas futuras.'
         : desactivar
           ? 'Dejará de aparecer a los clientes y no recibirá nuevos pedidos ni solicitudes de cita. Se conservarán todos sus datos y podrás reactivarlo desde aquí. Debes seguir atendiendo los pedidos y las citas existentes.'
           : 'El negocio volverá a aparecer a los clientes con su catálogo y su horario habitual.',

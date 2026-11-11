@@ -164,12 +164,18 @@ export default function AdminPedidosScreen(_props: Props) {
                     <Text style={styles.btnEntregarTexto}>Dar por entregado</Text>
                   </TouchableOpacity>
                 )}
-                {item.estado !== 'devolviendo' && <TouchableOpacity
+                <TouchableOpacity
                   style={styles.btnCancelar}
                   onPress={() => setCierre({ pedido: item, resultado: 'cancelado' })}>
-                  <Text style={styles.btnCancelarTexto}>Cancelar pedido</Text>
-                </TouchableOpacity>}
-                {item.estado === 'devolviendo' && <Text style={styles.alerta}>El comercio debe confirmar la devolución para cerrar este pedido.</Text>}
+                  <Text style={styles.btnCancelarTexto}>
+                    {item.estado === 'devolviendo' ? 'Cerrar devolución' : 'Cancelar pedido'}
+                  </Text>
+                </TouchableOpacity>
+                {item.estado === 'devolviendo' && (
+                  <Text style={styles.alerta}>
+                    Lo normal es que el comercio confirme la devolución. Ciérrala aquí solo si no responde.
+                  </Text>
+                )}
               </View>
             </FadeInView>
           )}
@@ -188,6 +194,8 @@ export default function AdminPedidosScreen(_props: Props) {
         motivos={
           entregar
             ? ['El cliente confirmó por teléfono', 'El cliente perdió el código', 'El domiciliario no pudo cerrarlo']
+            : cierre?.pedido.estado === 'devolviendo'
+            ? ['El comercio no responde', 'El comercio confirmó por teléfono que lo recibió', 'El domiciliario no devolvió el pedido']
             : ['El cliente no apareció', 'El negocio dejó de responder', 'No hubo domiciliario', 'Dirección incorrecta']
         }
         textoBoton={entregar ? 'Dar por entregado' : 'Cancelar pedido'}
