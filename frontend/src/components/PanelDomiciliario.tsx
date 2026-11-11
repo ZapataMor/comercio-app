@@ -8,9 +8,9 @@ import {
 } from 'react-native';
 import {
   confirmarEntrega,
+  avisarOcupado,
   clienteNoEncontrado,
   registrarLlegada,
-  avisarOcupado,
   getDisponibles,
   getMiReputacion,
   getMisEntregas,
@@ -65,9 +65,9 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
   const [disponibles, setDisponibles] = useState<Pedido[]>([]);
   const [entregas, setEntregas] = useState<Pedido[]>([]);
   // Vetado = no puedo tomar pedidos nuevos (baja confiabilidad).
+  const [bloqueadoEfectivo, setBloqueadoEfectivo] = useState(false);
   const [vetado, setVetado] = useState(false);
   const [cargando, setCargando] = useState(true);
-  const [bloqueadoEfectivo, setBloqueadoEfectivo] = useState(false);
   // Pedido que voy a tomar: abre el modal para elegir los minutos.
   const [porTomar, setPorTomar] = useState<Pedido | null>(null);
   const [tomando, setTomando] = useState(false);
@@ -87,6 +87,7 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
     ({ d, e }: Listas) => {
       setDisponibles(d.pedidos);
       setVetado(d.vetado);
+      setBloqueadoEfectivo(d.bloqueado_por_efectivo);
       // El turno se cambia con la moto de la topbar: ahí se muestra.
       publicarTurno(token, d.en_turno, d.vetado);
       setEntregas(e);
@@ -152,9 +153,6 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
     toast.exito('Pedido tomado', `Pasa a recogerlo en ${minutos} min.`);
   }
 
-  async function onEnCamino(id: number) {
-    setAvanzando(id);
-    try {
   async function onOcupado(id: number) {
     setAvanzando(id);
     try {
@@ -166,6 +164,9 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
     } finally { setAvanzando(null); }
   }
 
+  async function onEnCamino(id: number) {
+    setAvanzando(id);
+    try {
       await marcarEnCamino(token, id);
       await actualizarAnimado();
     } catch (e) {
@@ -366,6 +367,8 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
             Termina las entregas que llevas; un administrador revisará tu caso.
           </Text>
         </View>
+      ) : bloqueadoEfectivo ? (
+        <Text style={styles.vetadoTxt}>Entrega el efectivo pendiente en los negocios y espera su confirmación para tomar otro domicilio. Tu confiabilidad es menor de 70 puntos.</Text>
       ) : disponibles.length === 0 ? (
         <Text style={styles.vacio}>No hay pedidos disponibles ahora.</Text>
       ) : (
@@ -376,8 +379,6 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
         ))
       )}
 
-      ) : bloqueadoEfectivo ? (
-        <Text style={styles.vetadoTxt}>Entrega el efectivo pendiente en los negocios y espera su confirmación para tomar otro domicilio. Tu confiabilidad es menor de 70 puntos.</Text>
       {/* Módulo aparte con las entregas que ya completé. */}
       <PressableScale
         style={styles.entregados}

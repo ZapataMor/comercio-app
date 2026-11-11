@@ -78,8 +78,8 @@ class Pedido extends Model
         'novedad_at',
         'dinero_estado',
         'dinero_confirmado_at',
-        'cancelado_por',
         'efectivo_ocupado_at',
+        'cancelado_por',
         'motivo_cancelacion',
         'cancelado_at',
         'clave_intento',
@@ -127,9 +127,9 @@ class Pedido extends Model
             'entregado_at' => 'datetime',
             'novedad_at' => 'datetime',
             'dinero_confirmado_at' => 'datetime',
+            'efectivo_ocupado_at' => 'datetime',
             'llegada_at' => 'datetime',
             'cliente_no_encontrado_at' => 'datetime',
-            'efectivo_ocupado_at' => 'datetime',
             'devuelto_at' => 'datetime',
             'faltante_at' => 'datetime',
             'ajustado_at' => 'datetime',
@@ -287,14 +287,14 @@ class Pedido extends Model
      */
     public function debeDineroAlNegocio(): bool
     {
-        return $this->metodo_pago === 'efectivo'
-    {
         return $this->efectivoPendienteAlNegocio()
             && $this->recogido_at?->gte(now()->subHours((int) config('reputacion.horas_para_confirmar_dinero')));
     }
 
     /** La deuda no vence; el plazo anterior solo limita el seguimiento GPS. */
     public function efectivoPendienteAlNegocio(): bool
+    {
+        return $this->metodo_pago === 'efectivo'
             && $this->domiciliario_id !== null
             && $this->estado === 'entregado'
             && $this->negocio_id !== null
