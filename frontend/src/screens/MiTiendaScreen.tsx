@@ -1,4 +1,5 @@
 import CamposDireccion from '../components/CamposDireccion';
+import { normalizarDireccion } from '../direccion';
 import { direccionValida, errorDireccion, telefonoValido, errorTelefono } from '../direccion';
 /**
  * Mi Tienda — los datos del negocio activo.
@@ -203,7 +204,7 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
         descripcion: descripcion.trim() || null,
         categoria: categoriasFinales[0],
         categorias: categoriasFinales,
-        direccion: direccion.trim() || null,
+        direccion: normalizarDireccion(direccion) || null,
         barrio: barrio.trim(),
         lat: ubicacion?.lat ?? null,
         lng: ubicacion?.lng ?? null,

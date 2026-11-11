@@ -35,7 +35,7 @@ class ClienteDireccionController extends Controller
             return response()->json(['message' => 'Solo los clientes pueden agregar ubicaciones.'], 403);
         }
         $data = $request->validate([
-            'nombre' => ['nullable', 'string', 'max:80', 'regex:/\A[\p{L}\p{N}-]+\z/u'],
+            'nombre' => ['nullable', 'string', 'max:80', 'regex:'.Direccion::TEXTO],
             'direccion' => ['required', 'string', 'max:255', new Direccion],
             'barrio' => ['required', 'string', 'max:120', 'regex:/\A[\p{L}\p{N}-]+\z/u'],
             ...self::REGLAS_PUNTO,
@@ -71,7 +71,7 @@ class ClienteDireccionController extends Controller
         abort_unless($request->user()->hasRole('usuario'), 403);
         $existente = $request->user()->clienteDirecciones()->findOrFail($id);
         $data = $request->validate([
-            'nombre' => ['nullable', 'string', 'max:80', 'regex:/\A[\p{L}\p{N}-]+\z/u'],
+            'nombre' => ['nullable', 'string', 'max:80', 'regex:'.Direccion::TEXTO],
             'direccion' => ['required', 'string', 'max:255', new Direccion],
             'barrio' => ['required', 'string', 'max:120', 'regex:/\A[\p{L}\p{N}-]+\z/u'],
             ...self::REGLAS_PUNTO,
@@ -130,7 +130,7 @@ class ClienteDireccionController extends Controller
     {
         $reglas = [];
         foreach (['frente', 'izquierda', 'derecha'] as $tipo) {
-            $reglas['foto_'.$tipo] = [isset($existentes[$tipo]) ? 'sometimes' : 'required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'];
+            $reglas['foto_'.$tipo] = [isset($existentes[$tipo]) || ! config('vitrina.fotos_entrega_obligatorias') ? 'sometimes' : 'required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'];
         }
         return $reglas;
     }

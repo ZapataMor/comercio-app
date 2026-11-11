@@ -1,7 +1,8 @@
 import FotosDireccion, { fotosCompletas } from './FotosDireccion';
 import { FotosDireccion as Fotos } from '../api';
-import { campoDireccionValido, limpiarCampoDireccion } from '../direccion';
+import { campoDireccionValido, limpiarCampoDireccion, limpiarTextoDireccion, textoDireccionValido } from '../direccion';
 import CamposDireccion from '../components/CamposDireccion';
+import { normalizarDireccion } from '../direccion';
 import { direccionValida, errorDireccion } from '../direccion';
 import React, { useState } from 'react';
 import { ActivityIndicator, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -34,7 +35,7 @@ export default function EditarDireccion({ direccion, onCerrar, onGuardada }: {
     const campos: FieldErrors = {};
     if (!direccionValida(calle)) campos.direccion = errorDireccion;
     if (!campoDireccionValido(barrio)) campos.barrio = 'Elige o escribe el barrio.';
-    if (nombre && !campoDireccionValido(nombre)) campos.nombre = errorDireccion;
+    if (nombre.trim() && !textoDireccionValido(nombre.trim())) campos.nombre = errorDireccion;
     if (!punto) campos.lat = 'Marca tu casa en el mapa o usa tu ubicación actual.';
     if (!fotosCompletas(fotos)) campos.fotos = 'Añade las tres fotos de referencia.';
     setErrores(campos); setError('');
@@ -42,7 +43,7 @@ export default function EditarDireccion({ direccion, onCerrar, onGuardada }: {
     setGuardando(true);
     try {
       const body = {
-        nombre: nombre.trim() || null, direccion: calle.trim(), barrio: barrio.trim(),
+        nombre: nombre.trim() || null, direccion: normalizarDireccion(calle), barrio: barrio.trim(),
         lat: punto?.lat ?? null, lng: punto?.lng ?? null, fotos,
       };
       const guardada = direccion ? await editarClienteDireccion(auth.token, direccion.id, body)
@@ -57,7 +58,7 @@ export default function EditarDireccion({ direccion, onCerrar, onGuardada }: {
     <View style={styles.fondo}><ScrollView style={styles.caja} contentContainerStyle={styles.contenido} keyboardShouldPersistTaps="handled">
       <Text style={styles.titulo}>{direccion ? 'Editar dirección' : 'Agregar dirección'}</Text>
       <Text style={styles.label}>Nombre (opcional)</Text>
-      <TextInput style={styles.input} value={nombre} onChangeText={v => setNombre(limpiarCampoDireccion(v))} maxLength={80} placeholder="Casa-Trabajo" placeholderTextColor={c.muted} editable={!guardando} />
+      <TextInput style={styles.input} value={nombre} onChangeText={v => setNombre(limpiarTextoDireccion(v))} maxLength={80} placeholder="Mi casa, Mi trabajo…" placeholderTextColor={c.muted} editable={!guardando} />
       <Text style={styles.ayuda}>Solo tú verás este nombre.</Text>
       <FieldError mensaje={errores.nombre} />
       <Text style={styles.label}>Dirección</Text>

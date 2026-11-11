@@ -1,4 +1,5 @@
 import CamposDireccion from '../components/CamposDireccion';
+import { normalizarDireccion } from '../direccion';
 import { direccionValida, errorDireccion, telefonoValido, errorTelefono } from '../direccion';
 /**
  * Mi información — datos PERSONALES de la cuenta (cualquier rol).
@@ -228,7 +229,7 @@ export default function MiInformacionScreen(_props: Props) {
         ...(esCliente || telefono.trim() || direccion.trim() || barrio.trim()
           ? {
               telefono: telefono.trim(),
-              direccion: direccion.trim(),
+              direccion: normalizarDireccion(direccion),
               barrio: barrio.trim(),
             }
           : {}),

@@ -239,7 +239,8 @@ test('cada campo rechaza signos y puntos incluso al crear el pedido directamente
         ->assertUnprocessable()->assertJsonValidationErrors('direccion');
 })->with(['.', 'Calle . #1', 'Calle 1 Carrera . #2', 'Calle 1 #.', 'Calle 1/2 #3', 'Calle 1 #2_3', 'Calle 1 #2!']);
 
-test('se exigen tres fotos y se rechazan archivos que no son imagenes', function () {
+test('en produccion se exigen tres fotos y se rechazan archivos que no son imagenes', function () {
+    config(['vitrina.fotos_entrega_obligatorias' => true]);
     Sanctum::actingAs(puntoPersona());
     $base = ['direccion' => 'Calle 1 #2-3', 'barrio' => 'Centro', 'lat' => 11.379, 'lng' => -72.24];
     $this->postJson('/api/cliente/direcciones', $base)->assertUnprocessable()
@@ -280,7 +281,19 @@ test('fotos privadas solo para propietario y repartidor asignado durante entrega
     }
 });
 
+test('por ahora las fotos de referencia son opcionales', function () {
+    $cliente = puntoPersona();
+    Sanctum::actingAs($cliente);
+    $id = $this->postJson('/api/cliente/direcciones', ['direccion' => 'Calle San Martín #2-3', 'barrio' => 'Centro', 'lat' => 11.379, 'lng' => -72.24, 'nombre' => 'Mi casa'])
+        ->assertCreated()->assertJsonPath('direccion.nombre', 'Mi casa')->json('direccion.id');
+    $direccion = $cliente->clienteDirecciones()->findOrFail($id);
+    [$negocio, $producto] = puntoNegocio();
+    $body = array_replace(puntoCuerpo($negocio, $producto, ['direccion_id' => $direccion->id]), ['direccion_entrega' => $direccion->direccion]);
+    $this->postJson('/api/pedidos', $body)->assertCreated();
+});
+
 test('el pedido exige referencias completas y direccion consistente con el mapa', function () {
+    config(['vitrina.fotos_entrega_obligatorias' => true]);
     $cliente = puntoPersona();
     $direccion = puntoDireccion($cliente, ['fotos' => null]);
     [$negocio, $producto] = puntoNegocio();

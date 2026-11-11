@@ -1,7 +1,8 @@
-import FotosDireccion, { fotosCompletas } from '../components/FotosDireccion';
+import FotosDireccion, { FOTOS_OBLIGATORIAS, fotosCompletas } from '../components/FotosDireccion';
 import { FotosDireccion as Fotos } from '../api';
-import { campoDireccionValido, limpiarCampoDireccion } from '../direccion';
+import { campoDireccionValido, limpiarTextoDireccion } from '../direccion';
 import CamposDireccion from '../components/CamposDireccion';
+import { normalizarDireccion } from '../direccion';
 import { direccionValida, errorDireccion, telefonoValido, errorTelefono } from '../direccion';
 import { useFocusEffect } from '@react-navigation/native';
 import EditarDireccion from '../components/EditarDireccion';
@@ -189,12 +190,12 @@ export default function CheckoutScreen({ navigation }: Props) {
         setErrores(nuevosErrores);
         return;
       }
-      direccionEntrega = nuevaDireccion.trim();
+      direccionEntrega = normalizarDireccion(nuevaDireccion);
     }
 
     if (seleccion !== 'nueva' && ubicacionSeleccionada && (!direccionValida(ubicacionSeleccionada.direccion) || !campoDireccionValido(ubicacionSeleccionada.barrio) || ubicacionSeleccionada.lat == null || ubicacionSeleccionada.lng == null || !fotosCompletas(ubicacionSeleccionada.fotos))) {
       setEditandoDireccion(ubicacionSeleccionada);
-      setErrores({ ubicacion: 'Completa la dirección, el mapa y las tres fotos antes de pedir.' });
+      setErrores({ ubicacion: FOTOS_OBLIGATORIAS ? 'Completa la dirección, el mapa y las tres fotos antes de pedir.' : 'Completa la dirección y el mapa antes de pedir.' });
       return;
     }
     if (!direccionEntrega) {
@@ -233,7 +234,7 @@ export default function CheckoutScreen({ navigation }: Props) {
       if (seleccion === 'nueva') {
         const guardada = await crearClienteDireccion(auth!.token, {
           nombre: nuevoNombre.trim() || null,
-          direccion: nuevaDireccion.trim(),
+          direccion: normalizarDireccion(nuevaDireccion),
           barrio: nuevoBarrio.trim(),
           fotos,
           lat: nuevoPunto?.lat ?? null,
@@ -406,7 +407,7 @@ export default function CheckoutScreen({ navigation }: Props) {
 
       {seleccion === 'nueva' ? (
         <View style={styles.nuevaBox}>
-          <TextInput style={styles.input} value={nuevoNombre} onChangeText={v => setNuevoNombre(limpiarCampoDireccion(v))} maxLength={80} placeholder="Nombre opcional: Mi casa, Trabajo…" placeholderTextColor={c.mutedSoft} />
+          <TextInput style={styles.input} value={nuevoNombre} onChangeText={v => setNuevoNombre(limpiarTextoDireccion(v))} maxLength={80} placeholder="Nombre opcional: Mi casa, Trabajo…" placeholderTextColor={c.mutedSoft} />
           <Text style={styles.lineaDetalle}>Solo tú verás este nombre.</Text>
           <CamposDireccion value={nuevaDireccion} onChangeText={setNuevaDireccion} />
           <FieldError mensaje={errores.nuevaDireccion} />

@@ -156,11 +156,20 @@ test('si se pierde la red al confirmar, el formulario desaparece mientras se rei
 });
 
 
-test('una dirección antigua sin fotos obliga a completarla antes de confirmar', async () => {
+test('una dirección antigua sin punto en el mapa obliga a completarla antes de confirmar', async () => {
   const { getClienteDirecciones } = require('../src/api');
   getClienteDirecciones.mockResolvedValueOnce([{ ...mockDireccion, fotos: {}, lat: null }]);
   await montar();
   await tocar('Confirmar pedido');
   expect(mockCrear).not.toHaveBeenCalled();
-  expect(textos()).toContain('Completa la dirección, el mapa y las tres fotos antes de pedir.');
+  expect(textos()).toContain('Completa la dirección y el mapa antes de pedir.');
+});
+
+test('por ahora una dirección sin fotos permite confirmar el pedido', async () => {
+  const { getClienteDirecciones } = require('../src/api');
+  getClienteDirecciones.mockResolvedValueOnce([{ ...mockDireccion, fotos: {} }]);
+  mockCrear.mockResolvedValue({ id: 1 });
+  await montar();
+  await tocar('Confirmar pedido');
+  expect(mockCrear).toHaveBeenCalledTimes(1);
 });

@@ -177,8 +177,12 @@ class PedidoController extends Controller
             $direccion = isset($datos['direccion_id'])
                 ? $cliente->clienteDirecciones()->find($datos['direccion_id'])
                 : null;
-            if (! $direccion || ! $direccion->tieneUbicacion() || count(array_intersect(['frente', 'izquierda', 'derecha'], array_keys($direccion->fotos ?? []))) !== 3) {
-                throw \Illuminate\Validation\ValidationException::withMessages(['direccion_id' => 'Edita la dirección: marca tu casa en el mapa y añade las tres fotos.']);
+            $faltanFotos = config('vitrina.fotos_entrega_obligatorias')
+                && count(array_intersect(['frente', 'izquierda', 'derecha'], array_keys($direccion?->fotos ?? []))) !== 3;
+            if (! $direccion || ! $direccion->tieneUbicacion() || $faltanFotos) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['direccion_id' => $faltanFotos
+                    ? 'Edita la dirección: marca tu casa en el mapa y añade las tres fotos.'
+                    : 'Edita la dirección: marca tu casa en el mapa.']);
             }
             validator(['direccion' => $direccion->direccion, 'barrio' => $direccion->barrio], [
                 'direccion' => ['required', 'max:255', new \App\Rules\Direccion],

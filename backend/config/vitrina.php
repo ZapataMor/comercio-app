@@ -13,4 +13,9 @@ return [
     'correo_contacto' => env('VITRINA_CORREO_CONTACTO', 'soporte@vitrina.example'),
 
     'ciudad' => env('VITRINA_CIUDAD', 'Maicao, La Guajira, Colombia'),
+
+    // Fotos de referencia (frente y calle a cada lado) al guardar una dirección
+    // de entrega. Opcionales mientras se prueba; en producción poner true y
+    // cambiar también FOTOS_OBLIGATORIAS en frontend/src/components/FotosDireccion.tsx.
+    'fotos_entrega_obligatorias' => (bool) env('FOTOS_ENTREGA_OBLIGATORIAS', false),
 ];

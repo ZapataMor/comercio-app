@@ -1,4 +1,5 @@
 import CamposDireccion from '../components/CamposDireccion';
+import { normalizarDireccion } from '../direccion';
 import { direccionValida, errorDireccion, telefonoValido, errorTelefono } from '../direccion';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
@@ -93,7 +94,7 @@ export default function RegisterScreen({ navigation }: Props) {
         apellidos: apellidos.trim(),
         email: email.trim(),
         password,
-        direccion: direccion.trim(),
+        direccion: normalizarDireccion(direccion),
         barrio: barrio.trim(),
         telefono: telefono.trim(),
         acepta_terminos: aceptaTerminos,
