@@ -76,18 +76,18 @@ test('un cliente actualiza su dirección, barrio y teléfono', function () {
         'name' => $user->name,
         'email' => $user->email,
         'direccion' => 'Carrera 9 # 10-11',
-        'barrio' => 'La Loma',
+        'barrio' => 'La-Loma',
         'telefono' => '3111111111',
     ])->assertOk()
         ->assertJsonPath('user.direccion', 'Carrera 9 # 10-11')
-        ->assertJsonPath('user.barrio', 'La Loma')
+        ->assertJsonPath('user.barrio', 'La-Loma')
         ->assertJsonPath('user.telefono', '3111111111');
 
     // La ubicación principal del cliente queda sincronizada con el perfil.
     $this->assertDatabaseHas('cliente_direcciones', [
         'user_id' => $user->id,
         'direccion' => 'Carrera 9 # 10-11',
-        'barrio' => 'La Loma',
+        'barrio' => 'La-Loma',
         'es_principal' => true,
     ]);
 });

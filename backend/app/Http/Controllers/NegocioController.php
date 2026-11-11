@@ -90,7 +90,7 @@ class NegocioController extends Controller
             'categorias' => ['required_without:categoria', 'array', 'min:1'],
             'categorias.*' => ['required', 'string', 'max:100', 'distinct'],
             'direccion' => ['required', 'string', 'max:255', new \App\Rules\Direccion],
-            'barrio' => ['required', 'string', 'max:100'],
+            'barrio' => ['required', 'string', 'max:100', 'regex:/\A[\p{L}\p{N}-]+\z/u'],
             'telefono' => ['nullable', 'string', new \App\Rules\Telefono],
             'activo' => ['sometimes', 'boolean'],
             // Tiempo promedio que promete para tener listo un pedido (minutos).
@@ -241,7 +241,7 @@ class NegocioController extends Controller
             'categorias' => ['sometimes', 'array', 'min:1'],
             'categorias.*' => ['required', 'string', 'max:100', 'distinct'],
             'direccion' => ['sometimes', 'required', 'string', 'max:255', new \App\Rules\Direccion],
-            'barrio' => ['sometimes', 'required', 'string', 'max:100'],
+            'barrio' => ['sometimes', 'required', 'string', 'max:100', 'regex:/\A[\p{L}\p{N}-]+\z/u'],
             'telefono' => ['nullable', 'string', new \App\Rules\Telefono],
             'activo' => ['sometimes', 'boolean'],
             // Tiempo promedio que promete para tener listo un pedido (minutos).

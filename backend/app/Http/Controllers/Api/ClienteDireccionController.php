@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Barrio;
+use App\Rules\Direccion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -35,9 +36,9 @@ class ClienteDireccionController extends Controller
         }
 
         $data = $request->validate([
-            'nombre' => ['nullable', 'string', 'max:80'],
-            'direccion' => ['required', 'string', 'max:255', new \App\Rules\Direccion],
-            'barrio' => ['required', 'string', 'max:120'],
+            'nombre' => ['nullable', 'string', 'max:80', 'regex:/\A[\p{L}\p{N}-]+\z/u'],
+            'direccion' => ['required', 'string', 'max:255', new Direccion],
+            'barrio' => ['required', 'string', 'max:120', 'regex:/\A[\p{L}\p{N}-]+\z/u'],
             ...self::REGLAS_PUNTO,
         ]);
 
@@ -70,9 +71,9 @@ class ClienteDireccionController extends Controller
         abort_unless($request->user()->hasRole('usuario'), 403);
         $request->user()->clienteDirecciones()->findOrFail($id);
         $data = $request->validate([
-            'nombre' => ['nullable', 'string', 'max:80'],
-            'direccion' => ['required', 'string', 'max:255', new \App\Rules\Direccion],
-            'barrio' => ['required', 'string', 'max:120'],
+            'nombre' => ['nullable', 'string', 'max:80', 'regex:/\A[\p{L}\p{N}-]+\z/u'],
+            'direccion' => ['required', 'string', 'max:255', new Direccion],
+            'barrio' => ['required', 'string', 'max:120', 'regex:/\A[\p{L}\p{N}-]+\z/u'],
             ...self::REGLAS_PUNTO,
         ]);
         Barrio::registrarSiEsNuevo($data['barrio'], $request->user()->id);

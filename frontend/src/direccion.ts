@@ -9,8 +9,11 @@ export function unirDireccion({ calle, carrera, casa }: PartesDireccion): string
 }
 export function direccionValida(value: string): boolean {
   const p = separarDireccion(value);
-  return !!((p.calle.trim() || p.carrera.trim()) && p.casa.trim()) && value.length <= 255;
+  return !!((p.calle.trim() || p.carrera.trim()) && p.casa.trim()) && Object.values(p).every(v => !v || /^[\p{L}\p{N}-]+$/u.test(v.trim())) && value.length <= 255;
 }
 export const telefonoValido = (value: string) => /^3[0-9]{9}$/.test(value);
 export const errorTelefono = 'El teléfono debe tener exactamente 10 números y empezar por 3.';
-export const errorDireccion = 'Escribe Calle o Carrera y el Número de la casa.';
+export const errorDireccion = 'Escribe Calle o Carrera y el Número de la casa. Solo letras, números o guiones.';
+
+export const campoDireccionValido = (v: string) => /^[\p{L}\p{N}-]+$/u.test(v);
+export const limpiarCampoDireccion = (v: string) => v.replace(/[^\p{L}\p{N}-]/gu, '');

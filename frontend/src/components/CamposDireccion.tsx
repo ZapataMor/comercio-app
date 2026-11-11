@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text, TextInput, View } from 'react-native';
-import { separarDireccion, unirDireccion } from '../direccion';
+import { separarDireccion, unirDireccion, limpiarCampoDireccion } from '../direccion';
 import { font, makeStyles, radius, useTheme } from '../theme';
 
 export default function CamposDireccion({ value, onChangeText, editable = true }: {
@@ -19,7 +19,7 @@ export default function CamposDireccion({ value, onChangeText, editable = true }
         <TextInput accessibilityLabel={label} style={styles.input} value={partes[campo]}
           editable={editable} maxLength={70} placeholderTextColor={c.muted}
           placeholder={{ calle: 'Ej. 12A', carrera: 'Ej. 8', casa: 'Ej. 30-15' }[campo]}
-          onChangeText={text => onChangeText(unirDireccion({ ...partes, [campo]: text.replace(/[#\r\n]/g, '').trimStart() }))} />
+          onChangeText={text => onChangeText(unirDireccion({ ...partes, [campo]: limpiarCampoDireccion(text) }))} />
       </View>;
     })}
   </View>;

@@ -34,7 +34,7 @@ class AuthController extends Controller
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['present', 'string', 'min:5', 'confirmed'],
             'direccion' => ['required', 'string', 'max:255', new \App\Rules\Direccion],
-            'barrio' => ['required', 'string', 'max:120'],
+            'barrio' => ['required', 'string', 'max:120', 'regex:/\A[\p{L}\p{N}-]+\z/u'],
             'telefono' => ['required', 'string', new \App\Rules\Telefono],
             // Autorización previa del tratamiento de datos (Ley 1581 de 2012).
             'acepta_terminos' => ['accepted'],
@@ -143,7 +143,7 @@ class AuthController extends Controller
             'password_actual' => ['exclude_without:password', 'present', 'string', 'min:1'],
             // Datos de contacto: obligatorios para clientes, opcionales para el resto.
             'direccion' => [$esCliente ? 'required' : 'sometimes', 'nullable', 'string', 'max:255', new \App\Rules\Direccion],
-            'barrio' => [$esCliente ? 'required' : 'sometimes', 'nullable', 'string', 'max:120'],
+            'barrio' => [$esCliente ? 'required' : 'sometimes', 'nullable', 'string', 'max:120', 'regex:/\A[\p{L}\p{N}-]+\z/u'],
             'telefono' => [$esCliente ? 'required' : 'sometimes', 'nullable', 'string', new \App\Rules\Telefono],
         ]);
 

@@ -1,3 +1,4 @@
+import { limpiarCampoDireccion } from '../direccion';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -72,7 +73,7 @@ export default function BarrioSelect({
   );
 
   function elegir(nombre: string) {
-    onSeleccionar(nombre);
+    onSeleccionar(limpiarCampoDireccion(nombre.replace(/\s+/g, '-')));
     setAbierto(false);
     setBusqueda('');
   }
