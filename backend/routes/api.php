@@ -182,6 +182,8 @@ Route::middleware(['auth:sanctum', 'throttle:api-usuario'])->group(function () {
     Route::get('/cliente/direcciones', [ClienteDireccionController::class, 'index']);
     Route::post('/cliente/direcciones', [ClienteDireccionController::class, 'store']);
     Route::put('/cliente/direcciones/{id}', [ClienteDireccionController::class, 'update']);
+    Route::put('/cliente/direcciones/{id}/principal', [ClienteDireccionController::class, 'principal']);
+    Route::delete('/cliente/direcciones/{id}', [ClienteDireccionController::class, 'destroy']);
     Route::post('/pedidos', [ApiPedidoController::class, 'store']);
     Route::put('/carrito', [CarritoController::class, 'actualizar']);
     Route::get('/pedidos', [ApiPedidoController::class, 'index']);

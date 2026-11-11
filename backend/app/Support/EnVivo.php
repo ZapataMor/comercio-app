@@ -264,6 +264,14 @@ class EnVivo
             AuthController::class.'@actualizarPerfil' => ['despues' => fn (Request $r) => self::perfil($yo($r))],
             AuthController::class.'@hacerseDomiciliario' => ['despues' => fn (Request $r) => self::perfil($yo($r))],
             AuthController::class.'@dejarDeSerDomiciliario' => ['despues' => fn (Request $r) => self::perfil($yo($r))],
+            Api\ClienteDireccionController::class.'@principal' => ['despues' => function (Request $r) use ($yo) {
+                self::avisar(self::usuario($yo($r)), 'direcciones');
+                self::perfil($yo($r));
+            }],
+            Api\ClienteDireccionController::class.'@destroy' => ['despues' => function (Request $r) use ($yo) {
+                self::avisar(self::usuario($yo($r)), 'direcciones');
+                self::perfil($yo($r));
+            }],
             Api\ClienteDireccionController::class.'@store' => ['despues' => function (Request $r) use ($yo) {
                 self::avisar(self::usuario($yo($r)), 'direcciones');
                 self::avisar(self::ADMIN, 'barrios');

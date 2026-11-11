@@ -610,6 +610,16 @@ export async function editarClienteDireccion(
   return d.direccion as ClienteDireccion;
 }
 
+export async function marcarDireccionPrincipal(token: string, id: number): Promise<ClienteDireccion[]> {
+  const d = await authSend('PUT', `/api/cliente/direcciones/${id}/principal`, token);
+  return d.direcciones;
+}
+
+export async function eliminarClienteDireccion(token: string, id: number): Promise<ClienteDireccion[]> {
+  const d = await authSend('DELETE', `/api/cliente/direcciones/${id}`, token);
+  return d.direcciones;
+}
+
 // ---------- Mis negocios (modelo unificado: propietario o trabajador) ----------
 //
 // Toda la gestión va contra /api/negocios/{negocioId}/...: una persona puede

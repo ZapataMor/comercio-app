@@ -120,7 +120,11 @@ class AuthController extends Controller
      */
     public function actualizarPerfil(Request $request): JsonResponse
     {
-        return $this->guardarPerfil($request);
+        return DB::transaction(function () use ($request) {
+            $request->user()->newQuery()->lockForUpdate()->findOrFail($request->user()->id);
+
+            return $this->guardarPerfil($request);
+        });
     }
 
     private function guardarPerfil(Request $request): JsonResponse
