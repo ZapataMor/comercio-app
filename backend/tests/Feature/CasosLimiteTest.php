@@ -551,3 +551,37 @@ test('el panel web del administrador muestra reportes y guarda su resolución', 
     $this->put("/admin/reportes/{$reporte->id}/resolver", ['resolucion' => 'Se verificó lo ocurrido con las partes.'])->assertRedirect();
     expect($reporte->fresh()->resuelto_at)->not->toBeNull();
 });
+
+test('el tablero del admin muestra ventas, entregados y citas', function () {
+    [$dueno, $negocio] = limNegocio();
+    $cliente = limPersona();
+    limPedido($cliente, $negocio, 'entregado');
+    limPedido($cliente, $negocio, 'entregado');
+    $viejo = limPedido($cliente, $negocio, 'entregado');
+    $viejo->forceFill(['entregado_at' => now()->subMonths(2)])->save();
+    limPedido($cliente, $negocio, 'cancelado');
+    limPedido($cliente, $negocio, 'pendiente');
+
+    $cita = fn (string $estado, $inicio) => Cita::create([
+        'negocio_id' => $negocio->id, 'servicio_nombre' => 'Corte', 'cliente_id' => $cliente->id, 'cliente_nombre' => 'Cliente',
+        'profesional_id' => $dueno->id, 'origen' => 'app', 'estado' => $estado,
+        'inicio' => $inicio, 'fin' => $inicio->copy()->addMinutes(30),
+    ]);
+    $cita('confirmada', now()->endOfDay()->subHour());
+    $cita('pendiente', now()->addDays(2));
+    $cita('completada', now()->subDays(3));
+    $cita('cancelada', now()->endOfDay()->subHour());
+
+    Sanctum::actingAs(limPersona('administrador'));
+    $this->getJson('/api/admin/stats')->assertOk()
+        ->assertJsonPath('ventas_hoy', 12000)
+        ->assertJsonPath('ventas_total', 18000)
+        ->assertJsonPath('entregados_hoy', 2)
+        ->assertJsonPath('entregados_total', 3)
+        ->assertJsonPath('cancelados_hoy', 1)
+        ->assertJsonPath('pedidos_en_curso', 1)
+        ->assertJsonPath('citas_hoy', 1)
+        ->assertJsonPath('citas_por_confirmar', 1)
+        ->assertJsonPath('citas_proximas', 1)
+        ->assertJsonPath('citas_completadas', 1);
+});

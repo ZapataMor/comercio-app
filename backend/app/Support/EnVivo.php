@@ -162,6 +162,7 @@ class EnVivo
             self::usuario($cita->cliente_id),
             self::usuario($cita->profesional_id),
             self::negocio($cita->negocio_id),
+            self::ADMIN,
         ], 'citas', $datos);
         // Los demás clientes que miran la agenda ven el horario ocupado o libre.
         self::avisar(self::CATALOGO, 'agenda', ['negocio_id' => $cita->negocio_id]);

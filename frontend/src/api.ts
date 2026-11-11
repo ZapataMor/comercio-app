@@ -1168,6 +1168,18 @@ export type AdminStats = {
   domiciliarios_vetados?: number;
   negocios_vetados?: number;
   resenas_reportadas?: number;
+  /** Pesos cobrados en pedidos entregados (incluye domicilio). */
+  ventas_hoy?: number;
+  ventas_mes?: number;
+  ventas_total?: number;
+  entregados_hoy?: number;
+  entregados_mes?: number;
+  entregados_total?: number;
+  cancelados_hoy?: number;
+  citas_hoy?: number;
+  citas_por_confirmar?: number;
+  citas_proximas?: number;
+  citas_completadas?: number;
 };
 
 export type AdminUsuario = {

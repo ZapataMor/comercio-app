@@ -13,11 +13,17 @@ import { useToast } from '../Toast';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AdminTablero'>;
 
-function Tarjeta({ valor, etiqueta, color }: { valor: number; etiqueta: string; color: string }) {
+function cop(n: number) {
+  return '$' + Math.round(n).toLocaleString('es-CO');
+}
+
+function Tarjeta({ valor, etiqueta, color }: { valor: number | string; etiqueta: string; color: string }) {
   const styles = useStyles();
   return (
     <View style={styles.tarjeta}>
-      <Text style={[styles.valor, { color }]}>{valor}</Text>
+      <Text style={[styles.valor, typeof valor === 'string' && styles.valorDinero, { color }]} numberOfLines={1} adjustsFontSizeToFit>
+        {valor}
+      </Text>
       <Text style={styles.etiqueta}>{etiqueta}</Text>
     </View>
   );
@@ -47,7 +53,7 @@ export default function AdminTableroScreen({ navigation }: Props) {
   }, [auth]);
 
   // En vivo: los números del tablero siguen lo que pasa en la app.
-  useEnVivo(['pedidos', 'usuarios', 'perfil', 'negocio', 'reportes', 'barrios', 'resenas', 'reputacion'], () => {
+  useEnVivo(['pedidos', 'citas', 'usuarios', 'perfil', 'negocio', 'reportes', 'barrios', 'resenas', 'reputacion'], () => {
     getAdminStats(auth!.token).then(setStats).catch(() => {});
   });
 
@@ -78,26 +84,66 @@ export default function AdminTableroScreen({ navigation }: Props) {
       ) : error ? (
         <Text style={styles.error}>{error}</Text>
       ) : stats ? (
-        <FadeInView style={styles.grid}>
-          <Tarjeta valor={stats.usuarios} etiqueta="Usuarios" color={c.goldText} />
-          <Tarjeta valor={stats.negocios} etiqueta="Negocios" color={c.goldText} />
-          <Tarjeta valor={stats.negocios_activos} etiqueta="Abiertos" color={c.success} />
-          <Tarjeta valor={stats.productos} etiqueta="Productos" color={c.goldText} />
-          <Tarjeta
-            valor={stats.domiciliarios_vetados ?? 0}
-            etiqueta="Domiciliarios vetados"
-            color={stats.domiciliarios_vetados ? c.danger : c.muted}
-          />
-          <Tarjeta
-            valor={stats.negocios_vetados ?? 0}
-            etiqueta="Negocios vetados"
-            color={stats.negocios_vetados ? c.danger : c.muted}
-          />
-          <Tarjeta
-            valor={stats.resenas_reportadas ?? 0}
-            etiqueta="Reseñas reportadas"
-            color={stats.resenas_reportadas ? c.danger : c.muted}
-          />
+        <FadeInView>
+          <Text style={styles.seccion}>Ventas</Text>
+          <View style={styles.grid}>
+            <Tarjeta valor={cop(stats.ventas_hoy ?? 0)} etiqueta="Hoy" color={c.success} />
+            <Tarjeta valor={cop(stats.ventas_mes ?? 0)} etiqueta="Este mes" color={c.success} />
+            <Tarjeta valor={cop(stats.ventas_total ?? 0)} etiqueta="Desde el inicio" color={c.goldText} />
+          </View>
+
+          <Text style={styles.seccion}>Pedidos</Text>
+          <View style={styles.grid}>
+            <Tarjeta valor={stats.pedidos_en_curso ?? 0} etiqueta="En curso" color={c.accent} />
+            <Tarjeta valor={stats.entregados_hoy ?? 0} etiqueta="Entregados hoy" color={c.success} />
+            <Tarjeta valor={stats.entregados_mes ?? 0} etiqueta="Entregados este mes" color={c.success} />
+            <Tarjeta valor={stats.entregados_total ?? 0} etiqueta="Entregados en total" color={c.goldText} />
+            <Tarjeta
+              valor={stats.cancelados_hoy ?? 0}
+              etiqueta="Cancelados hoy"
+              color={stats.cancelados_hoy ? c.danger : c.muted}
+            />
+            <Tarjeta
+              valor={stats.reportes_pendientes ?? 0}
+              etiqueta="Reportes pendientes"
+              color={stats.reportes_pendientes ? c.danger : c.muted}
+            />
+          </View>
+
+          <Text style={styles.seccion}>Citas</Text>
+          <View style={styles.grid}>
+            <Tarjeta valor={stats.citas_hoy ?? 0} etiqueta="Hoy" color={c.accent} />
+            <Tarjeta
+              valor={stats.citas_por_confirmar ?? 0}
+              etiqueta="Por confirmar"
+              color={stats.citas_por_confirmar ? c.danger : c.muted}
+            />
+            <Tarjeta valor={stats.citas_proximas ?? 0} etiqueta="Confirmadas próximas" color={c.success} />
+            <Tarjeta valor={stats.citas_completadas ?? 0} etiqueta="Atendidas en total" color={c.goldText} />
+          </View>
+
+          <Text style={styles.seccion}>Plataforma</Text>
+          <View style={styles.grid}>
+            <Tarjeta valor={stats.usuarios} etiqueta="Usuarios" color={c.goldText} />
+            <Tarjeta valor={stats.negocios} etiqueta="Negocios" color={c.goldText} />
+            <Tarjeta valor={stats.negocios_activos} etiqueta="Abiertos" color={c.success} />
+            <Tarjeta valor={stats.productos} etiqueta="Productos" color={c.goldText} />
+            <Tarjeta
+              valor={stats.domiciliarios_vetados ?? 0}
+              etiqueta="Domiciliarios vetados"
+              color={stats.domiciliarios_vetados ? c.danger : c.muted}
+            />
+            <Tarjeta
+              valor={stats.negocios_vetados ?? 0}
+              etiqueta="Negocios vetados"
+              color={stats.negocios_vetados ? c.danger : c.muted}
+            />
+            <Tarjeta
+              valor={stats.resenas_reportadas ?? 0}
+              etiqueta="Reseñas reportadas"
+              color={stats.resenas_reportadas ? c.danger : c.muted}
+            />
+          </View>
         </FadeInView>
       ) : null}
 
@@ -202,6 +248,8 @@ const useStyles = makeStyles((c, shadow) => ({
     backgroundColor: c.surface, borderRadius: radius.lg, padding: 18, width: '47%', ...shadow.soft,
   },
   valor: { fontSize: 30, fontFamily: font.extra },
+  valorDinero: { fontSize: 22 },
+  seccion: { fontSize: 13, fontFamily: font.bold, color: c.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 8, marginBottom: 10 },
   etiqueta: { color: c.muted, marginTop: 4, fontFamily: font.medium },
   item: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: c.surface,

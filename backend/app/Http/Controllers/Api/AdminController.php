@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Cita;
 use App\Models\Negocio;
 use App\Models\Pedido;
 use App\Models\PedidoReporte;
@@ -28,7 +29,27 @@ class AdminController extends Controller
     /** Números generales para el tablero. */
     public function stats(): JsonResponse
     {
+        // Entregados: por fecha de entrega (los viejos sin ella, por la última actualización).
+        $entregados = fn () => Pedido::where('estado', 'entregado');
+        $fechaEntrega = DB::raw('COALESCE(entregado_at, updated_at)');
+        $hoy = now()->startOfDay();
+        $mes = now()->startOfMonth();
+
         return response()->json([
+            // Ventas = lo que pagaron los clientes en pedidos entregados (con domicilio).
+            'ventas_hoy' => (float) $entregados()->where($fechaEntrega, '>=', $hoy)->sum('total'),
+            'ventas_mes' => (float) $entregados()->where($fechaEntrega, '>=', $mes)->sum('total'),
+            'ventas_total' => (float) $entregados()->sum('total'),
+            'entregados_hoy' => $entregados()->where($fechaEntrega, '>=', $hoy)->count(),
+            'entregados_mes' => $entregados()->where($fechaEntrega, '>=', $mes)->count(),
+            'entregados_total' => $entregados()->count(),
+            'cancelados_hoy' => Pedido::where('estado', 'cancelado')->where('updated_at', '>=', $hoy)->count(),
+            // Citas de hoy que siguen en pie o ya se atendieron (no canceladas ni vencidas).
+            'citas_hoy' => Cita::whereBetween('inicio', [$hoy, now()->endOfDay()])
+                ->whereIn('estado', ['pendiente', 'confirmada', 'completada'])->count(),
+            'citas_por_confirmar' => Cita::where('estado', 'pendiente')->where('inicio', '>=', now())->count(),
+            'citas_proximas' => Cita::where('estado', 'confirmada')->where('inicio', '>=', now())->count(),
+            'citas_completadas' => Cita::where('estado', 'completada')->count(),
             'usuarios' => User::count(),
             'negocios' => Negocio::count(),
             'negocios_activos' => Negocio::where('activo', true)->count(),
