@@ -57,10 +57,10 @@ export function useTurno() {
   }, []);
 
   async function cambiar(valor: boolean) {
-    publicar(token, { enTurno: valor, cambiando: true });
+    publicar(token, { cambiando: true });
     try {
       const mensaje = await cambiarTurno(token, valor);
-      publicar(token, { cambiando: false });
+      publicar(token, { enTurno: valor, cambiando: false });
       toast.info(valor ? 'En turno' : 'Fuera de turno', mensaje);
     } catch (e) {
       publicar(token, { enTurno: !valor, cambiando: false });

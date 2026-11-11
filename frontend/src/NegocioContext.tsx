@@ -218,16 +218,8 @@ export function NegocioProvider({ children }: { children: React.ReactNode }) {
       if (!token || !negocio) {
         return;
       }
-      const previo = negocio;
-      // Optimista: refleja el cambio al instante en la UI.
-      reemplazar({ ...negocio, activo: abierto });
-      try {
-        reemplazar(await cambiarEstadoNegocio(token, negocio.id, abierto));
-      } catch (e) {
-        // Revierte si el servidor falla.
-        reemplazar(previo);
-        throw e;
-      }
+      // Conserva el estado hasta que el servidor valide los pedidos pendientes.
+      reemplazar(await cambiarEstadoNegocio(token, negocio.id, abierto));
     },
     [negocio, token, reemplazar],
   );

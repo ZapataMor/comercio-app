@@ -91,7 +91,7 @@ class NegocioLifecycleTest extends TestCase
         $this->negocio->tiposNegocio()->attach($tipo);
         $producto = $this->negocio->productos()->create(['nombre' => 'Producto temporal', 'precio' => 1000]);
         $servicio = $this->negocio->servicios()->create(['nombre' => 'Corte', 'descripcion' => 'Corte']);
-        $pedido = $this->pedido('aceptado');
+        $pedido = $this->pedido('entregado');
         $cita = $this->cita();
         $pedidoOriginal = $pedido->fresh()->getRawOriginal();
         $citaOriginal = $cita->fresh()->getRawOriginal();

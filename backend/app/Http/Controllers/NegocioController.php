@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Resources\NegocioResource;
 use App\Models\Barrio;
 use App\Models\Negocio;
+use App\Models\Pedido;
 use App\Models\TipoNegocio;
 use App\Support\EliminarNegocio;
 use App\Support\HorarioNegocio;
@@ -39,6 +40,9 @@ class NegocioController extends Controller
         $negocio = DB::transaction(function () use ($request, $negocio, $datos) {
             $negocio = Negocio::lockForUpdate()->findOrFail($negocio->id);
             abort_unless($negocio->esPropietario($request->user()), 403);
+            if ($datos['desactivado']) {
+                $this->validarSinPedidosPendientes($negocio);
+            }
             $negocio->forceFill(['desactivado_at' => $datos['desactivado'] ? ($negocio->desactivado_at ?? now()) : null])->save();
 
             return $negocio;
@@ -249,18 +253,27 @@ class NegocioController extends Controller
             $data['horario'] = HorarioNegocio::normalizar($data['horario']);
         }
 
-        // Abrir/cerrar a mano se respeta hasta la próxima hora del horario.
-        if (array_key_exists('activo', $data) && (bool) $data['activo'] !== $negocio->activo) {
-            $negocio->activo_cambiado_at = now();
-        }
-
         if (array_key_exists('categorias', $data) || array_key_exists('categoria', $data)) {
             $categorias = $this->normalizarCategorias($data);
             unset($data['categorias']);
             $data['categoria'] = $categorias[0] ?? null;
         }
 
-        $negocio->update($data);
+        $negocio = DB::transaction(function () use ($negocio, $data) {
+            // Comparte el bloqueo con la creación de pedidos.
+            $negocio = Negocio::lockForUpdate()->findOrFail($negocio->id);
+            if (array_key_exists('activo', $data)) {
+                if (! $data['activo']) {
+                    $this->validarSinPedidosPendientes($negocio);
+                }
+                if ((bool) $data['activo'] !== $negocio->activo) {
+                    $negocio->activo_cambiado_at = now();
+                }
+            }
+            $negocio->update($data);
+
+            return $negocio;
+        });
         if (array_key_exists('barrio', $data)) {
             Barrio::registrarSiEsNuevo($data['barrio'], $request->user()->id);
         }
@@ -274,6 +287,12 @@ class NegocioController extends Controller
         return response()->json([
             'negocio' => $this->conRol($negocio, $negocio->miembros()->whereKey($request->user()->id)->first()?->pivot->rol),
         ]);
+    }
+
+    private function validarSinPedidosPendientes(Negocio $negocio): void
+    {
+        abort_if($negocio->pedidos()->whereIn('estado', Pedido::EN_CURSO)->exists(), 409,
+            'No puedes cerrar ni desactivar el comercio porque tienes pedidos en proceso. Debes finalizarlos o cancelarlos antes de cerrar o desactivar el comercio.');
     }
 
     /**

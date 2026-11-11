@@ -68,8 +68,16 @@ class DomiciliarioController extends Controller
     {
         $datos = $request->validate(['en_turno' => ['required', 'boolean']]);
 
-        $yo = $request->user();
-        $yo->forceFill(['en_turno' => $datos['en_turno']])->save();
+        $yo = DB::transaction(function () use ($request, $datos) {
+            // Comparte el bloqueo con tomar() para revisar las entregas al cambiar.
+            $yo = User::lockForUpdate()->findOrFail($request->user()->id);
+            abort_if(! $datos['en_turno'] && Pedido::where('domiciliario_id', $yo->id)
+                ->whereIn('estado', Pedido::EN_CURSO)->exists(), 409,
+                'No puedes marcarte como inactivo porque tienes domicilios en proceso. Debes finalizarlos o cancelar los que puedas antes de salir de turno. Si aún no has recogido un pedido, puedes soltarlo desde Mis entregas.');
+            $yo->forceFill(['en_turno' => $datos['en_turno']])->save();
+
+            return $yo;
+        });
 
         // Fuera de turno y sin entregas, nadie debe verlo en el mapa.
         if (! UbicacionDomiciliario::debeCompartir($yo)) {
