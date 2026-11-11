@@ -7,6 +7,7 @@ import { textoCantidad } from '../cantidades';
 import { CommonActions } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEnVivo } from '../usePolling';
 import {
   ActivityIndicator,
   ScrollView,
@@ -108,6 +109,7 @@ export default function CheckoutScreen({ navigation }: Props) {
   }, [auth?.token]);
 
   useEffect(cargarTarifa, [cargarTarifa]);
+  useEnVivo(['ajustes'], cargarTarifa);
 
   function limpiarError(campo: string) {
     setErrores(prev => {

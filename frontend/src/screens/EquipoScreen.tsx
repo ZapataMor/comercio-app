@@ -7,6 +7,7 @@
  * Un trabajador ve el equipo y puede salirse del negocio.
  */
 import { useFocusEffect } from '@react-navigation/native';
+import { temasDelNegocio, useEnVivo } from '../usePolling';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Switch, RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -103,6 +104,8 @@ export default function EquipoScreen({ navigation }: Props) {
       cargar();
     }, [cargar]),
   );
+  // En vivo: alguien acepta o rechaza la invitación, sale del equipo o cambian sus permisos.
+  useEnVivo(temasDelNegocio(['equipo'], negocioId), cargar);
 
   async function refrescar() {
     setRefrescando(true);

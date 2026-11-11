@@ -5,6 +5,7 @@
  * marcarlo listo y se ven las ventas.
  */
 import { useFocusEffect } from '@react-navigation/native';
+import { temasDelNegocio, useEnVivo } from '../usePolling';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, Text, TouchableOpacity, View } from 'react-native';
@@ -98,6 +99,12 @@ export default function PedidosNegocioScreen({ navigation }: Props) {
       cargar('inicio');
     }, [cargar]),
   );
+
+  // En vivo: pedidos nuevos, aceptados por otro del equipo, cancelados... Si
+  // se está viendo más abajo de la primera página, la lista no se recorta.
+  useEnVivo(temasDelNegocio(['pedidos'], negocioId), () => {
+    if (pagina === 1) cargar('inicio');
+  });
 
   async function cargarMas() {
     if (!puedePedidos || !negocioId || !hayMas || cargandoMas || cargando) return;

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useEnVivo } from '../usePolling';
 import { ActivityIndicator, FlatList, RefreshControl, Text, TextInput, View } from 'react-native';
 import {
   descartarReportesResena,
@@ -66,6 +67,10 @@ export default function AdminResenasScreen() {
     setAbierta(null);
     cargar();
   }, [cargar]);
+  // En vivo: reportes nuevos o reseñas que otro admin resolvió.
+  useEnVivo(['resenas'], () => {
+    if (pagina === 1) cargar();
+  });
 
   async function cargarMas() {
     if (!hayMas || cargandoMas || cargando) return;

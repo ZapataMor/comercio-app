@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AvisarEnVivo;
 use App\Http\Middleware\CuentaActiva;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -15,6 +16,12 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    // Cambios en vivo (Reverb): la app autoriza sus canales privados con su
+    // token Sanctum en POST /api/broadcasting/auth. Ver App\Support\EnVivo.
+    ->withBroadcasting(
+        __DIR__.'/../routes/channels.php',
+        ['prefix' => 'api', 'middleware' => ['api', 'auth:sanctum']],
+    )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trimStrings(except: ['password_actual']);
 
@@ -28,7 +35,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->api(append: [
             'throttle:api-ip',
             CuentaActiva::class,
+            // Avisa a los demás dispositivos de lo que cambió (tiempo real).
+            AvisarEnVivo::class,
         ]);
+        // El panel web del admin también cambia datos que se ven en la app.
+        $middleware->web(append: [AvisarEnVivo::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Reporte de errores: sin SENTRY_LARAVEL_DSN no se envía nada.

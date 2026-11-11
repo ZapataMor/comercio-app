@@ -104,6 +104,8 @@ class CancelarPedido
         }
 
         $pedido->refresh();
+        // También cuando lo cancela el sistema (pedidos:vencer), sin petición de por medio.
+        EnVivo::pedido($pedido);
 
         if ($resultado['penalizar'] && $pedido->negocio) {
             Reputacion::registrar(Reputacion::NEGOCIO, $pedido->negocio, 'cancelo_tras_aceptar', $pedido);

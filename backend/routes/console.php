@@ -4,6 +4,7 @@ use App\Models\Negocio;
 use App\Models\Pedido;
 use App\Notifications\PreguntaCierreNegocio;
 use App\Support\CancelarPedido;
+use App\Support\EnVivo;
 use App\Support\AgendaCitas;
 use App\Support\HorarioNegocio;
 use App\Support\Push;
@@ -19,6 +20,8 @@ Artisan::command('negocios:aplicar-horario', function () {
         ->whereNull('archivado_at')
         ->each(function (Negocio $negocio) use ($ahora, &$cambiados) {
             if (HorarioNegocio::aplicar($negocio, $ahora)) {
+                // Los clientes que lo miran lo ven abrir o cerrar al instante.
+                EnVivo::datosNegocio($negocio->id);
                 $cambiados++;
             }
         });
@@ -43,6 +46,8 @@ Artisan::command('negocios:preguntar-cierre', function () {
             $negocio->forceFill(['cierre_preguntado' => $cierre])->save();
             $duenos = $negocio->miembrosActivos()->get()->filter(fn ($m) => $negocio->puede($m, 'cambiar_estado'));
             Push::enviar($duenos, new PreguntaCierreNegocio($negocio, HorarioNegocio::hora($cierre->format('H:i'))));
+            // Con la app abierta la pregunta aparece al instante, sin esperar el push.
+            EnVivo::avisar(EnVivo::negocio($negocio->id), 'cierre', ['negocio_id' => $negocio->id]);
             $preguntados++;
         });
 

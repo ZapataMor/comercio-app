@@ -29,7 +29,12 @@ jest.mock('../src/Toast', () => ({ useToast: () => mockToast }));
 const mockVolar = jest.fn();
 jest.mock('../src/components/FlyToCart', () => ({ useFlyToCart: () => ({ volar: mockVolar }) }));
 jest.mock('../src/components/Confirmacion', () => ({ useConfirmar: () => jest.fn() }));
-jest.mock('../src/usePolling', () => ({ REFRESCO_NEGOCIOS: 1000, usePolling: jest.fn() }));
+jest.mock('../src/usePolling', () => ({
+  ...jest.requireActual('../src/usePolling'),
+  REFRESCO_NEGOCIOS: 1000,
+  useEnVivo: jest.fn(),
+  usePolling: jest.fn(),
+}));
 
 const mockCatalogo = getCatalogo as jest.Mock;
 const mockRecetas = getRecetasPreferidas as jest.Mock;

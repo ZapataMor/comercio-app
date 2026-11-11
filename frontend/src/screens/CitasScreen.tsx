@@ -112,7 +112,7 @@ export default function CitasScreen({ route, navigation }: Props) {
   );
   usePolling(() => {
     if (pagina === 1 && !ocupado && !decision) cargar();
-  }, 15000);
+  }, 15000, ['citas']);
 
   async function cambiar(cita: Cita, estado: Cita['estado'], razon?: string) {
     if (ocupado) return;

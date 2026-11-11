@@ -226,6 +226,9 @@ class Reputacion
      */
     public static function recalcular(string $tipo, Model $sujeto, bool $puedeLevantarVeto = false): void
     {
+        // Su panel de confiabilidad (y, si es un negocio vetado, el catálogo) se refresca en vivo.
+        EnVivo::reputacion($tipo, $sujeto->getKey());
+
         $col = self::COLUMNAS[$tipo];
 
         $eventos = ReputacionEvento::where('tipo', $tipo)

@@ -4,6 +4,7 @@ import { getCatalogo, sincronizarCarrito } from '../api';
 import { useAuth } from '../AuthContext';
 import { useCart } from '../CartContext';
 import { font, makeStyles, radius } from '../theme';
+import { alCambiarEnVivo } from '../enVivo';
 import { alCambiarDesdePush } from '../usePolling';
 
 const cop = (n: number) => '$' + n.toLocaleString('es-CO');
@@ -44,7 +45,11 @@ export default function VigilarCarrito() {
     const timer = setInterval(consultar, 15000);
     const sub = AppState.addEventListener('change', estado => { if (estado === 'active') consultar(); });
     const quitarPush = alCambiarDesdePush(consultar);
-    return () => { activo = false; clearInterval(timer); sub.remove(); quitarPush(); };
+    // En vivo: el negocio del carrito cambia un precio o retira un producto.
+    const quitarVivo = alCambiarEnVivo(a => {
+      if (a.tema === '*' || (a.tema === 'catalogo' && a.negocio_id === cart.negocioId)) consultar();
+    });
+    return () => { activo = false; clearInterval(timer); sub.remove(); quitarPush(); quitarVivo(); };
   }, [token, cart.negocioId, firma]);
   const cambio = cart.cambiosPrecio[0];
   if (!cambio) return null;

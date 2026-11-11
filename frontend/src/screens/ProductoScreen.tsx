@@ -2,7 +2,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
 import { GestureResponderEvent, Image, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getEstadoNegocio, imagenUrl } from '../api';
+import { getCatalogo, getEstadoNegocio, imagenUrl } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import CantidadPeso from '../components/CantidadPeso';
@@ -15,7 +15,7 @@ import { RootStackParamList } from '../navTypes';
 import { coloresDe, informacionDe, ingredientesDe, precioDe, tallasDe } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useAgregarAlCarrito } from '../useAgregarAlCarrito';
-import { REFRESCO_NEGOCIOS, usePolling } from '../usePolling';
+import { REFRESCO_NEGOCIOS, temasDelNegocio, useEnVivo, usePolling } from '../usePolling';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Producto'>;
 
@@ -37,7 +37,10 @@ export default function ProductoScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { volar } = useFlyToCart();
   const { auth } = useAuth();
-  const { negocioId, negocioNombre, producto } = route.params;
+  const { negocioId, negocioNombre } = route.params;
+  // El negocio puede cambiar el precio o retirar el producto mientras se mira.
+  const [producto, setProducto] = useState(route.params.producto);
+  const [retirado, setRetirado] = useState(false);
   const agregar = useAgregarAlCarrito(negocioId, negocioNombre);
   const [abierto, setAbierto] = useState(route.params.abierto);
 
@@ -46,7 +49,18 @@ export default function ProductoScreen({ navigation, route }: Props) {
     getEstadoNegocio(auth!.token, negocioId)
       .then(({ activo }) => setAbierto(activo))
       .catch(() => {});
-  }, REFRESCO_NEGOCIOS);
+  }, REFRESCO_NEGOCIOS, temasDelNegocio(['negocio'], negocioId));
+
+  // En vivo: precio, descripción o disponibilidad nuevos se ven sin salir.
+  useEnVivo(temasDelNegocio(['catalogo', 'resenas'], negocioId), () => {
+    getCatalogo(auth!.token, negocioId)
+      .then(({ productos }) => {
+        const actual = productos.find(p => p.id === route.params.producto.id);
+        setRetirado(!actual);
+        if (actual) setProducto(actual);
+      })
+      .catch(() => {});
+  });
 
   const tallas = tallasDe(producto);
   const colores = coloresDe(producto);
@@ -144,7 +158,7 @@ export default function ProductoScreen({ navigation, route }: Props) {
       </ScrollView>
 
       <View style={[styles.barra, { paddingBottom: insets.bottom + 12 }]}>
-        {abierto ? (
+        {abierto && !retirado ? (
           <>
             <View style={styles.cantidad}>
               {esPorPeso(producto) ? <CantidadPeso cantidad={cantidad} unidad={producto.unidad_medida ?? 'kg'} onChange={setCantidad} /> : <>
@@ -173,7 +187,7 @@ export default function ProductoScreen({ navigation, route }: Props) {
           </>
         ) : (
           <View style={[styles.boton, styles.botonOff]}>
-            <Text style={styles.botonOffTxt}>Negocio cerrado</Text>
+            <Text style={styles.botonOffTxt}>{retirado ? 'Ya no está disponible' : 'Negocio cerrado'}</Text>
           </View>
         )}
       </View>

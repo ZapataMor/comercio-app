@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\ComercioPedidoController;
 use App\Http\Controllers\Api\CuentaController;
 use App\Http\Controllers\Api\DeviceTokenController;
 use App\Http\Controllers\Api\DomiciliarioController as ApiDomiciliarioController;
+use App\Http\Controllers\Api\EnVivoController;
 use App\Http\Controllers\Api\InvitacionController;
 use App\Http\Controllers\Api\PedidoController as ApiPedidoController;
 use App\Http\Controllers\Api\PedidoIncidenciaController;
@@ -68,6 +69,9 @@ Route::middleware(['auth:sanctum', 'throttle:api-usuario'])->group(function () {
     // Panel adaptativo: responde distinto según el rol del usuario logueado.
     // El frontend llama siempre aquí y pinta lo que reciba.
     Route::get('/dashboard', [DashboardController::class, 'index']);
+
+    // --- Cambios en vivo (WebSockets): canales que esta sesión debe escuchar ---
+    Route::get('/en-vivo/canales', [EnVivoController::class, 'canales']);
 
     // --- Notificaciones push: registrar/dar de baja el token del dispositivo ---
     Route::post('/device-tokens', [DeviceTokenController::class, 'store']);

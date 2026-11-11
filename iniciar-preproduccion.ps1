@@ -15,9 +15,16 @@ if (-not (Test-Path "$Root\.env.preproduccion")) {
         "DB_ROOT_PASSWORD=$(New-Secret)",
         'APP_URL=https://localhost:8443',
         'HTTPS_PORT=8443',
-        'MAIL_UI_PORT=8025'
+        'MAIL_UI_PORT=8025',
+        "REVERB_APP_SECRET=$(New-Secret)"
     ) -join "`n"
     [IO.File]::WriteAllText("$Root\.env.preproduccion", $content + "`n")
+}
+# Entornos creados antes de los cambios en vivo: se agrega la clave de Reverb.
+if (-not (Select-String -Path "$Root\.env.preproduccion" -Pattern '^REVERB_APP_SECRET=.+' -Quiet)) {
+    $lines = @(Get-Content "$Root\.env.preproduccion" | Where-Object { $_ -notmatch '^REVERB_APP_SECRET=' })
+    $lines += "REVERB_APP_SECRET=$(New-Secret)"
+    [IO.File]::WriteAllText("$Root\.env.preproduccion", ($lines -join "`n") + "`n")
 }
 if ($Firebase) {
     $project = (Get-Content "$Root\frontend\android\app\google-services.json" -Raw | ConvertFrom-Json).project_info.project_id

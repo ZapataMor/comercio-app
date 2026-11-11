@@ -18,6 +18,7 @@ Play Store". Complementa a `ENTORNO.md`, que cubre el entorno de desarrollo.
 | 2 | `.env` de producción (ver §3) | servidor | plantilla en `backend/.env.example` |
 | 3 | Cola de push corriendo siempre (`queue:work`) | servidor (supervisor) | ✅ los push van en cola |
 | 4 | Tareas programadas (`schedule:run` cada minuto) | servidor (cron) | ✅ |
+| 4b | Cambios en vivo: Reverb corriendo siempre y `/app` del proxy hacia él | servidor (supervisor + nginx) | ✅ ver «Procesos» |
 | 5 | Correo SMTP real (códigos de recuperar contraseña) | `.env` | ✅ flujo listo, falta el proveedor |
 | 6 | Credenciales de Firebase en el servidor | `storage/app/firebase/` | ✅ |
 | 7 | `API_URL_PRODUCCION` con el dominio real (HTTPS) | `frontend/src/config.ts` | ⏳ hoy dice `api.vitrina.example` |
@@ -95,6 +96,34 @@ stdout_logfile=/ruta/comercio-app/backend/storage/logs/cola.log
 * * * * * cd /ruta/comercio-app/backend && php artisan schedule:run >> /dev/null 2>&1
 ```
 
+**Cambios en vivo** (Laravel Reverb: abrir/cerrar un negocio, pedidos, citas… se ven
+al instante en los demás teléfonos). `/etc/supervisor/conf.d/vitrina-reverb.conf`:
+
+```ini
+[program:vitrina-reverb]
+command=php /ruta/comercio-app/backend/artisan reverb:start --host=127.0.0.1 --port=8080
+autostart=true
+autorestart=true
+user=www-data
+stdout_logfile=/ruta/comercio-app/backend/storage/logs/reverb.log
+```
+
+Y en el `server { }` HTTPS de nginx, el WebSocket de la app (`wss://api.tudominio.co/app/...`):
+
+```nginx
+location /app/ {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "Upgrade";
+    proxy_set_header Host $host;
+    proxy_read_timeout 120s;
+}
+```
+
+Si Reverb se cae la app sigue funcionando: cada pantalla vuelve a su refresco
+periódico de respaldo hasta que el WebSocket reconecta.
+
 ---
 
 ## 3. `.env` de producción (lo que cambia respecto a desarrollo)
@@ -112,6 +141,17 @@ DB_USERNAME=...
 DB_PASSWORD=...
 
 QUEUE_CONNECTION=database
+
+# Cambios en vivo (Reverb). El backend publica por la red interna; la app se
+# conecta por wss al mismo dominio (nginx pasa /app a Reverb).
+# REVERB_APP_KEY no es secreta y debe ser igual a EN_VIVO_KEY de frontend/src/config.ts.
+BROADCAST_CONNECTION=reverb
+REVERB_APP_ID=vitrina
+REVERB_APP_KEY=...
+REVERB_APP_SECRET=...   # secreta: genera una larga y aleatoria
+REVERB_HOST=127.0.0.1
+REVERB_PORT=8080
+REVERB_SCHEME=http
 
 # Correo real para los códigos de "olvidé mi contraseña" (Brevo, Mailgun, SES, Gmail SMTP…)
 MAIL_MAILER=smtp

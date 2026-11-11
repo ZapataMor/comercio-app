@@ -34,7 +34,7 @@ import { OpcionesLinea, pideEleccion, precioDe } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 import { useAgregarAlCarrito } from '../useAgregarAlCarrito';
-import { REFRESCO_NEGOCIOS, usePolling } from '../usePolling';
+import { REFRESCO_NEGOCIOS, temasDelNegocio, useEnVivo, usePolling } from '../usePolling';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Negocio'>;
 
@@ -163,9 +163,9 @@ export default function NegocioScreen({ navigation, route }: Props) {
     cargarRecetas();
   }, [cargarCatalogo, cargarRecetas]);
 
-  // Si el negocio abre o cierra se nota aquí mismo: solo se toca su estado, porque
-  // cambiar los productos volvería a llevar la lista al producto resaltado. Si la
-  // primera carga falló no hay nada que actualizar: se reintenta hasta lograrla.
+  // Si el negocio abre o cierra se nota aquí mismo (al instante con el aviso en
+  // vivo; si no, con el respaldo): solo se toca su estado. Si la primera carga
+  // falló no hay nada que actualizar: se reintenta hasta lograrla.
   usePolling(() => {
     if (!negocio) {
       cargarCatalogo()
@@ -176,17 +176,26 @@ export default function NegocioScreen({ navigation, route }: Props) {
     getEstadoNegocio(token, id)
       .then(estado => setNegocio(n => n && { ...n, ...estado }))
       .catch(() => {});
-  }, REFRESCO_NEGOCIOS);
+  }, REFRESCO_NEGOCIOS, temasDelNegocio(['negocio'], id));
+
+  // El negocio cambia un precio, agota un producto o le llega una reseña: el
+  // catálogo que mira el cliente se pone al día solo.
+  useEnVivo(temasDelNegocio(['catalogo', 'resenas'], id), () => {
+    cargarCatalogo().catch(() => {});
+  });
 
   // Si llegamos desde una búsqueda de producto, hacemos scroll hasta él una vez
-  // que el catálogo cargó, para mostrarlo resaltado dentro de la lista.
+  // que el catálogo cargó, para mostrarlo resaltado dentro de la lista. Solo la
+  // primera vez: si el catálogo se actualiza en vivo, la lista no salta.
+  const yaResaltado = useRef(false);
   useEffect(() => {
-    if (productoId == null || catalogo.length === 0) return;
+    if (productoId == null || catalogo.length === 0 || yaResaltado.current) return;
     const indice = catalogo.findIndex(
       fila => fila.tipo === 'productos' && fila.productos.some(p => p.id === productoId),
     );
     if (indice < 0) return;
     const t = setTimeout(() => {
+      yaResaltado.current = true;
       listaRef.current?.scrollToIndex({ index: indice, viewPosition: 0.3, animated: true });
     }, 350);
     return () => clearTimeout(t);

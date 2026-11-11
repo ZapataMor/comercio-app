@@ -1,5 +1,6 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
+import { useEnVivo } from '../usePolling';
 import { ActivityIndicator, ScrollView, Text, TextInput, View } from 'react-native';
 import { actualizarTarifaDomicilio, AdminStats, getAdminStats, getTarifaDomicilio } from '../api';
 import { useAuth } from '../AuthContext';
@@ -44,6 +45,11 @@ export default function AdminTableroScreen({ navigation }: Props) {
       .then(t => setTarifa(String(t)))
       .catch(() => {});
   }, [auth]);
+
+  // En vivo: los números del tablero siguen lo que pasa en la app.
+  useEnVivo(['pedidos', 'usuarios', 'perfil', 'negocio', 'reportes', 'barrios', 'resenas', 'reputacion'], () => {
+    getAdminStats(auth!.token).then(setStats).catch(() => {});
+  });
 
   async function guardarTarifa() {
     const valor = Number(tarifa.replace(/\D/g, ''));

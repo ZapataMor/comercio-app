@@ -69,9 +69,9 @@ export default function MapaScreen({ navigation, route }: Props) {
         );
       })
       .catch(() => {});
-  }, REFRESCO_NEGOCIOS);
+  }, REFRESCO_NEGOCIOS, ['negocio']);
 
-  // Admin: los domiciliarios se mueven; se refrescan cada 15 s.
+  // Admin: los domiciliarios se mueven; se refrescan con cada posición que mandan.
   const cargarDomiciliarios = useCallback(() => {
     if (!admin) return;
     getDomiciliariosMapa(token)
@@ -81,7 +81,7 @@ export default function MapaScreen({ navigation, route }: Props) {
   useEffect(() => {
     cargarDomiciliarios();
   }, [cargarDomiciliarios]);
-  usePolling(cargarDomiciliarios);
+  usePolling(cargarDomiciliarios, 15000, admin ? ['mapa', 'pedidos', 'perfil'] : undefined);
 
   const visibles = useMemo(
     () => (soloAbiertos ? negocios.filter(n => n.abierto) : negocios),

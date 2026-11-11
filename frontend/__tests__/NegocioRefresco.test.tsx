@@ -26,7 +26,12 @@ jest.mock('../src/useAgregarAlCarrito', () => ({ useAgregarAlCarrito: () => jest
 jest.mock('../src/components/FlyToCart', () => ({ useFlyToCart: () => ({ volar: jest.fn() }) }));
 
 let refrescar: () => void;
+let mockAlCambiarCatalogo: () => void;
 jest.mock('../src/usePolling', () => ({
+  ...jest.requireActual('../src/usePolling'),
+  useEnVivo: (_filtro: unknown, cargar: () => void) => {
+    mockAlCambiarCatalogo = cargar;
+  },
   REFRESCO_NEGOCIOS: 5000,
   usePolling: (cargar: () => void) => {
     refrescar = cargar;
@@ -131,4 +136,19 @@ test('desde Productos no muestra los servicios de una tienda mixta', async () =>
   await montar();
   expect(textos()).toContain('Pollo asado');
   expect(textos()).not.toContain('Instalación de internet');
+});
+
+test('en vivo: si el negocio cambia un precio, el catálogo se actualiza sin salir', async () => {
+  mockCatalogo.mockResolvedValue({ negocio, productos });
+  await montar();
+  expect(textos()).toContain('$20.000');
+
+  mockCatalogo.mockResolvedValueOnce({ negocio, productos: [{ ...productos[0], precio: 18000 }] });
+  await act(async () => {
+    mockAlCambiarCatalogo();
+  });
+
+  expect(mockCatalogo).toHaveBeenCalledTimes(2);
+  expect(textos()).toContain('$18.000');
+  expect(textos()).not.toContain('$20.000');
 });

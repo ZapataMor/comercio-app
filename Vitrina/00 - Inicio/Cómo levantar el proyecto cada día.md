@@ -32,7 +32,7 @@ sin borrar sus datos. Así puedes probar cliente, comerciante y domiciliario en 
 
 Requisitos: haber creado un emulador una vez (*Device Manager → Create Device*) y tener
 `config.ts` con `http://localhost:8000`. El lanzador configura `adb reverse` para los puertos
-8000 (API) y 8081 (Metro) en cada emulador. La línea `set "AVD="` permite elegir cuál encender
+8000 (API), 8080 (cambios en vivo) y 8081 (Metro) en cada emulador. La línea `set "AVD="` permite elegir cuál encender
 si todavía no hay ninguno abierto.
 
 ## 🧩 Las tres piezas (y por qué son tres)
@@ -114,6 +114,7 @@ queda. Solo se vuelve a ejecutar en los casos de la última fila.
 | `npm run dev` (en `backend/`) | Recarga en vivo los estilos Tailwind de la web. Solo si tocas CSS |
 | `php artisan queue:work --tries=3` | Procesa la cola: **sin esto no salen los push** (lo abren los `.bat`) |
 | `php artisan schedule:work` | Tareas programadas: abre/cierra los negocios según su horario (lo abren los `.bat`) |
+| `php artisan reverb:start` | Cambios en vivo (WebSocket, puerto 8080): lo que hace uno se ve al instante en los demás teléfonos (lo abren los `.bat`) |
 | `npm start -- --reset-cache` | Metro con la caché limpia. Cuando ves errores que "no tienen sentido" |
 
 ## 🚫 Lo que NO se ejecuta cada día
@@ -154,6 +155,7 @@ o directamente en la cabecera de `iniciar-dev.bat` al arrancar.
 | `adb devices` sale vacío | El teléfono se reinició: hay que rehacer el `tcpip` por USB |
 | La web del PC no carga | La API no está levantada (ventana 1) |
 | Las notificaciones push no llegan | Falta `php artisan queue:work` (ventana "Cola - Laravel"), o el domiciliario está **fuera de turno** |
+| Los cambios de otro teléfono no se ven al instante (solo al volver a entrar o tras unos segundos) | Falta `php artisan reverb:start` (ventana "En vivo - Reverb"), o en el emulador falta `adb reverse tcp:8080 tcp:8080` |
 
 ## 🔗 Relacionado
 - [[🏠 Home]] · [[Estado Actual]]

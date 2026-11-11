@@ -19,6 +19,15 @@ const API_URL_PRODUCCION = 'https://api.vitrina.example';
 const stagingUrl: string | undefined = NativeModules.EnvironmentConfig?.apiUrl;
 export const API_URL = stagingUrl || (__DEV__ ? API_URL_DESARROLLO : API_URL_PRODUCCION);
 
+// Cambios en vivo (WebSockets con Laravel Reverb, ver src/enVivo.ts). La clave
+// NO es secreta: identifica la app ante Reverb y debe coincidir con
+// REVERB_APP_KEY del backend. El servidor sale de API_URL:
+//   • http://host:8000  -> ws://host:8080   (php artisan reverb:start; en el
+//                                             emulador, adb reverse tcp:8080)
+//   • https://host[:p]  -> wss://host[:p]   (el proxy pasa /app a Reverb)
+export const EN_VIVO_KEY = 'vitrina-local';
+export const EN_VIVO_PUERTO_DESARROLLO = 8080;
+
 // Páginas públicas del servidor (política de privacidad, eliminar cuenta).
 export const WEB_URL = API_URL;
 

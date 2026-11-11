@@ -132,7 +132,7 @@ export default function PedidoDetalleScreen({ route }: Props) {
   // Se refresca al llegar un push (cambió el estado) y cada 15 s de respaldo;
   // con el pedido en camino, cada 10 s para que la moto avance en el mapa.
   const enRuta = pedido?.estado === 'recogido' || pedido?.estado === 'en_camino';
-  usePolling(() => cargarPedido(), enRuta ? 10000 : 15000);
+  usePolling(() => cargarPedido(), enRuta ? 10000 : 15000, a => (a.tema === 'pedidos' || a.tema === 'ubicacion') && a.id === id);
 
   if (cargando) {
     return <ActivityIndicator size="large" color={c.accent} style={{ marginTop: 40 }} />;

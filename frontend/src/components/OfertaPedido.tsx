@@ -22,6 +22,7 @@ import { abrirEntregas, navigationRef } from '../RootNavigation';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 import { useCompartirUbicacion } from '../ubicacion';
+import { alCambiarEnVivo } from '../enVivo';
 import { alCambiarDesdePush, avisarCambioDesdePush } from '../usePolling';
 import { PressableScale } from './anim';
 import Icon from './Icon';
@@ -82,11 +83,16 @@ export default function OfertaPedido() {
     if (AppState.currentState === 'active') iniciar();
     const sub = AppState.addEventListener('change', estado => (estado === 'active' ? iniciar() : detener()));
     const quitarOyente = alCambiarDesdePush(consultar);
+    // En vivo: un pedido queda listo, otro domiciliario lo toma o se cancela.
+    const quitarVivo = alCambiarEnVivo(a => {
+      if (['disponibles', 'perfil', 'reputacion', '*'].includes(a.tema)) consultar();
+    });
 
     return () => {
       detener();
       sub.remove();
       quitarOyente();
+      quitarVivo();
     };
   }, [revisar]);
 

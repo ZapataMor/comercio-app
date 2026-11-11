@@ -27,6 +27,7 @@ import notifee, {
 import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { getPedidosPorAceptar, PedidoPorAceptar } from './api';
+import { alCambiarEnVivo } from './enVivo';
 import { alCambiarDesdePush } from './usePolling';
 
 // Android no deja cambiar el sonido de un canal ya creado: si cambia el sonido,
@@ -211,12 +212,17 @@ export function useAlarmaPedidos(token: string | null, activa: boolean): PedidoE
     if (AppState.currentState === 'active') iniciar();
     const sub = AppState.addEventListener('change', estado => (estado === 'active' ? iniciar() : detener()));
     const quitarOyente = alCambiarDesdePush(() => revisar());
+    // En vivo: pedido nuevo, o alguien del equipo ya lo aceptó (la alarma se calla).
+    const quitarVivo = alCambiarEnVivo(a => {
+      if (a.tema === 'pedidos' || a.tema === 'negocios' || a.tema === '*') revisar();
+    });
 
     return () => {
       vigente = false;
       detener();
       sub.remove();
       quitarOyente();
+      quitarVivo();
     };
   }, [token, activa]);
 

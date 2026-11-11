@@ -68,7 +68,7 @@ export default function MisPedidosScreen({ navigation }: Props) {
       cargar(true);
     }, [cargar]),
   );
-  usePolling(() => cargar());
+  usePolling(() => cargar(), 15000, ['pedidos']);
 
   function refrescar() {
     setRefrescando(true);

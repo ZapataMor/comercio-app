@@ -33,6 +33,7 @@ import {
   Usuario,
 } from './api';
 import { useAuth } from './AuthContext';
+import { useAvisosEnVivo } from './usePolling';
 
 const CLAVE_ACTIVO = 'negocio_activo';
 
@@ -150,6 +151,17 @@ export function NegocioProvider({ children }: { children: React.ReactNode }) {
     setCargados(false);
     recargar();
   }, [recargar]);
+
+  // En vivo: otro miembro abre o cierra, el horario lo cierra solo, me dan o
+  // quitan permisos, me sacan del equipo... Todos los teléfonos lo ven ya.
+  useAvisosEnVivo(
+    token
+      ? a =>
+          a.tema === 'negocios' ||
+          (a.tema === 'negocio' && (a.negocio_id == null || negocios.some(n => n.id === a.negocio_id)))
+      : null,
+    recargar,
+  );
 
   // La sesión guardada recuerda mis negocios: con ellos se decide en qué
   // pantalla arranco la próxima vez que abra la app (rutaInicio), sin

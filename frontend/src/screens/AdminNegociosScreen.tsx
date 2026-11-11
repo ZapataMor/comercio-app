@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useEnVivo } from '../usePolling';
 import { ActivityIndicator, FlatList, RefreshControl, Text, TextInput, View } from 'react-native';
 import { AdminNegocio, getAdminNegocios } from '../api';
 import { useAuth } from '../AuthContext';
@@ -48,6 +49,19 @@ export default function AdminNegociosScreen() {
     const t = setTimeout(() => cargar(buscar), buscar ? 350 : 0);
     return () => clearTimeout(t);
   }, [buscar, cargar]);
+
+  // En vivo, sin ruedita: negocios que abren, cierran, se crean o se desactivan.
+  useEnVivo(['negocio', 'reputacion'], () => {
+    if (pagina !== 1) return;
+    const id = ++consulta.current;
+    getAdminNegocios(auth!.token, buscar, 1)
+      .then(p => {
+        if (id !== consulta.current) return;
+        setNegocios(p.items);
+        setHayMas(p.pagina < p.ultima_pagina);
+      })
+      .catch(() => {});
+  });
 
   async function cargarMas() {
     if (!hayMas || cargandoMas || cargando) return;

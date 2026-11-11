@@ -32,7 +32,7 @@ export default function AdminReportesScreen({ navigation }: Props) {
     finally { setCargando(false); }
   }, [token, filtro]);
   useFocusEffect(useCallback(() => { setCargando(true); cargar(); }, [cargar]));
-  usePolling(() => { if (pagina === 1 && !resolviendo && !enviando) cargar(); });
+  usePolling(() => { if (pagina === 1 && !resolviendo && !enviando) cargar(); }, 15000, ['reportes', 'pedidos']);
   async function resolver(id: number) {
     setEnviando(true);
     try { await resolverReportePedido(auth!.token, id, resolucion.trim()); setResolviendo(null); setResolucion(''); await cargar(); }

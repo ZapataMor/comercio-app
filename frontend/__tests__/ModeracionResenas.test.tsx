@@ -39,6 +39,8 @@ jest.mock('../src/api', () => ({
 
 const mockToast = { exito: jest.fn(), error: jest.fn(), info: jest.fn() };
 jest.mock('../src/Toast', () => ({ useToast: () => mockToast }));
+// Las pantallas se prueban sin navegación: los avisos en vivo se prueban aparte.
+jest.mock('../src/usePolling', () => ({ ...jest.requireActual('../src/usePolling'), useEnVivo: jest.fn() }));
 
 // El diálogo acepta de una vez: aquí solo importa qué acción queda armada.
 const mockConfirmar = jest.fn((opciones: { accion: () => unknown }) => opciones.accion());

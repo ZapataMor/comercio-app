@@ -31,7 +31,9 @@ import { NegocioProvider, useNegocio } from './src/NegocioContext';
 import { configurarMensajesForeground } from './src/pushNotifications';
 import { navigationRef, procesarNotificacionPendiente, rutaInicio } from './src/RootNavigation';
 import { ToastProvider } from './src/Toast';
-import { avisarCambioDesdePush } from './src/usePolling';
+import { avisarCambioDesdePush, useAvisosEnVivo } from './src/usePolling';
+import { actualizarCanalesEnVivo, conectarEnVivo, desconectarEnVivo } from './src/enVivo';
+import { Usuario } from './src/api';
 import { useToast } from './src/Toast';
 import { RootStackParamList } from './src/navTypes';
 import HomeScreen from './src/screens/HomeScreen';
@@ -291,6 +293,53 @@ function PushBridge() {
   return null;
 }
 
+/** Lo que de la sesión cambia en vivo (roles, datos, turno, negocios). */
+function huellaUsuario(u: Usuario): string {
+  return JSON.stringify([
+    u.name, u.apellidos ?? null, u.email, [...u.roles].sort(), u.direccion ?? null, u.barrio ?? null,
+    u.telefono ?? null, u.codigo_publico ?? null, !!u.en_turno,
+    (u.negocios ?? []).map(n => [n.id, n.nombre, n.rol]).sort((a, b) => Number(a[0]) - Number(b[0])),
+  ]);
+}
+
+/**
+ * Conexión de cambios en vivo (src/enVivo.ts) mientras hay sesión. Si el admin
+ * me cambia el rol, si entro a un equipo o edito mi perfil en otro teléfono,
+ * la sesión se pone al día sola (y con ella el menú y las pantallas). Si me
+ * suspenden, la API responde 401 y la app vuelve al login.
+ */
+function EnVivoBridge() {
+  const { auth, actualizarUsuario } = useAuth();
+  const token = auth?.token ?? null;
+  const usuarioRef = React.useRef(auth?.user);
+  usuarioRef.current = auth?.user;
+
+  const aplicar = React.useCallback(
+    (nuevo: Usuario | null) => {
+      const actual = usuarioRef.current;
+      if (nuevo && actual && nuevo.id === actual.id && huellaUsuario(nuevo) !== huellaUsuario(actual)) {
+        actualizarUsuario({ ...actual, ...nuevo });
+      }
+    },
+    [actualizarUsuario],
+  );
+
+  React.useEffect(() => {
+    if (!token) {
+      desconectarEnVivo();
+      return;
+    }
+    conectarEnVivo(token).then(aplicar).catch(() => {});
+    return () => desconectarEnVivo();
+  }, [token, aplicar]);
+
+  useAvisosEnVivo(token ? ['perfil', 'negocios', '*'] : null, () => {
+    actualizarCanalesEnVivo().then(aplicar).catch(() => {});
+  });
+
+  return null;
+}
+
 /**
  * La alarma de pedidos y su aviso siguen vivos en toda la app, no solo en el
  * Inicio. `mostrarAviso`: el aviso espera a que termine el splash.
@@ -344,6 +393,7 @@ function AppContenido() {
                 <PedidoPendienteProvider>
                 <StatusBar barStyle="light-content" backgroundColor={c.header} />
                 <PushBridge />
+                <EnVivoBridge />
                 <AlarmaBridge mostrarAviso={!splashVisible} />
                 {!splashVisible && <OfertaBridge />}
                 {!splashVisible && <CierreBridge />}

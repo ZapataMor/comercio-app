@@ -22,7 +22,7 @@ import { messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
-import { usePolling } from '../usePolling';
+import { temasDelNegocio, usePolling } from '../usePolling';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AgendarCita'>;
 export default function AgendarCitaScreen({ route, navigation }: Props) {
@@ -77,7 +77,7 @@ export default function AgendarCitaScreen({ route, navigation }: Props) {
   const refrescar = useCallback(() => {
     if (!guardando) setRevision(v => v + 1);
   }, [guardando]);
-  usePolling(refrescar, 30000);
+  usePolling(refrescar, 30000, temasDelNegocio(['agenda', 'catalogo', 'negocio', 'equipo'], negocioId));
 
   async function guardar() {
     if (!hora || !disponibilidad || cargando || guardando) return;

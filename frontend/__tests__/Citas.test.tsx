@@ -44,7 +44,7 @@ jest.mock('@react-navigation/native', () => ({
 jest.mock('../src/Toast', () => ({
   useToast: () => ({ exito: jest.fn(), error: jest.fn() }),
 }));
-jest.mock('../src/usePolling', () => ({ usePolling: () => {} }));
+jest.mock('../src/usePolling', () => ({ ...jest.requireActual('../src/usePolling'), useEnVivo: jest.fn(), usePolling: () => {} }));
 jest.mock('../src/citas', () => ({
   ...jest.requireActual('../src/citas'),
   hoyColombia: () => '2026-11-09',

@@ -9,12 +9,14 @@
  *
  * Mientras se ve, los Toast quedan detrás del Modal: los errores van en la tarjeta.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, KeyboardAvoidingView, Modal, Platform, Text, TextInput, View } from 'react-native';
 import { CierrePorConfirmar, confirmarCierre, getCierresPorConfirmar } from '../api';
 import { useAuth } from '../AuthContext';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
+import { alCambiarEnVivo } from '../enVivo';
+import { useNegocio } from '../NegocioContext';
 import { alCambiarDesdePush } from '../usePolling';
 import { PressableScale } from './anim';
 import { completarHora, formatearHora, hora12 } from './EditorHorario';
@@ -38,6 +40,10 @@ export default function ConfirmarCierre() {
   const [hora, setHora] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Para filtrar los avisos en vivo: solo los de mis negocios.
+  const { negocios } = useNegocio();
+  const misNegocios = useRef<number[]>([]);
+  misNegocios.current = negocios.map(n => n.id);
 
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | null = null;
@@ -61,12 +67,18 @@ export default function ConfirmarCierre() {
     if (AppState.currentState === 'active') iniciar();
     const sub = AppState.addEventListener('change', estado => (estado === 'active' ? iniciar() : detener()));
     const quitarOyente = alCambiarDesdePush(consultar);
+    // En vivo: llega la pregunta del cierre, u otro dueño ya la respondió.
+    const quitarVivo = alCambiarEnVivo(a => {
+      const mio = a.negocio_id != null && misNegocios.current.includes(a.negocio_id);
+      if (a.tema === '*' || ((a.tema === 'cierre' || a.tema === 'negocio') && mio)) consultar();
+    });
 
     return () => {
       vigente = false;
       detener();
       sub.remove();
       quitarOyente();
+      quitarVivo();
     };
   }, [token]);
 

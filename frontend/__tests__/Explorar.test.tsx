@@ -24,6 +24,8 @@ jest.mock('../src/api', () => ({
 // Sin navegador no hay foco: la prueba dispara el refresco cuando le conviene.
 let mockRefrescar = () => {};
 jest.mock('../src/usePolling', () => ({
+  ...jest.requireActual('../src/usePolling'),
+  useEnVivo: jest.fn(),
   REFRESCO_NEGOCIOS: 5000,
   usePolling: (cargar: () => void) => {
     mockRefrescar = cargar;

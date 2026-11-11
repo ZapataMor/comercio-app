@@ -82,7 +82,7 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
     if (pedido?.estado === 'cancelado') return;
     if (pedido?.estado === 'entregado' && !pedido.domiciliario_ubicacion) return;
     recargar().catch(() => {});
-  }, 10000);
+  }, 10000, a => (a.tema === 'pedidos' || a.tema === 'ubicacion') && a.id === pedidoId);
 
   // Rechazar (pendiente) o cancelar (aceptado, o listo y nadie lo tomó), con motivo.
   const [cancelando, setCancelando] = useState(false);

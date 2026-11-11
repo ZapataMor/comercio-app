@@ -3,5 +3,11 @@
 }
 https://localhost {
     tls internal
-    reverse_proxy web:80
+    # Cambios en vivo: el WebSocket de la app va a Reverb.
+    handle /app/* {
+        reverse_proxy reverb:8080
+    }
+    handle {
+        reverse_proxy web:80
+    }
 }

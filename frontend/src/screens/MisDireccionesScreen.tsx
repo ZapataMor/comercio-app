@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useEnVivo } from '../usePolling';
 import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { ClienteDireccion, getClienteDirecciones } from '../api';
 import { useAuth } from '../AuthContext';
@@ -21,6 +22,7 @@ export default function MisDireccionesScreen() {
     finally { setCargando(false); }
   }, [auth]);
   useEffect(() => { cargar(); }, [cargar]);
+  useEnVivo(['direcciones'], cargar);
   return <>
     <ScrollView style={styles.fondo} contentContainerStyle={styles.contenido}>
       {cargando ? <ActivityIndicator /> : error ? <>

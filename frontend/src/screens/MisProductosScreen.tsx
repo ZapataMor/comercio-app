@@ -1,5 +1,6 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { temasDelNegocio, useEnVivo } from '../usePolling';
 import {
 
   ActivityIndicator,
@@ -196,6 +197,8 @@ export default function MisProductosScreen({ navigation }: Props) {
   );
 
   useEffect(() => cargar(), [cargar]);
+  // En vivo: lo que otro del equipo agrega, edita o elimina aparece aquí.
+  useEnVivo(temasDelNegocio(['catalogo'], negocioId), () => cargar('silencioso'));
 
   function abrirNuevo() {
     dragY.setValue(0);

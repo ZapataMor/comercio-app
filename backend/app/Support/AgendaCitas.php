@@ -146,6 +146,8 @@ class AgendaCitas
 
     public static function avisar(Cita $cita, bool $alNegocio = false): void
     {
+        // Además del push, las pantallas abiertas se actualizan en vivo.
+        EnVivo::cita($cita);
         $destinatarios = $alNegocio ? $cita->negocio->miembrosActivos()->get() : User::whereKey($cita->cliente_id)->get();
         Push::enviar($destinatarios, new CitaActualizada($cita, $alNegocio));
     }

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useEnVivo } from '../usePolling';
 import { ActivityIndicator, FlatList, RefreshControl, Text, TextInput, View } from 'react-native';
 import {
   anularEventoReputacion,
@@ -63,6 +64,7 @@ export default function AdminReputacionScreen() {
     setAbierto(null);
     cargar();
   }, [cargar]);
+  useEnVivo(a => a.tema === 'reputacion' && a.tipo === tipo, () => cargar());
 
   return (
     <View style={styles.container}>

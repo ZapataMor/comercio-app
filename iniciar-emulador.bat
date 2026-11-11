@@ -24,7 +24,7 @@ echo.
 echo   comercio-app - levantando entorno con el emulador
 echo   =================================================
 echo.
-echo   Desarrollo: Laravel en http://localhost:8000 y Metro en 8081.
+echo   Desarrollo: Laravel en http://localhost:8000, cambios en vivo en 8080 y Metro en 8081.
 echo   Para Docker/HTTPS usa iniciar-preproduccion.ps1 ^(puerto 8443^).
 echo.
 
@@ -86,6 +86,8 @@ start "API - Laravel"  /D "%RAIZ%backend"  cmd /k php artisan serve --port=8000
 REM La cola envia los push; schedule:work corre las tareas programadas (horarios).
 start "Cola - Laravel"  /D "%RAIZ%backend"  cmd /k php artisan queue:work --tries=3
 start "Tareas - Laravel"  /D "%RAIZ%backend"  cmd /k php artisan schedule:work
+REM Reverb: los cambios en vivo (abrir/cerrar negocio, pedidos...) llegan al instante a todos.
+start "En vivo - Reverb"  /D "%RAIZ%backend"  cmd /k php artisan reverb:start
 
 echo   [3/4] Metro React Native -^> puerto 8081
 start "Metro - React Native"  /D "%RAIZ%frontend"  cmd /k npm start
@@ -131,7 +133,7 @@ if %PREPARADOS% equ 0 (
 )
 
 echo.
-echo   Listo. Deja abiertas las ventanas del emulador, la API, la cola, las tareas y Metro.
+echo   Listo. Deja abiertas las ventanas del emulador, la API, la cola, las tareas, Reverb y Metro.
 echo   Emuladores conectados al entorno local: %PREPARADOS%.
 echo.
 echo   - Panel admin web: http://localhost:8000
@@ -151,6 +153,9 @@ echo         Preparando %DISPOSITIVO% para desarrollo local...
 %ADB_CMD% -s %DISPOSITIVO% reverse tcp:8081 tcp:8081
 if errorlevel 1 exit /b 1
 %ADB_CMD% -s %DISPOSITIVO% reverse tcp:8000 tcp:8000
+if errorlevel 1 exit /b 1
+REM Cambios en vivo (WebSocket de Reverb).
+%ADB_CMD% -s %DISPOSITIVO% reverse tcp:8080 tcp:8080
 if errorlevel 1 exit /b 1
 
 REM Staging y debug comparten paquete: que exista no significa que use Metro.

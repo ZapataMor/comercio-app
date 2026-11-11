@@ -1,5 +1,6 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useState } from 'react';
+import { temasDelNegocio, useEnVivo } from '../usePolling';
 import { ActivityIndicator, FlatList, RefreshControl, Text, View } from 'react-native';
 import { getResenas, ResenaPublica, ResumenResenas } from '../api';
 import { useAuth } from '../AuthContext';
@@ -52,6 +53,10 @@ export default function ResenasScreen({ route }: Props) {
   useEffect(() => {
     cargar();
   }, [cargar]);
+  // En vivo: reseñas nuevas, respuestas del negocio, ocultas por el admin.
+  useEnVivo(temasDelNegocio(['resenas'], negocioId), () => {
+    if (pagina === 1) cargar();
+  });
 
   async function cargarMas() {
     if (!hayMas || cargandoMas || cargando) return;

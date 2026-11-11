@@ -226,7 +226,7 @@ export default function ExplorarScreen({ navigation, route }: Props) {
         setProductos(hallados);
       })
       .catch(() => {});
-  }, REFRESCO_NEGOCIOS);
+  }, REFRESCO_NEGOCIOS, ['negocio', 'catalogo', 'resenas']);
 
   useEffect(() => {
     ++ultimaPeticion.current;

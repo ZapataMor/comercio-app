@@ -9,6 +9,7 @@
  *  - comparte el código público para que otro negocio la invite.
  */
 import { useFocusEffect } from '@react-navigation/native';
+import { useEnVivo } from '../usePolling';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, Share, Text, TouchableOpacity, View } from 'react-native';
@@ -52,6 +53,10 @@ export default function MisNegociosScreen({ navigation }: Props) {
       cargarInvitaciones();
     }, [recargar, cargarInvitaciones]),
   );
+
+  // En vivo: una invitación nueva (o cancelada) aparece sin refrescar. Los
+  // negocios los mantiene al día NegocioContext.
+  useEnVivo(['invitaciones'], cargarInvitaciones);
 
   async function refrescar() {
     setRefrescando(true);

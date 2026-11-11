@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useEnVivo } from '../usePolling';
 import {
   ActivityIndicator,
   FlatList,
@@ -94,6 +95,11 @@ export default function AdminUsuariosScreen() {
   useEffect(() => {
     cargar('administrador');
   }, [cargar]);
+
+  // En vivo: registros nuevos, cambios de rol o suspensiones hechos en otro lado.
+  useEnVivo(['usuarios', 'perfil'], () => {
+    if (pagina === 1) cargar(rolActual, 'silencioso', buscar);
+  });
 
   // Busca 350 ms después de dejar de escribir.
   const primeraVez = React.useRef(true);

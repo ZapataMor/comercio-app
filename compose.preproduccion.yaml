@@ -34,6 +34,15 @@ x-app: &app
     MAIL_FROM_NAME: Vitrina Preproduccion
     FIREBASE_CREDENTIALS: ${FIREBASE_CREDENTIALS:-}
     SENTRY_LARAVEL_DSN: ""
+    # Cambios en vivo: el backend publica en Reverb por la red interna y la app
+    # se conecta por wss://localhost:8443/app (Caddy lo pasa a Reverb).
+    BROADCAST_CONNECTION: reverb
+    REVERB_APP_ID: vitrina
+    REVERB_APP_KEY: vitrina-local
+    REVERB_APP_SECRET: ${REVERB_APP_SECRET:?Ejecuta iniciar-preproduccion.ps1}
+    REVERB_HOST: reverb
+    REVERB_PORT: "8080"
+    REVERB_SCHEME: http
   volumes:
     - storage:/var/www/html/storage
     - ./backend/storage/app/firebase:/run/firebase:ro
@@ -92,6 +101,19 @@ services:
       migrate:
         condition: service_completed_successfully
     command: [php, artisan, "schedule:work"]
+
+  # WebSockets de los cambios en vivo (Laravel Reverb).
+  reverb:
+    <<: *app
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: [php, artisan, "reverb:start", "--host=0.0.0.0", "--port=8080"]
+    healthcheck:
+      test: [CMD, php, -r, "exit(@fsockopen('127.0.0.1', 8080) ? 0 : 1);"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   web:
     image: vitrina-web:preproduccion

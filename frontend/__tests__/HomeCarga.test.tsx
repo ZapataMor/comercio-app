@@ -30,6 +30,8 @@ jest.mock('../src/AuthContext', () => ({
 jest.mock('../src/NegocioContext', () => ({ useNegocio: () => mockContexto }));
 jest.mock('../src/Toast', () => ({ useToast: () => ({ exito: jest.fn(), error: jest.fn(), info: jest.fn() }) }));
 jest.mock('../src/usePolling', () => ({
+  ...jest.requireActual('../src/usePolling'),
+  useEnVivo: jest.fn(),
   usePolling: (cargar: () => void) => {
     refrescar = cargar;
   },

@@ -73,7 +73,7 @@ class AuthController extends Controller
         $token = $user->createToken('api')->plainTextToken;
 
         return response()->json([
-            'user' => $this->userPayload($user),
+            'user' => self::userPayload($user),
             'token' => $token,
         ], 201);
     }
@@ -106,7 +106,7 @@ class AuthController extends Controller
         $token = $user->createToken('api')->plainTextToken;
 
         return response()->json([
-            'user' => $this->userPayload($user),
+            'user' => self::userPayload($user),
             'token' => $token,
         ]);
     }
@@ -199,7 +199,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Perfil actualizado.',
-            'user' => $this->userPayload($user),
+            'user' => self::userPayload($user),
         ]);
     }
 
@@ -226,7 +226,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Ya eres domiciliario. Entra en turno para recibir pedidos.',
-            'user' => $this->userPayload($user->fresh()),
+            'user' => self::userPayload($user->fresh()),
         ]);
     }
 
@@ -257,7 +257,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Ya no eres domiciliario. Sigues siendo cliente.',
-            'user' => $this->userPayload($user->fresh()),
+            'user' => self::userPayload($user->fresh()),
         ]);
     }
 
@@ -273,7 +273,8 @@ class AuthController extends Controller
         ]);
     }
 
-    private function userPayload(User $user): array
+    /** Lo que la app guarda de la persona en su sesión (también lo da /api/en-vivo/canales). */
+    public static function userPayload(User $user): array
     {
         return [
             'id' => $user->id,

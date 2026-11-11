@@ -106,7 +106,7 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
   useEffect(() => {
     cargar();
   }, [cargar]);
-  usePolling(() => cargar());
+  usePolling(() => cargar(), 15000, ['disponibles', 'pedidos', 'reputacion', 'perfil']);
   useImperativeHandle(ref, () => ({ recargar: cargar }), [cargar]);
 
   /**

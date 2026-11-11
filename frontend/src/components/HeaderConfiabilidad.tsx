@@ -9,6 +9,7 @@
  * `publicarMiReputacion` y el ícono se actualiza sin pedirlo otra vez.
  */
 import React, { useCallback, useEffect, useState } from 'react';
+import { useAvisosEnVivo } from '../usePolling';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { getMiReputacion, Reputacion, ReputacionDetalle } from '../api';
 import { useAuth } from '../AuthContext';
@@ -63,6 +64,9 @@ function BotonConfiabilidad({ token }: { token: string }) {
       .then(d => publicarMiReputacion(token, d))
       .catch(() => setError(true));
   }, [token]);
+
+  // En vivo: una calificación o el admin cambian mi nivel.
+  useAvisosEnVivo(a => a.tema === 'reputacion' && a.tipo === 'domiciliario', cargar);
 
   useEffect(() => {
     oyentes.add(setDetalle);

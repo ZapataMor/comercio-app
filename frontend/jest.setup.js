@@ -44,6 +44,17 @@ jest.mock('@notifee/react-native', () => ({
   EventType: { PRESS: 1, ACTION_PRESS: 2 },
 }));
 
+// Cambios en vivo (WebSocket): en los tests no hay servidor; los avisos se
+// simulan con simularAvisoEnVivo (src/enVivo.ts).
+jest.mock('pusher-js/react-native', () => {
+  return jest.fn().mockImplementation(() => ({
+    connection: { bind: jest.fn() },
+    subscribe: jest.fn(() => ({ bind: jest.fn() })),
+    unsubscribe: jest.fn(),
+    disconnect: jest.fn(),
+  }));
+});
+
 jest.mock('@react-native-documents/picker', () => ({
   pick: jest.fn().mockResolvedValue([]),
   types: { images: 'image/*' },

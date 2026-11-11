@@ -419,6 +419,18 @@ async function authGet(path: string, token: string): Promise<any> {
   return data;
 }
 
+/**
+ * Canales en vivo que esta sesión debe escuchar (ver src/enVivo.ts) y mis
+ * datos actuales: si el admin me cambió el rol o entré a un equipo, la sesión
+ * se pone al día con esto.
+ */
+export async function getCanalesEnVivo(
+  token: string,
+): Promise<{ publicos: string[]; privados: string[]; user: Usuario }> {
+  const d = await authGet('/api/en-vivo/canales', token);
+  return { publicos: d.publicos ?? [], privados: d.privados ?? [], user: d.user as Usuario };
+}
+
 /** POST/PUT autenticado con cuerpo JSON. */
 async function authSend(method: 'POST' | 'PUT' | 'DELETE', path: string, token: string, body?: any): Promise<any> {
   let res: Response;

@@ -17,7 +17,7 @@ import { useNegocio } from '../NegocioContext';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
-import { usePolling } from '../usePolling';
+import { temasDelNegocio, usePolling } from '../usePolling';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -300,8 +300,9 @@ export default function HomeScreen({ navigation }: Props) {
   // Al cambiar de negocio no se muestran los pedidos del anterior.
   useEffect(() => { setPedidos([]); setCitasPendientes(0); }, [negocioId]);
 
-  // Pedidos en espera del negocio activo: se recargan al entrar, al llegar un
-  // push y cada 15 s mientras la pantalla está visible.
+  // Pedidos en espera del negocio activo: se recargan al entrar, al instante
+  // cuando cambia un pedido o una cita del negocio (en vivo o push) y, de
+  // respaldo, cada 15 s mientras la pantalla está visible.
   useFocusEffect(
     useCallback(() => {
       cargarPedidos();
@@ -313,7 +314,7 @@ export default function HomeScreen({ navigation }: Props) {
     } else {
       cargarPedidos();
     }
-  });
+  }, 15000, temasDelNegocio(['pedidos', 'citas', 'catalogo'], negocioId));
 
   /** Si el código no es correcto, el error lo muestra el mismo campo. */
   async function entregarAlDomiciliario(pedido: ComercioPedido, codigo: string) {
