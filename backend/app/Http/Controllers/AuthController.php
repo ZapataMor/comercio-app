@@ -191,7 +191,9 @@ class AuthController extends Controller
 
             $principal = $user->clienteDirecciones()->where('es_principal', true)->first();
             if ($principal) {
-                $principal->update(['direccion' => $data['direccion'], 'barrio' => $data['barrio']]);
+                if ($principal->direccion !== $data['direccion'] || $principal->barrio !== $data['barrio']) {
+                    $principal->update(['direccion' => $data['direccion'], 'barrio' => $data['barrio'], 'lat' => null, 'lng' => null, 'fotos' => null]);
+                }
             } else {
                 $user->clienteDirecciones()->create([
                     'direccion' => $data['direccion'],

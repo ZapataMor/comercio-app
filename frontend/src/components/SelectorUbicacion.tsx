@@ -29,7 +29,7 @@ const TEXTOS: Record<Tipo, { label: string; fijar: string; paraQue: string; ayud
     icono: 'tienda',
   },
   entrega: {
-    label: 'Punto en el mapa (opcional)',
+    label: 'Ubicación de tu casa (obligatoria)',
     fijar: 'Marcar en el mapa',
     paraQue: 'El domiciliario llega más fácil y verás en cuánto llega tu pedido.',
     ayuda: 'Mueve el mapa hasta que el pin quede en la puerta donde recibes.',

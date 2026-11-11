@@ -17,13 +17,14 @@ import Icon from './Icon';
 type Props = {
   /** URL/URI a previsualizar (remota del servidor o local recién elegida). */
   uri?: string;
+  headers?: Record<string, string>;
   /** Se llama con la URI cuando el usuario elige una imagen. */
   onSelect: (uri: string) => void;
   label?: string;
   disabled?: boolean;
 };
 
-export default function SelectorImagen({ uri, onSelect, label = 'Imagen', disabled }: Props) {
+export default function SelectorImagen({ uri, headers, onSelect, label = 'Imagen', disabled }: Props) {
   const { c } = useTheme();
   const styles = useStyles();
   async function elegir() {
@@ -43,7 +44,7 @@ export default function SelectorImagen({ uri, onSelect, label = 'Imagen', disabl
       <View style={styles.row}>
         <View style={styles.preview}>
           {uri ? (
-            <Image source={{ uri }} style={styles.img} resizeMode="cover" />
+            <Image source={{ uri, headers, cache: 'reload' }} style={styles.img} resizeMode="cover" />
           ) : (
             <Icon name="imagen" size={28} color={c.mutedSoft} />
           )}

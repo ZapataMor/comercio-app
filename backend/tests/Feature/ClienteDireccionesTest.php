@@ -97,7 +97,7 @@ test('el cliente puede agregar otra ubicacion', function () {
     ]);
     Sanctum::actingAs($user);
 
-    $this->postJson('/api/cliente/direcciones', [
+    $this->postJson('/api/cliente/direcciones', [...fotosReferenciaPrueba(), 'lat' => 11.379, 'lng' => -72.24,
         'direccion' => 'Carrera 5 # 6-7',
         'barrio' => 'Norte',
     ])->assertCreated()
@@ -115,36 +115,36 @@ test('el cliente edita su direccion y su nombre opcional y sincroniza el perfil'
         'direccion' => 'Calle anterior', 'barrio' => 'Centro', 'es_principal' => true,
     ]);
     Sanctum::actingAs($user);
-    $this->putJson("/api/cliente/direcciones/{$direccion->id}", [
-        'direccion' => 'Calle 20 Carrera 2 este #10-20', 'barrio' => 'Centro', 'nombre' => 'Mi casa',
-    ])->assertOk()->assertJsonPath('direccion.nombre', 'Mi casa');
-    $this->getJson('/api/cliente/direcciones')->assertOk()->assertJsonPath('direcciones.0.nombre', 'Mi casa');
-    expect($user->fresh()->direccion)->toBe('Calle 20 Carrera 2 este #10-20');
-    $this->putJson("/api/cliente/direcciones/{$direccion->id}", [
-        'direccion' => 'Calle 20 Carrera 2 este #10-20', 'barrio' => 'Centro', 'nombre' => null,
+    $this->putJson("/api/cliente/direcciones/{$direccion->id}", [...fotosReferenciaPrueba(), 'lat' => 11.379, 'lng' => -72.24,
+        'direccion' => 'Calle 20 Carrera 2-este #10-20', 'barrio' => 'Centro', 'nombre' => 'Mi-casa',
+    ])->assertOk()->assertJsonPath('direccion.nombre', 'Mi-casa');
+    $this->getJson('/api/cliente/direcciones')->assertOk()->assertJsonPath('direcciones.0.nombre', 'Mi-casa');
+    expect($user->fresh()->direccion)->toBe('Calle 20 Carrera 2-este #10-20');
+    $this->putJson("/api/cliente/direcciones/{$direccion->id}", [...fotosReferenciaPrueba(), 'lat' => 11.379, 'lng' => -72.24,
+        'direccion' => 'Calle 20 Carrera 2-este #10-20', 'barrio' => 'Centro', 'nombre' => null,
     ])->assertOk()->assertJsonPath('direccion.nombre', null);
 });
 
 test('no se puede consultar ni editar la direccion de otro cliente', function () {
     $otro = User::factory()->create();
-    $direccion = $otro->clienteDirecciones()->create(['direccion' => 'Privada', 'barrio' => 'Centro', 'nombre' => 'Mi casa']);
+    $direccion = $otro->clienteDirecciones()->create(['direccion' => 'Privada', 'barrio' => 'Centro', 'nombre' => 'Mi-casa']);
     $user = User::factory()->create();
     $user->assignRole('usuario');
     Sanctum::actingAs($user);
     $this->getJson('/api/cliente/direcciones')->assertOk()->assertJsonCount(0, 'direcciones');
-    $this->putJson("/api/cliente/direcciones/{$direccion->id}", [
+    $this->putJson("/api/cliente/direcciones/{$direccion->id}", [...fotosReferenciaPrueba(), 'lat' => 11.379, 'lng' => -72.24,
         'direccion' => 'Otra', 'barrio' => 'Centro', 'nombre' => 'Trabajo',
     ])->assertNotFound();
-    expect($direccion->fresh()->nombre)->toBe('Mi casa');
+    expect($direccion->fresh()->nombre)->toBe('Mi-casa');
 });
 
 test('el nombre es opcional al crear y no permite textos demasiado largos', function () {
     $user = User::factory()->create();
     $user->assignRole('usuario');
     Sanctum::actingAs($user);
-    $this->postJson('/api/cliente/direcciones', ['direccion' => 'Calle 1 #10-20', 'barrio' => 'Centro'])
+    $this->postJson('/api/cliente/direcciones', [...fotosReferenciaPrueba(), 'lat' => 11.379, 'lng' => -72.24, 'direccion' => 'Calle 1 #10-20', 'barrio' => 'Centro'])
         ->assertCreated()->assertJsonPath('direccion.nombre', null);
-    $this->postJson('/api/cliente/direcciones', ['direccion' => 'Calle 2 #10-20', 'barrio' => 'Centro', 'nombre' => str_repeat('a', 81)])
+    $this->postJson('/api/cliente/direcciones', [...fotosReferenciaPrueba(), 'lat' => 11.379, 'lng' => -72.24, 'direccion' => 'Calle 2 #10-20', 'barrio' => 'Centro', 'nombre' => str_repeat('a', 81)])
         ->assertUnprocessable()->assertJsonValidationErrors('nombre');
 });
 
@@ -176,7 +176,7 @@ test('borrar direcciones reasigna la principal y permite vaciar y volver a crear
     Sanctum::actingAs($user);
     $ids = [];
     foreach ([1, 2, 3] as $numero) {
-        $ids[] = $this->postJson('/api/cliente/direcciones', ['direccion' => "Calle $numero #10-20", 'barrio' => 'Centro'])
+        $ids[] = $this->postJson('/api/cliente/direcciones', [...fotosReferenciaPrueba(), 'lat' => 11.379, 'lng' => -72.24, 'direccion' => "Calle $numero #10-20", 'barrio' => 'Centro'])
             ->assertCreated()->assertJsonPath('direccion.es_principal', $numero === 1)->json('direccion.id');
     }
     $this->deleteJson("/api/cliente/direcciones/{$ids[2]}")->assertOk()->assertJsonCount(2, 'direcciones')
@@ -187,7 +187,7 @@ test('borrar direcciones reasigna la principal y permite vaciar y volver a crear
     $this->deleteJson("/api/cliente/direcciones/{$ids[1]}")->assertOk()->assertJsonCount(0, 'direcciones');
     expect($user->fresh()->direccion)->toBeNull();
     expect($user->fresh()->barrio)->toBeNull();
-    $this->postJson('/api/cliente/direcciones', ['direccion' => 'Calle 4 #10-20', 'barrio' => 'Norte'])
+    $this->postJson('/api/cliente/direcciones', [...fotosReferenciaPrueba(), 'lat' => 11.379, 'lng' => -72.24, 'direccion' => 'Calle 4 #10-20', 'barrio' => 'Norte'])
         ->assertCreated()->assertJsonPath('direccion.es_principal', true);
     expect($user->fresh()->direccion)->toBe('Calle 4 #10-20');
 });

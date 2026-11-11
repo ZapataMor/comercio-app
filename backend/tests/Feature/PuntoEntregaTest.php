@@ -33,6 +33,7 @@ function puntoPersona(string $rol = 'usuario'): User
 function puntoDireccion(User $cliente, array $datos = []): ClienteDireccion
 {
     return $cliente->clienteDirecciones()->create($datos + [
+        'fotos' => ['frente' => 'frente.jpg', 'izquierda' => 'izquierda.jpg', 'derecha' => 'derecha.jpg'],
         'direccion' => 'Calle 12 # 10-25', 'barrio' => 'Centro', 'lat' => 11.3790, 'lng' => -72.2400,
     ]);
 }
@@ -56,7 +57,7 @@ function puntoCuerpo(Negocio $negocio, Producto $producto, array $extra = []): a
         'negocio_id' => $negocio->id,
         'items' => [['producto_id' => $producto->id, 'cantidad' => 1]],
         'metodo_pago' => 'efectivo',
-        'direccion_entrega' => 'Calle 12 # 10-25 - Barrio Centro',
+        'direccion_entrega' => 'Calle 12 # 10-25',
         'telefono_contacto' => '3001234567',
     ] + $extra;
 }
@@ -81,19 +82,18 @@ function puntoPedidoEnCamino(User $cliente, User $domiciliario, array $extra = [
 test('el cliente guarda una dirección con su punto en el mapa', function () {
     Sanctum::actingAs(puntoPersona());
 
-    $this->postJson('/api/cliente/direcciones', [
+    $this->postJson('/api/cliente/direcciones', [...fotosReferenciaPrueba(),
         'direccion' => 'Calle 12 # 10-25', 'barrio' => 'Centro', 'lat' => 11.379, 'lng' => -72.24,
     ])->assertCreated()
         ->assertJsonPath('direccion.lat', 11.379)
         ->assertJsonPath('direccion.lng', -72.24);
 });
 
-test('la dirección sigue sirviendo sin punto en el mapa', function () {
+test('la dirección exige un punto en el mapa', function () {
     Sanctum::actingAs(puntoPersona());
 
     $this->postJson('/api/cliente/direcciones', ['direccion' => 'Calle 12 # 10-25', 'barrio' => 'Centro'])
-        ->assertCreated()
-        ->assertJsonPath('direccion.lat', null);
+        ->assertUnprocessable()->assertJsonValidationErrors(['lat', 'lng']);
 });
 
 test('el punto necesita latitud y longitud juntas y dentro del mapa', function () {
@@ -106,7 +106,7 @@ test('el punto necesita latitud y longitud juntas y dentro del mapa', function (
         ->assertStatus(422)->assertJsonValidationErrors(['lat']);
 });
 
-test('al editar la dirección el punto se puede mover o quitar', function () {
+test('al editar la dirección el punto se puede mover pero no quitar', function () {
     $cliente = puntoPersona();
     $direccion = puntoDireccion($cliente);
     Sanctum::actingAs($cliente);
@@ -115,9 +115,9 @@ test('al editar la dirección el punto se puede mover o quitar', function () {
     $this->putJson("/api/cliente/direcciones/{$direccion->id}", $base + ['lat' => 11.38, 'lng' => -72.25])
         ->assertOk()->assertJsonPath('direccion.lat', 11.38);
     $this->putJson("/api/cliente/direcciones/{$direccion->id}", $base)
-        ->assertOk()->assertJsonPath('direccion.lat', null);
+        ->assertUnprocessable()->assertJsonValidationErrors(['lat', 'lng']);
 
-    expect($direccion->fresh()->tieneUbicacion())->toBeFalse();
+    expect($direccion->fresh()->tieneUbicacion())->toBeTrue();
 });
 
 // ---------------------------------------------------------------------------
@@ -147,21 +147,15 @@ test('el pedido no toma el punto de una dirección ajena', function () {
     [$negocio, $producto] = puntoNegocio();
     Sanctum::actingAs(puntoPersona());
 
-    $id = $this->postJson('/api/pedidos', puntoCuerpo($negocio, $producto, ['direccion_id' => $ajena->id]))
-        ->assertCreated()->json('id');
-
-    expect(Pedido::find($id)->puntoEntrega())->toBeNull();
+    $this->postJson('/api/pedidos', puntoCuerpo($negocio, $producto, ['direccion_id' => $ajena->id]))
+        ->assertUnprocessable()->assertJsonValidationErrors('direccion_id');
 });
 
-test('un pedido sin dirección guardada se crea sin punto', function () {
+test('un pedido exige una dirección guardada', function () {
     [$negocio, $producto] = puntoNegocio();
     Sanctum::actingAs(puntoPersona());
 
-    $id = $this->postJson('/api/pedidos', puntoCuerpo($negocio, $producto))->assertCreated()->json('id');
-
-    $this->getJson("/api/pedidos/{$id}")
-        ->assertJsonPath('entrega_ubicacion', null)
-        ->assertJsonPath('minutos_estimados', null);
+    $this->postJson('/api/pedidos', puntoCuerpo($negocio, $producto))->assertUnprocessable()->assertJsonValidationErrors('direccion_id');
 });
 
 // ---------------------------------------------------------------------------
@@ -233,4 +227,70 @@ test('el domiciliario recibe el punto exacto de la entrega mientras lleva el ped
     $pedido->update(['estado' => 'entregado', 'entregado_at' => now()]);
 
     $this->getJson('/api/domiciliario/entregas')->assertJsonMissing(['lat' => 11.379]);
+});
+
+
+test('cada campo rechaza signos y puntos incluso al crear el pedido directamente', function ($direccion) {
+    Sanctum::actingAs(puntoPersona());
+    [$negocio, $producto] = puntoNegocio();
+    $this->postJson('/api/pedidos', array_replace(puntoCuerpo($negocio, $producto), ['direccion_entrega' => $direccion]))
+        ->assertUnprocessable()->assertJsonValidationErrors('direccion_entrega');
+    $this->postJson('/api/cliente/direcciones', ['direccion' => $direccion, 'barrio' => 'Centro'])
+        ->assertUnprocessable()->assertJsonValidationErrors('direccion');
+})->with(['.', 'Calle . #1', 'Calle 1 Carrera . #2', 'Calle 1 #.', 'Calle 1/2 #3', 'Calle 1 #2_3', 'Calle 1 #2!']);
+
+test('se exigen tres fotos y se rechazan archivos que no son imagenes', function () {
+    Sanctum::actingAs(puntoPersona());
+    $base = ['direccion' => 'Calle 1 #2-3', 'barrio' => 'Centro', 'lat' => 11.379, 'lng' => -72.24];
+    $this->postJson('/api/cliente/direcciones', $base)->assertUnprocessable()
+        ->assertJsonValidationErrors(['foto_frente', 'foto_izquierda', 'foto_derecha']);
+    $this->postJson('/api/cliente/direcciones', $base + ['foto_frente' => \Illuminate\Http\UploadedFile::fake()->create('script.svg', 10, 'image/svg+xml')])
+        ->assertUnprocessable()->assertJsonValidationErrors('foto_frente');
+});
+
+test('fotos privadas solo para propietario y repartidor asignado durante entrega', function () {
+    $cliente = puntoPersona();
+    Sanctum::actingAs($cliente);
+    $id = $this->postJson('/api/cliente/direcciones', fotosReferenciaPrueba() + [
+        'direccion' => 'Calle 12 # 10-25', 'barrio' => 'Centro', 'lat' => 11.379, 'lng' => -72.24,
+    ])->assertCreated()->json('direccion.id');
+    $direccion = ClienteDireccion::findOrFail($id);
+    $ruta = "/api/cliente/direcciones/{$id}/fotos/frente";
+    $this->get($ruta)->assertOk()->assertHeader('Cache-Control', 'max-age=0, no-store, private');
+    foreach ($direccion->fotos as $path) {
+        \Illuminate\Support\Facades\Storage::disk('local')->assertExists($path);
+        \Illuminate\Support\Facades\Storage::disk('public')->assertMissing($path);
+    }
+    $domiciliario = puntoPersona('domiciliario');
+    $pedido = puntoPedidoEnCamino($cliente, $domiciliario, ['entrega_fotos' => $direccion->fotos]);
+    $foto = "/api/pedidos/{$pedido->id}/fotos-entrega/frente";
+    Sanctum::actingAs(puntoPersona('administrador'));
+    $this->get($foto)->assertForbidden();
+    Sanctum::actingAs(puntoPersona('domiciliario'));
+    $this->get($ruta)->assertNotFound();
+    $this->get($foto)->assertForbidden();
+    Sanctum::actingAs($domiciliario);
+    $this->get($foto)->assertOk();
+    $this->getJson('/api/domiciliario/entregas')->assertJsonPath('pedidos.0.entrega_fotos.frente', $foto);
+    foreach (['entregado', 'cancelado', 'devolviendo', 'listo'] as $estado) {
+        $pedido->update(['estado' => $estado]);
+        $this->get($foto)->assertForbidden();
+        $this->getJson('/api/domiciliario/entregas')->assertJsonMissing(['entrega_ubicacion' => ['lat' => 11.379, 'lng' => -72.24]])
+            ->assertJsonMissing(['entrega_fotos' => ['frente' => $foto]]);
+    }
+});
+
+test('el pedido exige referencias completas y direccion consistente con el mapa', function () {
+    $cliente = puntoPersona();
+    $direccion = puntoDireccion($cliente, ['fotos' => null]);
+    [$negocio, $producto] = puntoNegocio();
+    Sanctum::actingAs($cliente);
+    $body = puntoCuerpo($negocio, $producto, ['direccion_id' => $direccion->id]);
+    $this->postJson('/api/pedidos', $body)->assertUnprocessable()->assertJsonValidationErrors('direccion_id');
+    $direccion->update(['fotos' => ['frente' => 'a.jpg', 'izquierda' => 'b.jpg', 'derecha' => 'c.jpg']]);
+    $this->postJson('/api/pedidos', array_replace($body, ['direccion_entrega' => 'Calle 99 #1']))
+        ->assertUnprocessable()->assertJsonValidationErrors('direccion_entrega');
+    $id = $this->postJson('/api/pedidos', $body)->assertCreated()->json('id');
+    $direccion->update(['fotos' => ['frente' => 'nueva.jpg']]);
+    expect(Pedido::findOrFail($id)->entrega_fotos['frente'])->toBe('a.jpg');
 });

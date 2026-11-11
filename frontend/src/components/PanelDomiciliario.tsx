@@ -1,4 +1,6 @@
-import React, { Ref, useCallback, useEffect, useImperativeHandle, useState } from 'react';
+import { Image } from 'react-native';
+import { API_URL } from '../config';
+import React, { Ref, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   LayoutAnimation,
@@ -83,6 +85,7 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
     return { d, e };
   }, [token]);
 
+  const finalizados = useRef(new Set<number>());
   const aplicar = useCallback(
     ({ d, e }: Listas) => {
       setDisponibles(d.pedidos);
@@ -90,8 +93,7 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
       setBloqueadoEfectivo(d.bloqueado_por_efectivo);
       // El turno se cambia con la moto de la topbar: ahí se muestra.
       publicarTurno(token, d.en_turno, d.vetado);
-      setEntregas(e);
-      setBloqueadoEfectivo(d.bloqueado_por_efectivo);
+      setEntregas(e.map(p => finalizados.current.has(p.id) ? { ...p, estado: 'entregado', entrega_fotos: null, entrega_ubicacion: null, direccion_entrega: '' } : p));
     },
     [token],
   );
@@ -188,7 +190,7 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
       texto: 'Avisaremos al cliente y al comercio. Debes devolver el pedido al comercio y esperar a que confirmen la devolución.',
       textoBoton: 'Cliente no encontrado', textoCancelar: 'Seguir intentando',
       accion: async () => {
-        try { await clienteNoEncontrado(token, pedido.id); await actualizarAnimado(); }
+        try { await clienteNoEncontrado(token, pedido.id); setEntregas(prev => prev.filter(p => p.id !== pedido.id)); await actualizarAnimado(); }
         catch (e) { toast.error('No se pudo reportar', e instanceof Error ? e.message : 'Error'); }
       },
     });
@@ -197,6 +199,8 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
   /** Si el código no es correcto, el error lo muestra el mismo campo. */
   async function onEntregar(id: number, codigo: string) {
     await confirmarEntrega(token, id, codigo);
+    finalizados.current.add(id);
+    setEntregas(prev => prev.map(p => p.id === id ? { ...p, estado: 'entregado', entrega_ubicacion: null, entrega_fotos: null, direccion_entrega: '' } : p));
     await actualizarAnimado();
     toast.exito('¡Entrega completada!', 'Si hay efectivo pendiente, el pedido seguirá en curso hasta que el negocio confirme su recepción.');
   }
@@ -213,6 +217,7 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
       accion: async () => {
         try {
           await soltarPedido(token, pedido.id);
+          setEntregas(prev => prev.filter(p => p.id !== pedido.id));
           await actualizarAnimado();
           toast.info('Soltaste el pedido', 'Ya está disponible para otros domiciliarios.');
         } catch (e) {
@@ -260,6 +265,10 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
                       Entregar: {p.cliente?.name} — {p.direccion_entrega}
                     </Text>
                   </View>
+                  {['tomado', 'recogido', 'en_camino'].includes(p.estado) && Object.entries(p.entrega_fotos ?? {}).map(([tipo, url]) => <View key={`${p.id}-${tipo}`}>
+                    <Text style={styles.linea}>{tipo === 'frente' ? 'Frente de la casa' : `Calle hacia la ${tipo}`}</Text>
+                    <Image source={{ uri: `${API_URL}${url}`, headers: { Authorization: `Bearer ${token}` }, cache: 'reload' }} style={{ width: '100%', height: 200 }} resizeMode="contain" />
+                  </View>)}
                   {/* Abre la ruta en Google Maps: al negocio antes de recoger, luego al cliente. */}
                   <PressableScale
                     style={styles.novedadLink}

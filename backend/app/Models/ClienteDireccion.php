@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['user_id', 'direccion', 'barrio', 'es_principal', 'nombre', 'lat', 'lng'])]
+#[Fillable(['user_id', 'direccion', 'barrio', 'es_principal', 'nombre', 'lat', 'lng', 'fotos'])]
 class ClienteDireccion extends Model
 {
     use HasFactory;
@@ -16,6 +16,7 @@ class ClienteDireccion extends Model
     protected function casts(): array
     {
         return [
+            'fotos' => 'array',
             'es_principal' => 'boolean',
             'lat' => 'float',
             'lng' => 'float',

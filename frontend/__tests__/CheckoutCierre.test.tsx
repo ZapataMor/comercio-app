@@ -31,7 +31,7 @@ jest.mock('../src/CartContext', () => ({
   }),
 }));
 
-const mockDireccion = { id: 1, direccion: 'Calle 1', barrio: 'Centro', es_principal: true };
+const mockDireccion = { id: 1, direccion: 'Calle 1 #2-3', barrio: 'Centro', lat: 11.379, lng: -72.24, fotos: { frente: '/api/frente', izquierda: '/api/izquierda', derecha: '/api/derecha' }, es_principal: true };
 jest.mock('../src/api', () => ({
   ...jest.requireActual('../src/api'),
   crearPedido: jest.fn(),
@@ -153,4 +153,14 @@ test('si se pierde la red al confirmar, el formulario desaparece mientras se rei
   expect(textos()).toContain('Enviando tu pedido');
   expect(textos().some(t => t.startsWith('Confirmar pedido'))).toBe(false);
   expect(mockCrear).toHaveBeenCalledTimes(1);
+});
+
+
+test('una dirección antigua sin fotos obliga a completarla antes de confirmar', async () => {
+  const { getClienteDirecciones } = require('../src/api');
+  getClienteDirecciones.mockResolvedValueOnce([{ ...mockDireccion, fotos: {}, lat: null }]);
+  await montar();
+  await tocar('Confirmar pedido');
+  expect(mockCrear).not.toHaveBeenCalled();
+  expect(textos()).toContain('Completa la dirección, el mapa y las tres fotos antes de pedir.');
 });

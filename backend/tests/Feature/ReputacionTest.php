@@ -379,7 +379,7 @@ test('el pedido guarda el tiempo de preparación que prometía el negocio', func
         'negocio_id' => $negocio->id,
         'items' => [['producto_id' => $producto->id, 'cantidad' => 2]],
         'metodo_pago' => 'efectivo',
-        'direccion_entrega' => 'Calle 1',
+        ...direccionPedidoPrueba(),
         'telefono_contacto' => '3000000000',
     ])->assertCreated()->json('id');
 
@@ -457,7 +457,7 @@ test('un negocio vetado desaparece de Explorar y no recibe pedidos', function ()
         'negocio_id' => $negocio->id,
         'items' => [['producto_id' => $producto->id, 'cantidad' => 1]],
         'metodo_pago' => 'efectivo',
-        'direccion_entrega' => 'Calle 1',
+        ...direccionPedidoPrueba(),
         'telefono_contacto' => '3000000000',
     ])->assertStatus(422);
 });

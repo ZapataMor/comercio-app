@@ -1,3 +1,6 @@
+import FotosDireccion, { fotosCompletas } from './FotosDireccion';
+import { FotosDireccion as Fotos } from '../api';
+import { campoDireccionValido, limpiarCampoDireccion } from '../direccion';
 import CamposDireccion from '../components/CamposDireccion';
 import { direccionValida, errorDireccion } from '../direccion';
 import React, { useState } from 'react';
@@ -16,6 +19,7 @@ export default function EditarDireccion({ direccion, onCerrar, onGuardada }: {
   const { auth, actualizarUsuario } = useAuth();
   const { c } = useTheme();
   const styles = useStyles();
+  const [fotos, setFotos] = useState<Fotos>(direccion?.fotos ?? {});
   const [nombre, setNombre] = useState(direccion?.nombre ?? '');
   const [calle, setCalle] = useState(direccion?.direccion ?? '');
   const [barrio, setBarrio] = useState(direccion?.barrio ?? '');
@@ -29,14 +33,17 @@ export default function EditarDireccion({ direccion, onCerrar, onGuardada }: {
     if (!auth || guardando) return;
     const campos: FieldErrors = {};
     if (!direccionValida(calle)) campos.direccion = errorDireccion;
-    if (!barrio.trim()) campos.barrio = 'Elige o escribe el barrio.';
+    if (!campoDireccionValido(barrio)) campos.barrio = 'Elige o escribe el barrio.';
+    if (nombre && !campoDireccionValido(nombre)) campos.nombre = errorDireccion;
+    if (!punto) campos.lat = 'Marca tu casa en el mapa o usa tu ubicación actual.';
+    if (!fotosCompletas(fotos)) campos.fotos = 'Añade las tres fotos de referencia.';
     setErrores(campos); setError('');
     if (Object.keys(campos).length) return;
     setGuardando(true);
     try {
       const body = {
         nombre: nombre.trim() || null, direccion: calle.trim(), barrio: barrio.trim(),
-        lat: punto?.lat ?? null, lng: punto?.lng ?? null,
+        lat: punto?.lat ?? null, lng: punto?.lng ?? null, fotos,
       };
       const guardada = direccion ? await editarClienteDireccion(auth.token, direccion.id, body)
         : await crearClienteDireccion(auth.token, body);
@@ -50,17 +57,19 @@ export default function EditarDireccion({ direccion, onCerrar, onGuardada }: {
     <View style={styles.fondo}><ScrollView style={styles.caja} contentContainerStyle={styles.contenido} keyboardShouldPersistTaps="handled">
       <Text style={styles.titulo}>{direccion ? 'Editar dirección' : 'Agregar dirección'}</Text>
       <Text style={styles.label}>Nombre (opcional)</Text>
-      <TextInput style={styles.input} value={nombre} onChangeText={setNombre} maxLength={80} placeholder="Mi casa, Trabajo…" placeholderTextColor={c.muted} editable={!guardando} />
+      <TextInput style={styles.input} value={nombre} onChangeText={v => setNombre(limpiarCampoDireccion(v))} maxLength={80} placeholder="Casa-Trabajo" placeholderTextColor={c.muted} editable={!guardando} />
       <Text style={styles.ayuda}>Solo tú verás este nombre.</Text>
       <FieldError mensaje={errores.nombre} />
       <Text style={styles.label}>Dirección</Text>
       <CamposDireccion value={calle} onChangeText={setCalle} editable={!guardando} />
       <FieldError mensaje={errores.direccion} />
       <Text style={styles.label}>Barrio</Text>
-      <BarrioSelect disabled={guardando} valor={barrio} onSeleccionar={setBarrio} />
+      <BarrioSelect disabled={guardando} valor={barrio} onSeleccionar={v => setBarrio(limpiarCampoDireccion(v))} />
       <FieldError mensaje={errores.barrio} />
       <View style={styles.mapa}><SelectorUbicacion tipo="entrega" valor={punto} onCambiar={setPunto} disabled={guardando} /></View>
       <FieldError mensaje={errores.lat ?? errores.lng} />
+      <FotosDireccion fotos={fotos} onChange={setFotos} token={auth!.token} disabled={guardando} />
+      <FieldError mensaje={errores.fotos ?? errores.foto_frente ?? errores.foto_izquierda ?? errores.foto_derecha} />
       {!!error && <Text style={styles.error}>{error}</Text>}
       <TouchableOpacity style={styles.boton} disabled={guardando} onPress={guardar}>
         {guardando ? <ActivityIndicator color={c.onAccent} /> : <Text style={styles.botonTexto}>Guardar dirección</Text>}

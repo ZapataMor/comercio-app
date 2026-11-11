@@ -471,6 +471,7 @@ async function authUpload(
   campos: Record<string, any>,
   imagenUri?: string,
   imagenesUri?: string[],
+  archivos?: Record<string, string>,
 ): Promise<any> {
   const form = new FormData();
   if (metodo === 'PUT') {
@@ -496,6 +497,9 @@ async function authUpload(
     form.append(`imagenes[${indice}]`, { uri, name: `trabajo-${indice}.jpg`, type: 'image/jpeg' } as any);
   }
 
+  for (const [campo, uri] of Object.entries(archivos ?? {})) {
+    form.append(campo, { uri, name: `${campo}.jpg`, type: 'image/jpeg' } as any);
+  }
   let res: Response;
   try {
     res = await solicitar(`${API_URL}${path}`, {
@@ -570,19 +574,23 @@ export async function eliminarCuenta(token: string, password: string): Promise<v
 
 // ---------- Cliente: ubicaciones ----------
 
+export type FotosDireccion = Partial<Record<'frente' | 'izquierda' | 'derecha', string>>;
+
 export type ClienteDireccion = {
+  fotos?: FotosDireccion;
   id: number;
   nombre?: string | null;
   direccion: string;
   barrio: string;
   es_principal: boolean;
-  /** Punto en el mapa, si el cliente lo fijó (opcional). */
+  /** Las direcciones antiguas pueden carecer de punto; deben completarse antes de pedir. */
   lat?: number | null;
   lng?: number | null;
 };
 
-/** Lo que se envía al guardar una dirección; sin punto, lat y lng van en null. */
+/** Dirección con punto obligatorio y tres fotos; al editar se conservan las fotos existentes. */
 export type DatosDireccion = {
+  fotos?: FotosDireccion;
   direccion: string;
   barrio: string;
   nombre?: string | null;
@@ -595,18 +603,24 @@ export async function getClienteDirecciones(token: string): Promise<ClienteDirec
   return (d.direcciones ?? []) as ClienteDireccion[];
 }
 
+function archivosDireccion(fotos?: FotosDireccion): Record<string, string> {
+  return Object.fromEntries(Object.entries(fotos ?? {}).filter(([, uri]) => !uri.startsWith('/api/')).map(([tipo, uri]) => [`foto_${tipo}`, uri]));
+}
+
 export async function crearClienteDireccion(
   token: string,
   body: DatosDireccion,
 ): Promise<ClienteDireccion> {
-  const d = await authSend('POST', '/api/cliente/direcciones', token, body);
+  const { fotos, ...campos } = body;
+  const d = await authUpload('POST', '/api/cliente/direcciones', token, campos, undefined, undefined, archivosDireccion(fotos));
   return d.direccion as ClienteDireccion;
 }
 
 export async function editarClienteDireccion(
   token: string, id: number, body: DatosDireccion,
 ): Promise<ClienteDireccion> {
-  const d = await authSend('PUT', `/api/cliente/direcciones/${id}`, token, body);
+  const { fotos, ...campos } = body;
+  const d = await authUpload('PUT', `/api/cliente/direcciones/${id}`, token, campos, undefined, undefined, archivosDireccion(fotos));
   return d.direccion as ClienteDireccion;
 }
 
@@ -1445,6 +1459,7 @@ export type Pedido = {
   direccion_entrega: string;
   /** Punto exacto de la entrega, si el cliente lo fijó (solo mientras lo llevo). */
   entrega_ubicacion?: Coordenadas | null;
+  entrega_fotos?: FotosDireccion | null;
   /** Solo cuando el pedido es mío y lo estoy llevando. */
   telefono_contacto: string | null;
   /** Justificación que reporté para una demora. */
@@ -1693,6 +1708,7 @@ export type SeguimientoPedido = {
   negocio_ubicacion?: Coordenadas | null;
   /** Mi puerta en el mapa, si la dirección del pedido tenía punto. */
   entrega_ubicacion?: Coordenadas | null;
+  entrega_fotos?: FotosDireccion | null;
   /** En cuánto llega el domiciliario (aprox., por distancia); solo en camino. */
   minutos_estimados?: number | null;
   /** Justificación del domiciliario si se está demorando. */

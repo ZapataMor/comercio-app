@@ -412,9 +412,11 @@ class DomiciliarioController extends Controller
             // Se lo dicta al negocio al llegar por el pedido.
             'codigo_recogida' => $p->estado === 'tomado' ? $p->codigo_confirmacion : null,
             'fecha_entrega' => $p->entregado_at?->format('d/m/Y H:i'),
-            'direccion_entrega' => $p->direccion_entrega,
+            'direccion_entrega' => $p->domiciliario_id === request()->user()->id && in_array($p->estado, ['tomado', 'recogido', 'en_camino'], true) ? $p->direccion_entrega : '',
             // Punto exacto de la entrega, solo para quien lleva el pedido.
-            'entrega_ubicacion' => in_array($p->estado, Pedido::EN_RUTA, true) ? $p->puntoEntrega() : null,
+            'entrega_ubicacion' => $p->domiciliario_id === request()->user()->id && in_array($p->estado, ['tomado', 'recogido', 'en_camino'], true) ? $p->puntoEntrega() : null,
+            'entrega_fotos' => $p->domiciliario_id === request()->user()->id && in_array($p->estado, ['tomado', 'recogido', 'en_camino'], true)
+                ? collect($p->entrega_fotos ?? [])->mapWithKeys(fn ($path, $tipo) => [$tipo => '/api/pedidos/'.$p->id.'/fotos-entrega/'.$tipo])->all() : null,
             // El teléfono del cliente solo lo ve quien lleva el pedido.
             'telefono_contacto' => in_array($p->estado, Pedido::EN_RUTA, true) ? $p->telefono_contacto : null,
             'novedad' => $p->novedad,

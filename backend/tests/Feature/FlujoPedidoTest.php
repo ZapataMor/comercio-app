@@ -422,7 +422,7 @@ test('el código de entrega nace al recoger y el domiciliario no puede verlo', f
         'negocio_id' => $negocio->id,
         'items' => [['producto_id' => $producto->id, 'cantidad' => 1]],
         'metodo_pago' => 'efectivo',
-        'direccion_entrega' => 'Calle 1',
+        ...direccionPedidoPrueba(),
         'telefono_contacto' => '3000000000',
     ])->assertCreated()->json('id');
 

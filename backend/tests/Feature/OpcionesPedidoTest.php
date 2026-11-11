@@ -43,7 +43,7 @@ function pedir(Negocio $negocio, array ...$items)
         'negocio_id' => $negocio->id,
         'items' => $items,
         'metodo_pago' => 'efectivo',
-        'direccion_entrega' => 'Calle 1 #10-20',
+        ...direccionPedidoPrueba(null, 'Calle 1 #10-20'),
         'telefono_contacto' => '3001234567',
     ]);
 }
@@ -75,20 +75,20 @@ test('el domiciliario recibe la direccion real y el peso pero no el nombre priva
     $id = pedir($this->negocio, ['producto_id' => $producto->id, 'cantidad' => 0.5])->assertCreated()->json('id');
     $pedido = $this->negocio->pedidos()->findOrFail($id);
     $direccion = $pedido->cliente->clienteDirecciones()->create([
-        'direccion' => 'Calle 1 #10-20', 'barrio' => 'Centro', 'nombre' => 'Mi casa privada',
+        'direccion' => 'Calle 1 #10-20', 'barrio' => 'Centro', 'nombre' => 'Mi-casa-privada',
     ]);
-    $this->putJson("/api/cliente/direcciones/{$direccion->id}", [
-        'direccion' => 'Calle 20 #10-20', 'barrio' => 'Centro', 'nombre' => 'Trabajo privado',
+    $this->putJson("/api/cliente/direcciones/{$direccion->id}", [...fotosReferenciaPrueba(), 'lat' => 11.379, 'lng' => -72.24,
+        'direccion' => 'Calle 20 #10-20', 'barrio' => 'Centro', 'nombre' => 'Trabajo-privado',
     ])->assertOk();
     $domiciliario = User::factory()->create();
     $domiciliario->assignRole('domiciliario');
     $pedido->update(['estado' => 'tomado', 'domiciliario_id' => $domiciliario->id, 'tomado_at' => now()]);
     Sanctum::actingAs($domiciliario);
     $resp = $this->getJson('/api/domiciliario/entregas')->assertOk()
-        ->assertJsonPath('pedidos.0.direccion_entrega', 'Calle 1 #10-20')
+        ->assertJsonPath('pedidos.0.direccion_entrega', 'Calle 1 #10-20 - Barrio Centro')
         ->assertJsonPath('pedidos.0.items.0.cantidad', 0.5)
         ->assertJsonPath('pedidos.0.items.0.unidad_medida', 'kg');
-    expect($resp->getContent())->not->toContain('Mi casa privada')->not->toContain('Trabajo privado');
+    expect($resp->getContent())->not->toContain('Mi-casa-privada')->not->toContain('Trabajo-privado');
 });
 
 test('el ajuste por faltantes conserva cantidades decimales y recalcula el total', function () {

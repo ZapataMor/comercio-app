@@ -1,3 +1,6 @@
+import FotosDireccion, { fotosCompletas } from '../components/FotosDireccion';
+import { FotosDireccion as Fotos } from '../api';
+import { campoDireccionValido, limpiarCampoDireccion } from '../direccion';
 import CamposDireccion from '../components/CamposDireccion';
 import { direccionValida, errorDireccion, telefonoValido, errorTelefono } from '../direccion';
 import { useFocusEffect } from '@react-navigation/native';
@@ -64,6 +67,7 @@ export default function CheckoutScreen({ navigation }: Props) {
   const [nuevaDireccion, setNuevaDireccion] = useState('');
   const [nuevoBarrio, setNuevoBarrio] = useState('');
   const [nuevoNombre, setNuevoNombre] = useState('');
+  const [fotos, setFotos] = useState<Fotos>({});
   const [nuevoPunto, setNuevoPunto] = useState<Coordenadas | null>(null);
   const [editandoDireccion, setEditandoDireccion] = useState<ClienteDireccion | null>(null);
   // Telefono guardado en el perfil del cliente (se pidio al registrarse).
@@ -173,22 +177,26 @@ export default function CheckoutScreen({ navigation }: Props) {
       return;
     }
 
-    let direccionEntrega = ubicacionSeleccionada ? textoUbicacion(ubicacionSeleccionada) : '';
+    let direccionEntrega = ubicacionSeleccionada?.direccion ?? '';
 
     if (seleccion === 'nueva') {
       const nuevosErrores: FieldErrors = {};
       if (!direccionValida(nuevaDireccion)) nuevosErrores.nuevaDireccion = errorDireccion;
-      if (!nuevoBarrio.trim()) nuevosErrores.nuevoBarrio = 'El campo barrio es obligatorio.';
+      if (!campoDireccionValido(nuevoBarrio)) nuevosErrores.nuevoBarrio = 'El campo barrio es obligatorio.';
+      if (!nuevoPunto) nuevosErrores.ubicacion = 'Marca tu casa en el mapa.';
+      if (!fotosCompletas(fotos)) nuevosErrores.ubicacion = 'Añade las tres fotos de referencia.';
       if (Object.keys(nuevosErrores).length > 0) {
         setErrores(nuevosErrores);
         return;
       }
-      direccionEntrega = textoUbicacion({
-        direccion: nuevaDireccion.trim(),
-        barrio: nuevoBarrio.trim(),
-      });
+      direccionEntrega = nuevaDireccion.trim();
     }
 
+    if (seleccion !== 'nueva' && ubicacionSeleccionada && (!direccionValida(ubicacionSeleccionada.direccion) || !campoDireccionValido(ubicacionSeleccionada.barrio) || ubicacionSeleccionada.lat == null || ubicacionSeleccionada.lng == null || !fotosCompletas(ubicacionSeleccionada.fotos))) {
+      setEditandoDireccion(ubicacionSeleccionada);
+      setErrores({ ubicacion: 'Completa la dirección, el mapa y las tres fotos antes de pedir.' });
+      return;
+    }
     if (!direccionEntrega) {
       setErrores({ ubicacion: 'Selecciona o agrega una ubicacion de entrega.' });
       return;
@@ -227,6 +235,7 @@ export default function CheckoutScreen({ navigation }: Props) {
           nombre: nuevoNombre.trim() || null,
           direccion: nuevaDireccion.trim(),
           barrio: nuevoBarrio.trim(),
+          fotos,
           lat: nuevoPunto?.lat ?? null,
           lng: nuevoPunto?.lng ?? null,
         });
@@ -397,7 +406,7 @@ export default function CheckoutScreen({ navigation }: Props) {
 
       {seleccion === 'nueva' ? (
         <View style={styles.nuevaBox}>
-          <TextInput style={styles.input} value={nuevoNombre} onChangeText={setNuevoNombre} maxLength={80} placeholder="Nombre opcional: Mi casa, Trabajo…" placeholderTextColor={c.mutedSoft} />
+          <TextInput style={styles.input} value={nuevoNombre} onChangeText={v => setNuevoNombre(limpiarCampoDireccion(v))} maxLength={80} placeholder="Nombre opcional: Mi casa, Trabajo…" placeholderTextColor={c.mutedSoft} />
           <Text style={styles.lineaDetalle}>Solo tú verás este nombre.</Text>
           <CamposDireccion value={nuevaDireccion} onChangeText={setNuevaDireccion} />
           <FieldError mensaje={errores.nuevaDireccion} />
@@ -412,6 +421,8 @@ export default function CheckoutScreen({ navigation }: Props) {
           <FieldError mensaje={errores.nuevoBarrio} />
           <View style={styles.nuevoMapa}>
             <SelectorUbicacion tipo="entrega" valor={nuevoPunto} onCambiar={setNuevoPunto} disabled={enviando} />
+            <FotosDireccion fotos={fotos} onChange={setFotos} token={auth!.token} disabled={enviando} />
+            <FieldError mensaje={errores.foto_frente ?? errores.foto_izquierda ?? errores.foto_derecha} />
           </View>
         </View>
       ) : null}

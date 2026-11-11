@@ -54,7 +54,7 @@ function limCuerpo(Negocio $negocio, Producto $producto, array $extra = []): arr
         'negocio_id' => $negocio->id,
         'items' => [['producto_id' => $producto->id, 'cantidad' => 2]],
         'metodo_pago' => 'efectivo',
-        'direccion_entrega' => 'Calle 1 # 2-3',
+        ...direccionPedidoPrueba(),
         'telefono_contacto' => '3001234567',
     ] + $extra;
 }
@@ -108,6 +108,7 @@ test('reintentar el mismo intento de compra devuelve el mismo pedido', function 
     // Otro intento (otra clave) sí es otro pedido, y la clave es por cliente.
     $this->postJson('/api/pedidos', limCuerpo($negocio, $producto, ['clave_intento' => 'intento-0002']))->assertCreated();
     Sanctum::actingAs(limPersona());
+    $cuerpo = array_replace($cuerpo, direccionPedidoPrueba());
     $this->postJson('/api/pedidos', $cuerpo)->assertCreated();
     expect(Pedido::count())->toBe(3);
 });
@@ -391,6 +392,7 @@ test('el precio reservado del carrito dura una hora y no se puede alterar ni pre
     $cliente = limPersona();
     $reserva = PrecioCarrito::cotizar($producto, $cliente->id);
     $producto->update(['precio' => 99000]);
+    Sanctum::actingAs($cliente);
     $cuerpo = array_replace(limCuerpo($negocio, $producto), ['items' => [['producto_id' => $producto->id, 'cantidad' => 2, 'precio_token' => $reserva['precio_token']]], 'total_esperado' => 6000]);
     Sanctum::actingAs(limPersona());
     $this->postJson('/api/pedidos', $cuerpo)->assertUnprocessable();

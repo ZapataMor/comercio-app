@@ -50,7 +50,7 @@ function pedirComo(User $cliente, Negocio $negocio, $producto, int $cantidad = 2
         'negocio_id' => $negocio->id,
         'items' => [['producto_id' => $producto->id, 'cantidad' => $cantidad]],
         'metodo_pago' => 'efectivo',
-        'direccion_entrega' => 'Calle 5',
+        ...direccionPedidoPrueba(),
         'telefono_contacto' => '3001234567',
     ]);
 }

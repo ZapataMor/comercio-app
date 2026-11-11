@@ -49,9 +49,9 @@ class PedidoController extends Controller
             'items.*.extra' => ['nullable', 'array', 'max:30'],
             'items.*.extra.*' => ['string', 'max:100'],
             'metodo_pago' => ['required', Rule::in(Pedido::METODOS_PAGO)],
-            'direccion_entrega' => ['required', 'string', 'max:255'],
+            'direccion_entrega' => ['required', 'string', 'max:255', new \App\Rules\Direccion],
             // Dirección guardada que eligió: de ahí sale el punto en el mapa.
-            'direccion_id' => ['sometimes', 'nullable', 'integer'],
+            'direccion_id' => ['required', 'integer'],
             'telefono_contacto' => ['required', 'string', new \App\Rules\Telefono],
             // Identifica el intento de compra: reintentar con la misma clave
             // devuelve el pedido ya creado en vez de duplicarlo.
@@ -148,6 +148,17 @@ class PedidoController extends Controller
         return $this->pedidoCreado($pedido);
     }
 
+    public function fotoEntrega(Request $request, int $id, string $tipo)
+    {
+        $pedido = Pedido::findOrFail($id);
+        abort_unless($pedido->domiciliario_id === $request->user()->id
+            && $request->user()->hasRole('domiciliario')
+            && in_array($pedido->estado, ['tomado', 'recogido', 'en_camino'], true), 403);
+        $path = ($pedido->entrega_fotos ?? [])[$tipo] ?? null;
+        abort_unless($path, 404);
+        return \Illuminate\Support\Facades\Storage::disk('local')->response($path, null, ['Cache-Control' => 'private, no-store, max-age=0', 'X-Content-Type-Options' => 'nosniff']);
+    }
+
     private function pedidoCreado(Pedido $pedido): JsonResponse
     {
         return response()->json(['id' => $pedido->id, 'message' => '¡Pedido confirmado!'], 201);
@@ -166,13 +177,24 @@ class PedidoController extends Controller
             $direccion = isset($datos['direccion_id'])
                 ? $cliente->clienteDirecciones()->find($datos['direccion_id'])
                 : null;
+            if (! $direccion || ! $direccion->tieneUbicacion() || count(array_intersect(['frente', 'izquierda', 'derecha'], array_keys($direccion->fotos ?? []))) !== 3) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['direccion_id' => 'Edita la dirección: marca tu casa en el mapa y añade las tres fotos.']);
+            }
+            validator(['direccion' => $direccion->direccion, 'barrio' => $direccion->barrio], [
+                'direccion' => ['required', 'max:255', new \App\Rules\Direccion],
+                'barrio' => ['required', 'regex:/\A[\p{L}\p{N}-]+\z/u'],
+            ])->validate();
+            if ($datos['direccion_entrega'] !== $direccion->direccion) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['direccion_entrega' => 'La dirección no coincide con la ubicación seleccionada.']);
+            }
             $pedido = Pedido::create([
                 'negocio_id' => $negocio->id,
                 'user_id' => $request->user()->id,
                 'estado' => 'pendiente',
                 'metodo_pago' => $datos['metodo_pago'],
                 'total' => 0,
-                'direccion_entrega' => $datos['direccion_entrega'],
+                'direccion_entrega' => $direccion->direccion.' - Barrio '.$direccion->barrio,
+                'entrega_fotos' => $direccion->fotos,
                 'entrega_lat' => $direccion?->lat,
                 'entrega_lng' => $direccion?->lng,
                 'telefono_contacto' => $datos['telefono_contacto'],

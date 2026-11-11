@@ -228,7 +228,7 @@ test('crear un pedido notifica al comercio', function () {
         'negocio_id' => $negocio->id,
         'items' => [['producto_id' => $producto->id, 'cantidad' => 2]],
         'metodo_pago' => 'efectivo',
-        'direccion_entrega' => 'Calle 1 #2-3',
+        ...direccionPedidoPrueba(),
         'telefono_contacto' => '3001234567',
     ])->assertStatus(201);
 
