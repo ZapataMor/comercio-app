@@ -179,6 +179,7 @@ Route::middleware(['auth:sanctum', 'throttle:api-usuario'])->group(function () {
     // --- Pedidos del cliente ---
     Route::get('/citas', [CitaController::class, 'index']);
     Route::post('/citas/{id}/cancelar', [CitaController::class, 'cancelar'])->whereNumber('id');
+    Route::put('/citas/{id}/reprogramar', [CitaController::class, 'reprogramar'])->whereNumber('id');
     Route::get('/cliente/direcciones/{id}/fotos/{tipo}', [ClienteDireccionController::class, 'foto']);
     Route::get('/pedidos/{id}/fotos-entrega/{tipo}', [ApiPedidoController::class, 'fotoEntrega']);
     Route::get('/cliente/direcciones', [ClienteDireccionController::class, 'index']);

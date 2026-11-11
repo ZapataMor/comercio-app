@@ -8,6 +8,7 @@ import {
   getDisponibilidadCitas,
   solicitarCita,
   registrarLlegadaCita,
+  reprogramarCita,
 } from '../src/api';
 import { errorHorario } from '../src/components/EditorHorario';
 import AgendarCitaScreen from '../src/screens/AgendarCitaScreen';
@@ -24,6 +25,7 @@ jest.mock('../src/api', () => ({
   actualizarCita: jest.fn(),
   cancelarCita: jest.fn(),
   registrarLlegadaCita: jest.fn(),
+  reprogramarCita: jest.fn(),
 }));
 jest.mock('../src/NegocioContext', () => ({
   useNegocio: () => ({
@@ -71,9 +73,9 @@ test('volver a tocar la fecha seleccionada conserva sus horas disponibles', asyn
 const mockDisponibilidad = getDisponibilidadCitas as jest.Mock;
 const mockSolicitar = solicitarCita as jest.Mock;
 let raiz: ReactTestRenderer.ReactTestRenderer;
-let navigation: { replace: jest.Mock };
-async function montar(presencial = false) {
-  navigation = { replace: jest.fn() };
+let navigation: { replace: jest.Mock; goBack: jest.Mock };
+async function montar(presencial = false, extra = {}) {
+  navigation = { replace: jest.fn(), goBack: jest.fn() };
   await act(async () => {
     raiz = ReactTestRenderer.create(
       <AgendarCitaScreen
@@ -85,6 +87,7 @@ async function montar(presencial = false) {
               negocioNombre: 'Salón',
               servicio: { id: 8, nombre: 'Corte', duracion_minutos: 60 },
               presencial,
+              ...extra,
             },
           },
         } as any)}
@@ -334,4 +337,64 @@ test('muestra No asistió y permite al cliente volver a los servicios para renov
   await tocarTexto('Solicitar nueva cita');
   const pantalla = raiz.root.findByType(CitasScreen);
   expect(pantalla.props.navigation.navigate).toHaveBeenCalledWith('Negocio', { id: 1, nombre: 'Salón', seccion: 'servicios' });
+});
+
+test('pide la cita a nombre de otra persona y exige su nombre', async () => {
+  await montar();
+  await tocarEtiqueta('Elegir hora 14:00');
+  await tocarTexto('Para otra persona');
+  await tocarTexto('Solicitar cita');
+  expect(textos()).toContain('Escribe el nombre de la persona que recibirá el servicio.');
+  expect(mockSolicitar).not.toHaveBeenCalled();
+  await act(async () => {
+    raiz.root
+      .findAllByType(TextInput)
+      .find(n => n.props.accessibilityLabel === 'A nombre de')!
+      .props.onChangeText('Laura 2 Gómez');
+  });
+  await tocarTexto('Solicitar cita');
+  expect(mockSolicitar).toHaveBeenCalledWith(
+    'token',
+    1,
+    expect.objectContaining({ a_nombre_de: 'Laura  Gómez' }),
+    false,
+  );
+});
+
+test('con 3 citas ese día no ofrece horas y bloquea la solicitud', async () => {
+  mockDisponibilidad.mockResolvedValue({ ...disponible, citas_del_dia: 3, max_citas_dia: 3 });
+  await montar();
+  expect(textos().some(t => t.includes('Ya tienes 3 citas este día'))).toBe(true);
+  expect(textos()).not.toContain('2:00 p. m.');
+});
+
+test('reprograma la cita desde Mis citas sin crear una nueva', async () => {
+  (reprogramarCita as jest.Mock).mockResolvedValue({ estado: 'pendiente' });
+  await montar(false, { reprogramar: { citaId: 12, fecha: '2026-11-10', profesionalId: 3 } });
+  expect(mockDisponibilidad).toHaveBeenCalledWith('token', 1, 8, '2026-11-10', 3, 12);
+  expect(textos()).not.toContain('¿Para quién es la cita?');
+  await tocarEtiqueta('Elegir hora 15:00');
+  await tocarTexto('Reprogramar cita');
+  expect(reprogramarCita).toHaveBeenCalledWith('token', 12, { profesional_id: 2, fecha: '2026-11-10', hora: '15:00' });
+  expect(mockSolicitar).not.toHaveBeenCalled();
+  expect(navigation.goBack).toHaveBeenCalled();
+});
+
+test('Mis citas muestra a nombre de quién está y abre la reprogramación', async () => {
+  await montarAgenda(false, { estado: 'confirmada', a_nombre_de: 'Laura', servicio_id: 8, profesional_id: 2, llegada_at: null });
+  expect(textos()).toContain('A nombre de Laura');
+  await tocarTexto('Reprogramar');
+  const pantalla = raiz.root.findByType(CitasScreen);
+  expect(pantalla.props.navigation.navigate).toHaveBeenCalledWith('AgendarCita', {
+    negocioId: 1,
+    negocioNombre: 'Salón',
+    servicio: { id: 8, nombre: 'Corte', duracion_minutos: 60 },
+    reprogramar: { citaId: 12, fecha: '2026-11-10', profesionalId: 2 },
+  });
+});
+
+test('el negocio ve quién solicitó una cita pedida para otra persona', async () => {
+  await montarAgenda(true, { a_nombre_de: 'Laura' });
+  expect(textos()).toContain('A nombre de Laura');
+  expect(textos()).toContain('Solicitó: Cliente');
 });

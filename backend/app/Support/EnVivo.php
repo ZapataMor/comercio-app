@@ -420,6 +420,7 @@ class EnVivo
             Api\CitaController::class.'@reasignar' => ['despues' => fn (Request $r) => self::cita($id($r))],
             Api\CitaController::class.'@llegada' => ['despues' => fn (Request $r) => self::cita($id($r))],
             Api\CitaController::class.'@cancelar' => ['despues' => fn (Request $r) => self::cita($id($r))],
+            Api\CitaController::class.'@reprogramar' => ['despues' => fn (Request $r) => self::cita($id($r))],
 
             // --- Administración ---
             Api\AdminController::class.'@storeUsuario' => ['despues' => fn () => self::avisar(self::ADMIN, 'usuarios')],

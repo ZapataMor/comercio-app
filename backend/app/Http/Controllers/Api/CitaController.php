@@ -18,41 +18,34 @@ use Illuminate\Validation\Rule;
 
 class CitaController extends Controller
 {
+    private const MENSAJES = [
+        'hora.regex' => AgendaCitas::MENSAJE_HORA,
+        'a_nombre_de.regex' => 'Escribe el nombre de la persona solo con letras.',
+    ];
+
     public function disponibilidad(Request $request, Negocio $negocio): JsonResponse
     {
         abort_if($negocio->archivado_at || $negocio->desactivado_at || $negocio->estaVetado(), 404);
         $d = $request->validate([
             'fecha' => ['required', 'date_format:Y-m-d', 'after_or_equal:today', 'before_or_equal:'.now()->addDays(90)->format('Y-m-d')],
             'servicio_id' => ['required', 'integer'], 'profesional_id' => ['nullable', 'integer'],
+            'cita_id' => ['nullable', 'integer'],
         ]);
         $servicio = $negocio->servicios()->where('disponible', true)->where('permite_citas', true)->findOrFail($d['servicio_id']);
         $profesionales = $negocio->miembrosActivos()->orderBy('name')->get();
         $profesional = isset($d['profesional_id']) ? $profesionales->firstWhere('id', $d['profesional_id']) : $profesionales->first();
         abort_unless($profesional, 422, 'Selecciona un profesional activo del negocio.');
         $dia = Carbon::parse($d['fecha'])->startOfDay();
-        $limite = $dia->copy()->addDay();
-        $ocupadas = AgendaCitas::ocupadas($profesional->id)->where('inicio', '<', $limite->copy()->addDay())->where('fin', '>', $dia)->get();
-        $horas = [];
-        foreach (HorarioNegocio::intervalosDeFecha($negocio->horario, $dia) as [$abre, $cierra]) {
-            for ($hora = $abre->copy(); $hora->lt($cierra) && $hora->lt($limite); $hora->addMinutes(15)) {
-                if ($hora->lt($dia) || $hora->lte(now()) || $hora->gt(now()->addDays(90))) {
-                    continue;
-                }
-                $fin = $hora->copy()->addMinutes($servicio->duracion_minutos);
-                if ($fin->gt($cierra)) {
-                    continue;
-                }
-                if ($ocupadas->contains(fn ($cita) => $cita->inicio->lt($fin) && $cita->fin->gt($hora))) {
-                    continue;
-                }
-                $horas[] = $hora->format('H:i');
-            }
-        }
+        // Al reprogramar, la cita propia no ocupa su horario ni cuenta para el límite diario.
+        $excepto = isset($d['cita_id']) ? Cita::where('cliente_id', $request->user()->id)->where('negocio_id', $negocio->id)->findOrFail($d['cita_id'])->id : null;
+        $horas = AgendaCitas::horasLibres($negocio, $servicio, $profesional->id, $dia, $excepto);
 
         return response()->json([
             'fecha' => $d['fecha'], 'profesional_id' => $profesional->id,
             'profesionales' => $profesionales->map(fn ($p) => ['id' => $p->id, 'nombre' => trim($p->name.' '.$p->apellidos)]),
-            'horas' => array_values(array_unique($horas)), 'duracion_minutos' => $servicio->duracion_minutos,
+            'horas' => $horas, 'duracion_minutos' => $servicio->duracion_minutos,
+            'citas_del_dia' => AgendaCitas::citasDelDia($request->user()->id, $negocio->id, $dia, $excepto),
+            'max_citas_dia' => AgendaCitas::MAX_CITAS_DIA,
             'mensaje' => ! $negocio->horario ? 'El negocio debe configurar su horario automático para recibir citas.' : null,
         ]);
     }
@@ -73,11 +66,12 @@ class CitaController extends Controller
     {
         $d = $request->validate([
             'servicio_id' => ['required', 'integer'], 'profesional_id' => ['required', 'integer'],
-            'fecha' => ['required', 'date_format:Y-m-d'], 'hora' => ['required', 'date_format:H:i'],
+            'fecha' => ['required', 'date_format:Y-m-d'], 'hora' => ['required', AgendaCitas::REGLA_HORA],
             'notas' => ['nullable', 'string', 'max:1000'],
             'cliente_nombre' => [$presencial ? 'required' : 'nullable', 'string', 'max:150'],
             'cliente_telefono' => ['nullable', 'string', new \App\Rules\Telefono],
-        ]);
+            'a_nombre_de' => ['nullable', 'string', 'max:150', AgendaCitas::REGLA_NOMBRE],
+        ], self::MENSAJES);
         $cita = AgendaCitas::crear($negocio, $request->user(), $d, $presencial);
         if (! $presencial) {
             AgendaCitas::avisar($cita, true);
@@ -139,7 +133,9 @@ class CitaController extends Controller
                 abort_unless($cita->fin->lte(now()), 422, 'Todavía no termina la cita.');
             }
             abort_if($cita->estado === 'confirmada' && ! $cita->llegada_at && $cita->inicio->lt(now()->subMinutes(AgendaCitas::MINUTOS_TOLERANCIA)), 409, 'La cita se canceló por inasistencia. Actualiza la agenda.');
-            $cita->update(['estado' => $d['estado'], 'motivo' => $d['motivo'] ?? null]);
+            $cita->update(['estado' => $d['estado'], 'motivo' => $d['motivo'] ?? null] + ($d['estado'] === 'confirmada'
+                // Los recordatorios cuyo momento ya pasó al confirmar no se envían.
+                ? ['recordatorio_minutos' => AgendaCitas::recordatorioAlcanzado($cita->inicio)] : []));
 
             return $cita;
         });
@@ -161,6 +157,20 @@ class CitaController extends Controller
             return $cita;
         });
         AgendaCitas::avisar($cita, true);
+
+        return response()->json(['cita' => AgendaCitas::datos($cita)]);
+    }
+
+    public function reprogramar(Request $request, int $id): JsonResponse
+    {
+        $cita = Cita::where('cliente_id', $request->user()->id)->findOrFail($id);
+        $d = $request->validate([
+            'profesional_id' => ['required', 'integer'],
+            'fecha' => ['required', 'date_format:Y-m-d'], 'hora' => ['required', AgendaCitas::REGLA_HORA],
+        ], self::MENSAJES);
+        AgendaCitas::vencer(clienteId: $request->user()->id);
+        $cita = AgendaCitas::reprogramar($cita, $request->user(), $d);
+        Push::enviar($cita->negocio->miembrosActivos()->get(), new CitaActualizada($cita, true, reprogramada: true));
 
         return response()->json(['cita' => AgendaCitas::datos($cita)]);
     }

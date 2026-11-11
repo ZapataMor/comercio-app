@@ -12,6 +12,7 @@ import {
 import {
   DisponibilidadCitas,
   getDisponibilidadCitas,
+  reprogramarCita,
   solicitarCita,
 } from '../api';
 import { useAuth } from '../AuthContext';
@@ -31,14 +32,20 @@ export default function AgendarCitaScreen({ route, navigation }: Props) {
     negocioNombre,
     servicio,
     presencial = false,
+    reprogramar,
   } = route.params;
   const { auth } = useAuth();
   const token = auth!.token;
   const { c } = useTheme();
   const styles = useStyles();
   const toast = useToast();
-  const [fecha, setFecha] = useState(hoyColombia);
-  const [profesional, setProfesional] = useState<number>();
+  const [fecha, setFecha] = useState(() => reprogramar?.fecha ?? hoyColombia());
+  const [profesional, setProfesional] = useState<number | undefined>(
+    reprogramar?.profesionalId ?? undefined,
+  );
+  // Vacío: la cita es para quien la pide. Con nombre: para otra persona.
+  const [paraOtra, setParaOtra] = useState(false);
+  const [aNombreDe, setANombreDe] = useState('');
   const [disponibilidad, setDisponibilidad] =
     useState<DisponibilidadCitas | null>(null);
   const [hora, setHora] = useState('');
@@ -54,7 +61,14 @@ export default function AgendarCitaScreen({ route, navigation }: Props) {
   useEffect(() => {
     let vigente = true;
     setCargando(true);
-    getDisponibilidadCitas(token, negocioId, servicio.id, fecha, profesional)
+    getDisponibilidadCitas(
+      token,
+      negocioId,
+      servicio.id,
+      fecha,
+      profesional,
+      ...(reprogramar ? [reprogramar.citaId] : []),
+    )
       .then(d => {
         if (vigente) {
           setDisponibilidad(d);
@@ -73,14 +87,23 @@ export default function AgendarCitaScreen({ route, navigation }: Props) {
     return () => {
       vigente = false;
     };
-  }, [token, negocioId, servicio.id, fecha, profesional, revision]);
+  }, [token, negocioId, servicio.id, fecha, profesional, revision, reprogramar]);
   const refrescar = useCallback(() => {
     if (!guardando) setRevision(v => v + 1);
   }, [guardando]);
   usePolling(refrescar, 30000, temasDelNegocio(['agenda', 'catalogo', 'negocio', 'equipo'], negocioId));
 
+  const limiteDia =
+    !presencial &&
+    !!disponibilidad?.max_citas_dia &&
+    (disponibilidad.citas_del_dia ?? 0) >= disponibilidad.max_citas_dia;
+
   async function guardar() {
-    if (!hora || !disponibilidad || cargando || guardando) return;
+    if (!hora || !disponibilidad || cargando || guardando || limiteDia) return;
+    if (!presencial && !reprogramar && paraOtra && !aNombreDe.trim()) {
+      setError('Escribe el nombre de la persona que recibirá el servicio.');
+      return;
+    }
     if (presencial && !cliente.trim()) {
       setError('Escribe el nombre del cliente.');
       return;
@@ -89,6 +112,19 @@ export default function AgendarCitaScreen({ route, navigation }: Props) {
     setGuardando(true);
     setError('');
     try {
+      if (reprogramar) {
+        await reprogramarCita(token, reprogramar.citaId, {
+          profesional_id: disponibilidad.profesional_id,
+          fecha,
+          hora,
+        });
+        toast.exito(
+          'Cita reprogramada',
+          'El negocio debe confirmar la nueva hora. Revisa Mis citas.',
+        );
+        navigation.goBack();
+        return;
+      }
       await solicitarCita(
         token,
         negocioId,
@@ -98,6 +134,9 @@ export default function AgendarCitaScreen({ route, navigation }: Props) {
           fecha,
           hora,
           notas: notas.trim(),
+          ...(!presencial && paraOtra && aNombreDe.trim()
+            ? { a_nombre_de: aNombreDe.trim() }
+            : {}),
           ...(presencial
             ? {
                 cliente_nombre: cliente.trim(),
@@ -132,15 +171,22 @@ export default function AgendarCitaScreen({ route, navigation }: Props) {
       <Text style={styles.negocio}>{negocioNombre}</Text>
       <Text style={styles.titulo}>{servicio.nombre}</Text>
       <Text style={styles.detalle}>
-        {servicio.duracion_minutos ?? 30} minutos ·{' '}
-        {servicio.precio == null
-          ? 'Precio por consultar'
-          : `$${servicio.precio.toLocaleString('es-CO')}`}
+        {disponibilidad?.duracion_minutos ?? servicio.duracion_minutos ?? 30}{' '}
+        minutos
+        {reprogramar
+          ? ''
+          : ` · ${
+              servicio.precio == null
+                ? 'Precio por consultar'
+                : `$${servicio.precio.toLocaleString('es-CO')}`
+            }`}
       </Text>
       <Text style={styles.aviso}>
         {presencial
           ? 'Registra aquí las citas pactadas en persona o por teléfono para mantener una sola agenda.'
-          : 'El negocio revisará también sus citas presenciales y tendrá hasta una hora para responder. La cita quedará reservada únicamente cuando la confirme. Si no responde a tiempo, la solicitud vencerá.'}
+          : reprogramar
+          ? 'Elige la nueva fecha y hora. El horario anterior se libera y el negocio tendrá hasta una hora para confirmar el cambio; mientras tanto la cita queda pendiente.'
+          : 'El negocio revisará también sus citas presenciales y tendrá hasta una hora para responder. La cita quedará reservada únicamente cuando la confirme. Si no responde a tiempo, la solicitud vencerá. Te recordaremos la cita un día, 5 horas, 1 hora y 15 minutos antes.'}
       </Text>
       <Text style={styles.subtitulo}>1. Elige la fecha</Text>
       <CalendarioCitas
@@ -193,6 +239,11 @@ export default function AgendarCitaScreen({ route, navigation }: Props) {
           <>
             {disponibilidad.mensaje ? (
               <Text style={styles.aviso}>{disponibilidad.mensaje}</Text>
+            ) : limiteDia ? (
+              <Text style={styles.aviso}>
+                Ya tienes {disponibilidad.max_citas_dia} citas este día en este
+                negocio, el máximo permitido. Elige otra fecha.
+              </Text>
             ) : disponibilidad.horas.length === 0 ? (
               <Text style={styles.aviso}>
                 No hay horas disponibles para este profesional en esta fecha.
@@ -251,6 +302,53 @@ export default function AgendarCitaScreen({ route, navigation }: Props) {
           />
         </>
       )}
+      {!presencial && !reprogramar && (
+        <>
+          <Text style={styles.subtitulo}>¿Para quién es la cita?</Text>
+          <View style={styles.opciones}>
+            {[false, true].map(otra => (
+              <TouchableOpacity
+                key={String(otra)}
+                disabled={guardando}
+                accessibilityRole="button"
+                accessibilityState={{ selected: paraOtra === otra }}
+                style={[styles.chip, paraOtra === otra && styles.seleccion]}
+                onPress={() => {
+                  setParaOtra(otra);
+                  setError('');
+                }}
+              >
+                <Text
+                  style={[
+                    styles.chipTexto,
+                    paraOtra === otra && styles.seleccionTexto,
+                  ]}
+                >
+                  {otra ? 'Para otra persona' : 'Para mí'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {paraOtra && (
+            <>
+              <TextInput
+                accessibilityLabel="A nombre de"
+                style={styles.input}
+                value={aNombreDe}
+                onChangeText={valor => setANombreDe(valor.replace(/[0-9]/g, ''))}
+                maxLength={150}
+                editable={!guardando}
+                placeholder="Nombre de quien recibirá el servicio *"
+                placeholderTextColor={c.muted}
+              />
+              <Text style={styles.detalle}>
+                La cita queda a su nombre, pero la gestionas tú: a ti te llegan
+                la confirmación y los recordatorios.
+              </Text>
+            </>
+          )}
+        </>
+      )}
       <Text style={styles.subtitulo}>Notas (opcional)</Text>
       <TextInput
         accessibilityLabel="Notas para la cita"
@@ -288,16 +386,20 @@ export default function AgendarCitaScreen({ route, navigation }: Props) {
         accessibilityRole="button"
         style={[
           styles.boton,
-          (!hora || cargando || guardando) && styles.inactivo,
+          (!hora || cargando || guardando || limiteDia) && styles.inactivo,
         ]}
-        disabled={!hora || cargando || guardando}
+        disabled={!hora || cargando || guardando || limiteDia}
         onPress={guardar}
       >
         {guardando ? (
           <ActivityIndicator color={c.onBrand} />
         ) : (
           <Text style={styles.botonTexto}>
-            {presencial ? 'Registrar cita presencial' : 'Solicitar cita'}
+            {presencial
+              ? 'Registrar cita presencial'
+              : reprogramar
+              ? 'Reprogramar cita'
+              : 'Solicitar cita'}
           </Text>
         )}
       </TouchableOpacity>

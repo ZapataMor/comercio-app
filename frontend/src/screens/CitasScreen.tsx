@@ -38,6 +38,12 @@ type Props = NativeStackScreenProps<
   RootStackParamList,
   'MisCitas' | 'AgendaNegocio'
 >;
+/** Minutos entre el inicio y el fin (la cita puede terminar al día siguiente). */
+function duracionCita(cita: Cita): number {
+  const minutos = (h: string) => Number(h.slice(0, 2)) * 60 + Number(h.slice(3, 5));
+  return (minutos(cita.hora_fin) - minutos(cita.hora) + 1440) % 1440 || 1440;
+}
+
 export default function CitasScreen({ route, navigation }: Props) {
   const { auth } = useAuth();
   const token = auth!.token;
@@ -261,9 +267,12 @@ export default function CitasScreen({ route, navigation }: Props) {
               Colombia
             </Text>
             <Text style={styles.texto}>Con {cita.profesional_nombre}</Text>
+            {!!cita.a_nombre_de && (
+              <Text style={styles.texto}>A nombre de {cita.a_nombre_de}</Text>
+            )}
             <Text style={styles.detalle}>
               {gestion
-                ? `${cita.cliente_nombre}${
+                ? `${cita.a_nombre_de ? 'Solicitó: ' : ''}${cita.cliente_nombre}${
                     cita.cliente_telefono ? ` · ${cita.cliente_telefono}` : ''
                   }`
                 : cita.negocio_nombre}
@@ -348,6 +357,33 @@ export default function CitasScreen({ route, navigation }: Props) {
                   </TouchableOpacity>
                 </>
               )}
+              {!gestion &&
+                ['pendiente', 'confirmada'].includes(cita.estado) &&
+                !cita.llegada_at &&
+                cita.servicio_id != null && (
+                  <TouchableOpacity
+                    disabled={ocupado}
+                    style={styles.secundario}
+                    onPress={() =>
+                      navigation.navigate('AgendarCita', {
+                        negocioId: cita.negocio_id,
+                        negocioNombre: cita.negocio_nombre,
+                        servicio: {
+                          id: cita.servicio_id!,
+                          nombre: cita.servicio_nombre,
+                          duracion_minutos: duracionCita(cita),
+                        },
+                        reprogramar: {
+                          citaId: cita.id,
+                          fecha: cita.fecha,
+                          profesionalId: cita.profesional_id,
+                        },
+                      })
+                    }
+                  >
+                    <Text style={styles.enlace}>Reprogramar</Text>
+                  </TouchableOpacity>
+                )}
               {!gestion &&
                 ['pendiente', 'confirmada'].includes(cita.estado) && (
                   <TouchableOpacity

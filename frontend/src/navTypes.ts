@@ -18,7 +18,14 @@ export type RootStackParamList = {
   MisServicios: undefined;
   // Miembros e invitaciones del negocio activo.
   Equipo: undefined;
-  AgendarCita: { negocioId: number; negocioNombre: string; servicio: Servicio; presencial?: boolean };
+  AgendarCita: {
+    negocioId: number;
+    negocioNombre: string;
+    servicio: Pick<Servicio, 'id' | 'nombre' | 'duracion_minutos' | 'precio'>;
+    presencial?: boolean;
+    // Desde Mis citas: mueve esa cita en vez de pedir una nueva.
+    reprogramar?: { citaId: number; fecha: string; profesionalId: number | null };
+  };
   MisCitas: undefined;
   AgendaNegocio: { negocioId?: number } | undefined;
   // `negocioId`: desde un push, el pedido puede ser de otro negocio que no es el activo.

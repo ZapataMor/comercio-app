@@ -3,6 +3,7 @@
 use App\Models\Cita;
 use App\Models\User;
 use App\Notifications\CitaActualizada;
+use App\Notifications\RecordatorioCita;
 use App\Support\HorarioNegocio;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
@@ -229,4 +230,115 @@ it('valida almuerzo opcional dentro de la jornada, incluidos turnos nocturnos', 
     HorarioNegocio::aplicar($n, now());
     expect(HorarioNegocio::almorzando($n, now()))->toBeTrue();
     $this->putJson($this->ruta, ['horario' => ['lun' => ['abre' => '09:00', 'cierra' => '18:00', 'almuerzo' => null]]])->assertOk();
+});
+
+it('solo acepta horas en intervalos de 15 minutos y alinea la disponibilidad aunque el negocio abra 07:07', function () {
+    foreach (['14:07', '14:10', '14:50', '7:00'] as $hora) {
+        $this->postJson($this->ruta.'/solicitudes-cita', [...$this->datos, 'hora' => $hora])->assertUnprocessable()->assertJsonValidationErrors('hora');
+    }
+    Sanctum::actingAs($this->dueno);
+    $this->postJson($this->ruta.'/citas', [...$this->datos, 'hora' => '14:07', 'cliente_nombre' => 'Presencial'])->assertUnprocessable();
+    $this->negocio->update(['horario' => ['lun' => ['abre' => '07:07', 'cierra' => '10:00']]]);
+    $horas = $this->getJson($this->ruta.'/disponibilidad?'.http_build_query($this->datos))->assertOk()->json('horas');
+    expect($horas)->toBe(['08:15', '08:30', '08:45', '09:00']);
+    Sanctum::actingAs($this->cliente);
+    $this->postJson($this->ruta.'/solicitudes-cita', [...$this->datos, 'hora' => '07:00'])->assertUnprocessable();
+    $this->postJson($this->ruta.'/solicitudes-cita', [...$this->datos, 'hora' => '10:00'])->assertUnprocessable();
+    $this->postJson($this->ruta.'/solicitudes-cita', [...$this->datos, 'hora' => '08:15'])->assertCreated();
+});
+
+it('limita a 3 citas vigentes por día y negocio para cada cliente', function () {
+    $ids = [];
+    foreach (['09:00', '10:00', '11:00'] as $hora) {
+        $ids[] = $this->postJson($this->ruta.'/solicitudes-cita', [...$this->datos, 'hora' => $hora])->assertCreated()->json('cita.id');
+    }
+    $this->postJson($this->ruta.'/solicitudes-cita', [...$this->datos, 'hora' => '15:00'])->assertUnprocessable()->assertJsonPath('message', fn ($m) => str_contains($m, '3 citas'));
+    $this->getJson($this->ruta.'/disponibilidad?'.http_build_query($this->datos))->assertJsonPath('citas_del_dia', 3)->assertJsonPath('max_citas_dia', 3);
+    // Otro día y otro negocio no cuentan.
+    $this->postJson($this->ruta.'/solicitudes-cita', [...$this->datos, 'fecha' => '2026-11-23'])->assertCreated();
+    $otro = $this->dueno->negocio()->create(['nombre' => 'Otra sede', 'horario' => $this->negocio->horario]);
+    $s = $otro->servicios()->create(['nombre' => 'Uñas', 'descripcion' => 'Uñas', 'duracion_minutos' => 30]);
+    $this->postJson('/api/negocios/'.$otro->id.'/solicitudes-cita', [...$this->datos, 'servicio_id' => $s->id, 'hora' => '16:00'])->assertCreated();
+    // Cancelar una libera el cupo.
+    $this->postJson('/api/citas/'.$ids[0].'/cancelar')->assertOk();
+    $this->postJson($this->ruta.'/solicitudes-cita', [...$this->datos, 'hora' => '15:00'])->assertCreated();
+});
+
+it('permite pedir la cita a nombre de otra persona y lo muestra al negocio', function () {
+    $this->postJson($this->ruta.'/solicitudes-cita', [...$this->datos, 'a_nombre_de' => 'Ana123'])->assertUnprocessable()->assertJsonValidationErrors('a_nombre_de');
+    $this->postJson($this->ruta.'/solicitudes-cita', [...$this->datos, 'a_nombre_de' => '  María   José Pérez '])->assertCreated()
+        ->assertJsonPath('cita.a_nombre_de', 'María José Pérez')->assertJsonPath('cita.cliente_nombre', trim($this->cliente->name.' '.$this->cliente->apellidos));
+    Notification::assertSentTo($this->dueno, CitaActualizada::class, fn ($n) => str_contains($n->toFcm($this->dueno)->notification->body, 'A nombre de María José Pérez'));
+    $this->postJson($this->ruta.'/solicitudes-cita', [...$this->datos, 'hora' => '15:00', 'a_nombre_de' => trim($this->cliente->name.' '.$this->cliente->apellidos)])
+        ->assertCreated()->assertJsonPath('cita.a_nombre_de', null);
+});
+
+it('recuerda la cita 1 día, 5 horas, 1 hora y 15 minutos antes, una sola vez cada uno', function () {
+    $id = $this->postJson($this->ruta.'/solicitudes-cita', [...$this->datos, 'fecha' => '2026-11-23'])->assertCreated()->json('cita.id');
+    Sanctum::actingAs($this->dueno);
+    $this->putJson($this->ruta.'/citas/'.$id, ['estado' => 'confirmada'])->assertOk();
+    foreach (['2026-11-22 13:59', '2026-11-22 14:00', '2026-11-22 14:01', '2026-11-23 09:00', '2026-11-23 12:00', '2026-11-23 13:00', '2026-11-23 13:45', '2026-11-23 13:50'] as $momento) {
+        Carbon::setTestNow($momento);
+        $this->artisan('citas:recordar')->assertSuccessful();
+    }
+    $enviados = [];
+    Notification::assertSentTo($this->cliente, RecordatorioCita::class, function ($n) use (&$enviados) {
+        $enviados[] = $n->minutos;
+
+        return true;
+    });
+    expect($enviados)->toBe([1440, 300, 60, 15]);
+});
+
+it('omite los recordatorios que ya no tenían tiempo al confirmar y no recuerda citas canceladas', function () {
+    Carbon::setTestNow('2026-11-09 11:00');
+    $id = $this->postJson($this->ruta.'/solicitudes-cita', $this->datos)->assertCreated()->json('cita.id');
+    Sanctum::actingAs($this->dueno);
+    Carbon::setTestNow('2026-11-09 11:30');
+    $this->putJson($this->ruta.'/citas/'.$id, ['estado' => 'confirmada'])->assertOk();
+    foreach (['2026-11-09 11:30', '2026-11-09 13:00', '2026-11-09 13:45'] as $momento) {
+        Carbon::setTestNow($momento);
+        $this->artisan('citas:recordar')->assertSuccessful();
+    }
+    Notification::assertSentToTimes($this->cliente, RecordatorioCita::class, 2);
+
+    Carbon::setTestNow('2026-11-09 15:00');
+    Sanctum::actingAs($this->cliente);
+    $otra = $this->postJson($this->ruta.'/solicitudes-cita', [...$this->datos, 'fecha' => '2026-11-23'])->assertCreated()->json('cita.id');
+    Sanctum::actingAs($this->dueno);
+    $this->putJson($this->ruta.'/citas/'.$otra, ['estado' => 'confirmada'])->assertOk();
+    $this->putJson($this->ruta.'/citas/'.$otra, ['estado' => 'cancelada', 'motivo' => 'Cierre'])->assertOk();
+    Carbon::setTestNow('2026-11-23 13:00');
+    $this->artisan('citas:recordar')->assertSuccessful();
+    Notification::assertSentToTimes($this->cliente, RecordatorioCita::class, 2);
+});
+
+it('reprograma una cita: vuelve a pendiente, libera el horario anterior y avisa al negocio', function () {
+    $id = $this->postJson($this->ruta.'/solicitudes-cita', $this->datos)->assertCreated()->json('cita.id');
+    Sanctum::actingAs($this->dueno);
+    $this->putJson($this->ruta.'/citas/'.$id, ['estado' => 'confirmada'])->assertOk();
+    Sanctum::actingAs($this->cliente);
+    $nuevos = ['profesional_id' => $this->dueno->id, 'fecha' => '2026-11-23', 'hora' => '10:00'];
+    $this->putJson('/api/citas/'.$id.'/reprogramar', [...$nuevos, 'hora' => '10:05'])->assertUnprocessable();
+    $this->putJson('/api/citas/'.$id.'/reprogramar', [...$nuevos, 'hora' => '20:00'])->assertUnprocessable();
+    $this->putJson('/api/citas/'.$id.'/reprogramar', [...$nuevos, 'fecha' => '2026-11-09', 'hora' => '14:00'])->assertUnprocessable();
+    $this->putJson('/api/citas/'.$id.'/reprogramar', $nuevos)->assertOk()
+        ->assertJsonPath('cita.estado', 'pendiente')->assertJsonPath('cita.fecha', '2026-11-23')->assertJsonPath('cita.hora', '10:00');
+    Notification::assertSentTo($this->dueno, CitaActualizada::class, fn ($n) => $n->reprogramada);
+    // El horario anterior quedó libre para otro cliente, que no puede tocar la cita ajena.
+    Sanctum::actingAs(User::factory()->create());
+    $this->postJson($this->ruta.'/solicitudes-cita', $this->datos)->assertCreated();
+    $this->putJson('/api/citas/'.$id.'/reprogramar', [...$nuevos, 'hora' => '11:00'])->assertNotFound();
+});
+
+it('no permite reprogramar para superar el límite diario ni citas canceladas', function () {
+    foreach (['09:00', '10:00', '11:00'] as $hora) {
+        $this->postJson($this->ruta.'/solicitudes-cita', [...$this->datos, 'hora' => $hora])->assertCreated();
+    }
+    $id = $this->postJson($this->ruta.'/solicitudes-cita', [...$this->datos, 'fecha' => '2026-11-23'])->assertCreated()->json('cita.id');
+    $this->putJson('/api/citas/'.$id.'/reprogramar', ['profesional_id' => $this->dueno->id, 'fecha' => '2026-11-09', 'hora' => '15:00'])->assertUnprocessable();
+    // Moverla dentro del mismo día no cuenta dos veces.
+    $this->putJson('/api/citas/'.$id.'/reprogramar', ['profesional_id' => $this->dueno->id, 'fecha' => '2026-11-23', 'hora' => '15:00'])->assertOk();
+    $this->postJson('/api/citas/'.$id.'/cancelar')->assertOk();
+    $this->putJson('/api/citas/'.$id.'/reprogramar', ['profesional_id' => $this->dueno->id, 'fecha' => '2026-11-23', 'hora' => '16:00'])->assertConflict();
 });

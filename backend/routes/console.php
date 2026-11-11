@@ -81,3 +81,8 @@ Artisan::command('citas:cancelar-inasistencias', function () {
     $this->info('Citas canceladas por inasistencia: '.AgendaCitas::cancelarInasistencias());
 })->purpose('Cancela y notifica las citas sin llegada después de 15 minutos');
 Schedule::command('citas:cancelar-inasistencias')->everyMinute()->withoutOverlapping();
+
+Artisan::command('citas:recordar', function () {
+    $this->info('Recordatorios de cita enviados: '.AgendaCitas::enviarRecordatorios());
+})->purpose('Recuerda al cliente su cita 1 día, 5 horas, 1 hora y 15 minutos antes');
+Schedule::command('citas:recordar')->everyMinute()->withoutOverlapping();

@@ -1895,12 +1895,23 @@ export type Cita = {
   origen: 'app' | 'presencial'; fecha: string; hora: string; hora_fin: string; fecha_fin: string;
   confirmar_antes_de: string | null; notas: string | null; motivo: string | null;
   llegada_at: string | null;
+  /** Persona que recibe el servicio cuando el cliente la pidió para otra. */
+  a_nombre_de: string | null; servicio_id: number | null;
 };
-export type DisponibilidadCitas = { fecha: string; profesional_id: number; profesionales: { id: number; nombre: string }[]; horas: string[]; duracion_minutos: number; mensaje: string | null };
-export type NuevaCita = { servicio_id: number; profesional_id: number; fecha: string; hora: string; notas?: string; cliente_nombre?: string; cliente_telefono?: string };
+export type DisponibilidadCitas = {
+  fecha: string; profesional_id: number; profesionales: { id: number; nombre: string }[]; horas: string[]; duracion_minutos: number; mensaje: string | null;
+  /** Citas vigentes de quien consulta ese día en el negocio, y el máximo permitido. */
+  citas_del_dia?: number; max_citas_dia?: number;
+};
+export type NuevaCita = { servicio_id: number; profesional_id: number; fecha: string; hora: string; notas?: string; cliente_nombre?: string; cliente_telefono?: string; a_nombre_de?: string };
 export type PaginaCitas = { citas: Cita[]; pagina: number; ultima_pagina: number };
-export async function getDisponibilidadCitas(token: string, negocioId: number, servicioId: number, fecha: string, profesionalId?: number): Promise<DisponibilidadCitas> {
-  return authGet(`/api/negocios/${negocioId}/disponibilidad?servicio_id=${servicioId}&fecha=${fecha}${profesionalId ? `&profesional_id=${profesionalId}` : ''}`, token);
+/** `citaId`: al reprogramar, esa cita no ocupa su horario ni cuenta para el límite diario. */
+export async function getDisponibilidadCitas(token: string, negocioId: number, servicioId: number, fecha: string, profesionalId?: number, citaId?: number): Promise<DisponibilidadCitas> {
+  return authGet(`/api/negocios/${negocioId}/disponibilidad?servicio_id=${servicioId}&fecha=${fecha}${profesionalId ? `&profesional_id=${profesionalId}` : ''}${citaId ? `&cita_id=${citaId}` : ''}`, token);
+}
+/** Mueve la cita a otra fecha, hora o profesional; vuelve a quedar pendiente de confirmación. */
+export async function reprogramarCita(token: string, id: number, datos: { profesional_id: number; fecha: string; hora: string }): Promise<Cita> {
+  return (await authSend('PUT', `/api/citas/${id}/reprogramar`, token, datos)).cita;
 }
 export async function solicitarCita(token: string, negocioId: number, datos: NuevaCita, presencial = false): Promise<Cita> {
   return (await authSend('POST', `/api/negocios/${negocioId}/${presencial ? 'citas' : 'solicitudes-cita'}`, token, datos)).cita;
