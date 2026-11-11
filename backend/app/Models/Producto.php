@@ -2,13 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Buscable;
+use App\Support\Busqueda;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Producto extends Model
 {
-    use SoftDeletes;
+    use Buscable, SoftDeletes;
 
     protected $table = 'productos';
 
@@ -80,5 +82,11 @@ class Producto extends Model
     public function tipoProducto(): BelongsTo
     {
         return $this->belongsTo(TipoProducto::class);
+    }
+
+    /** Texto para la búsqueda tolerante a errores. */
+    public function textoBusqueda(): string
+    {
+        return Busqueda::indexar($this->nombre, [$this->descripcion, $this->atributos ?? []]);
     }
 }

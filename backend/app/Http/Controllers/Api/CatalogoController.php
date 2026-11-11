@@ -8,11 +8,13 @@ use App\Models\Negocio;
 use App\Models\Producto;
 use App\Models\TipoNegocio;
 use App\Models\TipoProducto;
+use App\Support\Busqueda;
 use App\Support\HorarioNegocio;
 use App\Support\Reputacion;
 use App\Support\Resenas;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 /**
  * API de catálogo para que el CLIENTE (app móvil) explore negocios abiertos
@@ -49,25 +51,25 @@ class CatalogoController extends Controller
             $query->whereHas('tiposNegocio', fn ($q) => $q->where('tipos_negocio.id', $tipoId));
         }
 
-        if ($request->filled('buscar')) {
-            $texto = trim((string) $request->string('buscar'));
-
-            $query->where(function ($q) use ($texto, $seccion) {
-                $q->where('nombre', 'like', "%{$texto}%")
-                    ->orWhere('descripcion', 'like', "%{$texto}%")
-                    ->orWhereHas('tiposNegocio', fn ($c) => $c->where('nombre', 'like', "%{$texto}%"))
-                    // Negocios con productos disponibles que coincidan por
-                    // nombre o por el nombre de su categoría.
-                    ->when($seccion !== 'servicios', fn ($q) => $q->orWhereHas('productos', function ($p) use ($texto) {
-                        $p->where('disponible', true)
-                            ->where(function ($pp) use ($texto) {
-                                $pp->where('nombre', 'like', "%{$texto}%")
-                                    ->orWhereRaw('LOWER(CAST(atributos AS CHAR)) LIKE ?', ['%'.mb_strtolower($texto).'%'])
-                                    ->orWhereHas('categoria', fn ($c) => $c->where('nombre', 'like', "%{$texto}%"));
-                            });
+        // Búsqueda tolerante a errores (ver App\Support\Busqueda): cada palabra
+        // debe aparecer en el negocio, en su tipo o en algún producto/servicio
+        // disponible. Una consulta sin letras ni números («%») no encuentra nada.
+        $terminos = $request->filled('buscar') ? Busqueda::terminos((string) $request->string('buscar')) : null;
+        if ($terminos === []) {
+            $query->whereRaw('1 = 0');
+        }
+        foreach ($terminos ?? [] as $alternativas) {
+            $query->where(function ($q) use ($alternativas, $seccion) {
+                Busqueda::orContiene($q, 'negocios.busqueda', $alternativas)
+                    ->orWhereHas('tiposNegocio', fn ($t) => Busqueda::contieneAlguna($t, 'tipos_negocio.busqueda', $alternativas))
+                    // Por un producto disponible: su nombre, descripción,
+                    // atributos o el nombre de su categoría.
+                    ->when($seccion !== 'servicios', fn ($q) => $q->orWhereHas('productos', function ($p) use ($alternativas) {
+                        $p->where('disponible', true)->where(fn ($pp) => Busqueda::orContiene($pp, 'productos.busqueda', $alternativas)
+                            ->orWhereHas('categoria', fn ($c) => Busqueda::contieneAlguna($c, 'categorias.busqueda', $alternativas)));
                     }))
-                    ->when($seccion !== 'productos', fn ($q) => $q->orWhereHas('servicios', function ($s) use ($texto) {
-                        $s->where('disponible', true)->where(fn ($s) => $s->where('nombre', 'like', "%{$texto}%")->orWhere('descripcion', 'like', "%{$texto}%"));
+                    ->when($seccion !== 'productos', fn ($q) => $q->orWhereHas('servicios', function ($s) use ($alternativas) {
+                        $s->where('disponible', true)->where(fn ($ss) => Busqueda::orContiene($ss, 'servicios.busqueda', $alternativas));
                     }));
             });
         }
@@ -95,6 +97,11 @@ class CatalogoController extends Controller
             'tiempo_preparacion' => $n->tiempo_preparacion,
             'reputacion' => Reputacion::resumen(Reputacion::NEGOCIO, $n),
             'resenas' => Resenas::resumen($n),
+            // En una búsqueda: si coincide por su nombre o su tipo (la app lo
+            // lista en "Negocios"), y no solo por lo que vende.
+            'coincide_nombre' => $terminos
+                ? Busqueda::coincide(Str::before((string) $n->busqueda, '|').' '.$n->tiposNegocio->pluck('busqueda')->implode(' '), $terminos)
+                : null,
         ]);
 
         return response()->json([
@@ -183,13 +190,17 @@ class CatalogoController extends Controller
     {
         $texto = trim((string) $request->string('buscar'));
         $tipoNegocioId = $request->integer('tipo_negocio_id') ?: null;
+        $terminos = $texto !== '' ? Busqueda::terminos($texto) : [];
 
         // Sin texto ni categoria no buscamos productos (la app muestra negocios).
-        if ($texto === '' && ! $tipoNegocioId && ! $request->boolean('todos')) {
+        // Un texto sin letras ni números («%», «...») tampoco encuentra nada.
+        if (($texto === '' && ! $tipoNegocioId && ! $request->boolean('todos')) || ($texto !== '' && $terminos === [])) {
             return response()->json(['productos' => []]);
         }
 
-        $like = '%'.$texto.'%';
+        // La frase tal como suena (y con los errores de tecleo corregidos), para
+        // ordenar por cercanía al nombre.
+        $frase = Busqueda::fraseCorregida($texto, $terminos);
 
         $productos = Producto::query()
             ->where('disponible', true)->where('precio', '>', 0)
@@ -199,15 +210,13 @@ class CatalogoController extends Controller
                     $q->whereHas('tiposNegocio', fn ($t) => $t->where('tipos_negocio.id', $tipoNegocioId));
                 }
             })
-            ->when($texto !== '', function ($q) use ($like) {
-                $q->where(function ($qq) use ($like) {
-                    $qq->where('nombre', 'like', $like)
-                        ->orWhere('descripcion', 'like', $like)
-                        // MySQL compara JSON con colacion binaria: normalizamos
-                        // el texto para encontrar "Gripa" al buscar "gripa".
-                        ->orWhereRaw('LOWER(CAST(atributos AS CHAR)) LIKE ?', [mb_strtolower($like)])
-                        ->orWhereHas('categoria', fn ($c) => $c->where('nombre', 'like', $like));
-                });
+            // Cada palabra en el producto (nombre, descripción, atributos) o en
+            // el nombre de su categoría, escrita como suene.
+            ->when($terminos !== [], function ($q) use ($terminos) {
+                foreach ($terminos as $alternativas) {
+                    $q->where(fn ($qq) => Busqueda::orContiene($qq, 'productos.busqueda', $alternativas)
+                        ->orWhereHas('categoria', fn ($c) => Busqueda::contieneAlguna($c, 'categorias.busqueda', $alternativas)));
+                }
             })
             ->with(['categoria', 'negocio'])
             ->orderByDesc(
@@ -215,16 +224,19 @@ class CatalogoController extends Controller
                     ->whereColumn('negocios.id', 'productos.negocio_id')
                     ->limit(1)
             )
-            // Ranking de cercanía de la coincidencia (0 = más cercana).
-            ->orderByRaw(
+            // Ranking de cercanía de la coincidencia (0 = más cercana): nombre
+            // igual, nombre que empieza por, nombre que contiene, otros campos
+            // y, al final, lo que solo coincide palabra por palabra.
+            ->when($frase !== '', fn ($q) => $q->orderByRaw(
                 'CASE
-                    WHEN nombre = ? THEN 0
-                    WHEN nombre LIKE ? THEN 1
-                    WHEN nombre LIKE ? THEN 2
-                    ELSE 3
+                    WHEN productos.busqueda LIKE ? THEN 0
+                    WHEN productos.busqueda LIKE ? THEN 1
+                    WHEN productos.busqueda LIKE ? THEN 2
+                    WHEN productos.busqueda LIKE ? THEN 3
+                    ELSE 4
                 END',
-                [$texto, $texto.'%', $like]
-            )
+                [$frase.'|%', $frase.'%', '%'.$frase.'%|%', '%'.$frase.'%']
+            ))
             ->orderBy('nombre')
             ->limit(50)
             ->get();

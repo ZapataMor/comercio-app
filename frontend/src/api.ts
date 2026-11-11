@@ -210,6 +210,8 @@ export type NegocioLista = {
   tiempo_preparacion?: number;
   reputacion?: Reputacion;
   resenas?: ResumenResenas;
+  /** En una búsqueda: coincide por nombre o tipo (tolerando errores), no solo por lo que vende. */
+  coincide_nombre?: boolean | null;
 };
 
 /**

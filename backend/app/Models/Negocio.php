@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Buscable;
+use App\Support\Busqueda;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -9,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Negocio extends Model
 {
+    use Buscable;
+
     protected $table = 'negocios';
 
     /** Valores por defecto a nivel de modelo (coinciden con la migración). */
@@ -187,5 +191,11 @@ class Negocio extends Model
     public function pedidos(): HasMany
     {
         return $this->hasMany(Pedido::class);
+    }
+
+    /** Texto para la búsqueda tolerante a errores. */
+    public function textoBusqueda(): string
+    {
+        return Busqueda::indexar($this->nombre, [$this->descripcion]);
     }
 }

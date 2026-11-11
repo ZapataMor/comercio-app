@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Buscable;
+use App\Support\Busqueda;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Categoria extends Model
 {
+    use Buscable;
+
     protected $table = 'categorias';
 
     protected $fillable = [
@@ -28,5 +32,11 @@ class Categoria extends Model
     public function productos(): HasMany
     {
         return $this->hasMany(Producto::class);
+    }
+
+    /** Texto para la búsqueda tolerante a errores. */
+    public function textoBusqueda(): string
+    {
+        return Busqueda::indexar($this->nombre);
     }
 }

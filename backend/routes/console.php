@@ -86,3 +86,7 @@ Artisan::command('citas:recordar', function () {
     $this->info('Recordatorios de cita enviados: '.AgendaCitas::enviarRecordatorios());
 })->purpose('Recuerda al cliente su cita 1 día, 5 horas, 1 hora y 15 minutos antes');
 Schedule::command('citas:recordar')->everyMinute()->withoutOverlapping();
+
+Artisan::command('busqueda:reindexar', function () {
+    $this->info('Filas reindexadas para la búsqueda: '.\App\Support\Busqueda::reindexar());
+})->purpose('Recalcula el texto normalizado de la búsqueda tolerante a errores');

@@ -81,8 +81,10 @@ function filasListado(negocios: NegocioLista[]): Fila[] {
  */
 function filasBusqueda(negocios: NegocioLista[], productos: ProductoConNegocio[], consulta: string): Fila[] {
   const texto = normalizar(consulta);
+  // La API dice si coincide aun con errores de ortografía ("poyo" → "Pollos
+  // Juancho"); la comparación local queda para una API sin ese dato.
   const hallados = negocios.filter(n =>
-    [n.nombre, ...n.categorias].some(valor => normalizar(valor).includes(texto)),
+    n.coincide_nombre ?? [n.nombre, ...n.categorias].some(valor => normalizar(valor).includes(texto)),
   );
   return [
     ...(hallados.length ? [titulo('Negocios')] : []),

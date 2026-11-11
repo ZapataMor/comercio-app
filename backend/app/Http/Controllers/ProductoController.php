@@ -7,6 +7,7 @@ use App\Models\Negocio;
 use App\Models\Producto;
 use App\Models\User;
 use App\Notifications\PrecioProductoActualizado;
+use App\Support\Busqueda;
 use App\Support\Push;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -36,7 +37,8 @@ class ProductoController extends Controller
         $query = $negocio->productos()->with(['categoria', 'tipoProducto'])->latest();
 
         if ($request->filled('buscar')) {
-            $query->where('nombre', 'like', '%'.$request->string('buscar').'%');
+            // Tolerante a errores, como la del cliente (ver App\Support\Busqueda).
+            Busqueda::contieneTodos($query, 'productos.busqueda', Busqueda::terminos((string) $request->string('buscar')));
         }
 
         if ($request->boolean('sin_categoria')) {

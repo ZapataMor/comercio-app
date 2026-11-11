@@ -10,6 +10,7 @@ use App\Models\PedidoReporte;
 use App\Models\Producto;
 use App\Models\Resena;
 use App\Models\User;
+use App\Support\Busqueda;
 use App\Support\HorarioNegocio;
 use App\Support\UbicacionDomiciliario;
 use Illuminate\Http\JsonResponse;
@@ -84,10 +85,10 @@ class AdminController extends Controller
         $buscar = trim((string) $request->get('buscar', ''));
         $pagina = User::deTipo($rol)
             ->when($buscar !== '', fn ($q) => $q->where(fn ($qq) => $qq
-                ->where('name', 'like', "%{$buscar}%")
-                ->orWhere('apellidos', 'like', "%{$buscar}%")
-                ->orWhere('username', 'like', "%{$buscar}%")
-                ->orWhere('email', 'like', "%{$buscar}%")))
+                ->tap(fn ($b) => Busqueda::orWhereLiteral($b, 'name', $buscar))
+                ->tap(fn ($b) => Busqueda::orWhereLiteral($b, 'apellidos', $buscar))
+                ->tap(fn ($b) => Busqueda::orWhereLiteral($b, 'username', $buscar))
+                ->tap(fn ($b) => Busqueda::orWhereLiteral($b, 'email', $buscar))))
             ->orderBy('name')
             ->paginate(30);
 
@@ -225,7 +226,7 @@ class AdminController extends Controller
         $buscar = trim((string) $request->get('buscar', ''));
         $pagina = Negocio::with('user')
             ->withCount('productos')
-            ->when($buscar !== '', fn ($q) => $q->where('nombre', 'like', "%{$buscar}%"))
+            ->when($buscar !== '', fn ($q) => Busqueda::contieneTodos($q, 'negocios.busqueda', Busqueda::terminos($buscar)))
             ->orderBy('nombre')
             ->paginate(30);
 
