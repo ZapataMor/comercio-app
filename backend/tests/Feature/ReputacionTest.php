@@ -310,7 +310,7 @@ test('si el pedido nunca llegó no se piden caritas', function () {
 // El negocio confirma el dinero (efectivo)
 // ===========================================================================
 
-test('el negocio confirma si el domiciliario le entregó el dinero, una sola vez', function () {
+test('el negocio reporta el dinero y puede confirmar su recepción posterior', function () {
     $negocio = repNegocio();
     $domi = repUsuario('domiciliario');
     $pedido = repPedido($negocio, repUsuario(), 'entregado', $domi);
@@ -331,10 +331,12 @@ test('el negocio confirma si el domiciliario le entregó el dinero, una sola vez
     ]);
 
     $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}/dinero", ['estado' => 'recibido'])
+        ->assertOk();
+    $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}/dinero", ['estado' => 'recibido'])
         ->assertStatus(409);
 });
 
-test('los pedidos viejos (o de antes de esta función) no piden confirmar dinero', function () {
+test('el efectivo pendiente puede confirmarse aunque el pedido sea antiguo', function () {
     $negocio = repNegocio();
     $domi = repUsuario('domiciliario');
     $viejo = repPedido($negocio, repUsuario(), 'entregado', $domi, ['recogido_at' => now()->subDays(4)]);
@@ -342,12 +344,12 @@ test('los pedidos viejos (o de antes de esta función) no piden confirmar dinero
     Sanctum::actingAs($negocio->user);
 
     $this->getJson("/api/negocios/{$negocio->id}/pedidos")
-        ->assertJsonPath('pedidos.0.puede_confirmar_dinero', false)
-        ->assertJsonPath('pedidos.1.puede_confirmar_dinero', false);
+        ->assertJsonPath('pedidos.0.puede_confirmar_dinero', true)
+        ->assertJsonPath('pedidos.1.puede_confirmar_dinero', true);
     $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$viejo->id}/dinero", ['estado' => 'no_recibido'])
-        ->assertStatus(409);
+        ->assertOk();
     $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$legado->id}/dinero", ['estado' => 'no_recibido'])
-        ->assertStatus(409);
+        ->assertOk();
 });
 
 test('no hay dinero que confirmar en pedidos por transferencia o de otro negocio', function () {

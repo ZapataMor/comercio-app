@@ -10,6 +10,7 @@ import {
   confirmarEntrega,
   clienteNoEncontrado,
   registrarLlegada,
+  avisarOcupado,
   getDisponibles,
   getMiReputacion,
   getMisEntregas,
@@ -66,6 +67,7 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
   // Vetado = no puedo tomar pedidos nuevos (baja confiabilidad).
   const [vetado, setVetado] = useState(false);
   const [cargando, setCargando] = useState(true);
+  const [bloqueadoEfectivo, setBloqueadoEfectivo] = useState(false);
   // Pedido que voy a tomar: abre el modal para elegir los minutos.
   const [porTomar, setPorTomar] = useState<Pedido | null>(null);
   const [tomando, setTomando] = useState(false);
@@ -88,6 +90,7 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
       // El turno se cambia con la moto de la topbar: ahí se muestra.
       publicarTurno(token, d.en_turno, d.vetado);
       setEntregas(e);
+      setBloqueadoEfectivo(d.bloqueado_por_efectivo);
     },
     [token],
   );
@@ -152,6 +155,17 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
   async function onEnCamino(id: number) {
     setAvanzando(id);
     try {
+  async function onOcupado(id: number) {
+    setAvanzando(id);
+    try {
+      await avisarOcupado(token, id);
+      await actualizarAnimado();
+      toast.exito('Aviso enviado', 'El negocio sabe que estás ocupado y pronto llevarás el efectivo.');
+    } catch (e) {
+      toast.error('No se pudo avisar', e instanceof Error ? e.message : 'Error');
+    } finally { setAvanzando(null); }
+  }
+
       await marcarEnCamino(token, id);
       await actualizarAnimado();
     } catch (e) {
@@ -183,7 +197,7 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
   async function onEntregar(id: number, codigo: string) {
     await confirmarEntrega(token, id, codigo);
     await actualizarAnimado();
-    toast.exito('¡Entrega completada!', 'La encuentras en Pedidos entregados.');
+    toast.exito('¡Entrega completada!', 'Si hay efectivo pendiente, el pedido seguirá en curso hasta que el negocio confirme su recepción.');
   }
 
   /** Solo se puede antes de recogerlo: por eso se confirma. */
@@ -250,7 +264,7 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
                     style={styles.novedadLink}
                     onPress={() =>
                       abrirComoLlegar(
-                        !['tomado', 'devolviendo'].includes(p.estado)
+                        !['tomado', 'devolviendo', 'entregado'].includes(p.estado)
                           ? p.entrega_ubicacion ?? `${p.direccion_entrega}, Maicao, La Guajira`
                           : p.negocio?.lat != null && p.negocio?.lng != null
                             ? { lat: p.negocio.lat, lng: p.negocio.lng }
@@ -259,13 +273,13 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
                     }>
                     <Icon name="ubicacion" size={14} color={c.goldText} />
                     <Text style={styles.novedadLinkTxt}>
-                      {['tomado', 'devolviendo'].includes(p.estado) ? 'Cómo llegar al negocio' : 'Cómo llegar al cliente'}
+                      {['tomado', 'devolviendo', 'entregado'].includes(p.estado) ? 'Cómo llegar al negocio' : 'Cómo llegar al cliente'}
                     </Text>
                   </PressableScale>
                   <View style={[styles.linea, styles.fila]}>
                     <Icon name="tarjeta" size={14} color={c.text} />
                     <Text style={styles.linea}>
-                      {p.estado === 'devolviendo' ? 'Devuelve el pedido al comercio. Espera su confirmación para cerrar la entrega.' : p.cobrar > 0
+                      {p.efectivo_pendiente ? 'Efectivo pendiente: entrégalo al negocio y espera su confirmación.' : p.estado === 'devolviendo' ? 'Devuelve el pedido al comercio. Espera su confirmación para cerrar la entrega.' : p.cobrar > 0
                         ? `Cobrar al cliente: ${cop(p.cobrar)} en efectivo`
                         : 'Pagado por transferencia: no cobres nada'}
                     </Text>
@@ -274,7 +288,7 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
                     Productos {cop(p.subtotal ?? p.total)} · Domicilio {cop(p.costo_domicilio ?? 0)}
                   </Text>
                   {/* Antes de recoger se coordina con el negocio; después, con el cliente. */}
-                  {['tomado', 'devolviendo'].includes(p.estado) ? (
+                  {['tomado', 'devolviendo', 'entregado'].includes(p.estado) ? (
                     <BotonesContacto
                       telefono={p.negocio?.telefono}
                       mensaje={`Hola, soy el domiciliario de Vitrina que va por el pedido #${p.codigo}.`}
@@ -287,7 +301,14 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
                       etiquetaLlamar="Llamar al cliente"
                     />
                   )}
-                  <Novedad pedido={p} onReportada={() => cargar()} />
+                  {p.estado !== 'entregado' && <Novedad pedido={p} onReportada={() => cargar()} />}
+                  {p.efectivo_pendiente && <>
+                    <Text style={styles.prometido}>{bloqueadoEfectivo
+                      ? 'Con menos de 70 puntos debes liquidar el efectivo antes de tomar otro domicilio.'
+                      : 'Puedes seguir tomando domicilios mientras entregas el efectivo pendiente.'}</Text>
+                    {p.puede_avisar_ocupado && <Boton texto="Estoy un poco ocupado" icon="reloj" cargando={avanzando === p.id} onPress={() => onOcupado(p.id)} />}
+                    {!!p.efectivo_ocupado_at && <Text style={styles.lineaSub}>Ya avisaste al negocio que estás ocupado y pronto llevarás el efectivo.</Text>}
+                  </>}
                   {p.estado === 'en_camino' && (!p.llegada_at ? (
                     <Boton icon="ubicacion" texto="Llegué al destino" cargando={avanzando === p.id} onPress={() => onLlegada(p.id)} />
                   ) : <>
@@ -355,6 +376,8 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
         ))
       )}
 
+      ) : bloqueadoEfectivo ? (
+        <Text style={styles.vetadoTxt}>Entrega el efectivo pendiente en los negocios y espera su confirmación para tomar otro domicilio. Tu confiabilidad es menor de 70 puntos.</Text>
       {/* Módulo aparte con las entregas que ya completé. */}
       <PressableScale
         style={styles.entregados}

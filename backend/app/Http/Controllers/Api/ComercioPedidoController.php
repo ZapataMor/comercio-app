@@ -15,6 +15,7 @@ use App\Support\Reputacion;
 use App\Support\UbicacionDomiciliario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -98,6 +99,7 @@ class ComercioPedidoController extends Controller
         $pedidos = $consulta
             ->where(fn ($q) => $q
                 ->whereIn('estado', Pedido::EN_CURSO)
+                ->orWhere(fn ($q) => $q->efectivoPendiente())
                 ->orWhere(fn ($q2) => $q2->where('estado', 'entregado')->where('created_at', '>=', now()->subDays(7))))
             ->get()
             ->map(fn ($p) => $this->map($p));
@@ -200,6 +202,7 @@ class ComercioPedidoController extends Controller
             'puede_confirmar_devolucion' => $p->estado === 'devolviendo',
             'cliente_no_encontrado_at' => $p->cliente_no_encontrado_at?->toIso8601String(),
             'dinero_estado' => $p->dinero_estado,
+            'efectivo_ocupado_at' => $p->efectivo_ocupado_at?->toIso8601String(),
             'puede_confirmar_dinero' => $p->puedeConfirmarDinero(),
             'cancelado_por' => $p->cancelado_por,
             'motivo_cancelacion' => $p->motivo_cancelacion,
@@ -352,29 +355,33 @@ class ComercioPedidoController extends Controller
             'estado' => ['required', Rule::in(Pedido::DINERO_ESTADOS)],
         ]);
 
-        $pedido = $negocio->pedidos()->with('domiciliario')->find($id);
-        if (! $pedido || ! $pedido->puedeConfirmarDinero() || ! $pedido->domiciliario) {
-            return response()->json(['message' => 'Este pedido no tiene dinero por confirmar.'], 409);
-        }
+        return DB::transaction(function () use ($negocio, $id, $datos) {
+            $pedido = $negocio->pedidos()->with('domiciliario')->lockForUpdate()->find($id);
+            if (! $pedido || ! $pedido->puedeConfirmarDinero() || ! $pedido->domiciliario) {
+                return response()->json(['message' => 'Este pedido no tiene dinero por confirmar.'], 409);
+            }
 
-        $pedido->update(['dinero_estado' => $datos['estado'], 'dinero_confirmado_at' => now()]);
+            abort_if($pedido->dinero_estado !== null && $datos['estado'] !== 'recibido', 409, 'Solo puedes confirmar la recepción completa del efectivo pendiente.');
 
-        $motivo = match ($datos['estado']) {
-            'recibido' => 'dinero_entregado',
-            'incompleto' => 'dinero_incompleto',
-            'no_recibido' => 'dinero_no_entregado',
-        };
-        Reputacion::registrar(
-            Reputacion::DOMICILIARIO,
-            $pedido->domiciliario,
-            $motivo,
-            $pedido,
-            ReputacionEvento::ORIGEN_NEGOCIO,
-        );
+            $pedido->update(['dinero_estado' => $datos['estado'], 'dinero_confirmado_at' => now()]);
 
-        return response()->json([
-            'message' => $datos['estado'] === 'recibido' ? 'Listo, quedó confirmado.' : 'Gracias, lo tendremos en cuenta.',
-        ]);
+            $motivo = match ($datos['estado']) {
+                'recibido' => 'dinero_entregado',
+                'incompleto' => 'dinero_incompleto',
+                'no_recibido' => 'dinero_no_entregado',
+            };
+            Reputacion::registrar(
+                Reputacion::DOMICILIARIO,
+                $pedido->domiciliario,
+                $motivo,
+                $pedido,
+                ReputacionEvento::ORIGEN_NEGOCIO,
+            );
+
+            return response()->json([
+                'message' => $datos['estado'] === 'recibido' ? 'Listo, quedó confirmado.' : 'Gracias, lo tendremos en cuenta.',
+            ]);
+        });
     }
 
     private function sinAcceso(): JsonResponse

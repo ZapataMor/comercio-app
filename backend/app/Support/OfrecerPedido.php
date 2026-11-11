@@ -28,7 +28,7 @@ class OfrecerPedido
             ->whereNull('suspendido_at')
             ->where('en_turno', true)
             ->whereKeyNot(array_filter([$pedido->user_id, $excepto]))
-            ->get();
+            ->get()->reject(fn (User $user) => EfectivoDomiciliario::bloqueado($user));
 
         Push::enviar($domiciliarios, new PedidoDisponibleParaDomiciliario($pedido));
 

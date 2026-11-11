@@ -254,6 +254,7 @@ Route::middleware(['auth:sanctum', 'throttle:api-usuario'])->group(function () {
         // Justificar una demora (lluvia, tráfico...) de una entrega en curso.
         Route::put('/pedidos/{id}/novedad', [ApiDomiciliarioController::class, 'novedad']);
         Route::put('/pedidos/{id}/tomar', [ApiDomiciliarioController::class, 'tomar']);
+        Route::put('/pedidos/{id}/ocupado', [ApiDomiciliarioController::class, 'ocupado']);
         // Devolver un pedido tomado: solo antes de recogerlo.
         Route::put('/pedidos/{id}/soltar', [ApiDomiciliarioController::class, 'soltar']);
         Route::put('/pedidos/{id}/en-camino', [ApiDomiciliarioController::class, 'enCamino']);

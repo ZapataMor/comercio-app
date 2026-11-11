@@ -176,7 +176,7 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
       setPedido({
         ...pedido,
         dinero_estado: estado,
-        puede_confirmar_dinero: false,
+        puede_confirmar_dinero: estado !== 'recibido' && pedido.estado === 'entregado',
         // Con el dinero recibido se acaba el seguimiento.
         domiciliario_ubicacion: estado === 'recibido' ? null : pedido.domiciliario_ubicacion,
       });
@@ -368,6 +368,9 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
 
       {/* Efectivo: el negocio dice si el domiciliario le entregó el dinero
           (sube o baja su nivel de confiabilidad). */}
+      {!!pedido.efectivo_ocupado_at && pedido.dinero_estado !== 'recibido' && (
+        <View style={styles.card}><Text style={styles.novedadTxt}>El domiciliario está un poco ocupado y pronto vendrá a entregar el efectivo de este pedido.</Text></View>
+      )}
       {pedido.puede_confirmar_dinero ? (
         <FadeInView delay={60} style={[styles.card, styles.dineroCard]}>
           <View style={styles.filaInfo}>
@@ -380,14 +383,14 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
               <Text style={styles.dineroBtnTxt}>Sí, completo</Text>
             </PressableScale>
           </View>
-          <View style={styles.dineroFila}>
+          {!pedido.dinero_estado && <View style={styles.dineroFila}>
             <PressableScale style={[styles.dineroBtn, styles.dineroBtnBorde]} onPress={() => onDinero('incompleto')}>
               <Text style={[styles.dineroBtnTxt, { color: c.warning }]}>Incompleto</Text>
             </PressableScale>
             <PressableScale style={[styles.dineroBtn, styles.dineroBtnBorde]} onPress={() => onDinero('no_recibido')}>
               <Text style={[styles.dineroBtnTxt, { color: c.danger }]}>No me lo entregó</Text>
             </PressableScale>
-          </View>
+          </View>}
         </FadeInView>
       ) : pedido.dinero_estado ? (
         <View style={styles.filaNota}>

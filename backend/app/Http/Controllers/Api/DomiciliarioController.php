@@ -7,6 +7,7 @@ use App\Models\Pedido;
 use App\Models\PedidoReporte;
 use App\Models\User;
 use App\Notifications\EstadoPedidoActualizado;
+use App\Support\EfectivoDomiciliario;
 use App\Support\OfrecerPedido;
 use App\Support\Push;
 use App\Support\Reputacion;
@@ -45,7 +46,8 @@ class DomiciliarioController extends Controller
             ]);
         }
 
-        $pedidos = Pedido::where('estado', 'listo')
+        $bloqueado = EfectivoDomiciliario::bloqueado($yo);
+        $pedidos = Pedido::whereRaw($bloqueado ? '1 = 0' : '1 = 1')->where('estado', 'listo')
             ->whereNull('domiciliario_id')
             // También es cliente: su propio pedido no lo reparte él.
             ->where('user_id', '!=', $yo->id)
@@ -55,6 +57,7 @@ class DomiciliarioController extends Controller
 
         return response()->json([
             'pedidos' => $pedidos->map(fn ($p) => $this->map($p)),
+            'bloqueado_por_efectivo' => $bloqueado,
             'en_turno' => (bool) $yo->en_turno,
             'compartir_ubicacion' => UbicacionDomiciliario::debeCompartir($yo),
         ]);
@@ -99,7 +102,7 @@ class DomiciliarioController extends Controller
     public function entregas(Request $request): JsonResponse
     {
         $pedidos = Pedido::where('domiciliario_id', $request->user()->id)
-            ->whereIn('estado', Pedido::EN_RUTA)
+            ->where(fn ($q) => $q->whereIn('estado', Pedido::EN_RUTA)->orWhere(fn ($q) => $q->efectivoPendiente()))
             ->with(['negocio', 'cliente', 'items'])
             ->latest('tomado_at')
             ->latest('id')
@@ -183,6 +186,8 @@ class DomiciliarioController extends Controller
         $afectados = DB::transaction(function () use ($request, $id, $datos) {
             $yo = User::lockForUpdate()->findOrFail($request->user()->id);
             abort_unless($yo->hasRole('domiciliario') && ! $yo->suspendido_at && ! $yo->domiciliarioVetado(), 403, 'Tu cuenta no está habilitada para tomar pedidos.');
+
+            abort_if(EfectivoDomiciliario::bloqueado($yo), 409, 'Tu confiabilidad es menor de 70 puntos. Entrega el efectivo pendiente y espera la confirmación del negocio antes de tomar otro domicilio.');
 
             return Pedido::conCodigoDeConfirmacion(fn (string $codigo) => Pedido::where('id', $id)
                 ->where('estado', 'listo')
@@ -333,6 +338,26 @@ class DomiciliarioController extends Controller
         return response()->json(['message' => 'Novedad reportada. El cliente ya la puede ver.']);
     }
 
+    public function ocupado(Request $request, int $id): JsonResponse
+    {
+        $pedido = DB::transaction(function () use ($request, $id) {
+            $yo = User::lockForUpdate()->findOrFail($request->user()->id);
+            abort_if(($yo->reputacion_domiciliario ?? config('reputacion.inicial')) < 70, 403, 'Necesitas al menos 70 puntos de confiabilidad para enviar este aviso.');
+            $pedido = Pedido::whereKey($id)->where('domiciliario_id', $yo->id)->lockForUpdate()->firstOrFail();
+            abort_unless($pedido->efectivoPendienteAlNegocio(), 409, 'Este pedido no tiene efectivo pendiente.');
+            abort_if($pedido->efectivo_ocupado_at !== null, 409, 'Ya avisaste al negocio.');
+            $pedido->update(['efectivo_ocupado_at' => now()]);
+
+            return $pedido;
+        });
+        Push::enviar($pedido->negocio->miembrosActivos()->get(), new EstadoPedidoActualizado($pedido, [
+            'Domiciliario ocupado',
+            "El domiciliario del pedido #{$pedido->codigo} está un poco ocupado y pronto irá al negocio a entregar el efectivo.",
+        ]));
+
+        return response()->json(['message' => 'Aviso enviado al negocio.']);
+    }
+
     /** Un pedido MÍO que esté en el estado $desde (o null). */
     private function pedidoMio(Request $request, int $id, string $desde): ?Pedido
     {
@@ -379,6 +404,9 @@ class DomiciliarioController extends Controller
             'total' => (float) $p->total,
             'metodo_pago' => $p->metodo_pago,
             // Lo que el domiciliario le cobra al cliente al entregar.
+            'efectivo_pendiente' => $p->efectivoPendienteAlNegocio(),
+            'efectivo_ocupado_at' => $p->efectivo_ocupado_at?->toIso8601String(),
+            'puede_avisar_ocupado' => $p->efectivoPendienteAlNegocio() && ! $p->efectivo_ocupado_at && (request()->user()->reputacion_domiciliario ?? config('reputacion.inicial')) >= 70,
             'cobrar' => $p->metodo_pago === 'efectivo' ? (float) $p->total : 0.0,
             'minutos_recogida' => $p->minutos_recogida,
             // Se lo dicta al negocio al llegar por el pedido.

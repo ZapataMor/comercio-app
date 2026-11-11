@@ -79,6 +79,7 @@ class Pedido extends Model
         'dinero_estado',
         'dinero_confirmado_at',
         'cancelado_por',
+        'efectivo_ocupado_at',
         'motivo_cancelacion',
         'cancelado_at',
         'clave_intento',
@@ -128,6 +129,7 @@ class Pedido extends Model
             'dinero_confirmado_at' => 'datetime',
             'llegada_at' => 'datetime',
             'cliente_no_encontrado_at' => 'datetime',
+            'efectivo_ocupado_at' => 'datetime',
             'devuelto_at' => 'datetime',
             'faltante_at' => 'datetime',
             'ajustado_at' => 'datetime',
@@ -267,16 +269,16 @@ class Pedido extends Model
 
     /**
      * ¿El negocio puede decir si recibió el dinero? Solo efectivo, con
-     * domiciliario que ya recogió, una sola vez y dentro del plazo (así no se
-     * acumulan pedidos viejos, ni los de antes de que existiera recogido_at).
+     * domiciliario que ya recogió. Una deuda de una entrega completada
+     * siempre se puede liquidar, incluso después de un reporte negativo.
      */
     public function puedeConfirmarDinero(): bool
     {
         return $this->metodo_pago === 'efectivo'
             && $this->domiciliario_id !== null
             && in_array($this->estado, ['recogido', 'en_camino', 'entregado'], true)
-            && $this->dinero_estado === null
-            && $this->recogido_at?->gte(now()->subHours((int) config('reputacion.horas_para_confirmar_dinero')));
+            && ($this->efectivoPendienteAlNegocio() || ($this->dinero_estado === null
+                && $this->recogido_at?->gte(now()->subHours((int) config('reputacion.horas_para_confirmar_dinero')))));
     }
 
     /**
@@ -286,10 +288,24 @@ class Pedido extends Model
     public function debeDineroAlNegocio(): bool
     {
         return $this->metodo_pago === 'efectivo'
+    {
+        return $this->efectivoPendienteAlNegocio()
+            && $this->recogido_at?->gte(now()->subHours((int) config('reputacion.horas_para_confirmar_dinero')));
+    }
+
+    /** La deuda no vence; el plazo anterior solo limita el seguimiento GPS. */
+    public function efectivoPendienteAlNegocio(): bool
             && $this->domiciliario_id !== null
             && $this->estado === 'entregado'
-            && $this->dinero_estado !== 'recibido'
-            && $this->recogido_at?->gte(now()->subHours((int) config('reputacion.horas_para_confirmar_dinero')));
+            && $this->negocio_id !== null
+            && $this->dinero_estado !== 'recibido';
+    }
+
+    public function scopeEfectivoPendiente($query)
+    {
+        return $query->where('metodo_pago', 'efectivo')->where('estado', 'entregado')
+            ->whereNotNull('negocio_id')->whereNotNull('domiciliario_id')
+            ->where(fn ($q) => $q->whereNull('dinero_estado')->orWhere('dinero_estado', '!=', 'recibido'));
     }
 
     /** ¿El negocio sigue viendo dónde está el domiciliario de este pedido? */

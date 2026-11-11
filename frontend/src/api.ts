@@ -821,6 +821,7 @@ export type CanceladoPor = 'cliente' | 'negocio' | 'sistema' | 'administrador' |
 export function textoCancelacion(p: { cancelado_por?: CanceladoPor | null; motivo_cancelacion?: string | null }): string {
   const quien = {
     cliente: 'El cliente lo canceló',
+  efectivo_ocupado_at?: string | null;
     sistema: 'Venció: nadie lo aceptó a tiempo',
     negocio: 'Lo cancelaron ustedes',
     administrador: 'Vitrina lo cerró',
@@ -1434,6 +1435,9 @@ export type Pedido = {
   cobrar: number;
   metodo_pago: string;
   minutos_recogida: number | null;
+  efectivo_pendiente?: boolean;
+  efectivo_ocupado_at?: string | null;
+  puede_avisar_ocupado?: boolean;
   /** Lo dicto al negocio para que me entregue el pedido (solo si lo tomé y no lo he recogido). */
   codigo_recogida?: string | null;
   /** "dd/mm/aaaa hh:mm" en que lo entregué (solo los entregados). */
@@ -1460,7 +1464,7 @@ export type Pedido = {
 /** `vetado`: mi cuenta está suspendida y no puedo tomar pedidos nuevos. */
 export async function getDisponibles(
   token: string,
-): Promise<{ pedidos: Pedido[]; vetado: boolean; en_turno: boolean; compartir_ubicacion: boolean }> {
+): Promise<{ pedidos: Pedido[]; vetado: boolean; en_turno: boolean; compartir_ubicacion: boolean; bloqueado_por_efectivo: boolean }> {
   const d = await authGet('/api/domiciliario/disponibles', token);
   return {
     pedidos: (d.pedidos ?? []) as Pedido[],
@@ -1480,6 +1484,7 @@ export async function cambiarTurno(token: string, enTurno: boolean): Promise<str
  * Mi posición (GPS) para el mapa. Devuelve false si ya no debo compartirla
  * (fuera de turno y sin entregas).
  */
+    bloqueado_por_efectivo: !!d.bloqueado_por_efectivo,
 export async function enviarUbicacion(token: string, punto: Coordenadas): Promise<boolean> {
   const d = await authSend('PUT', '/api/domiciliario/ubicacion', token, punto);
   return !!d.compartir;
@@ -1506,6 +1511,10 @@ export async function getHistorialEntregas(token: string, pagina = 1): Promise<P
   return {
     items: (d.pedidos ?? []) as Pedido[],
     pagina: d.pagina ?? 1,
+export async function avisarOcupado(token: string, id: number): Promise<void> {
+  await authSend('PUT', `/api/domiciliario/pedidos/${id}/ocupado`, token);
+}
+
     ultima_pagina: d.ultima_pagina ?? 1,
     total: d.total ?? 0,
   };
