@@ -209,3 +209,61 @@ test('los productos con categoria solo coinciden si la palabra esta en ellos o e
     expect(collect($this->getJson('/api/negocios?buscar=martiyo')->json('negocios'))->all())->toBe([])
         ->and(collect($this->getJson('/api/negocios?buscar=restorante')->json('negocios'))->pluck('nombre')->all())->toBe(['Pollos Juancho']);
 });
+
+test('una consulta sin sentido no devuelve productos sin relacion', function () {
+    clienteAutenticado();
+    $negocio = negocioConProductos('Donde Pepe', ['Trago de whisky', 'Cazuela de mariscos', 'Churrasco', 'Roscón de arequipe', 'Arroz']);
+    // Con categoría: un término sin alternativas tampoco debe pasar por ella.
+    $categoria = $negocio->categorias()->create(['nombre' => 'Mariscos']);
+    $negocio->productos()->create(['nombre' => 'Langostinos', 'precio' => 30000, 'categoria_id' => $categoria->id]);
+
+    $buscar = fn (string $texto) => collect($this->getJson('/api/productos?buscar='.urlencode($texto))->assertOk()->json('productos'))->pluck('nombre')->all();
+
+    // «zzzzqqq» suena «sk», que está dentro de «uiski», «mariskos», «churasko»...
+    foreach (['zzzzqqq', 'zq', 'qqqq', 'jjjjjjj', 'kkkkaaa', 'asdfgh', 'zzzzqqq arroz'] as $texto) {
+        expect($buscar($texto))->toBe([], "«{$texto}» no debería encontrar nada");
+        expect($this->getJson('/api/negocios?buscar='.urlencode($texto))->json('negocios'))->toBe([]);
+    }
+    expect(Busqueda::terminos('zzzzqqq'))->toBe([[]]);
+
+    // Una palabra con letras estiradas sigue valiendo si es del catálogo.
+    expect($buscar('arrrrrroz'))->toBe(['Arroz']);
+});
+
+test('las busquedas cortas solo coinciden con palabras completas o con su comienzo', function () {
+    clienteAutenticado();
+    negocioConProductos('La Tienda', ['Té verde', 'Aceite', 'Pan blanco', 'Empanada', 'Sal marina', 'Salchicha', 'Ron viejo', 'Jugo de toronja']);
+
+    $buscar = fn (string $texto) => collect($this->getJson('/api/productos?buscar='.urlencode($texto))->assertOk()->json('productos'))->pluck('nombre')->all();
+
+    expect($buscar('té'))->toBe(['Té verde'])
+        ->and($buscar('TE'))->toBe(['Té verde'])
+        ->and($buscar('pan'))->toBe(['Pan blanco'])
+        ->and($buscar('sal'))->toBe(['Sal marina', 'Salchicha'])
+        ->and($buscar('ron'))->toBe(['Ron viejo'])
+        ->and($buscar('toronja'))->toBe(['Jugo de toronja'])
+        ->and($buscar('empa'))->toBe(['Empanada']);
+
+    // También al decidir si un negocio coincide por su nombre.
+    negocioConProductos('Rondón Licores', ['Aguardiente']);
+    $negocios = collect($this->getJson('/api/negocios?buscar=ron')->json('negocios'));
+    expect($negocios->pluck('nombre')->sort()->values()->all())->toBe(['La Tienda', 'Rondón Licores'])
+        ->and($negocios->firstWhere('nombre', 'Rondón Licores')['coincide_nombre'])->toBeTrue()
+        ->and($negocios->firstWhere('nombre', 'La Tienda')['coincide_nombre'])->toBeFalse();
+});
+
+test('la correccion de errores sigue funcionando con palabras partidas o mal escritas', function () {
+    clienteAutenticado();
+    negocioConProductos('Pollos Juancho', ['Arroz con pollo', 'Pollo asado', 'Gaseosa']);
+    negocioConProductos('Droguería Salud', ['Acetaminofén 500mg']);
+
+    $buscar = fn (string $texto) => collect($this->getJson('/api/productos?buscar='.urlencode($texto))->assertOk()->json('productos'))->pluck('nombre')->all();
+
+    expect($buscar('arrz con pllo'))->toBe(['Arroz con pollo'])
+        ->and($buscar('gasiosa'))->toBe(['Gaseosa'])
+        ->and($buscar('asetaminofen'))->toBe(['Acetaminofén 500mg'])
+        ->and($buscar('asetamim'))->toBe(['Acetaminofén 500mg'])
+        // Las cifras no se juntan como las letras dobles: «50» no es «500».
+        ->and($buscar('500'))->toBe(['Acetaminofén 500mg'])
+        ->and($buscar('50'))->toBe([]);
+});

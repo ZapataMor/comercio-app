@@ -25,6 +25,9 @@ use Illuminate\Support\Str;
  * cada palabra que no aparezca en el catálogo se cambia por las palabras del
  * catálogo que se le parecen (distancia de edición pequeña).
  *
+ * Los términos cortos no se buscan como fragmento: con dos letras cualquier
+ * texto las tiene («zzzzqqq» suena «sk», que está en «uiski» y «mariskos»).
+ *
  * La columna tiene la forma "{nombre}|{resto}" para poder ordenar por
  * relevancia según coincida en el nombre o en lo demás.
  */
@@ -44,10 +47,13 @@ class Busqueda
     /** Texto normalizado «como suena»: palabras separadas por un espacio. */
     public static function normalizar(?string $texto): string
     {
-        $texto = strtolower(Str::ascii((string) $texto));
-        $palabras = preg_split('/[^a-z0-9]+/', $texto, -1, PREG_SPLIT_NO_EMPTY);
+        return implode(' ', array_map(self::fonetica(...), self::palabrasEscritas($texto)));
+    }
 
-        return implode(' ', array_map(self::fonetica(...), $palabras));
+    /** Palabras tal como se escribieron, en minúscula y sin tildes. */
+    private static function palabrasEscritas(?string $texto): array
+    {
+        return preg_split('/[^a-z0-9]+/', strtolower(Str::ascii((string) $texto)), -1, PREG_SPLIT_NO_EMPTY);
     }
 
     /** Valor de la columna `busqueda` a partir del nombre y del resto de textos. */
@@ -69,7 +75,8 @@ class Busqueda
         $p = strtr($p, ['c' => 'k', 'q' => 'k', 'z' => 's', 'v' => 'b', 'w' => 'u', 'h' => '', '%' => 'g']);
         $p = str_replace(['x', 'll', '#'], ['ks', 'y', 'ch'], $p);
         $p = preg_replace('/n(?=[bp])/', 'm', $p);
-        $p = preg_replace('/(.)\1+/', '$1', $p);
+        // Letras dobles, no cifras: «500» no es «50».
+        $p = preg_replace('/([a-z])\1+/', '$1', $p);
         // "muy"/"mui", "rey"/"rei"; la palabra suelta "y" queda como "i".
         $p = preg_replace('/y$/', 'i', $p);
 
@@ -80,19 +87,32 @@ class Busqueda
      * Términos de la consulta, cada uno con sus alternativas (él mismo o, si no
      * aparece en el catálogo, las palabras parecidas). Vacío si la consulta no
      * tiene letras ni números (p. ej. «%»), que entonces no debe encontrar nada.
+     * Un término sin alternativas no coincide con nada.
      *
      * @return list<list<string>>
      */
     public static function terminos(string $consulta): array
     {
-        $palabras = array_values(array_unique(explode(' ', self::normalizar($consulta))));
-        $palabras = array_values(array_filter($palabras, fn ($p) => $p !== ''));
-        $utiles = array_values(array_diff($palabras, self::VACIAS));
+        // Palabra normalizada => ¿se encogió a menos de la mitad al normalizarla?
+        // Pasa con lo tecleado al azar: «zzzzqqq» queda en «sk».
+        $palabras = [];
+        foreach (self::palabrasEscritas($consulta) as $escrita) {
+            $p = self::fonetica($escrita);
+            if ($p !== '') {
+                $palabras[$p] = ($palabras[$p] ?? true) && strlen($p) * 2 < strlen($escrita);
+            }
+        }
+        $utiles = array_diff_key($palabras, array_flip(self::VACIAS));
         $palabras = $utiles ?: $palabras;
 
         $vocabulario = $palabras ? self::vocabulario() : [];
 
-        return array_map(fn ($p) => self::alternativas($p, $vocabulario), $palabras);
+        $terminos = [];
+        foreach ($palabras as $p => $encogida) {
+            $terminos[] = self::alternativas((string) $p, $vocabulario, $encogida);
+        }
+
+        return $terminos;
     }
 
     /**
@@ -111,15 +131,23 @@ class Busqueda
         return implode(' ', array_map(fn ($p) => $correcciones[$p] ?? $p, explode(' ', self::normalizar($consulta))));
     }
 
-    /** @return list<string> */
-    private static function alternativas(string $termino, array $vocabulario): array
+    /**
+     * Alternativas de un término. Las cortas no se buscan como fragmento (ver
+     * contiene()), así que solo se aceptan si el catálogo las tiene igual: una
+     * de una o dos letras como palabra completa, una de tres como comienzo de
+     * palabra. Lo que se encogió al normalizarlo tampoco se corrige: vale solo
+     * si es una palabra del catálogo.
+     *
+     * @return list<string>
+     */
+    private static function alternativas(string $termino, array $vocabulario, bool $encogida = false): array
     {
         $largo = strlen($termino);
-        if ($largo < 3) {
-            return [$termino];
+        if ($encogida || $largo < 3) {
+            return in_array($termino, $vocabulario, true) ? [$termino] : [];
         }
         foreach ($vocabulario as $palabra) {
-            if (str_contains($palabra, $termino)) {
+            if ($largo === 3 ? str_starts_with($palabra, $termino) : str_contains($palabra, $termino)) {
                 return [$termino];
             }
         }
@@ -127,6 +155,9 @@ class Busqueda
         $maximo = $largo <= 5 ? 1 : 2;
         $candidatas = [];
         foreach ($vocabulario as $palabra) {
+            if (strlen($palabra) < 3 || in_array($palabra, self::VACIAS, true)) {
+                continue;
+            }
             $diferencia = abs(strlen($palabra) - $largo);
             $distancia = $diferencia <= $maximo ? self::distancia($termino, $palabra) : PHP_INT_MAX;
             // Palabra a medio escribir y con error: "asetamim" -> "asetaminofen".
@@ -216,13 +247,58 @@ class Busqueda
     }
 
     /**
+     * Patrones LIKE que equivalen a contiene(). Una alternativa de una o dos
+     * letras debe ser una palabra completa; una de tres, el comienzo de una
+     * palabra; las demás, cualquier fragmento. Así «te» no encuentra «aceite»
+     * ni «ron» encuentra «toronja». Las palabras de la columna van separadas
+     * por un espacio o por la «|» entre el nombre y el resto.
+     *
+     * @return list<string>
+     */
+    private static function patrones(string $alternativa): array
+    {
+        $largo = strlen($alternativa);
+        if ($largo >= 4) {
+            return ['%'.$alternativa.'%'];
+        }
+        $antes = ['', '% ', '%|'];
+        $despues = $largo === 3 ? ['%'] : ['', ' %', '|%'];
+        $patrones = [];
+        foreach ($antes as $a) {
+            foreach ($despues as $d) {
+                $patrones[] = $a.$alternativa.$d;
+            }
+        }
+
+        return $patrones;
+    }
+
+    /** ¿Un texto ya normalizado contiene la alternativa? (como patrones()) */
+    private static function contiene(string $texto, string $alternativa): bool
+    {
+        $largo = strlen($alternativa);
+        if ($largo >= 4) {
+            return str_contains($texto, $alternativa);
+        }
+
+        return (bool) preg_match('/(?:^|[ |])'.preg_quote($alternativa, '/').($largo === 3 ? '/' : '(?:$|[ |])/'), $texto);
+    }
+
+    /**
      * Añade una condición OR por cada alternativa sobre la columna dada. Las
      * alternativas solo tienen letras y números, así que no llevan comodines.
+     * Sin alternativas, añade una condición falsa: un grupo vacío dejaría
+     * pasar todas las filas.
      */
     public static function orContiene(Builder|Relation $q, string $columna, array $alternativas): Builder|Relation
     {
+        if ($alternativas === []) {
+            return $q->orWhereRaw('1 = 0');
+        }
         foreach ($alternativas as $alternativa) {
-            $q->orWhere($columna, 'like', '%'.$alternativa.'%');
+            foreach (self::patrones($alternativa) as $patron) {
+                $q->orWhere($columna, 'like', $patron);
+            }
         }
 
         return $q;
@@ -258,7 +334,7 @@ class Busqueda
     public static function coincide(string $texto, array $terminos): bool
     {
         foreach ($terminos as $alternativas) {
-            if (! collect($alternativas)->contains(fn ($a) => str_contains($texto, $a))) {
+            if (! collect($alternativas)->contains(fn ($a) => self::contiene($texto, $a))) {
                 return false;
             }
         }
