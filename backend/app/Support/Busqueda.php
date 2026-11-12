@@ -143,6 +143,11 @@ class Busqueda
     private static function alternativas(string $termino, array $vocabulario, bool $encogida = false): array
     {
         $largo = strlen($termino);
+        // Encogida a una o dos letras («qqqq» -> «k») ya no dice nada, aunque
+        // el catálogo tenga esa letra suelta («USB-C»).
+        if ($encogida && $largo < 3) {
+            return [];
+        }
         if ($encogida || $largo < 3) {
             return in_array($termino, $vocabulario, true) ? [$termino] : [];
         }

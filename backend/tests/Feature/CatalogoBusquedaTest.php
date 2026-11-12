@@ -212,7 +212,7 @@ test('los productos con categoria solo coinciden si la palabra esta en ellos o e
 
 test('una consulta sin sentido no devuelve productos sin relacion', function () {
     clienteAutenticado();
-    $negocio = negocioConProductos('Donde Pepe', ['Trago de whisky', 'Cazuela de mariscos', 'Churrasco', 'Roscón de arequipe', 'Arroz']);
+    $negocio = negocioConProductos('Donde Pepe', ['Trago de whisky', 'Cazuela de mariscos', 'Churrasco', 'Roscón de arequipe', 'Arroz', 'Cable USB-C']);
     // Con categoría: un término sin alternativas tampoco debe pasar por ella.
     $categoria = $negocio->categorias()->create(['nombre' => 'Mariscos']);
     $negocio->productos()->create(['nombre' => 'Langostinos', 'precio' => 30000, 'categoria_id' => $categoria->id]);
@@ -225,6 +225,11 @@ test('una consulta sin sentido no devuelve productos sin relacion', function () 
         expect($this->getJson('/api/negocios?buscar='.urlencode($texto))->json('negocios'))->toBe([]);
     }
     expect(Busqueda::terminos('zzzzqqq'))->toBe([[]]);
+
+    // «qqqq» suena «k», que es una palabra del catálogo («USB-C»), pero no
+    // se buscó la letra c: no encuentra el cable. «c» sí.
+    expect($buscar('qqqq'))->toBe([])
+        ->and($buscar('c'))->toBe(['Cable USB-C']);
 
     // Una palabra con letras estiradas sigue valiendo si es del catálogo.
     expect($buscar('arrrrrroz'))->toBe(['Arroz']);
