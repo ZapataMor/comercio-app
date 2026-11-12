@@ -46,7 +46,7 @@ Invoke-Api /api/login POST @{email='inexistente@staging.example';password='incor
 # Crea una cuenta temporal en la BD de staging y la elimina al terminar.
 $email = "smoke-$([Guid]::NewGuid().ToString('N'))@staging.example"
 $password = "Smoke-$([Guid]::NewGuid().ToString('N'))"
-$registered = Invoke-Api /api/register POST @{name='Prueba';apellidos='Preproduccion';email=$email;password=$password;password_confirmation=$password;direccion='Calle prueba 1';barrio='Centro';telefono='3000000000';acepta_terminos=$true} -Status 201
+$registered = Invoke-Api /api/register POST @{name='Prueba';apellidos='Preproduccion';email=$email;password=$password;password_confirmation=$password;direccion='Calle 1 # 2-3';barrio='Centro';telefono='3000000000';acepta_terminos=$true} -Status 201
 $token = $registered.token
 if (-not $token) { throw 'El registro no devolvio un token.' }
 try {

@@ -24,6 +24,9 @@ return new class extends Migration
     {
         Schema::table('pedidos', function (Blueprint $table) {
             $table->dropConstrainedForeignId('cerrado_por_admin_id');
+            // MySQL usa el índice único para la llave foránea de user_id y no
+            // deja borrarlo si la columna se queda sin otro índice.
+            $table->index('user_id');
             $table->dropUnique(['user_id', 'clave_intento']);
             $table->dropColumn(['clave_intento', 'nota_admin']);
         });
