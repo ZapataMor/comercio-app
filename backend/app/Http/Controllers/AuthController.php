@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Middleware\CuentaActiva;
 use App\Models\Barrio;
 use App\Models\User;
+use App\Support\Telefono\CodigosTelefono;
 use App\Support\UbicacionDomiciliario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,35 +26,51 @@ class AuthController extends Controller
      * domiciliaria (hacerseDomiciliario). El rol 'administrador' lo asigna
      * otro admin.
      */
-    public function register(Request $request): JsonResponse
+    public function register(Request $request, CodigosTelefono $codigos): JsonResponse
     {
+        $request->merge(['telefono' => CodigosTelefono::normalizar($request->input('telefono')) ?? $request->input('telefono')]);
+        if (is_string($request->input('email')) && trim($request->input('email')) === '') {
+            $request->merge(['email' => null]);
+        }
         $data = $request->validate([
             // Nombre(s) y apellidos se piden por separado.
             'name' => ['required', 'string', 'max:255'],
             'apellidos' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
+            // Opcional: se entra con el celular verificado; el correo es otra forma más.
+            'email' => ['nullable', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['present', 'string', 'min:5', 'confirmed'],
             'direccion' => ['required', 'string', 'max:255', new \App\Rules\Direccion],
             'barrio' => ['required', 'string', 'max:120', 'regex:/\A[\p{L}\p{N}-]+\z/u'],
             'telefono' => ['required', 'string', new \App\Rules\Telefono],
+            // Token de /telefono/verificar: el número se confirmó por WhatsApp.
+            'verificacion' => ['required', 'string', 'max:100'],
             // Autorización previa del tratamiento de datos (Ley 1581 de 2012).
             'acepta_terminos' => ['accepted'],
         ], [
             'acepta_terminos.accepted' => 'Debes aceptar la política de privacidad para crear la cuenta.',
+            'verificacion.required' => 'Confirma tu número de celular con el código de WhatsApp.',
         ]);
 
-        $user = DB::transaction(function () use ($data) {
+        $user = DB::transaction(function () use ($data, $codigos) {
+            $codigos->consumirTokenRegistro($data['telefono'], $data['verificacion']);
+            if (CodigosTelefono::cuentaConTelefono($data['telefono'])) {
+                throw ValidationException::withMessages([
+                    'telefono' => ['Este número ya tiene una cuenta. Inicia sesión o recupera tu contraseña.'],
+                ]);
+            }
+
             $user = User::create([
                 'name' => $data['name'],
                 'apellidos' => $data['apellidos'],
-                'email' => $data['email'],
+                'email' => $data['email'] ?? null,
                 'password' => $data['password'], // se hashea solo (cast 'hashed' en el modelo)
                 'direccion' => $data['direccion'],
                 'barrio' => $data['barrio'],
                 'telefono' => $data['telefono'],
             ]);
-            // Prueba de cuándo autorizó el tratamiento de sus datos.
-            $user->forceFill(['terminos_aceptados_at' => now()])->save();
+            // Prueba de cuándo autorizó el tratamiento de sus datos, y del
+            // celular confirmado por WhatsApp.
+            $user->forceFill(['terminos_aceptados_at' => now(), 'telefono_verificado_at' => now()])->save();
 
             $user->assignRole('usuario');
 
@@ -79,27 +96,32 @@ class AuthController extends Controller
     }
 
     /**
-     * Login con email + password. Devuelve un token Sanctum.
+     * Login con correo, celular verificado o nombre de usuario (campo
+     * `usuario`) + password. Devuelve un token Sanctum. Se sigue aceptando
+     * el campo `email` de las versiones anteriores de la app.
      */
     public function login(Request $request): JsonResponse
     {
+        $campo = $request->has('usuario') ? 'usuario' : 'email';
         $data = $request->validate([
-            'email' => ['required', 'string', 'email'],
+            $campo => $campo === 'usuario' ? ['required', 'string', 'max:255'] : ['required', 'string', 'email'],
             'password' => ['present', 'string', 'min:1'],
+        ], [
+            'usuario.required' => 'Escribe tu correo, celular o usuario.',
         ]);
 
-        $user = User::where('email', $data['email'])->first();
+        $user = self::buscarParaAcceso($data[$campo]);
 
         if (! $user || ! Hash::check($data['password'], $user->password)) {
-            // Mensaje genérico: no revelamos si el email existe o no.
+            // Mensaje genérico: no revelamos si la cuenta existe o no.
             throw ValidationException::withMessages([
-                'email' => ['Las credenciales no son correctas.'],
+                $campo => ['Las credenciales no son correctas.'],
             ]);
         }
 
         if ($user->suspendido_at !== null) {
             throw ValidationException::withMessages([
-                'email' => [CuentaActiva::mensajeSuspension($user)],
+                $campo => [CuentaActiva::mensajeSuspension($user)],
             ]);
         }
 
@@ -109,6 +131,25 @@ class AuthController extends Controller
             'user' => self::userPayload($user),
             'token' => $token,
         ]);
+    }
+
+    /**
+     * La cuenta a la que se refiere lo que la persona escribió al entrar:
+     * correo si tiene "@", celular si son 10 dígitos que empiezan por 3 (o
+     * con +57) y solo si está verificado, o si no, nombre de usuario.
+     */
+    public static function buscarParaAcceso(string $identificador): ?User
+    {
+        $identificador = trim($identificador);
+        if (str_contains($identificador, '@')) {
+            return User::where('email', $identificador)->first();
+        }
+        $telefono = CodigosTelefono::normalizar($identificador);
+        if ($telefono !== null) {
+            return CodigosTelefono::cuentaConTelefono($telefono);
+        }
+
+        return User::where('username', mb_strtolower($identificador))->first();
     }
 
     /**
@@ -134,11 +175,15 @@ class AuthController extends Controller
         // cuentas creadas por un admin (domiciliario, admin) pueden no tenerlos.
         $esCliente = $user->hasRole('usuario');
 
+        if (is_string($request->input('email')) && trim($request->input('email')) === '') {
+            $request->merge(['email' => null]);
+        }
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             // Opcional aquí: las cuentas creadas antes (o por un admin) pueden no tenerlos.
             'apellidos' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            // Puede quedar vacío si la persona entra con su celular verificado.
+            'email' => ['present', 'nullable', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'password' => ['sometimes', 'nullable', 'string', 'min:5', 'confirmed'],
             'password_actual' => ['exclude_without:password', 'present', 'string', 'min:1'],
             // Datos de contacto: obligatorios para clientes, opcionales para el resto.
@@ -146,6 +191,18 @@ class AuthController extends Controller
             'barrio' => [$esCliente ? 'required' : 'sometimes', 'nullable', 'string', 'max:120', 'regex:/\A[\p{L}\p{N}-]+\z/u'],
             'telefono' => [$esCliente ? 'required' : 'sometimes', 'nullable', 'string', new \App\Rules\Telefono],
         ]);
+
+        // Cambiar el número a mano le quita la verificación (no se confirmó el
+        // nuevo). La cuenta debe conservar al menos una forma de entrar.
+        $cambiaTelefono = array_key_exists('telefono', $data) && $data['telefono'] !== $user->telefono;
+        $conservaCelular = $user->telefono_verificado_at !== null && ! $cambiaTelefono;
+        if (blank($data['email']) && blank($user->username) && ! $conservaCelular) {
+            throw ValidationException::withMessages([
+                $cambiaTelefono ? 'telefono' : 'email' => [$cambiaTelefono
+                    ? 'Tu celular es tu forma de entrar: para cambiarlo, verifica el número nuevo con el código de WhatsApp.'
+                    : 'El campo correo es obligatorio.'],
+            ]);
+        }
 
         if (! empty($data['password'])) {
             if (! Hash::check($data['password_actual'], $user->password)) {
@@ -169,8 +226,9 @@ class AuthController extends Controller
         if (array_key_exists('barrio', $data)) {
             $user->barrio = $data['barrio'];
         }
-        if (array_key_exists('telefono', $data)) {
+        if ($cambiaTelefono) {
             $user->telefono = $data['telefono'];
+            $user->telefono_verificado_at = null;
         }
         $user->save();
 
@@ -292,6 +350,8 @@ class AuthController extends Controller
             'direccion' => $user->direccion,
             'barrio' => $user->barrio,
             'telefono' => $user->telefono,
+            // Confirmado por WhatsApp: sirve para entrar y recuperar la contraseña.
+            'telefono_verificado' => $user->telefono_verificado_at !== null,
             // Domiciliario: si está en turno (le llegan los avisos de pedidos).
             'en_turno' => (bool) $user->en_turno,
             // Código único para que un negocio lo invite como trabajador.

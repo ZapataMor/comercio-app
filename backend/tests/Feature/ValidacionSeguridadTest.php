@@ -25,7 +25,8 @@ test('el registro admite cualquier clave de cinco caracteres y rechaza cuatro', 
     Role::findOrCreate('usuario', 'web');
     $datos = ['name' => 'Ana', 'apellidos' => 'Pérez', 'email' => 'ana@example.com',
         'password' => '1234', 'password_confirmation' => '1234', 'direccion' => 'Carrera 8 #30',
-        'barrio' => 'Centro', 'telefono' => '3001234567', 'acepta_terminos' => true];
+        'barrio' => 'Centro', 'telefono' => '3001234567', 'acepta_terminos' => true,
+        'verificacion' => verificacionTelefono('3001234567')];
     $this->postJson('/api/register', $datos)->assertUnprocessable()->assertJsonValidationErrors('password');
     $this->postJson('/api/register', [...$datos, 'password' => '     ', 'password_confirmation' => '     '])->assertCreated();
 });

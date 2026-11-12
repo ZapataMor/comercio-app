@@ -28,6 +28,19 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    // Códigos por WhatsApp (registro, acceso y recuperación con el celular).
+    // driver: 'log' mientras no haya cuenta de Meta (el código va al log);
+    // 'cloud' para enviarlos de verdad con WhatsApp Cloud API.
+    // Guía: Vitrina/00 - Inicio/Configurar WhatsApp Cloud API.md
+    'whatsapp' => [
+        'driver' => env('WHATSAPP_DRIVER', 'log'),
+        'token' => env('WHATSAPP_TOKEN'),
+        'phone_number_id' => env('WHATSAPP_PHONE_NUMBER_ID'),
+        'plantilla' => env('WHATSAPP_PLANTILLA_CODIGO', 'codigo_vitrina'),
+        'idioma' => env('WHATSAPP_PLANTILLA_IDIOMA', 'es'),
+        'version' => env('WHATSAPP_API_VERSION', 'v23.0'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

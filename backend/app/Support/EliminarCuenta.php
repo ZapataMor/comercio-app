@@ -98,6 +98,7 @@ class EliminarCuenta
             $user->clienteDirecciones()->delete();
             $user->deviceTokens()->delete();
             $user->tokens()->delete();
+            \App\Models\CodigoTelefono::where('user_id', $user->id)->delete();
 
             // Los pedidos terminados se conservan para el negocio, sin los
             // datos de contacto de la persona.
@@ -118,6 +119,7 @@ class EliminarCuenta
                 'direccion' => null,
                 'barrio' => null,
                 'telefono' => null,
+                'telefono_verificado_at' => null,
                 'codigo_publico' => null,
                 'remember_token' => null,
                 'eliminado_at' => now(),

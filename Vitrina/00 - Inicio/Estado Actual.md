@@ -501,10 +501,12 @@ reputacion_eventos · calificaciones · barrios · ajustes
 - [ ] Reclamo cuando un pedido queda "en camino" y nunca se entrega.
 - [ ] Push al domiciliario o negocio cuando queda vetado o en riesgo; hoy solo lo ve en la app.
 - [ ] Ordenar Explorar por confiabilidad; hoy solo se muestra el nivel.
-- [ ] Enviar los códigos también por WhatsApp con la API oficial de Meta. Hace falta cuenta de Meta
-      Business, número dedicado y plantilla aprobada; confirmar tarifa en Colombia y si exige
-      verificar la empresa. Idea ligada: que el comerciante escriba el código de recogida al WhatsApp
-      de Vitrina y el servidor lo valide.
+- [ ] Acceso con el celular (2026-11-11): registro, login y recuperar la contraseña con un código
+      por WhatsApp ya están hechos y probados en modo prueba (el código va al log). Falta la cuenta
+      de Meta: ver [[Configurar WhatsApp Cloud API]].
+- [ ] Enviar también los códigos de recogida y entrega por WhatsApp (misma cuenta de Meta; sería
+      una plantilla de utilidad). Idea ligada: que el comerciante escriba el código de recogida al
+      WhatsApp de Vitrina y el servidor lo valide.
 - [ ] Con el mapa funcionando: modal para escribir el código de recogida cuando el domiciliario esté
       muy cerca del negocio.
 - [ ] Dependencias: `@react-native-firebase` a 27 (revisar si aún hace falta el override de

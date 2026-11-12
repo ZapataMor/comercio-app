@@ -254,6 +254,9 @@ class EnVivo
             Api\DeviceTokenController::class.'@destroy' => null,
             Api\RecuperarClaveController::class.'@enviarCodigo' => null,
             Api\RecuperarClaveController::class.'@restablecer' => null,
+            Api\TelefonoController::class.'@codigoRegistro' => null,
+            Api\TelefonoController::class.'@verificarRegistro' => null,
+            Api\TelefonoController::class.'@codigoPerfil' => null,
             Api\TrabajadorController::class.'@resolverCodigo' => null,
             // El carrito vive en el teléfono; esto solo recalcula precios.
             Api\CarritoController::class.'@actualizar' => null,
@@ -264,6 +267,8 @@ class EnVivo
             AuthController::class.'@register' => ['despues' => fn () => self::avisar(self::ADMIN, 'usuarios')],
             AuthController::class.'@actualizarPerfil' => ['despues' => fn (Request $r) => self::perfil($yo($r))],
             AuthController::class.'@hacerseDomiciliario' => ['despues' => fn (Request $r) => self::perfil($yo($r))],
+            // Verificar el celular cambia el número que ven negocios y domiciliarios.
+            Api\TelefonoController::class.'@verificarPerfil' => ['despues' => fn (Request $r) => self::perfil($yo($r))],
             AuthController::class.'@dejarDeSerDomiciliario' => ['despues' => fn (Request $r) => self::perfil($yo($r))],
             Api\ClienteDireccionController::class.'@principal' => ['despues' => function (Request $r) use ($yo) {
                 self::avisar(self::usuario($yo($r)), 'direcciones');

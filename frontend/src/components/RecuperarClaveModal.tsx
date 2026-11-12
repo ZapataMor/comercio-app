@@ -1,9 +1,10 @@
 /**
  * "¿Olvidaste tu contraseña?" (desde el Login, sin sesión).
  *
- * Paso 1: escribe su correo → el backend envía un código de 6 dígitos.
+ * Paso 1: escribe su correo o su celular → el backend envía un código de 6
+ * dígitos al correo o, si es un celular verificado, por WhatsApp.
  * Paso 2: escribe el código y la contraseña nueva → vuelve al Login con el
- * correo listo para entrar. El código vence a los 15 minutos.
+ * correo o celular listo para entrar.
  */
 import React, { useEffect, useState } from 'react';
 import {
@@ -17,24 +18,26 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { pedirCodigoClave, restablecerClave } from '../api';
+import { identidadDe, pedirCodigoClave, restablecerClave } from '../api';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import FieldError from './FieldError';
 
 type Props = {
   visible: boolean;
-  emailInicial: string;
+  /** Lo que la persona ya escribió en el Login (correo, celular o usuario). */
+  identificadorInicial: string;
   onCerrar: () => void;
-  /** Contraseña cambiada: el Login se queda con este correo. */
-  onListo: (email: string, mensaje: string) => void;
+  /** Contraseña cambiada: el Login se queda con este correo o celular. */
+  onListo: (identificador: string, mensaje: string) => void;
 };
 
-export default function RecuperarClaveModal({ visible, emailInicial, onCerrar, onListo }: Props) {
+export default function RecuperarClaveModal({ visible, identificadorInicial, onCerrar, onListo }: Props) {
   const { c } = useTheme();
   const styles = useStyles();
   const [paso, setPaso] = useState<'correo' | 'codigo'>('correo');
-  const [email, setEmail] = useState(emailInicial);
+  const [email, setEmail] = useState(identificadorInicial);
+  const [codigoPrueba, setCodigoPrueba] = useState<string | null>(null);
   const [codigo, setCodigo] = useState('');
   const [clave, setClave] = useState('');
   const [confirmar, setConfirmar] = useState('');
@@ -46,14 +49,15 @@ export default function RecuperarClaveModal({ visible, emailInicial, onCerrar, o
   useEffect(() => {
     if (visible) {
       setPaso('correo');
-      setEmail(emailInicial);
+      setEmail(identificadorInicial);
+      setCodigoPrueba(null);
       setCodigo('');
       setClave('');
       setConfirmar('');
       setAviso(null);
       setErrores({});
     }
-  }, [visible, emailInicial]);
+  }, [visible, identificadorInicial]);
 
   function limpiar(campo: string) {
     setErrores(prev => {
@@ -64,18 +68,22 @@ export default function RecuperarClaveModal({ visible, emailInicial, onCerrar, o
   }
 
   async function enviarCodigo() {
-    if (!email.trim()) {
-      setErrores({ email: 'Escribe el correo de tu cuenta.' });
+    const identidad = identidadDe(email);
+    if (!email.trim() || ('email' in identidad && !identidad.email.includes('@'))) {
+      setErrores({ email: 'Escribe el correo o el celular de tu cuenta.' });
       return;
     }
     setCargando(true);
     setErrores({});
     try {
-      setAviso(await pedirCodigoClave(email.trim()));
+      const r = await pedirCodigoClave(identidad);
+      setAviso(r.message);
+      setCodigoPrueba(r.codigo_prueba ?? null);
       setPaso('codigo');
     } catch (e) {
       const campos = fieldErrorsFromError(e);
-      setErrores(Object.keys(campos).length ? campos : { email: messageFromError(e) });
+      const mensaje = campos.email ?? campos.telefono ?? messageFromError(e);
+      setErrores(paso === 'codigo' ? { codigo: mensaje } : { email: mensaje });
     } finally {
       setCargando(false);
     }
@@ -93,7 +101,7 @@ export default function RecuperarClaveModal({ visible, emailInicial, onCerrar, o
     setCargando(true);
     setErrores({});
     try {
-      const mensaje = await restablecerClave(email.trim(), codigo, clave);
+      const mensaje = await restablecerClave(identidadDe(email), codigo, clave);
       onListo(email.trim(), mensaje);
     } catch (e) {
       const campos = fieldErrorsFromError(e, { password_confirmation: 'confirmar' });
@@ -113,7 +121,8 @@ export default function RecuperarClaveModal({ visible, emailInicial, onCerrar, o
             {paso === 'correo' ? (
               <>
                 <Text style={styles.texto}>
-                  Escribe el correo de tu cuenta y te enviaremos un código de 6 números.
+                  Escribe el correo o el celular de tu cuenta. Te enviaremos un código de 6 números: al correo, o por
+                  WhatsApp si es tu celular.
                 </Text>
                 <TextInput
                   style={styles.input}
@@ -123,8 +132,10 @@ export default function RecuperarClaveModal({ visible, emailInicial, onCerrar, o
                     limpiar('email');
                   }}
                   autoCapitalize="none"
+                  autoCorrect={false}
                   keyboardType="email-address"
-                  placeholder="correo@ejemplo.co"
+                  placeholder="correo@ejemplo.co o 3001234567"
+                  accessibilityLabel="Correo o celular"
                   placeholderTextColor={c.mutedSoft}
                   editable={!cargando}
                 />
@@ -140,6 +151,11 @@ export default function RecuperarClaveModal({ visible, emailInicial, onCerrar, o
             ) : (
               <>
                 {!!aviso && <Text style={styles.texto}>{aviso}</Text>}
+                {!!codigoPrueba && (
+                  <Text style={styles.prueba}>
+                    Modo prueba (WhatsApp sin configurar): tu código es {codigoPrueba}
+                  </Text>
+                )}
                 <TextInput
                   style={[styles.input, styles.inputCodigo]}
                   value={codigo}
@@ -212,6 +228,10 @@ const useStyles = makeStyles((c, shadow) => ({
   input: {
     borderWidth: 1, borderColor: c.borderStrong, borderRadius: radius.md, paddingHorizontal: 14,
     paddingVertical: 12, fontSize: 16, fontFamily: font.regular, color: c.textStrong, marginBottom: 6,
+  },
+  prueba: {
+    fontSize: 12.5, fontFamily: font.semibold, color: c.text, backgroundColor: c.accentSoft,
+    borderRadius: radius.sm, padding: 10, marginBottom: 12,
   },
   inputCodigo: { fontSize: 24, letterSpacing: 8, textAlign: 'center', fontFamily: font.bold },
   boton: {

@@ -21,11 +21,14 @@ export type Usuario = {
   /** Nombre(s). Los apellidos van aparte. */
   name: string;
   apellidos?: string | null;
-  email: string;
+  /** Puede faltar si la persona se registró con su celular. */
+  email: string | null;
   roles: string[];
   direccion?: string | null;
   barrio?: string | null;
   telefono?: string | null;
+  /** Celular confirmado por WhatsApp: sirve para entrar y recuperar la contraseña. */
+  telefono_verificado?: boolean;
   /** Código que la persona comparte para que un negocio la invite (ej. "U34F4D"). */
   codigo_publico?: string | null;
   /** Negocios donde es miembro activo, con su rol en cada uno. */
@@ -265,9 +268,10 @@ export function alRechazarToken(cb: ((token: string) => void) | null) {
 
 /**
  * Inicia sesión contra POST /api/login del backend Laravel (Sanctum).
+ * `usuario`: correo, celular verificado o nombre de usuario.
  * Devuelve el usuario + token, o lanza un Error con el mensaje del backend.
  */
-export async function login(email: string, password: string): Promise<LoginResponse> {
+export async function login(usuario: string, password: string): Promise<LoginResponse> {
   let res: Response;
   try {
     res = await solicitar(`${API_URL}/api/login`, {
@@ -276,7 +280,7 @@ export async function login(email: string, password: string): Promise<LoginRespo
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ usuario, password }),
     });
   } catch (error) {
     if (error instanceof ErrorRed) throw error;
@@ -303,11 +307,14 @@ export async function login(email: string, password: string): Promise<LoginRespo
 export async function register(body: {
   name: string;
   apellidos: string;
-  email: string;
+  /** Opcional: se puede entrar con el celular verificado. */
+  email?: string | null;
   password: string;
   direccion: string;
   barrio: string;
   telefono: string;
+  /** Token de verificarTelefono(): el número se confirmó por WhatsApp. */
+  verificacion: string;
   // Autorización del tratamiento de datos (Ley 1581); el backend la exige.
   acepta_terminos: boolean;
 }): Promise<LoginResponse> {
@@ -342,6 +349,11 @@ export async function register(body: {
 
 /** POST público (sin token) con cuerpo JSON. Devuelve el `message` del backend. */
 async function publicPost(path: string, body: any, porDefecto: string): Promise<string> {
+  return (await publicPostDatos(path, body, porDefecto))?.message ?? '';
+}
+
+/** POST público (sin token) con cuerpo JSON. Devuelve todo el cuerpo de la respuesta. */
+async function publicPostDatos(path: string, body: any, porDefecto: string): Promise<any> {
   let res: Response;
   try {
     res = await solicitar(`${API_URL}${path}`, {
@@ -359,21 +371,66 @@ async function publicPost(path: string, body: any, porDefecto: string): Promise<
     const mensaje = res.status === 429 ? 'Demasiados intentos. Espera un minuto.' : data?.message;
     throw new ApiError(firstValidationMessage(errors) ?? mensaje ?? porDefecto, res.status, errors);
   }
-  return data?.message ?? '';
+  return data;
 }
 
-/** Envía al correo un código de 6 dígitos (la respuesta no dice si el correo existe). */
-export function pedirCodigoClave(email: string): Promise<string> {
-  return publicPost('/api/password/codigo', { email }, 'No se pudo enviar el código.');
+/**
+ * Respuesta al pedir un código. `codigo_prueba` solo llega en local mientras
+ * el backend no envía WhatsApp de verdad (WHATSAPP_DRIVER=log).
+ */
+export type CodigoEnviado = { message: string; espera?: number; codigo_prueba?: string };
+
+/** Correo o celular con que la persona recupera su contraseña. */
+export type Identidad = { email: string } | { telefono: string };
+
+/**
+ * Lo que escribió la persona: celular si son solo números (con o sin +57),
+ * si no, correo.
+ */
+export function identidadDe(texto: string): Identidad {
+  const limpio = texto.trim();
+  return /^\+?[\d\s-]+$/.test(limpio) ? { telefono: limpio.replace(/\D/g, '').replace(/^57(?=3\d{9}$)/, '') } : { email: limpio };
 }
 
-/** Pone una contraseña nueva con el código recibido por correo. */
-export function restablecerClave(email: string, codigo: string, password: string): Promise<string> {
+/**
+ * Envía un código de 6 dígitos al correo o, con el celular verificado, por
+ * WhatsApp (la respuesta no dice si la cuenta existe).
+ */
+export function pedirCodigoClave(identidad: Identidad): Promise<CodigoEnviado> {
+  return publicPostDatos('/api/password/codigo', identidad, 'No se pudo enviar el código.');
+}
+
+/** Pone una contraseña nueva con el código recibido por correo o WhatsApp. */
+export function restablecerClave(identidad: Identidad, codigo: string, password: string): Promise<string> {
   return publicPost(
     '/api/password/restablecer',
-    { email, codigo, password, password_confirmation: password },
+    { ...identidad, codigo, password, password_confirmation: password },
     'No se pudo cambiar la contraseña.',
   );
+}
+
+// ---------- Confirmar el celular con un código por WhatsApp ----------
+
+/** Registro: envía el código al celular (falla si el número ya tiene cuenta). */
+export function pedirCodigoRegistro(telefono: string): Promise<CodigoEnviado> {
+  return publicPostDatos('/api/telefono/codigo', { telefono }, 'No se pudo enviar el código.');
+}
+
+/** Registro: confirma el código y devuelve el token `verificacion` que pide register(). */
+export async function verificarTelefonoRegistro(telefono: string, codigo: string): Promise<string> {
+  const d = await publicPostDatos('/api/telefono/verificar', { telefono, codigo }, 'No se pudo confirmar el código.');
+  return d.verificacion as string;
+}
+
+/** Mi información: envía el código al número que se quiere verificar. */
+export async function pedirCodigoTelefonoPerfil(token: string, telefono: string): Promise<CodigoEnviado> {
+  return (await authSend('POST', '/api/perfil/telefono/codigo', token, { telefono })) as CodigoEnviado;
+}
+
+/** Mi información: confirma el código; el número queda guardado y verificado. */
+export async function verificarTelefonoPerfil(token: string, telefono: string, codigo: string): Promise<Usuario> {
+  const d = await authSend('POST', '/api/perfil/telefono/verificar', token, { telefono, codigo });
+  return d.user as Usuario;
 }
 
 // ---------- Barrios (Maicao) ----------
@@ -528,6 +585,7 @@ async function authUpload(
 export type PerfilInput = {
   name: string;
   apellidos?: string | null;
+  /** Vacío solo si la cuenta entra con su celular verificado. */
   email: string;
   /** Si viene, se exige también `password_actual`. */
   password?: string;

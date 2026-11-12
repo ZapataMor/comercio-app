@@ -55,6 +55,7 @@ test('una cuenta nueva se crea como cliente', function () {
         'barrio' => 'Centro',
         'telefono' => '3001234567',
         'acepta_terminos' => true,
+        'verificacion' => verificacionTelefono('3001234567'),
     ])
         ->assertCreated()
         ->assertJsonPath('user.roles', ['usuario']);

@@ -432,7 +432,8 @@ export default function LoginScreen({ navigation }: Props) {
   const modo = useModoVitrina();
   const p = PALETA[modo];
   const e = ESTILOS[modo];
-  const [email, setEmail] = useState('');
+  // Correo, celular o nombre de usuario.
+  const [usuario, setUsuario] = useState('');
   const [password, setPassword] = useState('');
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -554,7 +555,7 @@ export default function LoginScreen({ navigation }: Props) {
     setError(null);
     setErrores({});
     const nuevosErrores: FieldErrors = {};
-    if (!email.trim()) nuevosErrores.email = 'El campo correo es obligatorio.';
+    if (!usuario.trim()) nuevosErrores.usuario = 'Escribe tu correo, celular o usuario.';
     if (!password) nuevosErrores.password = 'El campo contrasena es obligatorio.';
     if (Object.keys(nuevosErrores).length > 0) {
       setErrores(nuevosErrores);
@@ -562,7 +563,7 @@ export default function LoginScreen({ navigation }: Props) {
     }
     setCargando(true);
     try {
-      const { token, user } = await login(email.trim(), password);
+      const { token, user } = await login(usuario.trim(), password);
       guardarSesion(token, user);
     } catch (err) {
       const campos = fieldErrorsFromError(err);
@@ -703,25 +704,27 @@ export default function LoginScreen({ navigation }: Props) {
               {error ? <Text style={[styles.error, e.error]}>{error}</Text> : null}
 
               <Animated.View style={bloque(1)}>
-                <Text style={[styles.label, e.label]}>CORREO</Text>
+                <Text style={[styles.label, e.label]}>CORREO, CELULAR O USUARIO</Text>
                 <View style={styles.inputWrapEmail}>
                   <TextInput
                     style={[styles.input, e.input]}
                     cursorColor={p.inputTexto}
-                    value={email}
+                    value={usuario}
                     onChangeText={valor => {
-                      setEmail(valor);
-                      limpiarError('email');
+                      setUsuario(valor);
+                      limpiarError('usuario');
                     }}
                     autoCapitalize="none"
+                    autoCorrect={false}
                     keyboardType="email-address"
+                    accessibilityLabel="Correo, celular o usuario"
                     editable={!cargando}
                     onFocus={() => enfocar(anim.focoEmail, true)}
                     onBlur={() => enfocar(anim.focoEmail, false)}
                   />
                   <Animated.View pointerEvents="none" style={[styles.inputFoco, e.inputFoco, { opacity: anim.focoEmail }]} />
                 </View>
-                <FieldError mensaje={errores.email} />
+                <FieldError mensaje={errores.usuario} />
 
                 <Text style={[styles.label, e.label]}>CONTRASEÑA</Text>
                 <View style={styles.inputWrapPass}>
@@ -788,11 +791,11 @@ export default function LoginScreen({ navigation }: Props) {
       </View>
       <RecuperarClaveModal
         visible={recuperando}
-        emailInicial={email}
+        identificadorInicial={usuario}
         onCerrar={() => setRecuperando(false)}
-        onListo={(correo, mensaje) => {
+        onListo={(identificador, mensaje) => {
           setRecuperando(false);
-          setEmail(correo);
+          setUsuario(identificador);
           setPassword('');
           setErrores({});
           setError(null);

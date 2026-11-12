@@ -33,6 +33,7 @@ function datosRegistro(array $extra = []): array
         'name' => 'Ana', 'apellidos' => 'Pérez', 'email' => 'ana@correo.com',
         'password' => 'password123', 'password_confirmation' => 'password123',
         'direccion' => 'Calle 1 #10-20', 'barrio' => 'Centro', 'telefono' => '3001234567',
+        'verificacion' => verificacionTelefono('3001234567'),
     ] + $extra;
 }
 

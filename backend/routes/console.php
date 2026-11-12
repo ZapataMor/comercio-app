@@ -90,3 +90,24 @@ Schedule::command('citas:recordar')->everyMinute()->withoutOverlapping();
 Artisan::command('busqueda:reindexar', function () {
     $this->info('Filas reindexadas para la búsqueda: '.\App\Support\Busqueda::reindexar());
 })->purpose('Recalcula el texto normalizado de la búsqueda tolerante a errores');
+
+// Prueba de WhatsApp Cloud API: envía un código de ejemplo con la plantilla
+// configurada (ver Vitrina/00 - Inicio/Configurar WhatsApp Cloud API.md).
+Artisan::command('whatsapp:probar {telefono : Celular de 10 dígitos, ej. 3001234567}', function (string $telefono) {
+    $numero = \App\Support\Telefono\CodigosTelefono::normalizar($telefono);
+    if ($numero === null) {
+        $this->error('El número debe ser un celular colombiano de 10 dígitos que empiece por 3.');
+
+        return 1;
+    }
+    $driver = config('services.whatsapp.driver');
+    $this->line("Canal: {$driver}".($driver === 'cloud' ? '' : ' (modo prueba: el código solo va al log)'));
+    try {
+        app(\App\Support\Telefono\EnviadorCodigos::class)->enviar($numero, '123456');
+    } catch (\Throwable $e) {
+        $this->error('No se pudo enviar: '.$e->getMessage());
+
+        return 1;
+    }
+    $this->info("Listo: se envió el código 123456 al {$numero}.");
+})->purpose('Envía un código de prueba por WhatsApp para revisar la configuración de Meta');

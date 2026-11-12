@@ -2,6 +2,10 @@
 
 namespace App\Providers;
 
+use App\Support\Telefono\CodigosTelefono;
+use App\Support\Telefono\EnviadorCodigos;
+use App\Support\Telefono\EnviadorLog;
+use App\Support\Telefono\EnviadorWhatsApp;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -14,7 +18,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Canal de los códigos por celular (ver config/services.php → whatsapp).
+        $this->app->bind(EnviadorCodigos::class, fn () => config('services.whatsapp.driver') === 'cloud'
+            ? EnviadorWhatsApp::desdeConfig()
+            : new EnviadorLog);
     }
 
     /**
@@ -46,16 +53,39 @@ class AppServiceProvider extends ServiceProvider
             Limit::perMinute($r->isMethod('GET') ? 120 : 40)
                 ->by(($r->isMethod('GET') ? 'lectura|' : 'escritura|').$r->user()->id)->response($respuesta),
         ]);
-        $correo = fn (Request $r) => mb_strtolower((string) $r->input('email'));
+        // Correo o celular con que se identifica la persona (recuperar la clave).
+        $correo = fn (Request $r) => filled($r->input('email'))
+            ? mb_strtolower((string) $r->input('email'))
+            : (string) (CodigosTelefono::normalizar($r->input('telefono')) ?? '');
+        $celular = fn (Request $r) => (string) (CodigosTelefono::normalizar($r->input('telefono')) ?? '');
+        $muchosCodigos = fn () => response()->json([
+            'message' => 'Pediste muchos códigos para este número. Inténtalo más tarde.',
+        ], 429);
 
-        // Login y registro (API y web): 6 por minuto por correo e IP.
-        RateLimiter::for('acceso', fn (Request $r) => Limit::perMinute(6)->by('acceso|'.mb_strtolower(trim((string) $r->input('username', $r->input('email')))).'|'.$r->ip()));
+        // Login y registro (API y web): 6 por minuto por correo (o celular, o usuario) e IP.
+        RateLimiter::for('acceso', fn (Request $r) => Limit::perMinute(6)->by('acceso|'.mb_strtolower(trim((string) $r->input('usuario', $r->input('username', $r->input('email', $r->input('telefono')))))).'|'.$r->ip()));
 
-        // Pedir código de recuperación: 3 por minuto y 10 por hora por correo.
+        // Pedir código de recuperación: 3 por minuto y 10 por hora por correo
+        // o celular. Por WhatsApp cada código cuesta, así que también hay tope por IP.
         RateLimiter::for('codigo-clave', fn (Request $r) => [
             Limit::perMinute(3)->by('codigo-min|'.$correo($r).'|'.$r->ip()),
             Limit::perHour(10)->by('codigo-hora|'.$correo($r)),
+            Limit::perHour(30)->by('codigo-ip|'.$r->ip())->response($muchosCodigos),
         ]);
+
+        // Códigos por WhatsApp para confirmar un celular (registro y Mi
+        // información). Además de la espera de 60 s entre envíos
+        // (CodigosTelefono), topes por número y por IP para que nadie
+        // dispare mensajes pagos en masa.
+        RateLimiter::for('codigo-telefono', fn (Request $r) => [
+            Limit::perMinute(3)->by('tel-min|'.$celular($r).'|'.$r->ip()),
+            Limit::perHour(5)->by('tel-hora|'.$celular($r))->response($muchosCodigos),
+            Limit::perDay(10)->by('tel-dia|'.$celular($r))->response($muchosCodigos),
+            Limit::perHour(20)->by('tel-ip|'.$r->ip())->response($muchosCodigos),
+        ]);
+
+        // Escribir el código (además, el código se anula tras 5 fallos).
+        RateLimiter::for('verificar-telefono', fn (Request $r) => Limit::perMinute(6)->by('tel-verificar|'.$celular($r).'|'.$r->ip()));
 
         // Usar el código (además, el código se anula tras 5 fallos).
         RateLimiter::for('restablecer-clave', fn (Request $r) => Limit::perMinute(6)->by('restablecer|'.$correo($r).'|'.$r->ip()));

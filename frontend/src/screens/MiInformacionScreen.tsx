@@ -24,13 +24,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { actualizarPerfil, dejarDeSerDomiciliario, desactivarNegocio, eliminarCuenta, eliminarNegocio, Negocio, Usuario } from '../api';
+import { actualizarPerfil, dejarDeSerDomiciliario, desactivarNegocio, eliminarCuenta, eliminarNegocio, Negocio, pedirCodigoTelefonoPerfil, Usuario, verificarTelefonoPerfil } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import BarrioSelect from '../components/BarrioSelect';
 import { useConfirmar } from '../components/Confirmacion';
 import FieldError from '../components/FieldError';
 import Icon, { IconName } from '../components/Icon';
+import VerificarTelefono from '../components/VerificarTelefono';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { useNegocio } from '../NegocioContext';
 import { RootStackParamList } from '../navTypes';
@@ -86,7 +87,7 @@ export default function MiInformacionScreen(_props: Props) {
 
   const [nombre, setNombre] = useState(user.name);
   const [apellidos, setApellidos] = useState(user.apellidos ?? '');
-  const [email, setEmail] = useState(user.email);
+  const [email, setEmail] = useState(user.email ?? '');
   const [telefono, setTelefono] = useState(user.telefono ?? '');
   const [direccion, setDireccion] = useState(user.direccion ?? '');
   const [barrio, setBarrio] = useState(user.barrio ?? '');
@@ -97,6 +98,9 @@ export default function MiInformacionScreen(_props: Props) {
   const [errores, setErrores] = useState<FieldErrors>({});
 
   const cambiaPass = passActual.length > 0 || passNueva.length > 0 || passConfirma.length > 0;
+
+  // Verificar el celular con un código por WhatsApp.
+  const [verificandoCelular, setVerificandoCelular] = useState(false);
 
   // "Eliminar mi cuenta": se confirma escribiendo la contraseña.
   const [eliminando, setEliminando] = useState(false);
@@ -164,7 +168,7 @@ export default function MiInformacionScreen(_props: Props) {
   function cargarCampos(u: Usuario) {
     setNombre(u.name);
     setApellidos(u.apellidos ?? '');
-    setEmail(u.email);
+    setEmail(u.email ?? '');
     setTelefono(u.telefono ?? '');
     setDireccion(u.direccion ?? '');
     setBarrio(u.barrio ?? '');
@@ -189,7 +193,9 @@ export default function MiInformacionScreen(_props: Props) {
     const nuevosErrores: FieldErrors = {};
     if (!nombre.trim()) nuevosErrores.name = 'El campo nombre es obligatorio.';
     if (!apellidos.trim()) nuevosErrores.apellidos = 'El campo apellidos es obligatorio.';
-    if (!email.trim()) nuevosErrores.email = 'El campo correo es obligatorio.';
+    // Sin correo, la cuenta entra con su celular verificado (si no lo cambia).
+    const conservaCelular = !!user.telefono_verificado && telefono === (user.telefono ?? '');
+    if (!email.trim() && !conservaCelular) nuevosErrores.email = 'El campo correo es obligatorio.';
     if (telefono && !telefonoValido(telefono)) nuevosErrores.telefono = errorTelefono;
     if (direccion && !direccionValida(direccion)) nuevosErrores.direccion = errorDireccion;
     if (esCliente) {
@@ -262,6 +268,25 @@ export default function MiInformacionScreen(_props: Props) {
             <Dato icono="usuarios" etiqueta="Apellidos" valor={user.apellidos} />
             <Dato icono="lista" etiqueta="Correo" valor={user.email} />
             <Dato icono="telefono" etiqueta="Teléfono" valor={user.telefono} ultimo />
+            <View style={styles.celularEstado}>
+              {user.telefono_verificado ? (
+                <>
+                  <Icon name="check" size={15} color={c.success} />
+                  <Text style={[styles.celularEstadoTxt, { color: c.success }]}>
+                    Verificado por WhatsApp: puedes entrar con tu celular.
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.celularEstadoTxt}>
+                    Sin verificar. Verifícalo para entrar y recuperar tu contraseña con el celular.
+                  </Text>
+                  <TouchableOpacity onPress={() => setVerificandoCelular(true)} hitSlop={8}>
+                    <Text style={styles.celularVerificar}>Verificar</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
           </View>
         </FadeInView>
 
@@ -329,6 +354,34 @@ export default function MiInformacionScreen(_props: Props) {
             <Text style={styles.eliminarTxt}>Eliminar mi cuenta</Text>
           </TouchableOpacity>
         </FadeInView>
+
+        <Modal
+          visible={verificandoCelular}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setVerificandoCelular(false)}>
+          <KeyboardAvoidingView
+            style={styles.modalFondo}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View style={styles.modalCaja}>
+              <Text style={styles.modalTitulo}>Verificar mi celular</Text>
+              <VerificarTelefono
+                telefonoInicial={user.telefono ?? ''}
+                pedir={tel => pedirCodigoTelefonoPerfil(auth!.token, tel)}
+                verificar={async (tel, codigo) => {
+                  const actualizado = await verificarTelefonoPerfil(auth!.token, tel, codigo);
+                  actualizarUsuario(actualizado);
+                  cargarCampos(actualizado);
+                  setVerificandoCelular(false);
+                  toast.exito('Celular verificado', 'Ya puedes entrar con tu número de celular.');
+                }}
+              />
+              <TouchableOpacity onPress={() => setVerificandoCelular(false)}>
+                <Text style={styles.celularCancelar}>Cancelar</Text>
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
 
         <Modal visible={eliminando} transparent animationType="fade" onRequestClose={cerrarEliminar}>
           <KeyboardAvoidingView
@@ -412,7 +465,7 @@ export default function MiInformacionScreen(_props: Props) {
               editable={!guardando}
             />
             <FieldError mensaje={errores.apellidos} />
-            <Text style={styles.label}>Correo</Text>
+            <Text style={styles.label}>{user.telefono_verificado ? 'Correo (opcional)' : 'Correo'}</Text>
             <TextInput
               style={styles.input}
               value={email}
@@ -441,6 +494,11 @@ export default function MiInformacionScreen(_props: Props) {
               editable={!guardando}
             />
             <FieldError mensaje={errores.telefono} />
+            {user.telefono_verificado && telefono !== (user.telefono ?? '') ? (
+              <Text style={styles.ayuda}>
+                El número nuevo queda sin verificar: después de guardar, verifícalo desde Mi información.
+              </Text>
+            ) : null}
           </View>
         </FadeInView>
 
@@ -589,6 +647,13 @@ const useStyles = makeStyles((c, shadow) => ({
   dejarTxt: { textAlign: 'center', color: c.muted, fontFamily: font.semibold, fontSize: 13, marginTop: 22 },
   // Eliminar mi cuenta
   eliminarTxt: { textAlign: 'center', color: c.danger, fontFamily: font.semibold, fontSize: 13, marginTop: 22 },
+  celularEstado: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingTop: 12,
+    borderTopWidth: 1, borderTopColor: c.border,
+  },
+  celularEstadoTxt: { flex: 1, fontSize: 12.5, fontFamily: font.regular, color: c.muted, lineHeight: 18 },
+  celularVerificar: { color: c.goldText, fontFamily: font.bold, fontSize: 13 },
+  celularCancelar: { textAlign: 'center', color: c.muted, fontFamily: font.semibold, marginTop: 16 },
   modalFondo: { flex: 1, backgroundColor: c.scrim, justifyContent: 'center', padding: 24 },
   modalCaja: { backgroundColor: c.surface, borderRadius: radius.xl, padding: 22, ...shadow.card },
   modalTitulo: { fontSize: 18, fontFamily: font.display, color: c.textStrong, marginBottom: 8 },

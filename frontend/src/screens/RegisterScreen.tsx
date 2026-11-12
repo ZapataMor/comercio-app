@@ -1,6 +1,6 @@
 import CamposDireccion from '../components/CamposDireccion';
 import { normalizarDireccion } from '../direccion';
-import { direccionValida, errorDireccion, telefonoValido, errorTelefono } from '../direccion';
+import { direccionValida, errorDireccion } from '../direccion';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
 import {
@@ -15,13 +15,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { register } from '../api';
+import { pedirCodigoRegistro, register, verificarTelefonoRegistro } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import BarrioSelect from '../components/BarrioSelect';
 import FieldError from '../components/FieldError';
 import Icon from '../components/Icon';
 import { VitrinaMark } from '../components/Logo';
+import VerificarTelefono, { formatoCelular } from '../components/VerificarTelefono';
 import { WEB_URL } from '../config';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
@@ -32,6 +33,10 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 // No se elige tipo al registrarse: toda cuenta nace como Cliente. Luego
 // puede crear sus negocios (o unirse a otros) desde "Mis negocios" y hacerse
 // domiciliario desde el menú del ícono de usuario.
+//
+// Primero se confirma el celular con un código por WhatsApp (con él se
+// entra y se recupera la contraseña); después se llenan los datos. El
+// correo es opcional.
 
 export default function RegisterScreen({ navigation }: Props) {
   const { c } = useTheme();
@@ -44,7 +49,8 @@ export default function RegisterScreen({ navigation }: Props) {
   const [confirmar, setConfirmar] = useState('');
   const [direccion, setDireccion] = useState('');
   const [barrio, setBarrio] = useState('');
-  const [telefono, setTelefono] = useState('');
+  // Celular confirmado por WhatsApp y el token que pide /register.
+  const [celular, setCelular] = useState<{ telefono: string; token: string } | null>(null);
   // Autorización del tratamiento de datos (Ley 1581): casilla sin marcar por defecto.
   const [aceptaTerminos, setAceptaTerminos] = useState(false);
   const [cargando, setCargando] = useState(false);
@@ -66,11 +72,9 @@ export default function RegisterScreen({ navigation }: Props) {
     const nuevosErrores: FieldErrors = {};
     if (!nombre.trim()) nuevosErrores.name = 'El campo nombre es obligatorio.';
     if (!apellidos.trim()) nuevosErrores.apellidos = 'El campo apellidos es obligatorio.';
-    if (!email.trim()) nuevosErrores.email = 'El campo correo es obligatorio.';
     if (!password) nuevosErrores.password = 'El campo contrasena es obligatorio.';
     if (!direccionValida(direccion)) nuevosErrores.direccion = errorDireccion;
     if (!barrio.trim()) nuevosErrores.barrio = 'El campo barrio es obligatorio.';
-    if (!telefonoValido(telefono)) nuevosErrores.telefono = errorTelefono;
     if (!aceptaTerminos) {
       nuevosErrores.acepta_terminos = 'Debes aceptar la política de privacidad para crear la cuenta.';
     }
@@ -87,22 +91,28 @@ export default function RegisterScreen({ navigation }: Props) {
       return;
     }
 
+    if (!celular) return;
     setCargando(true);
     try {
       const { token, user } = await register({
         name: nombre.trim(),
         apellidos: apellidos.trim(),
-        email: email.trim(),
+        email: email.trim() || null,
         password,
         direccion: normalizarDireccion(direccion),
         barrio: barrio.trim(),
-        telefono: telefono.trim(),
+        telefono: celular.telefono,
+        verificacion: celular.token,
         acepta_terminos: aceptaTerminos,
       });
       guardarSesion(token, user);
     } catch (e) {
       const campos = fieldErrorsFromError(e, { password_confirmation: 'confirmar' });
-      if (Object.keys(campos).length > 0) {
+      if (campos.telefono || campos.verificacion) {
+        // La verificación venció o el número ya tiene cuenta: volver a confirmarlo.
+        setCelular(null);
+        setError(campos.telefono ?? campos.verificacion);
+      } else if (Object.keys(campos).length > 0) {
         setErrores(campos);
       } else {
         setError(messageFromError(e));
@@ -123,9 +133,36 @@ export default function RegisterScreen({ navigation }: Props) {
             <VitrinaMark size={30} />
             <Text style={styles.logo}>Crear cuenta</Text>
           </View>
-          <Text style={styles.subtitle}>Únete a Vitrina</Text>
+          <Text style={styles.subtitle}>{celular ? 'Únete a Vitrina' : 'Empieza con tu número de celular'}</Text>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
+
+          {!celular ? (
+            <>
+              <VerificarTelefono
+                pedir={pedirCodigoRegistro}
+                verificar={async (telefono, codigo) => {
+                  const token = await verificarTelefonoRegistro(telefono, codigo);
+                  setError(null);
+                  setCelular({ telefono, token });
+                }}
+              />
+              <TouchableOpacity onPress={() => navigation.goBack()}>
+                <Text style={styles.hint}>¿Ya tienes cuenta? Inicia sesión</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+          <>
+          <View style={styles.celularListo}>
+            <Icon name="check" size={18} color={c.success} />
+            <View style={styles.celularTexto}>
+              <Text style={styles.celularEtiqueta}>Celular confirmado</Text>
+              <Text style={styles.celularNumero}>+57 {formatoCelular(celular.telefono)}</Text>
+            </View>
+            <TouchableOpacity onPress={() => setCelular(null)} disabled={cargando} hitSlop={8}>
+              <Text style={styles.enlace}>Cambiar</Text>
+            </TouchableOpacity>
+          </View>
 
           <Text style={styles.label}>Nombre(s)</Text>
           <TextInput
@@ -161,7 +198,7 @@ export default function RegisterScreen({ navigation }: Props) {
           />
           <FieldError mensaje={errores.apellidos} />
 
-          <Text style={styles.label}>Correo</Text>
+          <Text style={styles.label}>Correo (opcional)</Text>
           <TextInput
             style={styles.input}
             value={email}
@@ -176,6 +213,7 @@ export default function RegisterScreen({ navigation }: Props) {
             editable={!cargando}
           />
           <FieldError mensaje={errores.email} />
+          <Text style={styles.ayudaCampo}>Otra forma de entrar y de recuperar tu contraseña.</Text>
 
           <Text style={styles.label}>Contraseña</Text>
           <TextInput
@@ -222,21 +260,6 @@ export default function RegisterScreen({ navigation }: Props) {
           />
           <FieldError mensaje={errores.barrio} />
 
-          <Text style={styles.label}>Telefono</Text>
-          <TextInput
-            style={styles.input}
-            value={telefono}
-            onChangeText={valor => {
-              setTelefono(valor.replace(/[^0-9]/g, '').slice(0, 10));
-              limpiarError('telefono');
-            }}
-            keyboardType="number-pad" maxLength={10}
-            placeholder="3001234567"
-            placeholderTextColor={c.mutedSoft}
-            editable={!cargando}
-          />
-          <FieldError mensaje={errores.telefono} />
-
           <View style={styles.terminosRow}>
             <TouchableOpacity
               style={[styles.casilla, aceptaTerminos && styles.casillaMarcada]}
@@ -276,6 +299,8 @@ export default function RegisterScreen({ navigation }: Props) {
           <TouchableOpacity onPress={() => navigation.goBack()} disabled={cargando}>
             <Text style={styles.hint}>¿Ya tienes cuenta? Inicia sesión</Text>
           </TouchableOpacity>
+          </>
+          )}
         </FadeInView>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -306,6 +331,14 @@ const useStyles = makeStyles((c, shadow) => ({
     marginBottom: 16,
     color: c.textStrong,
   },
+  ayudaCampo: { fontSize: 12, color: c.muted, fontFamily: font.regular, marginTop: -10, marginBottom: 16 },
+  celularListo: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.successSoft,
+    borderRadius: radius.md, padding: 12, marginBottom: 18,
+  },
+  celularTexto: { flex: 1 },
+  celularEtiqueta: { fontSize: 12, fontFamily: font.semibold, color: c.success },
+  celularNumero: { fontSize: 15, fontFamily: font.bold, color: c.textStrong, marginTop: 2 },
   nota: { fontSize: 12, color: c.muted, fontFamily: font.regular, textAlign: 'center', marginBottom: 16 },
   terminosRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 12 },
   casilla: {

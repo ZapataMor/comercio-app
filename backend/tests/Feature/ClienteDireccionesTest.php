@@ -31,6 +31,7 @@ test('el registro exige los apellidos en su propio campo', function () {
         'barrio' => 'Centro',
         'telefono' => '3001234567',
         'acepta_terminos' => true,
+        'verificacion' => verificacionTelefono('3001234567'),
     ])->assertStatus(422)
         ->assertJsonValidationErrors(['apellidos']);
 });
@@ -46,6 +47,7 @@ test('el registro guarda nombre y apellidos por separado', function () {
         'barrio' => 'Centro',
         'telefono' => '3001234567',
         'acepta_terminos' => true,
+        'verificacion' => verificacionTelefono('3001234567'),
     ])->assertCreated()
         ->assertJsonPath('user.name', 'Ana María')
         ->assertJsonPath('user.apellidos', 'Pérez Gómez');
@@ -65,6 +67,7 @@ test('la direccion del registro queda como ubicacion principal', function () {
         'barrio' => 'Centro',
         'telefono' => '3001234567',
         'acepta_terminos' => true,
+        'verificacion' => verificacionTelefono('3001234567'),
     ])->assertCreated()
         ->assertJsonPath('user.direccion', 'Calle 10 # 20-30')
         ->assertJsonPath('user.barrio', 'Centro')

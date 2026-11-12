@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\PedidoReporteController;
 use App\Http\Controllers\Api\RecetaPreferidaController;
 use App\Http\Controllers\Api\RecuperarClaveController;
 use App\Http\Controllers\Api\ResenaController;
+use App\Http\Controllers\Api\TelefonoController;
 use App\Http\Controllers\Api\TrabajadorController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoriaController;
@@ -47,6 +48,11 @@ Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:ac
 Route::post('/password/codigo', [RecuperarClaveController::class, 'enviarCodigo'])->middleware('throttle:codigo-clave');
 Route::post('/password/restablecer', [RecuperarClaveController::class, 'restablecer'])->middleware('throttle:restablecer-clave');
 
+// Registro con el celular: un código por WhatsApp confirma el número y
+// devuelve el token `verificacion` que /register exige.
+Route::post('/telefono/codigo', [TelefonoController::class, 'codigoRegistro'])->middleware('throttle:codigo-telefono');
+Route::post('/telefono/verificar', [TelefonoController::class, 'verificarRegistro'])->middleware('throttle:verificar-telefono');
+
 // Barrios aprobados de Maicao. Pública: el registro la necesita sin token.
 Route::get('/barrios', [BarrioController::class, 'index'])->middleware('throttle:publico');
 
@@ -61,6 +67,9 @@ Route::middleware(['auth:sanctum', 'throttle:api-usuario'])->group(function () {
     // Perfil personal del usuario logueado (cualquier rol).
     Route::put('/perfil', [AuthController::class, 'actualizarPerfil']);
     // Un cliente se vuelve domiciliario (sigue siendo cliente), o deja de serlo.
+    // Verificar el celular desde Mi información (código por WhatsApp).
+    Route::post('/perfil/telefono/codigo', [TelefonoController::class, 'codigoPerfil'])->middleware('throttle:codigo-telefono');
+    Route::post('/perfil/telefono/verificar', [TelefonoController::class, 'verificarPerfil'])->middleware('throttle:verificar-telefono');
     Route::post('/perfil/domiciliario', [AuthController::class, 'hacerseDomiciliario']);
     Route::delete('/perfil/domiciliario', [AuthController::class, 'dejarDeSerDomiciliario']);
     // Eliminar mi cuenta (anonimiza; exige la contraseña).

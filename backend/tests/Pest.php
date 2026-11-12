@@ -34,3 +34,16 @@ function direccionPedidoPrueba(?\App\Models\User $cliente = null, string $texto 
     ]);
     return ['direccion_id' => $direccion->id, 'direccion_entrega' => $texto];
 }
+
+/** Token de /telefono/verificar listo para /register (el número ya confirmado por WhatsApp). */
+function verificacionTelefono(string $telefono = '3001234567'): string
+{
+    \App\Models\CodigoTelefono::where('telefono', $telefono)->where('proposito', 'registro')->delete();
+    $token = \Illuminate\Support\Str::random(48);
+    \App\Models\CodigoTelefono::create([
+        'telefono' => $telefono, 'proposito' => 'registro', 'codigo' => 'x',
+        'expira_at' => now()->addMinutes(30), 'verificado_at' => now(), 'token' => hash('sha256', $token),
+    ]);
+
+    return $token;
+}
