@@ -7,7 +7,8 @@ import { font, makeStyles, radius } from '../theme';
 import { useToast } from '../Toast';
 
 const etiquetas = { cliente: 'Cliente', negocio: 'Comercio', domiciliario: 'Domiciliario' };
-export default function ReportarPedido({ id, objetivos }: { id: number; objetivos: ObjetivoReporte[] }) {
+/** `discreto`: enlace tenue, para el pie de una tarjeta con otras acciones. */
+export default function ReportarPedido({ id, objetivos, discreto }: { id: number; objetivos: ObjetivoReporte[]; discreto?: boolean }) {
   const { auth } = useAuth();
   const toast = useToast();
   const styles = useStyles();
@@ -24,7 +25,7 @@ export default function ReportarPedido({ id, objetivos }: { id: number; objetivo
     finally { setEnviando(false); }
   }
   return <>
-    <TouchableOpacity onPress={() => { setVisible(true); setMotivo(''); setError(''); }}><Text style={styles.enlace}>Reportar un incumplimiento</Text></TouchableOpacity>
+    <TouchableOpacity onPress={() => { setVisible(true); setMotivo(''); setError(''); }}><Text style={[styles.enlace, discreto && styles.enlaceDiscreto]}>Reportar un incumplimiento</Text></TouchableOpacity>
     <Modal visible={visible} transparent animationType="fade" onRequestClose={() => { if (!enviando) setVisible(false); }}>
       <View style={styles.fondo}><View style={styles.caja}>
         <Text style={styles.titulo}>Reportar un incumplimiento</Text>
@@ -40,6 +41,7 @@ export default function ReportarPedido({ id, objetivos }: { id: number; objetivo
 }
 const useStyles = makeStyles(c => ({
   enlace: { color: c.goldText, fontFamily: font.semibold, textAlign: 'center', padding: 14 },
+  enlaceDiscreto: { color: c.muted, fontFamily: font.medium, fontSize: 13 },
   fondo: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: 'rgba(0,0,0,0.5)' },
   caja: { backgroundColor: c.surface, borderRadius: radius.lg, padding: 22 },
   titulo: { color: c.textStrong, fontFamily: font.bold, fontSize: 18, marginBottom: 12 },

@@ -24,7 +24,7 @@ import {
 } from '../api';
 import { useAuth } from '../AuthContext';
 import { navigationRef } from '../RootNavigation';
-import { font, makeStyles, radius, useTheme } from '../theme';
+import { Colores, font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 import { usePolling } from '../usePolling';
 import { FadeInView, PressableScale } from './anim';
@@ -240,65 +240,119 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
           <Text style={styles.seccion}>Mis entregas en curso</Text>
           {entregas.map((p, i) => {
             const ec = estadoColor(p.estado);
+            // Antes de recoger (o al devolver / llevar el efectivo) el destino es el negocio.
+            const haciaNegocio = ['tomado', 'devolviendo', 'entregado'].includes(p.estado);
+            const pago = resumenPago(p, c);
             return (
               <FadeInView key={p.id} delay={i * 50}>
-                <View style={[styles.card, styles.bordeAzul]}>
-                  <View style={styles.cardHead}>
-                    <Text style={styles.pedidoId}>Pedido #{p.codigo}</Text>
+                <View style={styles.entrega}>
+                  {/* Encabezado: número del pedido y su estado. */}
+                  <View style={styles.entregaHead}>
+                    <View style={styles.entregaIcono}>
+                      <Icon name="moto" size={18} color={c.goldText} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.eyebrow}>Pedido</Text>
+                      <Text style={styles.entregaCodigo}>#{p.codigo}</Text>
+                    </View>
                     <Text style={[styles.badge, { backgroundColor: ec.bg, color: ec.fg }]}>{p.estado_label}</Text>
                   </View>
+                  <Progreso estado={p.estado} />
                   {p.estado === 'tomado' && !!p.minutos_recogida && (
-                    <View style={[styles.lineaSub, styles.fila]}>
+                    <View style={styles.prometidoChip}>
                       <Icon name="reloj" size={13} color={c.goldText} />
-                      <Text style={styles.prometido}>Prometiste recogerlo en {p.minutos_recogida} min</Text>
+                      <Text style={styles.prometidoChipTxt}>Prometiste recogerlo en {p.minutos_recogida} min</Text>
                     </View>
                   )}
-                  <View style={[styles.linea, styles.fila]}>
-                    <Icon name="tienda" size={14} color={c.text} />
-                    <Text style={[styles.linea, { flex: 1 }]}>
-                      Recoger: {p.negocio?.nombre} — {p.negocio?.direccion ?? 's/d'}
-                    </Text>
+
+                  {/* Ruta: de dónde sale y a dónde va; resalta la parada a la que voy ahora. */}
+                  <View style={styles.ruta}>
+                    <Parada
+                      icono="tienda"
+                      etiqueta={p.estado === 'devolviendo' ? 'Devolver en' : 'Recoger en'}
+                      titulo={p.negocio?.nombre ?? 'Negocio'}
+                      detalle={p.negocio?.direccion ?? 'Sin dirección'}
+                      activa={haciaNegocio}
+                    />
+                    <View style={styles.rutaLinea} />
+                    <Parada
+                      icono="casa"
+                      etiqueta="Entregar a"
+                      titulo={p.cliente?.name ?? 'Cliente'}
+                      detalle={p.direccion_entrega || undefined}
+                      activa={!haciaNegocio}
+                      hecha={p.estado === 'entregado'}
+                    />
+                    {/* Abre la ruta en el mapa: al negocio antes de recoger, luego al cliente. */}
+                    <PressableScale
+                      style={styles.comoLlegar}
+                      onPress={() =>
+                        abrirComoLlegar(
+                          !haciaNegocio
+                            ? p.entrega_ubicacion ?? `${p.direccion_entrega}, Maicao, La Guajira`
+                            : p.negocio?.lat != null && p.negocio?.lng != null
+                              ? { lat: p.negocio.lat, lng: p.negocio.lng }
+                              : `${p.negocio?.direccion ?? p.negocio?.nombre ?? ''}, Maicao, La Guajira`,
+                        )
+                      }>
+                      <Icon name="mapa" size={15} color={c.goldText} />
+                      <Text style={styles.comoLlegarTxt}>{haciaNegocio ? 'Cómo llegar al negocio' : 'Cómo llegar al cliente'}</Text>
+                    </PressableScale>
                   </View>
-                  <View style={[styles.linea, styles.fila]}>
-                    <Icon name="casa" size={14} color={c.text} />
-                    <Text style={[styles.linea, { flex: 1 }]}>
-                      Entregar: {p.cliente?.name} — {p.direccion_entrega}
-                    </Text>
+
+                  {['tomado', 'recogido', 'en_camino'].includes(p.estado) && Object.entries(p.entrega_fotos ?? {}).map(([tipo, url]) => (
+                    <View key={`${p.id}-${tipo}`} style={styles.foto}>
+                      <Text style={styles.eyebrow}>{tipo === 'frente' ? 'Frente de la casa' : `Calle hacia la ${tipo}`}</Text>
+                      <Image source={{ uri: `${API_URL}${url}`, headers: { Authorization: `Bearer ${token}` }, cache: 'reload' }} style={styles.fotoImg} resizeMode="cover" />
+                    </View>
+                  ))}
+
+                  {/* Pago: qué hacer con el dinero, y el desglose debajo. */}
+                  <View style={[styles.pago, { backgroundColor: pago.bg }]}>
+                    <View style={styles.pagoFila}>
+                      <View style={[styles.pagoIcono, { backgroundColor: c.surface }]}>
+                        <Icon name={pago.icono} size={17} color={pago.fg} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.pagoTitulo, { color: pago.fg }]}>{pago.titulo}</Text>
+                        <Text style={styles.pagoTexto}>{pago.texto}</Text>
+                      </View>
+                      {!!pago.monto && <Text style={[styles.pagoMonto, { color: pago.fg }]}>{pago.monto}</Text>}
+                    </View>
+                    {p.efectivo_pendiente && <>
+                      <Text style={[styles.pagoNota, bloqueadoEfectivo && { color: c.danger }]}>{bloqueadoEfectivo
+                        ? 'Con menos de 70 puntos debes liquidar el efectivo antes de tomar otro domicilio.'
+                        : 'Puedes seguir tomando domicilios mientras entregas el efectivo pendiente.'}</Text>
+                      {p.puede_avisar_ocupado && (
+                        <PressableScale style={styles.ocupado} disabled={avanzando === p.id} onPress={() => onOcupado(p.id)}>
+                          {avanzando === p.id ? <ActivityIndicator color={c.textStrong} /> : <>
+                            <Icon name="reloj" size={15} color={c.textStrong} />
+                            <Text style={styles.ocupadoTxt}>Estoy un poco ocupado</Text>
+                          </>}
+                        </PressableScale>
+                      )}
+                      {!!p.efectivo_ocupado_at && (
+                        <View style={[styles.fila, { marginTop: 10 }]}>
+                          <Icon name="check" size={14} color={c.success} />
+                          <Text style={[styles.pagoNota, { marginTop: 0, flex: 1 }]}>Ya avisaste al negocio que estás ocupado y pronto llevarás el efectivo.</Text>
+                        </View>
+                      )}
+                    </>}
+                    <View style={styles.desglose}>
+                      <View style={styles.desgloseFila}>
+                        <Text style={styles.desgloseTxt}>Productos</Text>
+                        <Text style={styles.desgloseValor}>{cop(p.subtotal ?? p.total)}</Text>
+                      </View>
+                      <View style={styles.desgloseFila}>
+                        <Text style={styles.desgloseTxt}>Domicilio</Text>
+                        <Text style={styles.desgloseValor}>{cop(p.costo_domicilio ?? 0)}</Text>
+                      </View>
+                    </View>
                   </View>
-                  {['tomado', 'recogido', 'en_camino'].includes(p.estado) && Object.entries(p.entrega_fotos ?? {}).map(([tipo, url]) => <View key={`${p.id}-${tipo}`}>
-                    <Text style={styles.linea}>{tipo === 'frente' ? 'Frente de la casa' : `Calle hacia la ${tipo}`}</Text>
-                    <Image source={{ uri: `${API_URL}${url}`, headers: { Authorization: `Bearer ${token}` }, cache: 'reload' }} style={{ width: '100%', height: 200 }} resizeMode="contain" />
-                  </View>)}
-                  {/* Abre la ruta en Google Maps: al negocio antes de recoger, luego al cliente. */}
-                  <PressableScale
-                    style={styles.novedadLink}
-                    onPress={() =>
-                      abrirComoLlegar(
-                        !['tomado', 'devolviendo', 'entregado'].includes(p.estado)
-                          ? p.entrega_ubicacion ?? `${p.direccion_entrega}, Maicao, La Guajira`
-                          : p.negocio?.lat != null && p.negocio?.lng != null
-                            ? { lat: p.negocio.lat, lng: p.negocio.lng }
-                            : `${p.negocio?.direccion ?? p.negocio?.nombre ?? ''}, Maicao, La Guajira`,
-                      )
-                    }>
-                    <Icon name="ubicacion" size={14} color={c.goldText} />
-                    <Text style={styles.novedadLinkTxt}>
-                      {['tomado', 'devolviendo', 'entregado'].includes(p.estado) ? 'Cómo llegar al negocio' : 'Cómo llegar al cliente'}
-                    </Text>
-                  </PressableScale>
-                  <View style={[styles.linea, styles.fila]}>
-                    <Icon name="tarjeta" size={14} color={c.text} />
-                    <Text style={styles.linea}>
-                      {p.efectivo_pendiente ? 'Efectivo pendiente: entrégalo al negocio y espera su confirmación.' : p.estado === 'devolviendo' ? 'Devuelve el pedido al comercio. Espera su confirmación para cerrar la entrega.' : p.cobrar > 0
-                        ? `Cobrar al cliente: ${cop(p.cobrar)} en efectivo`
-                        : 'Pagado por transferencia: no cobres nada'}
-                    </Text>
-                  </View>
-                  <Text style={styles.lineaSub}>
-                    Productos {cop(p.subtotal ?? p.total)} · Domicilio {cop(p.costo_domicilio ?? 0)}
-                  </Text>
+
                   {/* Antes de recoger se coordina con el negocio; después, con el cliente. */}
-                  {['tomado', 'devolviendo', 'entregado'].includes(p.estado) ? (
+                  <Text style={[styles.eyebrow, styles.bloqueTitulo]}>{haciaNegocio ? 'Contacto del negocio' : 'Contacto del cliente'}</Text>
+                  {haciaNegocio ? (
                     <BotonesContacto
                       telefono={p.negocio?.telefono}
                       mensaje={`Hola, soy el domiciliario de Vitrina que va por el pedido #${p.codigo}.`}
@@ -311,24 +365,7 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
                       etiquetaLlamar="Llamar al cliente"
                     />
                   )}
-                  {p.estado !== 'entregado' && <Novedad pedido={p} onReportada={() => cargar()} />}
-                  {p.efectivo_pendiente && <>
-                    <Text style={styles.prometido}>{bloqueadoEfectivo
-                      ? 'Con menos de 70 puntos debes liquidar el efectivo antes de tomar otro domicilio.'
-                      : 'Puedes seguir tomando domicilios mientras entregas el efectivo pendiente.'}</Text>
-                    {p.puede_avisar_ocupado && <Boton texto="Estoy un poco ocupado" icon="reloj" cargando={avanzando === p.id} onPress={() => onOcupado(p.id)} />}
-                    {!!p.efectivo_ocupado_at && <Text style={styles.lineaSub}>Ya avisaste al negocio que estás ocupado y pronto llevarás el efectivo.</Text>}
-                  </>}
-                  {p.estado === 'en_camino' && (!p.llegada_at ? (
-                    <Boton icon="ubicacion" texto="Llegué al destino" cargando={avanzando === p.id} onPress={() => onLlegada(p.id)} />
-                  ) : <>
-                    {(p.segundos_para_reportar_ausencia ?? 300) > 0 && <Text style={styles.lineaSub}>Contacta al cliente. Podrás reportar su ausencia en {Math.ceil((p.segundos_para_reportar_ausencia ?? 300) / 60)} min.</Text>}
-                    <PressableScale style={styles.soltar} disabled={p.segundos_para_reportar_ausencia !== 0} onPress={() => onClienteAusente(p)}>
-                      <Text style={styles.soltarTxt}>Cliente no encontrado</Text>
-                    </PressableScale>
-                  </>)}
-                  {p.estado === 'devolviendo' && <Text style={styles.prometido}>Devolución pendiente: el comercio debe confirmar que recibió el pedido.</Text>}
-                  <ReportarPedido id={p.id} objetivos={['cliente', 'negocio']} />
+
                   {/* El negocio confirma la recogida escribiendo este código. */}
                   {p.estado === 'tomado' && !!p.codigo_recogida && (
                     <VerCodigo
@@ -336,11 +373,6 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
                       codigo={p.codigo_recogida}
                       ayuda="Dáselo al negocio para que te entregue el pedido."
                     />
-                  )}
-                  {p.estado === 'tomado' && (
-                    <PressableScale style={styles.soltar} onPress={() => onSoltar(p)}>
-                      <Text style={styles.soltarTxt}>Soltar pedido</Text>
-                    </PressableScale>
                   )}
                   {p.estado === 'recogido' && (
                     <Boton
@@ -350,6 +382,17 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
                       onPress={() => onEnCamino(p.id)}
                     />
                   )}
+                  {p.estado === 'en_camino' && (!p.llegada_at ? (
+                    <Boton icon="ubicacion" texto="Llegué al destino" cargando={avanzando === p.id} onPress={() => onLlegada(p.id)} />
+                  ) : <>
+                    {(p.segundos_para_reportar_ausencia ?? 300) > 0 && <Text style={styles.ayuda}>Contacta al cliente. Podrás reportar su ausencia en {Math.ceil((p.segundos_para_reportar_ausencia ?? 300) / 60)} min.</Text>}
+                    <PressableScale
+                      style={[styles.ausente, p.segundos_para_reportar_ausencia !== 0 && { opacity: 0.45 }]}
+                      disabled={p.segundos_para_reportar_ausencia !== 0}
+                      onPress={() => onClienteAusente(p)}>
+                      <Text style={styles.soltarTxt}>Cliente no encontrado</Text>
+                    </PressableScale>
+                  </>)}
                   {p.estado === 'en_camino' && (
                     <PedirCodigo
                       titulo="Código de entrega"
@@ -358,6 +401,17 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
                       onConfirmar={codigo => onEntregar(p.id, codigo)}
                     />
                   )}
+                  {p.estado !== 'entregado' && <Novedad pedido={p} onReportada={() => cargar()} />}
+
+                  {/* Acciones de excepción, aparte y discretas. */}
+                  <View style={styles.pie}>
+                    {p.estado === 'tomado' && (
+                      <PressableScale style={styles.pieBtn} onPress={() => onSoltar(p)}>
+                        <Text style={styles.soltarTxt}>Soltar pedido</Text>
+                      </PressableScale>
+                    )}
+                    <ReportarPedido id={p.id} objetivos={['cliente', 'negocio']} discreto />
+                  </View>
                 </View>
               </FadeInView>
             );
@@ -485,6 +539,64 @@ function Novedad({ pedido, onReportada }: { pedido: Pedido; onReportada: () => v
   );
 }
 
+/** Qué hacer con el dinero de una entrega, con su tono de color. */
+function resumenPago(p: Pedido, c: Colores): { titulo: string; texto: string; monto?: string; icono: IconName; fg: string; bg: string } {
+  if (p.efectivo_pendiente) {
+    return { titulo: 'Efectivo pendiente', texto: 'Entrégalo al negocio y espera su confirmación.', icono: 'efectivo', fg: c.warning, bg: c.warningSoft };
+  }
+  if (p.estado === 'devolviendo') {
+    return { titulo: 'Devolución pendiente', texto: 'Devuelve el pedido al comercio y espera su confirmación para cerrar la entrega.', icono: 'caja', fg: c.info, bg: c.infoSoft };
+  }
+  if (p.cobrar > 0) {
+    return { titulo: 'Cobrar al cliente', texto: 'En efectivo, al entregar.', monto: cop(p.cobrar), icono: 'efectivo', fg: c.goldText, bg: c.accentSoft };
+  }
+  return { titulo: 'Ya está pagado', texto: 'Pagado por transferencia: no cobres nada.', icono: 'banco', fg: c.success, bg: c.successSoft };
+}
+
+const PASOS = [
+  { estado: 'tomado', label: 'Tomado' },
+  { estado: 'recogido', label: 'Recogido' },
+  { estado: 'en_camino', label: 'En camino' },
+  { estado: 'entregado', label: 'Entregado' },
+];
+
+/** Barra de pasos de la entrega; no se muestra en una devolución. */
+function Progreso({ estado }: { estado: string }) {
+  const styles = useStyles();
+  const actual = PASOS.findIndex(s => s.estado === estado);
+  if (actual < 0) return null;
+  return (
+    <View style={styles.pasos}>
+      {PASOS.map((s, i) => (
+        <View key={s.estado} style={{ flex: 1 }}>
+          <View style={[styles.pasoBarra, i <= actual && styles.pasoBarraHecha]} />
+          <Text style={[styles.pasoTxt, i === actual && styles.pasoTxtActual]} numberOfLines={1}>{s.label}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/** Una parada de la ruta (negocio o cliente). */
+function Parada({ icono, etiqueta, titulo, detalle, activa, hecha }: {
+  icono: IconName; etiqueta: string; titulo: string; detalle?: string; activa: boolean; hecha?: boolean;
+}) {
+  const { c } = useTheme();
+  const styles = useStyles();
+  return (
+    <View style={styles.parada}>
+      <View style={[styles.paradaIcono, activa && styles.paradaIconoActiva, hecha && { backgroundColor: c.successSoft, borderColor: c.successSoft }]}>
+        <Icon name={hecha ? 'check' : icono} size={15} color={hecha ? c.success : activa ? c.goldText : c.muted} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.eyebrow, activa && { color: c.goldText }]}>{etiqueta}</Text>
+        <Text style={styles.paradaTitulo} numberOfLines={2}>{titulo}</Text>
+        {!!detalle && <Text style={styles.paradaDetalle}>{detalle}</Text>}
+      </View>
+    </View>
+  );
+}
+
 function Boton({
   texto,
   onPress,
@@ -554,7 +666,6 @@ const useStyles = makeStyles((c, shadow) => ({
     backgroundColor: c.surface, borderRadius: radius.md, padding: 14, marginBottom: 10, ...shadow.low,
   },
   bordeAmbar: { borderLeftWidth: 4, borderLeftColor: c.accent },
-  bordeAzul: { borderLeftWidth: 4, borderLeftColor: c.info },
   cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   pedidoId: { fontSize: 15, fontFamily: font.bold, color: c.textStrong },
   total: { fontFamily: font.bold, color: c.textStrong },
@@ -566,13 +677,11 @@ const useStyles = makeStyles((c, shadow) => ({
   minLabel: { fontSize: 11, color: c.muted, marginBottom: 4, fontFamily: font.regular },
   tomarBtn: { backgroundColor: c.accent, borderRadius: radius.sm, paddingVertical: 13, marginTop: 12, ...shadow.gold },
   tomarTxt: { color: c.onAccent, fontFamily: font.bold },
-  soltar: { alignItems: 'center', paddingVertical: 10, marginTop: 4 },
   soltarTxt: { color: c.danger, fontFamily: font.semibold, fontSize: 14 },
   btn: { borderRadius: radius.sm, paddingVertical: 13, alignItems: 'center', marginTop: 12 },
   btnFila: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
   fila: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   btnTxt: { color: c.onBrand, fontFamily: font.bold },
-  prometido: { color: c.goldText, fontSize: 13, fontFamily: font.semibold },
   vacio: { color: c.muted, fontSize: 14, fontFamily: font.regular },
   entregados: {
     flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.surface,
@@ -607,4 +716,70 @@ const useStyles = makeStyles((c, shadow) => ({
   otraBtn: { backgroundColor: c.brand, borderRadius: radius.sm, paddingHorizontal: 16, justifyContent: 'center' },
   otraBtnTxt: { color: c.onBrand, fontFamily: font.bold },
   cancelar: { color: c.muted, fontSize: 13, marginTop: 10, fontFamily: font.medium },
+  // Tarjeta de una entrega en curso.
+  entrega: {
+    backgroundColor: c.surface, borderRadius: radius.lg, padding: 16, marginBottom: 14,
+    borderWidth: 1, borderColor: c.border, ...shadow.soft,
+  },
+  entregaHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  entregaIcono: {
+    width: 40, height: 40, borderRadius: radius.pill, backgroundColor: c.accentSoft,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  entregaCodigo: { fontSize: 17, fontFamily: font.display, color: c.textStrong, letterSpacing: 0.3 },
+  eyebrow: { fontSize: 11, fontFamily: font.semibold, color: c.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
+  bloqueTitulo: { marginTop: 16 },
+  pasos: { flexDirection: 'row', gap: 6, marginTop: 16 },
+  pasoBarra: { height: 4, borderRadius: radius.pill, backgroundColor: c.surface2 },
+  pasoBarraHecha: { backgroundColor: c.accent },
+  pasoTxt: { fontSize: 11, fontFamily: font.medium, color: c.mutedSoft, marginTop: 6 },
+  pasoTxtActual: { color: c.textStrong, fontFamily: font.semibold },
+  prometidoChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 12,
+    backgroundColor: c.accentSoft, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 5,
+  },
+  prometidoChipTxt: { color: c.goldText, fontSize: 12, fontFamily: font.semibold },
+  ruta: { marginTop: 16, backgroundColor: c.surface2, borderRadius: radius.md, padding: 14 },
+  rutaLinea: { width: 2, height: 14, marginLeft: 16, marginVertical: 4, borderRadius: 1, backgroundColor: c.borderStrong },
+  parada: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  paradaIcono: {
+    width: 34, height: 34, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: c.surface, borderWidth: 1, borderColor: c.border,
+  },
+  paradaIconoActiva: { backgroundColor: c.accentSoft, borderColor: c.accent },
+  paradaTitulo: { fontSize: 15, fontFamily: font.semibold, color: c.textStrong, marginTop: 2 },
+  paradaDetalle: { fontSize: 13, fontFamily: font.regular, color: c.muted, marginTop: 2, lineHeight: 18 },
+  comoLlegar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 14,
+    backgroundColor: c.surface, borderRadius: radius.sm, borderWidth: 1, borderColor: c.border, paddingVertical: 10,
+  },
+  comoLlegarTxt: { color: c.goldText, fontSize: 14, fontFamily: font.semibold },
+  foto: { marginTop: 14, gap: 6 },
+  fotoImg: { width: '100%', height: 180, borderRadius: radius.md, backgroundColor: c.surface2 },
+  pago: { marginTop: 12, borderRadius: radius.md, padding: 14 },
+  pagoFila: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  pagoIcono: { width: 34, height: 34, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  pagoTitulo: { fontSize: 15, fontFamily: font.bold },
+  pagoTexto: { fontSize: 13, fontFamily: font.regular, color: c.text, marginTop: 2, lineHeight: 18 },
+  pagoMonto: { fontSize: 17, fontFamily: font.display },
+  pagoNota: { fontSize: 13, fontFamily: font.medium, color: c.text, marginTop: 12, lineHeight: 18 },
+  desglose: { marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: c.border, gap: 4 },
+  desgloseFila: { flexDirection: 'row', justifyContent: 'space-between' },
+  desgloseTxt: { fontSize: 13, fontFamily: font.regular, color: c.muted },
+  desgloseValor: { fontSize: 13, fontFamily: font.semibold, color: c.textStrong },
+  ocupado: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 12,
+    backgroundColor: c.surface, borderRadius: radius.sm, paddingVertical: 11, minHeight: 44,
+  },
+  ocupadoTxt: { color: c.textStrong, fontFamily: font.semibold, fontSize: 14 },
+  ayuda: { color: c.muted, marginTop: 12, fontSize: 13, fontFamily: font.regular, textAlign: 'center' },
+  ausente: {
+    alignItems: 'center', paddingVertical: 11, marginTop: 8, borderRadius: radius.sm,
+    borderWidth: 1, borderColor: c.danger,
+  },
+  pie: {
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', columnGap: 8,
+    marginTop: 14, borderTopWidth: 1, borderTopColor: c.border,
+  },
+  pieBtn: { paddingVertical: 14, paddingHorizontal: 12 },
 }));
