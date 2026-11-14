@@ -2,6 +2,7 @@
 
 use App\Models\Negocio;
 use App\Models\Pedido;
+use App\Models\TipoNegocio;
 use App\Models\User;
 use App\Support\UbicacionDomiciliario;
 use Illuminate\Support\Facades\Notification;
@@ -96,6 +97,23 @@ test('el mapa solo muestra negocios con pin, ni vetados ni archivados', function
         ->assertJsonCount(1, 'negocios')
         ->assertJsonPath('negocios.0.nombre', 'Con pin')
         ->assertJsonPath('negocios.0.lat', 11.38);
+});
+
+test('cada negocio del mapa trae todos sus tipos para el filtro', function () {
+    $drogueria = mapaNegocio(null, ['nombre' => 'Droguería', 'lat' => 11.38, 'lng' => -72.24]);
+    $drogueria->tiposNegocio()->attach([
+        TipoNegocio::firstOrCreate(['slug' => 'farmacia'], ['nombre' => 'Farmacia'])->id,
+        TipoNegocio::firstOrCreate(['slug' => 'tienda'], ['nombre' => 'Tienda'])->id,
+    ]);
+    // Negocio viejo sin tipos en la tabla: se usa su categoría de texto.
+    mapaNegocio(null, ['nombre' => 'Peluquería', 'categoria' => 'Peluquería', 'lat' => 11.39, 'lng' => -72.25]);
+
+    Sanctum::actingAs(mapaUsuario('usuario'));
+
+    $negocios = collect($this->getJson('/api/negocios/mapa')->assertOk()->json('negocios'))->keyBy('nombre');
+
+    expect($negocios['Droguería']['tipos'])->toEqualCanonicalizing(['Farmacia', 'Tienda'])
+        ->and($negocios['Peluquería']['tipos'])->toBe(['Peluquería']);
 });
 
 // ---------------------------------------------------------------------------

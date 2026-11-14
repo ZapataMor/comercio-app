@@ -132,6 +132,10 @@ class CatalogoController extends Controller
                 'id' => $n->id,
                 'nombre' => $n->nombre,
                 'categoria' => $n->tiposNegocio->first()?->nombre ?? $n->categoria,
+                // Todos sus tipos (un negocio puede ser farmacia y droguería): para el filtro del mapa.
+                'tipos' => $n->tiposNegocio->isNotEmpty()
+                    ? $n->tiposNegocio->pluck('nombre')->values()
+                    : array_values(array_filter([$n->categoria])),
                 'direccion' => $n->direccion,
                 'barrio' => $n->barrio,
                 'imagen' => $n->imagen ? '/storage/'.$n->imagen : null,

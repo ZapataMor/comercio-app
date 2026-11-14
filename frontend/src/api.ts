@@ -1141,6 +1141,8 @@ export type NegocioMapa = Coordenadas & {
   id: number;
   nombre: string;
   categoria: string | null;
+  /** Todos sus tipos de negocio (Farmacia, Peluquería...), para filtrar el mapa. */
+  tipos?: string[];
   direccion: string | null;
   imagen?: string | null;
   abierto: boolean;

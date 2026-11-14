@@ -1,8 +1,16 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { DomiciliarioMapa, getDomiciliariosMapa, getNegociosMapa, imagenUrl, NegocioMapa } from '../api';
+import {
+  ClienteDireccion,
+  DomiciliarioMapa,
+  getClienteDirecciones,
+  getDomiciliariosMapa,
+  getNegociosMapa,
+  imagenUrl,
+  NegocioMapa,
+} from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import Icon from '../components/Icon';
@@ -12,22 +20,29 @@ import {
   MapaRef,
   MapaVitrina,
   PinDomiciliario,
+  PinEntrega,
   PinNegocio,
   ZOOM,
 } from '../components/Mapa';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
+import { Estado, ESTADOS, filtrarNegocios, tiposDe } from '../filtrosMapa';
 import { useToast } from '../Toast';
 import { miUbicacion, pedirPermisoUbicacion } from '../ubicacion';
 import { REFRESCO_NEGOCIOS, usePolling } from '../usePolling';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Mapa'>;
 
-type Seleccion = { tipo: 'negocio'; item: NegocioMapa } | { tipo: 'domiciliario'; item: DomiciliarioMapa } | null;
+type Seleccion =
+  | { tipo: 'negocio'; item: NegocioMapa }
+  | { tipo: 'domiciliario'; item: DomiciliarioMapa }
+  | { tipo: 'casa'; item: ClienteDireccion }
+  | null;
 
 /**
  * Mapa de Vitrina. El cliente ve los negocios que fijaron su pin (toca uno
- * para ver la tienda o cómo llegar). El administrador además ve a los
+ * para ver la tienda o cómo llegar), filtrados por tipo y por abiertos o
+ * cerrados, más su casa y dónde está ahora. El administrador además ve a los
  * domiciliarios que reportaron su posición hace poco, en vivo.
  */
 export default function MapaScreen({ navigation, route }: Props) {
@@ -45,10 +60,32 @@ export default function MapaScreen({ navigation, route }: Props) {
   const [negocios, setNegocios] = useState<NegocioMapa[]>([]);
   const [domiciliarios, setDomiciliarios] = useState<DomiciliarioMapa[]>([]);
   const [cargando, setCargando] = useState(true);
-  const [soloAbiertos, setSoloAbiertos] = useState(false);
+  const [tipo, setTipo] = useState<string | null>(null);
+  const [estado, setEstado] = useState<Estado>('todos');
+  const [casa, setCasa] = useState<ClienteDireccion | null>(null);
   const [seleccion, setSeleccion] = useState<Seleccion>(null);
   const [conPermiso, setConPermiso] = useState(false);
   const [ubicando, setUbicando] = useState(false);
+  const esCliente = puedeVerTienda && !admin;
+
+  // El cliente ve su casa (la dirección principal con punto)...
+  useEffect(() => {
+    if (!esCliente) return;
+    getClienteDirecciones(token)
+      .then(lista => {
+        const conPunto = lista.filter(d => d.lat != null && d.lng != null);
+        setCasa(conPunto.find(d => d.es_principal) ?? conPunto[0] ?? null);
+      })
+      .catch(() => {});
+  }, [esCliente, token]);
+
+  // ...y dónde está ahora: el punto azul en vivo, si da el permiso.
+  useEffect(() => {
+    if (!esCliente) return;
+    pedirPermisoUbicacion()
+      .then(si => si && setConPermiso(true))
+      .catch(() => {});
+  }, [esCliente]);
 
   useEffect(() => {
     getNegociosMapa(token)
@@ -83,10 +120,17 @@ export default function MapaScreen({ navigation, route }: Props) {
   }, [cargarDomiciliarios]);
   usePolling(cargarDomiciliarios, 15000, admin ? ['mapa', 'pedidos', 'perfil'] : undefined);
 
-  const visibles = useMemo(
-    () => (soloAbiertos ? negocios.filter(n => n.abierto) : negocios),
-    [negocios, soloAbiertos],
+  // Los tipos salen de los negocios que hay en el mapa: nunca un chip vacío.
+  const tipos = useMemo(
+    () => [...new Set(negocios.flatMap(tiposDe))].sort((a, b) => a.localeCompare(b, 'es')),
+    [negocios],
   );
+  const visibles = useMemo(() => filtrarNegocios(negocios, tipo, estado), [negocios, tipo, estado]);
+
+  // Si el negocio de la tarjeta queda fuera del filtro, se cierra la tarjeta.
+  useEffect(() => {
+    setSeleccion(s => (s?.tipo === 'negocio' && !visibles.some(n => n.id === s.item.id) ? null : s));
+  }, [visibles]);
   const enEntrega = domiciliarios.filter(d => d.en_entrega).length;
 
   async function centrarEnMi() {
@@ -128,6 +172,13 @@ export default function MapaScreen({ navigation, route }: Props) {
             onPress={() => setSeleccion({ tipo: 'negocio', item: n })}
           />
         ))}
+        {!!casa && (
+          <PinEntrega
+            punto={{ lat: casa.lat!, lng: casa.lng! }}
+            nombre="Mi casa"
+            onPress={() => setSeleccion({ tipo: 'casa', item: casa })}
+          />
+        )}
         {domiciliarios.map(d => (
           <PinDomiciliario
             key={`d-${d.id}`}
@@ -139,32 +190,84 @@ export default function MapaScreen({ navigation, route }: Props) {
         ))}
       </MapaVitrina>
 
-      {/* Arriba: filtro y resumen. */}
+      {/* Arriba: tipo de negocio, abiertos/cerrados y resumen. */}
       <View style={styles.arriba} pointerEvents="box-none">
-        <TouchableOpacity
-          style={[styles.chip, soloAbiertos && styles.chipActivo]}
-          onPress={() => setSoloAbiertos(v => !v)}>
-          <Text style={[styles.chipTxt, soloAbiertos && styles.chipTxtActivo]}>Solo abiertos</Text>
-        </TouchableOpacity>
-        <View style={styles.resumen}>
-          {cargando ? (
-            <ActivityIndicator size="small" color={c.accent} />
-          ) : (
-            <Text style={styles.resumenTxt}>
-              {visibles.length} {visibles.length === 1 ? 'negocio' : 'negocios'}
-              {admin ? ` · ${domiciliarios.length} domiciliarios (${enEntrega} en entrega)` : ''}
-            </Text>
-          )}
+        {tipos.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.tipos}
+            style={styles.tiposScroll}>
+            {[null, ...tipos].map(t => {
+              const activo = tipo === t;
+              return (
+                <TouchableOpacity
+                  key={t ?? '*'}
+                  style={[styles.chip, activo && styles.chipActivo]}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: activo }}
+                  onPress={() => setTipo(t)}>
+                  <Text style={[styles.chipTxt, activo && styles.chipTxtActivo]}>{t ?? 'Todos los tipos'}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        )}
+        <View style={styles.filaArriba} pointerEvents="box-none">
+          <View style={styles.segmentos} accessibilityRole="radiogroup">
+            {ESTADOS.map(e => {
+              const activo = estado === e.valor;
+              return (
+                <TouchableOpacity
+                  key={e.valor}
+                  style={[styles.segmento, activo && styles.chipActivo]}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: activo }}
+                  onPress={() => setEstado(e.valor)}>
+                  <Text style={[styles.chipTxt, activo && styles.chipTxtActivo]}>{e.texto}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <View style={styles.resumen}>
+            {cargando ? (
+              <ActivityIndicator size="small" color={c.accent} />
+            ) : (
+              <Text style={styles.resumenTxt} numberOfLines={1}>
+                {visibles.length} {visibles.length === 1 ? 'negocio' : 'negocios'}
+                {admin ? ` · ${domiciliarios.length} domiciliarios (${enEntrega} en entrega)` : ''}
+              </Text>
+            )}
+          </View>
         </View>
+        {!cargando && negocios.length === 0 && (
+          <View style={styles.vacio}>
+            <Icon name="ubicacion" size={20} color={c.muted} />
+            <Text style={styles.vacioTxt}>Aún no hay negocios en el mapa. Cada negocio fija su ubicación en Mi Tienda.</Text>
+          </View>
+        )}
+        {!cargando && negocios.length > 0 && visibles.length === 0 && (
+          <View style={styles.vacio}>
+            <Icon name="tienda" size={20} color={c.muted} />
+            <Text style={styles.vacioTxt}>
+              No hay {tipo ? `negocios de tipo «${tipo}»` : 'negocios'}
+              {estado === 'abiertos' ? ' abiertos' : estado === 'cerrados' ? ' cerrados' : ''} en este momento.
+            </Text>
+          </View>
+        )}
       </View>
 
-      {!cargando && negocios.length === 0 && (
-        <View style={styles.vacio}>
-          <Icon name="ubicacion" size={20} color={c.muted} />
-          <Text style={styles.vacioTxt}>Aún no hay negocios en el mapa. Cada negocio fija su ubicación en Mi Tienda.</Text>
-        </View>
+      {!!casa && (
+        <TouchableOpacity
+          style={[styles.miUbicacion, { bottom: abajo + (seleccion ? 170 : 0) + 58 }]}
+          onPress={() => {
+            mapa.current?.irA({ lat: casa.lat!, lng: casa.lng! }, ZOOM.barrio);
+            setSeleccion({ tipo: 'casa', item: casa });
+          }}
+          accessibilityLabel="Ir a mi casa">
+          <Icon name="casa" size={20} color={c.accent} />
+        </TouchableOpacity>
       )}
-
       <TouchableOpacity
         style={[styles.miUbicacion, { bottom: abajo + (seleccion ? 170 : 0) }]}
         onPress={centrarEnMi}
@@ -185,11 +288,24 @@ export default function MapaScreen({ navigation, route }: Props) {
           />
         </FadeInView>
       )}
+      {seleccion?.tipo === 'casa' && (
+        <FadeInView key="casa" style={[styles.tarjeta, { bottom: abajo }]}>
+          <View style={styles.fila}>
+            <Icon name="casa" size={22} color={c.accent} />
+            <View style={styles.lleno}>
+              <Text style={styles.nombre}>{seleccion.item.nombre || 'Mi casa'}</Text>
+              <Text style={styles.sub} numberOfLines={2}>
+                {[seleccion.item.direccion, seleccion.item.barrio].filter(Boolean).join(' · ')}
+              </Text>
+            </View>
+          </View>
+        </FadeInView>
+      )}
       {seleccion?.tipo === 'domiciliario' && (
         <FadeInView key={`d-${seleccion.item.id}`} style={[styles.tarjeta, { bottom: abajo }]}>
           <View style={styles.fila}>
             <Icon name="moto" size={22} color={c.accent} />
-            <View style={{ flex: 1 }}>
+            <View style={styles.lleno}>
               <Text style={styles.nombre}>{seleccion.item.nombre}</Text>
               <Text style={styles.sub}>
                 {seleccion.item.en_entrega ? 'Llevando un pedido' : 'En turno, libre'} · posición{' '}
@@ -218,7 +334,7 @@ function TarjetaNegocio({ negocio, onVerTienda }: { negocio: NegocioMapa; onVerT
             <Icon name="tienda" size={22} color={c.muted} />
           </View>
         )}
-        <View style={{ flex: 1 }}>
+        <View style={styles.lleno}>
           <Text style={styles.nombre} numberOfLines={1}>
             {negocio.nombre}
           </Text>
@@ -254,7 +370,19 @@ function TarjetaNegocio({ negocio, onVerTienda }: { negocio: NegocioMapa; onVerT
 const useStyles = makeStyles((c, shadow) => ({
   container: { flex: 1, backgroundColor: c.bg },
   lleno: { flex: 1 },
-  arriba: { position: 'absolute', top: 12, left: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  arriba: { position: 'absolute', top: 12, left: 0, right: 0, gap: 8 },
+  // Los chips de tipos llegan al borde al deslizar; el aire va dentro.
+  tiposScroll: { flexGrow: 0 },
+  tipos: { paddingHorizontal: 12, gap: 8, paddingBottom: 4 },
+  filaArriba: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12 },
+  segmentos: {
+    flexDirection: 'row',
+    borderRadius: radius.pill,
+    backgroundColor: c.surface,
+    padding: 3,
+    ...shadow.card,
+  },
+  segmento: { borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 6 },
   chip: {
     borderRadius: radius.pill,
     backgroundColor: c.surface,
@@ -275,10 +403,7 @@ const useStyles = makeStyles((c, shadow) => ({
   },
   resumenTxt: { color: c.muted, fontFamily: font.medium, fontSize: 12 },
   vacio: {
-    position: 'absolute',
-    top: 64,
-    left: 12,
-    right: 12,
+    marginHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,

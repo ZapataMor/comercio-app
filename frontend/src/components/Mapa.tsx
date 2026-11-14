@@ -201,13 +201,26 @@ export function PinNegocio({ punto, nombre, imagen, abierto = true, seleccionado
   );
 }
 
-/** Marcador del punto de entrega: una casa en el color de acento. */
-export function PinEntrega({ punto, nombre = 'Punto de entrega' }: { punto: Coordenadas; nombre?: string }) {
+/** Marcador del punto de entrega (o de la casa del cliente): una casa en el color de acento. */
+export function PinEntrega({
+  punto,
+  nombre = 'Punto de entrega',
+  onPress,
+}: {
+  punto: Coordenadas;
+  nombre?: string;
+  onPress?: () => void;
+}) {
   const { c } = useTheme();
   const styles = useStyles();
 
   return (
-    <Marker lngLat={lngLat(punto)} anchor="bottom" style={styles.encima} accessibilityLabel={nombre}>
+    <Marker
+      lngLat={lngLat(punto)}
+      anchor="bottom"
+      style={styles.encima}
+      onPress={onPress && alTocarPin(onPress)}
+      accessibilityLabel={nombre}>
       <View style={styles.pin}>
         <View style={[styles.gota, styles.gotaEntrega]}>
           <Icon name="casa" size={18} color={c.onAccent} />
