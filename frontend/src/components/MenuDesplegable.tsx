@@ -12,13 +12,25 @@
  * Los menús se pintan en CapaMenus, encima de toda la app. En cuanto uno
  * empieza a recogerse deja pasar los toques: se puede tocar enseguida otro
  * botón de la topbar sin esperar a que termine la animación.
+ *
+ * Con `texto` el botón es una píldora con nombre (los filtros del Mapa), y
+ * con OpcionCheck el menú sirve para marcar varias opciones sin cerrarse.
  */
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import {
   Animated,
   BackHandler,
   Easing,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -43,6 +55,10 @@ type Props = {
    */
   renglones: (elegir: Elegir) => React.ReactNode[];
   ancho?: number;
+  /** Con texto: píldora clara con nombre y flecha (sobre el mapa), no un ícono de la topbar. */
+  texto?: string;
+  /** Hacia dónde crece el menú desde el botón (por defecto, hacia la izquierda: bordes derechos alineados). */
+  alinear?: 'derecha' | 'izquierda';
 };
 
 /**
@@ -103,8 +119,6 @@ export function CapaMenus({ children }: { children: React.ReactNode }) {
 
 export default function MenuDesplegable(props: Props) {
   const { icono, etiqueta } = props;
-  const { c } = useTheme();
-  const styles = useStyles();
   const { width } = useWindowDimensions();
   const capa = useContext(CapaContext);
   const boton = useRef<View>(null);
@@ -141,6 +155,8 @@ export default function MenuDesplegable(props: Props) {
         etiqueta={actuales.etiqueta}
         renglones={actuales.renglones}
         ancho={actuales.ancho ?? 240}
+        texto={actuales.texto}
+        alinear={actuales.alinear}
         // Solo si sigue siendo este menú (no otro abierto mientras se recogía).
         onCerrado={() => setAncla(a => (a === ancla ? null : a))}
       />,
@@ -151,30 +167,63 @@ export default function MenuDesplegable(props: Props) {
   return (
     // PressableScale no reenvía la ref: este View es el que se mide.
     <View ref={boton} collapsable={false}>
-      <PressableScale
-        style={styles.boton}
-        hitSlop={8}
-        accessibilityRole="button"
-        accessibilityLabel={etiqueta}
-        accessibilityState={{ expanded: !!ancla }}
-        onPress={abrir}>
-        <Icon name={icono} size={18} color={c.onHeader} strokeWidth={2} />
-      </PressableScale>
+      <BotonMenu icono={icono} etiqueta={etiqueta} texto={props.texto} abierto={!!ancla} onPress={abrir} />
     </View>
   );
 }
 
-function Menu({
-  ancla,
+/** El botón que abre el menú: ícono redondo de la topbar, o píldora con texto. */
+function BotonMenu({
   icono,
   etiqueta,
-  renglones,
-  ancho,
-  onCerrado,
-}: Required<Props> & { ancla: Ancla; onCerrado: () => void }) {
+  texto,
+  abierto,
+  onPress,
+}: {
+  icono: IconName;
+  etiqueta: string;
+  texto?: string;
+  abierto: boolean;
+  onPress: () => void;
+}) {
   const { c } = useTheme();
   const styles = useStyles();
-  const { width } = useWindowDimensions();
+  if (texto) {
+    return (
+      <PressableScale
+        style={styles.pildora}
+        accessibilityRole="button"
+        accessibilityLabel={etiqueta}
+        accessibilityState={{ expanded: abierto }}
+        onPress={onPress}>
+        <Icon name={icono} size={16} color={c.accent} strokeWidth={2} />
+        <Text style={styles.pildoraTxt} numberOfLines={1}>
+          {texto}
+        </Text>
+        <View style={abierto ? styles.flechaArriba : styles.flechaAbajo}>
+          <Icon name="chevron" size={14} color={c.muted} strokeWidth={2.2} />
+        </View>
+      </PressableScale>
+    );
+  }
+  return (
+    <PressableScale
+      style={styles.boton}
+      hitSlop={8}
+      accessibilityRole="button"
+      accessibilityLabel={etiqueta}
+      accessibilityState={{ expanded: abierto }}
+      onPress={onPress}>
+      <Icon name={icono} size={18} color={c.onHeader} strokeWidth={2} />
+    </PressableScale>
+  );
+}
+
+type MenuProps = Omit<Props, 'ancho'> & { ancho: number; ancla: Ancla; onCerrado: () => void };
+
+function Menu({ ancla, icono, etiqueta, renglones, ancho, texto, alinear, onCerrado }: MenuProps) {
+  const styles = useStyles();
+  const { width, height } = useWindowDimensions();
   const capa = useContext(CapaContext);
   // Fijos mientras el menú está abierto.
   const [contenido] = useState(() => renglones(elegir).filter(Boolean));
@@ -287,12 +336,24 @@ function Menu({
   const x = ancla.x - origen.x;
   const y = ancla.y - origen.y;
   const anchoMenu = Math.min(ancho, width - 24);
-  // Borde derecho del menú alineado con el del botón; el pico apunta a su centro.
-  const derecha = Math.max(12, width - (x + ancla.w));
-  const pico = Math.max(14, width - (x + ancla.w / 2) - derecha - 7);
+  // Un borde del menú alineado con el del botón; el pico apunta a su centro.
+  let borde: { left: number } | { right: number };
+  let pico: { left: number } | { right: number };
+  if (alinear === 'izquierda') {
+    const izquierda = Math.max(12, Math.min(x, width - 12 - anchoMenu));
+    borde = { left: izquierda };
+    pico = { left: Math.max(14, x + ancla.w / 2 - izquierda - 7) };
+  } else {
+    const derecha = Math.max(12, width - (x + ancla.w));
+    borde = { right: derecha };
+    pico = { right: Math.max(14, width - (x + ancla.w / 2) - derecha - 7) };
+  }
+  const top = y + ancla.h + 10;
+  // Una lista larga (los tipos de negocio) no se sale de la pantalla: se desliza.
+  const altoMax = Math.max(120, height - top - 40);
   const translateY = a.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] });
   const scale = a.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] });
-  const altoVisible = despliegue.interpolate({ inputRange: [0, 1], outputRange: [0, alto] });
+  const altoVisible = despliegue.interpolate({ inputRange: [0, 1], outputRange: [0, Math.min(alto, altoMax)] });
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents={saliendo ? 'none' : 'box-none'}>
@@ -301,38 +362,40 @@ function Menu({
       {/* El desenfoque alcanza toda la app, botón incluido: encima va una
           copia nítida en el mismo sitio, sobre un círculo del color de la
           topbar que tapa al original (su fondo es translúcido). */}
-      <View style={[styles.botonNitido, { left: x, top: y, width: ancla.w, height: ancla.h }]}>
-        <PressableScale
-          style={styles.boton}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={etiqueta}
-          accessibilityState={{ expanded: true }}
-          onPress={() => cerrar()}>
-          <Icon name={icono} size={18} color={c.onHeader} strokeWidth={2} />
-        </PressableScale>
+      <View
+        style={[
+          styles.botonNitido,
+          texto ? styles.sinFondo : null,
+          { left: x, top: y, width: ancla.w, height: ancla.h },
+        ]}>
+        <BotonMenu icono={icono} etiqueta={etiqueta} texto={texto} abierto onPress={() => cerrar()} />
       </View>
       <Animated.View
         style={[
           styles.menu,
+          alinear === 'izquierda' && styles.menuIzquierda,
           {
-            top: y + ancla.h + 10,
-            right: derecha,
+            top,
+            ...borde,
             width: anchoMenu,
             opacity: a,
             transform: [{ translateY }, { scale }],
           },
         ]}>
-        <View style={[styles.pico, { right: pico }]} />
+        <View style={[styles.pico, pico]} />
         <View style={styles.caja}>
-          {/* La lista se mide en una capa absoluta y la caja crece hasta su alto. */}
+          {/* La lista se mide en una capa absoluta y la caja crece hasta su
+              alto (o hasta altoMax: entonces se desliza). */}
           <Animated.View style={[styles.lista, { height: altoVisible }]}>
-            <View
-              style={styles.listaContenido}
-              onLayout={e => {
-                setAlto(e.nativeEvent.layout.height);
+            <ScrollView
+              style={[styles.listaScroll, { maxHeight: altoMax }]}
+              contentContainerStyle={styles.listaContenido}
+              scrollEnabled={alto > altoMax}
+              showsVerticalScrollIndicator={alto > altoMax}
+              onContentSizeChange={(_, h) => {
+                setAlto(h);
                 // Si se cerró antes de medirse, ya no entra.
-                if (!empezado.current && !cerrando.current) {
+                if (h > 0 && !empezado.current && !cerrando.current) {
                   empezado.current = true;
                   entrar();
                 }
@@ -342,7 +405,7 @@ function Menu({
                   {renglon}
                 </Cascada>
               ))}
-            </View>
+            </ScrollView>
           </Animated.View>
         </View>
       </Animated.View>
@@ -403,6 +466,55 @@ export function OpcionMenu({ icono, titulo, detalle, variante, activa, onPress }
   );
 }
 
+/**
+ * Valor compartido entre la pantalla y un menú abierto. Los renglones se
+ * arman una sola vez al abrir: los que cambian mientras está abierto (los
+ * checks) leen de aquí con useAlmacen.
+ */
+export type Almacen<T> = { get(): T; set(v: T): void; subscribe(f: () => void): () => void };
+
+export function crearAlmacen<T>(inicial: T): Almacen<T> {
+  let valor = inicial;
+  const oyentes = new Set<() => void>();
+  return {
+    get: () => valor,
+    set: v => {
+      valor = v;
+      oyentes.forEach(f => f());
+    },
+    subscribe: f => {
+      oyentes.add(f);
+      return () => {
+        oyentes.delete(f);
+      };
+    },
+  };
+}
+
+export function useAlmacen<T>(almacen: Almacen<T>): T {
+  return useSyncExternalStore(almacen.subscribe, almacen.get);
+}
+
+/** Renglón con casilla: se marca y desmarca sin cerrar el menú. */
+export function OpcionCheck({ titulo, marcada, onPress }: { titulo: string; marcada: boolean; onPress: () => void }) {
+  const { c } = useTheme();
+  const styles = useStyles();
+  return (
+    <PressableScale
+      style={[styles.opcion, styles.opcionCheck, marcada && styles.activa]}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: marcada }}
+      onPress={onPress}>
+      <View style={[styles.casilla, marcada && styles.casillaMarcada]}>
+        {marcada && <Icon name="check" size={14} color={c.onAccent} strokeWidth={3} />}
+      </View>
+      <Text style={[styles.opcionTxt, styles.opcionTexto]} numberOfLines={1}>
+        {titulo}
+      </Text>
+    </PressableScale>
+  );
+}
+
 const useStyles = makeStyles((c, shadow) => ({
   boton: {
     width: 34,
@@ -413,8 +525,23 @@ const useStyles = makeStyles((c, shadow) => ({
     backgroundColor: 'rgba(255,255,255,0.14)',
   },
   botonNitido: { position: 'absolute', borderRadius: radius.pill, backgroundColor: c.header },
+  sinFondo: { backgroundColor: 'transparent' },
+  pildora: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    borderRadius: radius.pill,
+    backgroundColor: c.surface,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    ...shadow.card,
+  },
+  pildoraTxt: { color: c.textStrong, fontFamily: font.semibold, fontSize: 13.5, maxWidth: 160 },
+  flechaAbajo: { transform: [{ rotate: '90deg' }] },
+  flechaArriba: { transform: [{ rotate: '-90deg' }] },
   // Crece desde la esquina del ícono.
   menu: { position: 'absolute', transformOrigin: 'top right' },
+  menuIzquierda: { transformOrigin: 'top left' },
   // Pico que une el menú con el ícono (queda medio oculto tras la caja).
   pico: {
     position: 'absolute', top: -6, width: 14, height: 14, borderRadius: 3,
@@ -422,7 +549,8 @@ const useStyles = makeStyles((c, shadow) => ({
   },
   caja: { backgroundColor: c.surface, borderRadius: radius.lg, padding: 10, ...shadow.card },
   lista: { overflow: 'hidden' },
-  listaContenido: { position: 'absolute', top: 0, left: 0, right: 0, gap: 8 },
+  listaScroll: { position: 'absolute', top: 0, left: 0, right: 0 },
+  listaContenido: { gap: 8 },
   opcion: {
     flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, paddingHorizontal: 10,
     borderRadius: radius.md, backgroundColor: c.bg, borderWidth: 1, borderColor: c.border,
@@ -435,6 +563,12 @@ const useStyles = makeStyles((c, shadow) => ({
   opcionTxt: { fontSize: 14, fontFamily: font.semibold, color: c.textStrong },
   opcionDetalle: { fontSize: 11.5, lineHeight: 15, fontFamily: font.regular, color: c.muted, marginTop: 1 },
   activa: { borderColor: c.accent },
+  opcionCheck: { paddingVertical: 10 },
+  casilla: {
+    width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: c.borderStrong,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  casillaMarcada: { backgroundColor: c.accent, borderColor: c.accent },
   destacado: { backgroundColor: c.accentSoft, borderColor: c.accent, marginTop: 4 },
   destacadoIcono: { backgroundColor: c.accent },
   peligro: { backgroundColor: c.dangerSoft, borderColor: c.dangerSoft, marginTop: 4 },

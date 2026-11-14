@@ -34,16 +34,16 @@ beforeEach(() => {
   mockRoles = ['usuario'];
 });
 
-test.each(['Home', 'Entregas'])('en %s no aparece, aunque la cuenta sea de cliente', async ruta => {
+test.each(['Home', 'Entregas', 'Mapa'])('en %s no aparece, aunque la cuenta sea de cliente', async ruta => {
   mockRoles = ['usuario', 'domiciliario'];
   expect(await textos(ruta)).toEqual([]);
 });
 
-test.each(['Explorar', 'Mapa', 'Negocio', 'PedidoDetalle'])('en %s aparece', async ruta => {
+test.each(['Explorar', 'Negocio', 'PedidoDetalle'])('en %s aparece', async ruta => {
   expect(await textos(ruta)).toEqual(expect.arrayContaining(['Carrito', 'Mis pedidos']));
 });
 
 test('sin el rol de cliente no aparece', async () => {
   mockRoles = ['administrador'];
-  expect(await textos('Mapa')).toEqual([]);
+  expect(await textos('Explorar')).toEqual([]);
 });

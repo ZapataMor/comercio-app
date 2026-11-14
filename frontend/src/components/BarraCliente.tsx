@@ -9,6 +9,7 @@
  *  - En "Carrito", "Confirmar pedido" (Checkout) y "Mis pedidos" la barra no
  *    se muestra: son pasos de compra/consulta y sobraría un botón flotante.
  *  - Dentro del catálogo de servicios de una tienda tampoco se muestra.
+ *  - En el Mapa tampoco: ahí estorba ver los negocios.
  *  - El botón Carrito es, además, el DESTINO de la animación del paquete:
  *    registra su posición y rebota cuando un paquete aterriza.
  */
@@ -26,7 +27,6 @@ import Icon from './Icon';
 /** Rutas del flujo cliente donde la barra queda fija. */
 const RUTAS_CLIENTE = new Set([
   'Explorar',
-  'Mapa',
   'Negocio',
   'PedidoDetalle',
 ]);
