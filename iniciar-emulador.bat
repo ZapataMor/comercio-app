@@ -131,9 +131,12 @@ if %PREPARADOS% equ 0 (
     echo   [X] No hay emuladores conectados. Revisa ADB y vuelve a intentar.
     goto fin
 )
+REM Un emulador abierto o reiniciado despues pierde el reverse: el vigilante lo repone.
+start "Emuladores - adb reverse" powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%RAIZ%scripts\vigilar-emuladores.ps1" -Adb "%ADB%"
 
 echo.
-echo   Listo. Deja abiertas las ventanas del emulador, la API, la cola, las tareas, Reverb y Metro.
+echo   Listo. Deja abiertas las ventanas del emulador, la API, la cola, las tareas, Reverb, Metro
+echo   y "Emuladores - adb reverse" ^(repone la conexion si abres o reinicias otro emulador^).
 echo   Emuladores conectados al entorno local: %PREPARADOS%.
 echo.
 echo   - Panel admin web: http://localhost:8000
