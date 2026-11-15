@@ -166,15 +166,28 @@ it('exige iniciar sesión', function () {
     $this->postJson('/api/propiedades', [])->assertUnauthorized();
 });
 
-it('el seeder demo publica casas y patios sin duplicar', function () {
-    \Illuminate\Support\Facades\Http::fake(['*' => \Illuminate\Support\Facades\Http::response('x', 200, ['Content-Type' => 'image/jpeg'])]);
-    User::factory()->create(['email' => 'cliente@demo.co']);
+it('el seeder demo publica casas y patios con las fotos del grupo, sin duplicar', function () {
+    $dueno = User::factory()->create(['email' => 'cliente@demo.co']);
+    // Sin fotos del grupo: igual publica, sin fotos.
     $this->seed(\Database\Seeders\PropiedadesDemoSeeder::class);
+    expect(Propiedad::count())->toBe(9)->and(Propiedad::first()->galeria)->toBeEmpty();
+
+    foreach (['casa-01', 'casa-02', 'casa-03', 'interior-01', 'patio-01', 'patio-02'] as $f) {
+        Storage::disk('public')->put("propiedades/tematico-{$f}.jpg", 'x');
+    }
+    // Una demo con fotos de otra prueba también recibe las del grupo; una del usuario no se toca.
+    Propiedad::where('titulo', 'Patio La Ceiba')->first()->forceFill(['galeria' => ['/storage/propiedades/dibujo.jpg']])->save();
+    $propia = publicarPropiedad($dueno, ['titulo' => 'Mi casa']);
     $this->seed(\Database\Seeders\PropiedadesDemoSeeder::class);
 
-    expect(Propiedad::count())->toBe(9)
+    $casa = Propiedad::where('tipo', 'venta')->where('titulo', '!=', 'Mi casa')->first();
+    expect(Propiedad::count())->toBe(10)
         ->and(Propiedad::where('tipo', 'eventos')->whereNull('capacidad')->count())->toBe(0)
-        ->and(Propiedad::first()->galeria)->toHaveCount(3);
+        ->and($casa->galeria)->toHaveCount(3)
+        ->and($casa->galeria[2])->toBe('/storage/propiedades/tematico-interior-01.jpg')
+        ->and(Propiedad::where('titulo', 'Patio La Ceiba')->first()->galeria)
+        ->toBe(['/storage/propiedades/tematico-patio-01.jpg', '/storage/propiedades/tematico-patio-02.jpg'])
+        ->and($propia->fresh()->galeria)->toBe(['/storage/propiedades/demo.jpg']);
 });
 
 it('las fotos se suben de a una hasta el máximo, solo por el dueño', function () {

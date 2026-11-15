@@ -1,4 +1,5 @@
 import { solicitar, ErrorRed, TIEMPO_SUBIDA_MS } from './red';
+import { comprimirFoto } from './fotos';
 import { API_URL } from './config';
 import type { OpcionesLinea } from './opcionesProducto';
 
@@ -533,6 +534,14 @@ async function authUpload(
   archivos?: Record<string, string>,
 ): Promise<any> {
   const form = new FormData();
+  // Las fotos se achican en el teléfono antes de subirlas (ver src/fotos.ts).
+  if (imagenUri) imagenUri = await comprimirFoto(imagenUri);
+  if (imagenesUri) imagenesUri = await Promise.all(imagenesUri.map(comprimirFoto));
+  if (archivos) {
+    archivos = Object.fromEntries(
+      await Promise.all(Object.entries(archivos).map(async ([campo, uri]) => [campo, await comprimirFoto(uri)] as const)),
+    );
+  }
   if (metodo === 'PUT') {
     form.append('_method', 'PUT');
   }

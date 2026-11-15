@@ -95,3 +95,9 @@ jest.mock('@maplibre/maplibre-react-native', () => {
 });
 
 jest.mock('@react-native-community/netinfo', () => require('@react-native-community/netinfo/jest/netinfo-mock.js'));
+
+// Achicar fotos (nativo): en las pruebas devuelve la misma foto.
+jest.mock('@bam.tech/react-native-image-resizer', () => ({
+  __esModule: true,
+  default: { createResizedImage: jest.fn(async uri => ({ uri, path: uri, name: 'foto.jpg', size: 1, width: 1, height: 1 })) },
+}));
