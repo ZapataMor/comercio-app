@@ -1,3 +1,5 @@
+import { useLectura } from '../useLectura';
+import ErrorCarga from '../components/ErrorCarga';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -156,7 +158,7 @@ export default function NegocioScreen({ navigation, route }: Props) {
       .catch(() => {});
   }, [token, id, seccion]);
 
-  useEffect(() => {
+  useLectura(() => {
     cargarCatalogo()
       .catch(e => setError(e.message))
       .finally(() => setCargando(false));
@@ -231,7 +233,7 @@ export default function NegocioScreen({ navigation, route }: Props) {
     return <ActivityIndicator size="large" color={c.accent} style={{ marginTop: 40 }} />;
   }
   if (error) {
-    return <Text style={styles.error}>{error}</Text>;
+    return <ErrorCarga mensaje={error} />;
   }
 
   const portada = imagenUrl(negocio?.imagen);

@@ -1,5 +1,6 @@
+import { useLectura } from '../useLectura';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useEnVivo } from '../usePolling';
 import { ActivityIndicator, ScrollView, Text, TextInput, View } from 'react-native';
 import { actualizarTarifaDomicilio, AdminStats, getAdminStats, getTarifaDomicilio } from '../api';
@@ -42,19 +43,19 @@ export default function AdminTableroScreen({ navigation }: Props) {
   const [tarifa, setTarifa] = useState('');
   const [guardandoTarifa, setGuardandoTarifa] = useState(false);
 
-  useEffect(() => {
+  useLectura(() => {
     getAdminStats(auth!.token)
-      .then(setStats)
+      .then(datos => { setStats(datos); setError(null); })
       .catch(e => setError(e.message))
       .finally(() => setCargando(false));
     getTarifaDomicilio(auth!.token)
-      .then(t => setTarifa(String(t)))
+      .then(t => setTarifa(actual => actual || String(t)))
       .catch(() => {});
   }, [auth]);
 
   // En vivo: los números del tablero siguen lo que pasa en la app.
   useEnVivo(['pedidos', 'citas', 'usuarios', 'perfil', 'negocio', 'reportes', 'barrios', 'resenas', 'reputacion'], () => {
-    getAdminStats(auth!.token).then(setStats).catch(() => {});
+    getAdminStats(auth!.token).then(datos => { setStats(datos); setError(null); }).catch(() => {});
   });
 
   async function guardarTarifa() {

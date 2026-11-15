@@ -1,3 +1,4 @@
+import { useLectura } from '../useLectura';
 /**
  * Botón de la topbar, junto a "Mi perfil", con el nivel de confiabilidad del
  * domiciliario: un escudo con un punto del color de su nivel (verde
@@ -8,7 +9,7 @@
  * refresca cada 15 s y con cada push, avisa el nivel nuevo con
  * `publicarMiReputacion` y el ícono se actualiza sin pedirlo otra vez.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useAvisosEnVivo } from '../usePolling';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { getMiReputacion, Reputacion, ReputacionDetalle } from '../api';
@@ -68,7 +69,7 @@ function BotonConfiabilidad({ token }: { token: string }) {
   // En vivo: una calificación o el admin cambian mi nivel.
   useAvisosEnVivo(a => a.tema === 'reputacion' && a.tipo === 'domiciliario', cargar);
 
-  useEffect(() => {
+  useLectura(() => {
     oyentes.add(setDetalle);
     if (ultimo?.token !== token) {
       cargar();

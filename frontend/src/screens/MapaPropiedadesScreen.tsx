@@ -1,3 +1,4 @@
+import { useLectura } from '../useLectura';
 /**
  * Mapa de Propiedades: solo casas en venta, casas en alquiler y patios para
  * eventos (nada de negocios), cada una con su precio en el pin. Arriba, sus
@@ -53,7 +54,7 @@ export default function MapaPropiedadesScreen({ navigation }: Props) {
   const [conPermiso, setConPermiso] = useState(false);
   const [ubicando, setUbicando] = useState(false);
 
-  useEffect(() => {
+  useLectura(() => {
     getPropiedadesMapa(token)
       .then(setPropiedades)
       .catch(e => toast.error('No se pudo cargar el mapa', e instanceof Error ? e.message : 'Error'))

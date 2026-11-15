@@ -1,3 +1,4 @@
+import { useLecturaEnFoco } from '../useLectura';
 /**
  * Mis negocios — todos los negocios donde la persona es miembro activo
  * (propietaria o trabajadora), con el activo marcado.
@@ -8,7 +9,6 @@
  *  - responden las invitaciones de trabajo recibidas,
  *  - comparte el código público para que otro negocio la invite.
  */
-import { useFocusEffect } from '@react-navigation/native';
 import { useEnVivo } from '../usePolling';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useState } from 'react';
@@ -47,7 +47,7 @@ export default function MisNegociosScreen({ navigation }: Props) {
   );
 
   // Al entrar: negocios e invitaciones al día (pudieron llegar por push).
-  useFocusEffect(
+  useLecturaEnFoco(
     useCallback(() => {
       recargar();
       cargarInvitaciones();

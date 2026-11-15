@@ -177,7 +177,7 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
     ];
 
     if (categoriasFinales.length === 0) {
-      setErrores({ categorias: 'Selecciona al menos una categoria para el negocio.' });
+      setErrores({ categorias: 'Selecciona al menos una categoría para el negocio.' });
       return;
     }
     if (!barrio.trim()) {

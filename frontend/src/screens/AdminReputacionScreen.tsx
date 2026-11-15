@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useLectura } from '../useLectura';
+import React, { useCallback, useState } from 'react';
 import { useEnVivo } from '../usePolling';
 import { ActivityIndicator, FlatList, RefreshControl, Text, TextInput, View } from 'react-native';
 import {
@@ -59,7 +60,7 @@ export default function AdminReputacionScreen() {
     [token, tipo, toast],
   );
 
-  useEffect(() => {
+  useLectura(() => {
     setCargando(true);
     setAbierto(null);
     cargar();
@@ -148,7 +149,7 @@ function Sujeto({
       .catch(e => toast.error('No se pudo cargar', e instanceof Error ? e.message : 'Error'));
   }, [token, tipo, sujeto.id, toast]);
 
-  useEffect(() => {
+  useLectura(() => {
     if (abierto) cargarDetalle();
   }, [abierto, cargarDetalle]);
 

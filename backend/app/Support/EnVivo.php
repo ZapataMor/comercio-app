@@ -374,6 +374,7 @@ class EnVivo
             // --- Pedidos: cliente ---
             Api\PedidoController::class.'@store' => ['despues' => fn (Request $r, Response $res) => self::pedido($json($res, 'id'))],
             Api\PedidoController::class.'@cancelar' => $pedido,
+            Api\PedidoController::class.'@solicitarReembolso' => $pedido,
             Api\PedidoController::class.'@calificar' => ['despues' => function (Request $r) use ($id) {
                 $p = Pedido::find($id($r));
                 self::pedido($p);

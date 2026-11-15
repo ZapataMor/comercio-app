@@ -101,7 +101,7 @@ async function montar(seccion: 'productos' | 'servicios' = 'productos') {
       raiz.root.findByType(FlatList).props.onEndReached();
     });
   };
-  return { navigation, textos, buscar, tocar, finDeLista };
+  return { navigation, textos, buscar, tocar, finDeLista, raiz: raiz! };
 }
 
 async function refrescar() {
@@ -276,4 +276,16 @@ test('Servicios mantiene las tarjetas de negocios y abre su catálogo de servici
   expect(mockNegocios).toHaveBeenLastCalledWith('t', undefined, 1, null, 'servicios');
   await tocar('Taller mixto');
   expect(navigation.navigate).toHaveBeenLastCalledWith('Negocio', { id: 1, nombre: 'Taller mixto', seccion: 'servicios' });
+});
+
+test('el refresco conserva la consulta aplicada mientras se escribe otra búsqueda', async () => {
+  mockNegocios.mockResolvedValue(pagina([negocio(1, 'Panadería')]));
+  const pantalla = await montar();
+  await pantalla.buscar('pan');
+  mockProductos.mockClear();
+  await act(async () => {
+    pantalla.raiz.root.findByProps({ placeholder: 'Busca negocios o productos' }).props.onChangeText('pan con');
+  });
+  await refrescar();
+  expect(mockProductos).toHaveBeenLastCalledWith('t', 'pan');
 });

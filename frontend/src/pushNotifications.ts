@@ -141,7 +141,7 @@ async function atenderToque({ type, detail }: Event, user?: Usuario) {
 }
 
 async function mostrarNotificacionForeground(message: FirebaseMessagingTypes.RemoteMessage) {
-  const title = message.notification?.title ?? 'Nueva notificacion';
+  const title = message.notification?.title ?? 'Nueva notificación';
   const body = message.notification?.body ?? 'Toca para ver el detalle.';
   const data = dataPlano(message.data);
 

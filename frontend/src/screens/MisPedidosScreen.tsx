@@ -1,4 +1,5 @@
-import { useFocusEffect } from '@react-navigation/native';
+import { useLecturaEnFoco } from '../useLectura';
+import ErrorCarga from '../components/ErrorCarga';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, Text, View } from 'react-native';
@@ -20,6 +21,7 @@ export default function MisPedidosScreen({ navigation }: Props) {
   const { c, estadoColor } = useTheme();
   const styles = useStyles();
   const { auth } = useAuth();
+  const [error, setError] = useState<string | null>(null);
   const [pedidos, setPedidos] = useState<MiPedido[]>([]);
   const [cargando, setCargando] = useState(true);
   const [refrescando, setRefrescando] = useState(false);
@@ -35,6 +37,7 @@ export default function MisPedidosScreen({ navigation }: Props) {
     (reiniciar = false) => {
       return getMisPedidos(auth!.token, 1)
         .then(p => {
+          setError(null);
           setPedidos(prev => {
             const nuevos = new Set(p.items.map(x => x.id));
             return [...p.items, ...prev.filter(x => !nuevos.has(x.id) && x.id < (p.items[p.items.length - 1]?.id ?? 0))];
@@ -42,6 +45,7 @@ export default function MisPedidosScreen({ navigation }: Props) {
           setHayMas(prev => (reiniciar ? p.pagina < p.ultima_pagina : prev || p.pagina < p.ultima_pagina));
           if (reiniciar) setPagina(1);
         })
+        .catch(e => setError(e.message ?? 'No pudimos cargar tus pedidos.'))
         .finally(() => setCargando(false));
     },
     [auth],
@@ -55,15 +59,15 @@ export default function MisPedidosScreen({ navigation }: Props) {
       setPedidos(prev => [...prev, ...p.items.filter(x => !prev.some(y => y.id === x.id))]);
       setPagina(p.pagina);
       setHayMas(p.pagina < p.ultima_pagina);
-    } catch {
-      // Se reintenta al volver a llegar al final.
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No pudimos cargar más pedidos.');
     } finally {
       setCargandoMas(false);
     }
   }
 
   // Al entrar se carga de cero; luego se refresca al llegar un push y cada 15 s.
-  useFocusEffect(
+  useLecturaEnFoco(
     useCallback(() => {
       cargar(true);
     }, [cargar]),
@@ -89,7 +93,8 @@ export default function MisPedidosScreen({ navigation }: Props) {
       refreshControl={
         <RefreshControl refreshing={refrescando} onRefresh={refrescar} colors={[c.accent]} tintColor={c.accent} />
       }
-      ListEmptyComponent={<Text style={styles.vacio}>Aún no has hecho pedidos.</Text>}
+      ListHeaderComponent={error ? <ErrorCarga mensaje={error} /> : null}
+      ListEmptyComponent={error ? null : <Text style={styles.vacio}>Aún no has hecho pedidos.</Text>}
       onEndReached={cargarMas}
       onEndReachedThreshold={0.4}
       ListFooterComponent={cargandoMas ? <ActivityIndicator color={c.accent} style={{ marginVertical: 16 }} /> : null}

@@ -1,6 +1,6 @@
 import NetInfo from '@react-native-community/netinfo';
 import { direccionValida, separarDireccion, telefonoValido, unirDireccion } from '../src/direccion';
-import { iniciarMonitorRed, solicitar, TIEMPO_PETICION_MS } from '../src/red';
+import { alReintentarRed, reintentarRed, iniciarMonitorRed, solicitar, TIEMPO_PETICION_MS } from '../src/red';
 
 const fetchOriginal = globalThis.fetch;
 
@@ -53,4 +53,19 @@ test('una respuesta HTML de limite devuelve un mensaje comprensible', async () =
   const response = await solicitar('/api/test');
   expect(response.status).toBe(429);
   expect((await response.json()).message).toContain('demasiadas solicitudes');
+});
+
+test('reintentar comprueba la conexión y refresca lecturas sin repetir escrituras', async () => {
+  const leer = jest.fn();
+  const quitar = alReintentarRed(leer);
+  globalThis.fetch = jest.fn().mockRejectedValue(new TypeError('Network request failed'));
+  await expect(solicitar('/api/pedidos', { method: 'POST' })).rejects.toThrow();
+  jest.spyOn(NetInfo, 'refresh').mockResolvedValueOnce({ isConnected: false, isInternetReachable: false } as any);
+  await reintentarRed();
+  expect(leer).not.toHaveBeenCalled();
+  jest.spyOn(NetInfo, 'refresh').mockResolvedValueOnce({ isConnected: true, isInternetReachable: true } as any);
+  await reintentarRed();
+  expect(leer).toHaveBeenCalledTimes(1);
+  expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+  quitar();
 });

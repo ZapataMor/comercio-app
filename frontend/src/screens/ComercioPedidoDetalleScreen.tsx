@@ -1,6 +1,7 @@
+import { useLectura } from '../useLectura';
 import { textoCantidad } from '../cantidades';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { detenerAlarma } from '../alarmaPedidos';
 import {
@@ -69,7 +70,7 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
   }, [negocioId, pedidoId, token, puedePedidos]);
 
   // Puede venir de una lista vieja o de un push: se trae el estado real.
-  useEffect(() => {
+  useLectura(() => {
     recargar()
       .catch(e => toast.error('No se pudo cargar', e instanceof Error ? e.message : 'Error'))
       .finally(() => setCargando(false));
@@ -230,6 +231,10 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
+      {pedido.reembolso_solicitado && <View style={styles.card}>
+        <Text style={styles.bloqueTitulo}>Reembolso solicitado</Text>
+        <Text style={styles.nota}>El cliente solicita la devolución de una transferencia. Verifica el pago y contáctalo para acordar el reembolso.</Text>
+      </View>}
       <FadeInView style={styles.card}>
         <View style={styles.head}>
           <Text style={styles.pid}>Pedido #{pedido.codigo}</Text>

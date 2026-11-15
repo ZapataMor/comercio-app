@@ -10,7 +10,9 @@ use App\Models\User;
 use App\Notifications\CitaActualizada;
 use App\Notifications\EstadoPedidoActualizado;
 use App\Notifications\PrecioProductoActualizado;
+use App\Notifications\ReembolsoSolicitado;
 use App\Support\PrecioCarrito;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
@@ -386,7 +388,7 @@ test('un faltante espera la elección del cliente sin cambiar los productos unil
     $this->putJson($ruta.'/listo')->assertOk();
 });
 
-test('el precio reservado del carrito dura una hora y no se puede alterar ni prestar a otro cliente', function () {
+test('la cotización vence en una hora y el aumento exige aceptar el total vigente', function () {
     [, $negocio, $producto] = limNegocio();
     Ajuste::guardar(Ajuste::TARIFA_DOMICILIO, 0);
     $cliente = limPersona();
@@ -400,9 +402,12 @@ test('el precio reservado del carrito dura una hora y no se puede alterar ni pre
     $alterado = $cuerpo;
     $alterado['items'][0]['precio_token'] = 'precio-falsificado';
     $this->postJson('/api/pedidos', $alterado)->assertUnprocessable();
+    $this->postJson('/api/pedidos', $cuerpo)->assertStatus(409);
+    expect(Pedido::count())->toBe(0);
+    $cuerpo['total_esperado'] = 198000;
     $id = $this->postJson('/api/pedidos', $cuerpo)->assertCreated()->json('id');
-    expect(Pedido::find($id)->total)->toBe('6000.00');
-    expect(Pedido::find($id)->items()->sole()->precio)->toBe('3000.00');
+    expect(Pedido::find($id)->total)->toBe('198000.00');
+    expect(Pedido::find($id)->items()->sole()->precio)->toBe('99000.00');
     $this->travel(1)->hours();
     $this->postJson('/api/pedidos', $cuerpo)->assertUnprocessable();
     expect(Pedido::count())->toBe(1);
@@ -528,7 +533,7 @@ test('cambiar la clave también cierra las sesiones web guardadas de ese usuario
     $usuario = limPersona();
     $otraPersona = limPersona();
     $token = $usuario->createToken('actual')->plainTextToken;
-    \Illuminate\Support\Facades\DB::table('sessions')->insert([
+    DB::table('sessions')->insert([
         ['id' => 'equipo-anterior', 'user_id' => $usuario->id, 'payload' => base64_encode(serialize([])), 'last_activity' => time()],
         ['id' => 'sesion-ajena', 'user_id' => $otraPersona->id, 'payload' => base64_encode(serialize([])), 'last_activity' => time()],
     ]);
@@ -545,7 +550,7 @@ test('cambiar la clave también cierra las sesiones web guardadas de ese usuario
 test('el panel web del administrador muestra reportes y guarda su resolución', function () {
     [, $negocio] = limNegocio();
     $pedido = limPedido(limPersona(), $negocio, 'aceptado');
-    $reporte = \App\Models\PedidoReporte::registrar($pedido, 'negocio', 'reporte_usuario', 'El comercio dejó de atender el pedido.');
+    $reporte = PedidoReporte::registrar($pedido, 'negocio', 'reporte_usuario', 'El comercio dejó de atender el pedido.');
     $this->actingAs(limPersona('administrador'));
     $this->get('/admin/reportes')->assertOk()->assertSee('El comercio dejó de atender el pedido.');
     $this->put("/admin/reportes/{$reporte->id}/resolver", ['resolucion' => 'Se verificó lo ocurrido con las partes.'])->assertRedirect();
@@ -584,4 +589,41 @@ test('el tablero del admin muestra ventas, entregados y citas', function () {
         ->assertJsonPath('citas_por_confirmar', 1)
         ->assertJsonPath('citas_proximas', 1)
         ->assertJsonPath('citas_completadas', 1);
+});
+
+test('una rebaja se cobra automáticamente incluso con una cotización anterior', function () {
+    [, $negocio, $producto] = limNegocio();
+    Ajuste::guardar(Ajuste::TARIFA_DOMICILIO, 0);
+    $cliente = limPersona();
+    $reserva = PrecioCarrito::cotizar($producto, $cliente->id);
+    $producto->update(['precio' => 2000]);
+    Sanctum::actingAs($cliente);
+    $cuerpo = array_replace(limCuerpo($negocio, $producto), ['items' => [['producto_id' => $producto->id, 'cantidad' => 2, 'precio_token' => $reserva['precio_token']]], 'total_esperado' => 6000]);
+    $id = $this->postJson('/api/pedidos', $cuerpo)->assertCreated()->json('id');
+    expect(Pedido::find($id)->total)->toBe('4000.00');
+});
+
+test('el reembolso es idempotente, privado y solo para transferencias canceladas', function () {
+    [$dueno, $negocio] = limNegocio();
+    $cliente = limPersona();
+    $pedido = limPedido($cliente, $negocio, 'cancelado');
+    Sanctum::actingAs($cliente);
+    $ruta = "/api/pedidos/{$pedido->id}/reembolso";
+    $this->postJson($ruta)->assertUnprocessable();
+    $pedido->update(['metodo_pago' => 'transferencia', 'estado' => 'aceptado']);
+    $this->postJson($ruta)->assertUnprocessable();
+    $pedido->update(['estado' => 'cancelado']);
+    Sanctum::actingAs(limPersona());
+    $this->postJson($ruta)->assertNotFound();
+    Sanctum::actingAs($cliente);
+    $this->postJson($ruta)->assertOk();
+    $this->postJson($ruta)->assertOk();
+    expect($pedido->fresh()->reembolso_solicitado_at)->not->toBeNull();
+    Notification::assertSentToTimes($dueno, ReembolsoSolicitado::class, 1);
+    $this->getJson("/api/pedidos/{$pedido->id}")->assertJsonPath('reembolso_solicitado', true);
+    $this->getJson('/api/negocios/mios/reembolsos')->assertJsonCount(0, 'solicitudes');
+    Sanctum::actingAs($dueno);
+    $this->getJson('/api/negocios/mios/reembolsos')->assertOk()->assertJsonPath('solicitudes.0.id', $pedido->id);
+    Sanctum::actingAs(limPersona());
+    $this->getJson('/api/negocios/mios/reembolsos')->assertJsonCount(0, 'solicitudes');
 });

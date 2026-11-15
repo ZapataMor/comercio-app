@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useLectura } from '../useLectura';
+import React, { useCallback, useState } from 'react';
 import { temasDelNegocio, useEnVivo } from '../usePolling';
 import {
   ActivityIndicator,
@@ -65,7 +66,7 @@ export default function CatalogoServicios({
       .catch(e => setError(e.message))
       .finally(() => setCargando(false));
   }, [token, negocioId]);
-  useEffect(cargar, [cargar]);
+  useLectura(cargar, [cargar]);
   // En vivo (sin la ruedita): lo que otro del equipo cambia aparece aquí.
   useEnVivo(temasDelNegocio(['catalogo'], negocioId), () => {
     getServicios(token, negocioId).then(setServicios).catch(() => {});

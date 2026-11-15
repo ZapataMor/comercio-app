@@ -87,8 +87,8 @@ const CartContext = createContext<CartContextType>({} as CartContextType);
 
 /**
  * El carrito se guarda en el teléfono, uno por cuenta: sobrevive a cerrar la
- * app y no se mezcla si otra persona inicia sesión en el mismo aparato. Los
- * precios se reservan por una hora y el servidor verifica la reserva al confirmar.
+ * app y no se mezcla si otra persona inicia sesión en el mismo aparato. Las
+ * cotizaciones vencen en una hora y el servidor verifica el precio al confirmar.
  */
 const claveCarrito = (userId: number) => `carrito:${userId}`;
 
@@ -248,6 +248,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       }
       return sumarLinea(actuales, nueva);
     });
+    revisarPrecios([p]);
     return true;
   };
 
@@ -337,18 +338,25 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   const revisarPrecios = (productos: Producto[]) => {
-    const precios = new Map(productos.map(p => [p.id, p.precio]));
-    const medidas = new Map(productos.map(p => [p.id, p]));
-    setLineas(prev => {
-      const nuevas = prev.map(i => precios.has(i.producto_id) && precios.get(i.producto_id) !== i.precioVigente
-        ? { ...i, precioVigente: precios.get(i.producto_id), tipo_venta: medidas.get(i.producto_id)?.tipo_venta, unidad_medida: medidas.get(i.producto_id)?.unidad_medida } : i);
-      return nuevas.some((i, idx) => i !== prev[idx]) ? nuevas : prev;
-    });
+    const catalogo = new Map(productos.map(p => [p.id, p]));
+    setLineas(prev => prev.map(i => {
+      const p = catalogo.get(i.producto_id);
+      if (!p) return i;
+      const baja = p.precio <= i.precio;
+      if (p.precio === i.precioVigente && p.precio >= i.precio) return i;
+      return { ...i, precioVigente: p.precio,
+        tipo_venta: p.tipo_venta, unidad_medida: p.unidad_medida,
+        // La cotización corresponde siempre al precio vigente. No al anterior.
+        precio_token: p.precio_token, precio_vence_at: p.precio_vence_at,
+        ...(baja ? { precio: p.precio, precioAvisado: undefined } : {}),
+      };
+    }));
   };
-  const cambiosPrecio = items.filter((i, idx) => i.precioVigente != null && i.precioVigente !== i.precio && i.precioVigente !== i.precioAvisado
+  const cambiosPrecio = items.filter((i, idx) => i.precioVigente != null && i.precioVigente > i.precio
     && items.findIndex(j => j.producto_id === i.producto_id) === idx);
   const resolverCambioPrecio = (productoId: number, conservar: boolean) => {
-    setLineas(prev => conservar ? prev.map(i => i.producto_id === productoId ? { ...i, precioAvisado: i.precioVigente } : i)
+    setLineas(prev => conservar ? prev.map(i => i.producto_id === productoId
+      ? { ...i, precio: i.precioVigente ?? i.precio, precioAvisado: undefined } : i)
       : prev.filter(i => i.producto_id !== productoId));
   };
 

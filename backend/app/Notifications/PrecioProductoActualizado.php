@@ -26,7 +26,7 @@ class PrecioProductoActualizado extends Notification implements ShouldQueue
     {
         return (new FcmMessage(notification: new FcmNotification(
             title: 'Cambió el precio de '.$this->producto->nombre,
-            body: 'Revisa tu carrito para conservar el producto o eliminarlo. El precio reservado se mantiene hasta que venza el carrito.',
+            body: 'Las rebajas se aplican automáticamente. Si el precio subió, acepta el nuevo precio o quita el producto desde tu carrito.',
         )))->android($this->androidAlertaAlta())->data(['tipo' => 'precio_carrito', 'producto_id' => (string) $this->producto->id]);
     }
 }

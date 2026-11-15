@@ -1,3 +1,4 @@
+import { useConfirmar } from '../components/Confirmacion';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
@@ -141,6 +142,7 @@ function LineaCarrito({ item, onAjustar, onAgregarOtra }: LineaProps) {
 export default function CarritoScreen({ navigation }: Props) {
   const { c } = useTheme();
   const styles = useStyles();
+  const confirmar = useConfirmar();
   const { items, lineas, negocioNombre, total, personalizar, sumarUnidad, vaciar } = useCart();
   // Línea en la hoja de ajustes. Se guarda la clave y no la línea: así la hoja
   // se cierra sola si la línea sale mientras está abierta.
@@ -162,7 +164,7 @@ export default function CarritoScreen({ navigation }: Props) {
     <View style={styles.container}>
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 24 }}>
         {!!negocioNombre && (
-          <View style={[styles.tienda, styles.fila]}>
+          <View style={[styles.fila, { marginBottom: 12 }]}>
             <Icon name="tienda" size={15} color={c.text} />
             <Text style={styles.tienda}>{negocioNombre}</Text>
           </View>
@@ -176,7 +178,7 @@ export default function CarritoScreen({ navigation }: Props) {
             />
           </FadeInView>
         ))}
-        <TouchableOpacity onPress={vaciar} style={{ marginTop: 8 }}>
+        <TouchableOpacity onPress={() => confirmar({ icono: 'basura', titulo: '¿Vaciar carrito?', texto: 'Se quitarán todos los productos de tu carrito.', textoBoton: 'Vaciar carrito', peligro: true, accion: vaciar })} style={{ marginTop: 8 }}>
           <Text style={styles.vaciar}>Vaciar carrito</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -187,7 +189,7 @@ export default function CarritoScreen({ navigation }: Props) {
           <Text style={styles.totalValor}>{cop(total)}</Text>
         </View>
         <Text style={styles.notaDomicilio}>El domicilio se suma en el siguiente paso.</Text>
-        <Text style={styles.notaDomicilio}>El carrito vence una hora después de agregar el primer producto. Los precios se conservan durante su vigencia.</Text>
+        <Text style={styles.notaDomicilio}>El carrito vence una hora después de agregar el primer producto. Las rebajas se aplican automáticamente; los aumentos requieren tu aceptación.</Text>
         <PressableScale
           style={[styles.btn, items.length === 0 && styles.btnOff]}
           disabled={items.length === 0}
@@ -215,7 +217,7 @@ export default function CarritoScreen({ navigation }: Props) {
 
 const useStyles = makeStyles((c, shadow) => ({
   container: { flex: 1, backgroundColor: c.bg },
-  tienda: { fontFamily: font.bold, color: c.text, marginBottom: 12 },
+  tienda: { fontFamily: font.bold, color: c.text },
   fila: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   item: {
     flexDirection: 'row',

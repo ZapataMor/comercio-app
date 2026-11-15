@@ -72,7 +72,7 @@ export default function RegisterScreen({ navigation }: Props) {
     const nuevosErrores: FieldErrors = {};
     if (!nombre.trim()) nuevosErrores.name = 'El campo nombre es obligatorio.';
     if (!apellidos.trim()) nuevosErrores.apellidos = 'El campo apellidos es obligatorio.';
-    if (!password) nuevosErrores.password = 'El campo contrasena es obligatorio.';
+    if (!password) nuevosErrores.password = 'El campo contraseña es obligatorio.';
     if (!direccionValida(direccion)) nuevosErrores.direccion = errorDireccion;
     if (!barrio.trim()) nuevosErrores.barrio = 'El campo barrio es obligatorio.';
     if (!aceptaTerminos) {
@@ -83,11 +83,11 @@ export default function RegisterScreen({ navigation }: Props) {
       return;
     }
     if (password.length < 5) {
-      setErrores({ password: 'La contrasena debe tener al menos 5 caracteres.' });
+      setErrores({ password: 'La contraseña debe tener al menos 5 caracteres.' });
       return;
     }
     if (password !== confirmar) {
-      setErrores({ confirmar: 'La contrasena y su confirmacion deben ser iguales.' });
+      setErrores({ confirmar: 'La contraseña y su confirmación deben ser iguales.' });
       return;
     }
 
@@ -245,7 +245,7 @@ export default function RegisterScreen({ navigation }: Props) {
           />
           <FieldError mensaje={errores.confirmar} />
 
-          <Text style={styles.label}>Direccion</Text>
+          <Text style={styles.label}>Dirección</Text>
           <CamposDireccion value={direccion} onChangeText={valor => { setDireccion(valor); limpiarError('direccion'); }} editable={!cargando} />
           <FieldError mensaje={errores.direccion} />
 

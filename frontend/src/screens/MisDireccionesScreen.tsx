@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useLectura } from '../useLectura';
+import React, { useCallback, useState } from 'react';
 import { useEnVivo } from '../usePolling';
 import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { ClienteDireccion, eliminarClienteDireccion, getClienteDirecciones, marcarDireccionPrincipal } from '../api';
@@ -24,7 +25,7 @@ export default function MisDireccionesScreen() {
     catch (e) { setError(messageFromError(e)); }
     finally { setCargando(false); }
   }, [auth]);
-  useEffect(() => { cargar(); }, [cargar]);
+  useLectura(() => { cargar(); }, [cargar]);
   useEnVivo(['direcciones'], cargar);
   async function cambiar(d: ClienteDireccion, borrar: boolean) {
     if (!auth || guardando) return;

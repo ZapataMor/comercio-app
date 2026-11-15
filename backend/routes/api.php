@@ -117,6 +117,7 @@ Route::middleware(['auth:sanctum', 'throttle:api-usuario'])->group(function () {
     // Va ANTES de /negocios/{id} para que "mios" no se tome como un id.
     Route::get('/negocios/mios', [NegocioController::class, 'index']);
     // Pedidos sin aceptar de todos mis negocios: de aquí sale la alarma con la app abierta.
+    Route::get('/negocios/mios/reembolsos', [ApiPedidoController::class, 'reembolsos']);
     Route::get('/negocios/mios/por-aceptar', [ComercioPedidoController::class, 'porAceptar']);
     // Cierres del horario automático que el dueño debe confirmar (20 min antes).
     Route::get('/negocios/mios/por-cerrar', [NegocioController::class, 'cierresPorConfirmar']);
@@ -214,6 +215,7 @@ Route::middleware(['auth:sanctum', 'throttle:api-usuario'])->group(function () {
     Route::get('/pedidos', [ApiPedidoController::class, 'index']);
     Route::get('/pedidos/{id}', [ApiPedidoController::class, 'show']);
     // Cancelar mientras el negocio no lo tenga listo.
+    Route::post('/pedidos/{id}/reembolso', [ApiPedidoController::class, 'solicitarReembolso']);
     Route::post('/pedidos/{id}/cancelar', [ApiPedidoController::class, 'cancelar']);
     Route::put('/pedidos/{id}/ajuste', [PedidoIncidenciaController::class, 'ajustar']);
     Route::post('/pedidos/{id}/reporte', [PedidoReporteController::class, 'store']);

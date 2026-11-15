@@ -1,4 +1,4 @@
-import { useFocusEffect } from '@react-navigation/native';
+import { useLecturaEnFoco } from '../useLectura';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, ScrollView, Text, View } from 'react-native';
@@ -273,7 +273,7 @@ export default function HomeScreen({ navigation }: Props) {
     });
   }, [navigation, styles, esDomiciliario]);
 
-  useFocusEffect(useCallback(() => { recargar(); }, [recargar]));
+  useLecturaEnFoco(useCallback(() => { recargar(); }, [recargar]));
 
   const cargarPedidos = useCallback(() => {
     if (!negocioId) {
@@ -303,7 +303,7 @@ export default function HomeScreen({ navigation }: Props) {
   // Pedidos en espera del negocio activo: se recargan al entrar, al instante
   // cuando cambia un pedido o una cita del negocio (en vivo o push) y, de
   // respaldo, cada 15 s mientras la pantalla está visible.
-  useFocusEffect(
+  useLecturaEnFoco(
     useCallback(() => {
       cargarPedidos();
     }, [cargarPedidos]),

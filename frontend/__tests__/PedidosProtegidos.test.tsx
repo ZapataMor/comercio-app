@@ -47,15 +47,15 @@ test('el carrito vence a la hora aunque se agreguen unidades y sigue vacío al r
   expect(reabierto.cart.count).toBe(0);
 });
 
-test('un cambio de precio pide una decisión y conserva el precio reservado al conservar el producto', async () => {
+test('un aumento pide una decisión y aplica el nuevo precio al aceptarlo', async () => {
   const api = await montar();
   await act(async () => { api.cart.agregar(3, 'Tienda', producto); });
-  act(() => api.cart.revisarPrecios([{ ...producto, precio: 99000 }]));
+  act(() => api.cart.revisarPrecios([{ ...producto, precio: 99000, precio_token: 'nuevo' }]));
   expect(api.cart.total).toBe(21000);
   expect(api.cart.cambiosPrecio[0].nombre).toBe('Arepa');
   act(() => api.cart.resolverCambioPrecio(4, true));
-  expect(api.cart.total).toBe(21000);
-  expect(api.cart.items[0].precio_token).toBe('reserva');
+  expect(api.cart.total).toBe(99000);
+  expect(api.cart.items[0].precio_token).toBe('nuevo');
   expect(api.cart.cambiosPrecio).toHaveLength(0);
   act(() => api.cart.revisarPrecios([{ ...producto, precio: 100000 }]));
   expect(api.cart.cambiosPrecio).toHaveLength(1);
@@ -86,7 +86,8 @@ test('agregar otra variante de un producto conserva la misma reserva de precio',
   await act(async () => { api.cart.agregar(3, 'Tienda', { ...producto, precio: 99000, precio_token: 'reserva-nueva' }, { sin: ['Queso'] }); });
   expect(api.cart.items).toHaveLength(2);
   expect(api.cart.total).toBe(42000);
-  expect(api.cart.items.map(i => i.precio_token)).toEqual(['reserva', 'reserva']);
+  expect(api.cart.items.map(i => i.precio_token)).toEqual(['reserva-nueva', 'reserva-nueva']);
+  expect(api.cart.cambiosPrecio).toHaveLength(1);
 });
 
 test('el envío sobrevive al cierre de la app y recupera el pedido con la misma clave', async () => {
@@ -126,4 +127,16 @@ test('no admite un nuevo pedido si no puede leer el envío guardado', async () =
     await act(async () => { api.envio.recargar(); });
     expect(api.envio.cargando).toBe(false);
   } finally { (AsyncStorage.getItem as jest.Mock).mockImplementation(obtener); }
+});
+
+test('una rebaja actualiza todas las variantes y elimina cualquier aviso de aumento pendiente', async () => {
+  const api = await montar();
+  await act(async () => { api.cart.agregar(3, 'Tienda', producto); });
+  act(() => { api.cart.agregar(3, 'Tienda', producto, { sin: ['Queso'] }); });
+  act(() => api.cart.revisarPrecios([{ ...producto, precio: 25000 }]));
+  expect(api.cart.cambiosPrecio).toHaveLength(1);
+  act(() => api.cart.revisarPrecios([{ ...producto, precio: 18000, precio_token: 'rebaja' }]));
+  expect(api.cart.total).toBe(36000);
+  expect(api.cart.cambiosPrecio).toHaveLength(0);
+  expect(api.cart.items.map(i => i.precio_token)).toEqual(['rebaja', 'rebaja']);
 });

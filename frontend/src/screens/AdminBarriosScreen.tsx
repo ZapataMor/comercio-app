@@ -1,5 +1,6 @@
+import { useLectura } from '../useLectura';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useEnVivo } from '../usePolling';
 import { ActivityIndicator, FlatList, Text, TouchableOpacity, View } from 'react-native';
 import { aprobarBarrio, BarrioPendiente, getBarriosPendientes, rechazarBarrio } from '../api';
@@ -25,14 +26,14 @@ export default function AdminBarriosScreen(_props: Props) {
   const [error, setError] = useState<string | null>(null);
   const [procesando, setProcesando] = useState<number | null>(null);
 
-  useEffect(() => {
+  useLectura(() => {
     getBarriosPendientes(auth!.token)
-      .then(setBarrios)
+      .then(datos => { setBarrios(datos); setError(null); })
       .catch(e => setError(e.message));
   }, [auth]);
   // En vivo: barrios que sugieren los clientes o que resuelve otro admin.
   useEnVivo(['barrios'], () => {
-    getBarriosPendientes(auth!.token).then(setBarrios).catch(() => {});
+    getBarriosPendientes(auth!.token).then(datos => { setBarrios(datos); setError(null); }).catch(() => {});
   });
 
   async function resolver(barrio: BarrioPendiente, aprobar: boolean) {

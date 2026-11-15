@@ -181,6 +181,7 @@ class ComercioPedidoController extends Controller
             'costo_domicilio' => (float) $p->costo_domicilio,
             'total' => (float) $p->total,
             'metodo_pago' => $p->metodo_pago,
+            'reembolso_solicitado' => $p->reembolso_solicitado_at !== null,
             'direccion_entrega' => $p->direccion_entrega,
             'telefono_contacto' => $p->telefono_contacto,
             'cliente' => $p->cliente?->nombre_completo,

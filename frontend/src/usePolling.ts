@@ -1,3 +1,4 @@
+import { alReintentarRed } from './red';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
@@ -94,6 +95,9 @@ export function useEnVivo(filtro: FiltroEnVivo, cargar: () => void) {
   const pendiente = useRef(false);
   const cargarRef = useRef(cargar);
   cargarRef.current = cargar;
+  useEffect(() => alReintentarRed(() => {
+    if (enfocada.current && AppState.currentState === 'active') cargarRef.current();
+  }), []);
 
   useAvisosEnVivo(filtro, () => {
     if (enfocada.current && AppState.currentState === 'active') {

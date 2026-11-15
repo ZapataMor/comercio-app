@@ -1,6 +1,7 @@
+import { useLectura } from '../useLectura';
 import { telefonoValido, errorTelefono } from '../direccion';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -58,7 +59,7 @@ export default function AgendarCitaScreen({ route, navigation }: Props) {
   const [revision, setRevision] = useState(0);
 
   // Descarta respuestas de fechas/profesionales anteriores, también al salir de la pantalla.
-  useEffect(() => {
+  useLectura(() => {
     let vigente = true;
     setCargando(true);
     getDisponibilidadCitas(

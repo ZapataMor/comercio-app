@@ -1,3 +1,4 @@
+import { useLectura } from '../useLectura';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -116,6 +117,7 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
   // Texto de los resultados en pantalla; vacío = listado normal. Va aparte de
   // `busqueda`, que cambia con cada tecla antes de que lleguen los resultados.
   const [consulta, setConsulta] = useState('');
+  const [consultaAplicada, setConsultaAplicada] = useState('');
   const [tiposNegocio, setTiposNegocio] = useState<TipoNegocio[]>([]);
   const [tipoSeleccionadoId, setTipoSeleccionadoId] = useState<number | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -140,7 +142,7 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
     [negocios, productos, consulta, seccion],
   );
 
-  useEffect(() => {
+  useLectura(() => {
     if (!auth?.token) return;
     let vigente = true;
     setTiposNegocio([]);
@@ -166,6 +168,7 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
       ])
         .then(([p, hallados]) => {
           if (turno !== ultimaPeticion.current) return;
+          setConsultaAplicada(t);
           setNegocios(p.negocios);
           setPagina(p.pagina);
           setUltimaPagina(p.ultimaPagina);
@@ -191,7 +194,7 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
     cargandoMasRef.current = true;
     setCargandoMas(true);
     const turno = ultimaPeticion.current;
-    getNegocios(auth!.token, busqueda.trim() || undefined, pagina + 1, tipoSeleccionadoId, seccion)
+    getNegocios(auth!.token, consultaAplicada || undefined, pagina + 1, tipoSeleccionadoId, seccion)
       .then(p => {
         if (turno !== ultimaPeticion.current) return;
         setNegocios(prev => {
@@ -207,7 +210,7 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
         cargandoMasRef.current = false;
         setCargandoMas(false);
       });
-  }, [auth, consulta, cargando, refrescando, pagina, ultimaPagina, tipoSeleccionadoId, busqueda, seccion]);
+  }, [auth, consulta, cargando, refrescando, pagina, ultimaPagina, tipoSeleccionadoId, consultaAplicada, seccion]);
 
   // Trae de nuevo lo que hay en pantalla, sin indicadores ni avisos de error, para
   // que un negocio que abre o cierra cambie solo. Son todas las páginas cargadas:
@@ -216,7 +219,7 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
     if (cargando || refrescando || cargandoMasRef.current) return;
     const turno = ultimaPeticion.current;
     const paginaVista = pagina;
-    const t = busqueda.trim();
+    const t = consultaAplicada;
     const conProductos = seccion === 'productos' && !!t && tipoSeleccionadoId == null;
     const paginas = Array.from({ length: paginaVista }, (_, i) => i + 1);
 
@@ -249,7 +252,7 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
   }, [seccion]);
 
   // Solo el teclado espera a que dejen de escribir; cambiar de categoría es inmediato.
-  useEffect(() => {
+  useLectura(() => {
     const espera = busqueda === ultimaBusqueda.current ? 0 : ESPERA_BUSQUEDA;
     ultimaBusqueda.current = busqueda;
     const t = setTimeout(() => cargar(busqueda), espera);

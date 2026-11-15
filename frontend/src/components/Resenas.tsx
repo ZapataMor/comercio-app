@@ -1,3 +1,4 @@
+import { useLectura } from '../useLectura';
 /**
  * Reseñas públicas de tiendas y productos (estrellas de 1 a 5 y comentario).
  *
@@ -11,7 +12,7 @@
  * No confundir con el nivel de confiabilidad (Reputacion.tsx): ese mide si
  * cumplieron con el pedido; las reseñas, si le gustó al cliente.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { ActivityIndicator, StyleProp, Text, TextInput, View, ViewStyle } from 'react-native';
 import { Path, Svg } from 'react-native-svg';
 import {
@@ -303,7 +304,7 @@ export function ResenasDeProducto({
   const [datos, setDatos] = useState<PaginaResenas | null>(null);
   const [fallo, setFallo] = useState(false);
 
-  useEffect(() => {
+  useLectura(() => {
     getResenas(token, negocioId, { productoId })
       .then(setDatos)
       .catch(() => setFallo(true));

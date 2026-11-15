@@ -1,10 +1,10 @@
+import { useLectura, useLecturaEnFoco } from '../useLectura';
 import FotosDireccion, { FOTOS_OBLIGATORIAS, fotosCompletas } from '../components/FotosDireccion';
 import { FotosDireccion as Fotos } from '../api';
 import { campoDireccionValido, limpiarTextoDireccion } from '../direccion';
 import CamposDireccion from '../components/CamposDireccion';
 import { normalizarDireccion } from '../direccion';
 import { direccionValida, errorDireccion, telefonoValido, errorTelefono } from '../direccion';
-import { useFocusEffect } from '@react-navigation/native';
 import EditarDireccion from '../components/EditarDireccion';
 import SelectorUbicacion from '../components/SelectorUbicacion';
 import { textoCantidad } from '../cantidades';
@@ -113,7 +113,7 @@ export default function CheckoutScreen({ navigation }: Props) {
       });
   }, [auth?.token]);
 
-  useEffect(cargarTarifa, [cargarTarifa]);
+  useLectura(cargarTarifa, [cargarTarifa]);
   useEnVivo(['ajustes'], cargarTarifa);
 
   function limpiarError(campo: string) {
@@ -124,7 +124,7 @@ export default function CheckoutScreen({ navigation }: Props) {
     });
   }
 
-  useFocusEffect(useCallback(() => {
+  useLecturaEnFoco(useCallback(() => {
     let activo = true;
 
     async function cargarDirecciones() {
@@ -199,7 +199,7 @@ export default function CheckoutScreen({ navigation }: Props) {
       return;
     }
     if (!direccionEntrega) {
-      setErrores({ ubicacion: 'Selecciona o agrega una ubicacion de entrega.' });
+      setErrores({ ubicacion: 'Selecciona o agrega una ubicación de entrega.' });
       return;
     }
 
@@ -316,7 +316,7 @@ export default function CheckoutScreen({ navigation }: Props) {
       <FadeInView style={styles.resumen}>
         <View style={[styles.resumenTitulo, styles.fila]}>
           <Icon name="tienda" size={15} color={c.text} />
-          <Text style={styles.resumenTitulo}>{cart.negocioNombre}</Text>
+          <Text style={[styles.resumenTitulo, { marginBottom: 0 }]}>{cart.negocioNombre}</Text>
         </View>
         {cart.items.map(i => {
           const detalle = detalleOpciones(i.opciones);
@@ -349,7 +349,7 @@ export default function CheckoutScreen({ navigation }: Props) {
         </View>
       </FadeInView>
 
-      <Text style={styles.label}>Ubicacion de entrega</Text>
+      <Text style={styles.label}>Ubicación de entrega</Text>
       {cargandoDirecciones ? (
         <View style={styles.cargandoUbicaciones}>
           <ActivityIndicator color={c.accent} />
@@ -371,7 +371,7 @@ export default function CheckoutScreen({ navigation }: Props) {
                 </View>
                 <View style={styles.ubicacionTexto}>
                   <Text style={[styles.ubicacionTitulo, activa && styles.ubicacionTituloOn]}>
-                    {d.nombre || (d.es_principal ? 'Direccion principal' : 'Otra ubicacion')}
+                    {d.nombre || (d.es_principal ? 'Dirección principal' : 'Otra ubicación')}
                   </Text>
                   <Text style={[styles.ubicacionDetalle, activa && styles.ubicacionDetalleOn]}>
                     {textoUbicacion(d)}
@@ -394,10 +394,10 @@ export default function CheckoutScreen({ navigation }: Props) {
             </View>
             <View style={styles.ubicacionTexto}>
               <Text style={[styles.ubicacionTitulo, seleccion === 'nueva' && styles.ubicacionTituloOn]}>
-                Agregar otra ubicacion
+                Agregar otra ubicación
               </Text>
               <Text style={[styles.ubicacionDetalle, seleccion === 'nueva' && styles.ubicacionDetalleOn]}>
-                Guardala para usarla en otros pedidos.
+                Guárdala para usarla en otros pedidos.
               </Text>
             </View>
           </TouchableOpacity>
@@ -428,7 +428,7 @@ export default function CheckoutScreen({ navigation }: Props) {
         </View>
       ) : null}
 
-      <Text style={styles.label}>Telefono de contacto</Text>
+      <Text style={styles.label}>Teléfono de contacto</Text>
       <View style={styles.ubicaciones}>
         {telefonoGuardado ? (
           <TouchableOpacity
@@ -442,7 +442,7 @@ export default function CheckoutScreen({ navigation }: Props) {
             </View>
             <View style={styles.ubicacionTexto}>
               <Text style={[styles.ubicacionTitulo, !usarOtroTelefono && styles.ubicacionTituloOn]}>
-                Mi telefono
+                Mi teléfono
               </Text>
               <Text style={[styles.ubicacionDetalle, !usarOtroTelefono && styles.ubicacionDetalleOn]}>
                 {telefonoGuardado}
@@ -463,7 +463,7 @@ export default function CheckoutScreen({ navigation }: Props) {
             </View>
             <View style={styles.ubicacionTexto}>
               <Text style={[styles.ubicacionTitulo, usarOtroTelefono && styles.ubicacionTituloOn]}>
-                Usar otro numero
+                Usar otro número
               </Text>
               <Text style={[styles.ubicacionDetalle, usarOtroTelefono && styles.ubicacionDetalleOn]}>
                 Solo para este pedido.

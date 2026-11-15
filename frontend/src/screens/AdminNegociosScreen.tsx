@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useLectura } from '../useLectura';
+import React, { useCallback, useRef, useState } from 'react';
 import { useEnVivo } from '../usePolling';
 import { ActivityIndicator, FlatList, RefreshControl, Text, TextInput, View } from 'react-native';
 import { AdminNegocio, getAdminNegocios } from '../api';
@@ -45,7 +46,7 @@ export default function AdminNegociosScreen() {
   );
 
   // Busca 350 ms después de dejar de escribir.
-  useEffect(() => {
+  useLectura(() => {
     const t = setTimeout(() => cargar(buscar), buscar ? 350 : 0);
     return () => clearTimeout(t);
   }, [buscar, cargar]);

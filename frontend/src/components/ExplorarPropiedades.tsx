@@ -1,10 +1,11 @@
+import { useLectura } from '../useLectura';
 /**
  * Catálogo de Propiedades del cliente (Explorar → «Propiedades»): casas en
  * venta, casas en alquiler y patios para eventos, con búsqueda, pestañas por
  * tipo y el botón de su propio mapa. Un toque abre el detalle.
  */
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -73,7 +74,7 @@ export default function ExplorarPropiedades({ navigation }: Props) {
   );
 
   // El teclado espera a que dejen de escribir; cambiar de pestaña es inmediato.
-  useEffect(() => {
+  useLectura(() => {
     const espera = busqueda === ultimaBusqueda.current ? 0 : ESPERA_BUSQUEDA;
     ultimaBusqueda.current = busqueda;
     const t = setTimeout(() => cargar(), espera);

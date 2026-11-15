@@ -1,6 +1,7 @@
+import { useLectura } from '../useLectura';
 import { Image } from 'react-native';
 import { API_URL } from '../config';
-import React, { Ref, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import React, { Ref, useCallback, useImperativeHandle, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   LayoutAnimation,
@@ -109,7 +110,7 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
     [traer, aplicar, toast],
   );
 
-  useEffect(() => {
+  useLectura(() => {
     cargar();
   }, [cargar]);
   usePolling(() => cargar(), 15000, ['disponibles', 'pedidos', 'reputacion', 'perfil']);

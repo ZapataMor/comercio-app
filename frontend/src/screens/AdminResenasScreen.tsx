@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useLectura } from '../useLectura';
+import React, { useCallback, useState } from 'react';
 import { useEnVivo } from '../usePolling';
 import { ActivityIndicator, FlatList, RefreshControl, Text, TextInput, View } from 'react-native';
 import {
@@ -62,7 +63,7 @@ export default function AdminResenasScreen() {
     [token, filtro, toast],
   );
 
-  useEffect(() => {
+  useLectura(() => {
     setCargando(true);
     setAbierta(null);
     cargar();

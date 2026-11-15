@@ -848,6 +848,7 @@ export async function eliminarProducto(token: string, negocioId: number, id: num
 
 /** Pedidos recibidos por un negocio mío. */
 export type ComercioPedido = {
+  reembolso_solicitado?: boolean;
   faltante_motivo?: string | null;
   puede_confirmar_devolucion?: boolean;
   id: number;
@@ -1744,6 +1745,7 @@ export type CaritasPromedio = {
 };
 
 export type SeguimientoPedido = {
+  reembolso_solicitado?: boolean;
   negocio_id?: number;
   faltante_motivo?: string | null;
   faltante_version?: string | null;
@@ -2108,4 +2110,12 @@ export async function cambiarDisponibilidadPropiedad(token: string, id: number, 
 
 export async function eliminarPropiedad(token: string, id: number): Promise<void> {
   await authSend('DELETE', `/api/propiedades/${id}`, token);
+}
+
+export async function solicitarReembolso(token: string, id: number): Promise<void> {
+  await authSend('POST', `/pedidos/${id}/reembolso`, token);
+}
+export type SolicitudReembolso = { id: number; codigo: string; negocio_id: number; negocio: string; cliente: string; telefono: string | null; fecha: string };
+export async function getReembolsos(token: string, pagina = 1): Promise<{ solicitudes: SolicitudReembolso[]; total: number; pagina: number; ultima_pagina: number }> {
+  return authGet(`/negocios/mios/reembolsos?page=${pagina}`, token);
 }

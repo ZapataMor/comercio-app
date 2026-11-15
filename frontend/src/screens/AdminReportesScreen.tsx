@@ -1,6 +1,6 @@
+import { useLecturaEnFoco } from '../useLectura';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
 import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { getReportesPedidos, ReportePedido, resolverReportePedido } from '../api';
 import { useAuth } from '../AuthContext';
@@ -31,7 +31,7 @@ export default function AdminReportesScreen({ navigation }: Props) {
     } catch (e) { setError(messageFromError(e)); }
     finally { setCargando(false); }
   }, [token, filtro]);
-  useFocusEffect(useCallback(() => { setCargando(true); cargar(); }, [cargar]));
+  useLecturaEnFoco(useCallback(() => { setCargando(true); cargar(); }, [cargar]));
   usePolling(() => { if (pagina === 1 && !resolviendo && !enviando) cargar(); }, 15000, ['reportes', 'pedidos']);
   async function resolver(id: number) {
     setEnviando(true);

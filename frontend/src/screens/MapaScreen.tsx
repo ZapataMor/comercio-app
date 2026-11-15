@@ -1,3 +1,4 @@
+import { useLectura } from '../useLectura';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Text, TouchableOpacity, View } from 'react-native';
@@ -78,7 +79,7 @@ export default function MapaScreen({ navigation, route }: Props) {
   const esCliente = puedeVerTienda && !admin;
 
   // El cliente ve su casa (la dirección principal con punto)...
-  useEffect(() => {
+  useLectura(() => {
     if (!esCliente) return;
     getClienteDirecciones(token)
       .then(lista => {
@@ -96,7 +97,7 @@ export default function MapaScreen({ navigation, route }: Props) {
       .catch(() => {});
   }, [esCliente]);
 
-  useEffect(() => {
+  useLectura(() => {
     getNegociosMapa(token)
       .then(setNegocios)
       .catch(e => toast.error('No se pudo cargar el mapa', e instanceof Error ? e.message : 'Error'))
@@ -124,7 +125,7 @@ export default function MapaScreen({ navigation, route }: Props) {
       .then(setDomiciliarios)
       .catch(() => {});
   }, [admin, token]);
-  useEffect(() => {
+  useLectura(() => {
     cargarDomiciliarios();
   }, [cargarDomiciliarios]);
   usePolling(cargarDomiciliarios, 15000, admin ? ['mapa', 'pedidos', 'perfil'] : undefined);

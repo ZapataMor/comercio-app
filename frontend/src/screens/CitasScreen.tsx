@@ -1,4 +1,4 @@
-import { useFocusEffect } from '@react-navigation/native';
+import { useLecturaEnFoco } from '../useLectura';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useRef, useState } from 'react';
 import {
@@ -106,7 +106,7 @@ export default function CitasScreen({ route, navigation }: Props) {
     },
     [token, negocioId, gestion],
   );
-  useFocusEffect(
+  useLecturaEnFoco(
     useCallback(() => {
       setCargando(true);
       setCitas([]);

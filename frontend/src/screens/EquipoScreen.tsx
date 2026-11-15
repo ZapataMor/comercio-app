@@ -1,3 +1,4 @@
+import { useLecturaEnFoco } from '../useLectura';
 /**
  * Equipo del negocio ACTIVO: miembros e invitaciones.
  *
@@ -6,7 +7,6 @@
  * confirmar y le envía una invitación que esa persona debe aceptar.
  * Un trabajador ve el equipo y puede salirse del negocio.
  */
-import { useFocusEffect } from '@react-navigation/native';
 import { temasDelNegocio, useEnVivo } from '../usePolling';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -99,7 +99,7 @@ export default function EquipoScreen({ navigation }: Props) {
     }
   }, [negocioId, token, toast]);
 
-  useFocusEffect(
+  useLecturaEnFoco(
     useCallback(() => {
       cargar();
     }, [cargar]),

@@ -1,9 +1,11 @@
+import { useConfirmar } from '../components/Confirmacion';
+import { useLecturaEnFoco } from '../useLectura';
+import ErrorCarga from '../components/ErrorCarga';
 import { textoCantidad } from '../cantidades';
-import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { cancelarMiPedido, getPedido, SeguimientoPedido } from '../api';
+import { cancelarMiPedido, getPedido, solicitarReembolso, SeguimientoPedido } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView } from '../components/anim';
 import BotonesContacto from '../components/BotonesContacto';
@@ -88,7 +90,10 @@ export default function PedidoDetalleScreen({ route }: Props) {
   const styles = useStyles();
   const { auth } = useAuth();
   const toast = useToast();
+  const confirmar = useConfirmar();
+  const [solicitando, setSolicitando] = useState(false);
   const { id } = route.params;
+  const [error, setError] = useState<string | null>(null);
   const [pedido, setPedido] = useState<SeguimientoPedido | null>(null);
   const [cargando, setCargando] = useState(true);
   const [cancelando, setCancelando] = useState(false);
@@ -114,7 +119,8 @@ export default function PedidoDetalleScreen({ route }: Props) {
   const cargarPedido = useCallback(
     () =>
       getPedido(auth!.token, id)
-        .then(setPedido)
+        .then(p => { setPedido(p); setError(null); })
+        .catch(e => setError(messageFromError(e)))
         .finally(() => setCargando(false)),
     [auth, id],
   );
@@ -124,7 +130,7 @@ export default function PedidoDetalleScreen({ route }: Props) {
   useEffect(() => {
     setCargando(true);
   }, [id]);
-  useFocusEffect(
+  useLecturaEnFoco(
     useCallback(() => {
       cargarPedido();
     }, [cargarPedido]),
@@ -137,6 +143,7 @@ export default function PedidoDetalleScreen({ route }: Props) {
   if (cargando) {
     return <ActivityIndicator size="large" color={c.accent} style={{ marginTop: 40 }} />;
   }
+  if (error) return <ErrorCarga mensaje={error} />;
   if (!pedido) {
     return <Text style={styles.error}>No se encontró el pedido.</Text>;
   }
@@ -200,7 +207,27 @@ export default function PedidoDetalleScreen({ route }: Props) {
                     : 'Lo cancelaste tú'}
             {pedido.motivo_cancelacion ? `: ${pedido.motivo_cancelacion}` : '.'}
           </Text>
-          <Text style={styles.canceladoNota}>No se te cobra nada.</Text>
+          {pedido.metodo_pago === 'transferencia' ? <>
+            <Text style={styles.canceladoNota}>Si ya pagaste por transferencia, solicita al negocio la devolución del dinero. El reembolso no es automático.</Text>
+            <TouchableOpacity disabled={solicitando || pedido.reembolso_solicitado} onPress={() => confirmar({
+              icono: 'banco', titulo: '¿Ya hiciste la transferencia?',
+              texto: 'Solicita el reembolso solo si ya pagaste. Avisaremos al negocio para que acuerden la devolución.',
+              textoBoton: 'Solicitar reembolso', accion: async () => {
+                setSolicitando(true);
+                try {
+                  await solicitarReembolso(auth!.token, pedido.id);
+                  setPedido(p => p && { ...p, reembolso_solicitado: true });
+                  toast.exito('Solicitud registrada', 'Puedes contactar directamente al negocio para acordar la devolución.');
+                } catch (e) { toast.error('No se pudo solicitar', messageFromError(e)); }
+                finally { setSolicitando(false); }
+              },
+            })}>
+              <Text style={styles.cancelarTxt}>{pedido.reembolso_solicitado ? 'Reembolso solicitado' : solicitando ? 'Solicitando…' : 'Solicitar reembolso'}</Text>
+              <Text style={styles.canceladoNota}>{pedido.negocio} · {pedido.negocio_telefono || 'Teléfono no disponible'}</Text>
+            </TouchableOpacity>
+            <BotonesContacto telefono={pedido.negocio_telefono} etiquetaLlamar="Llamar al negocio"
+              mensaje={`Hola, ya pagué por transferencia el pedido #${pedido.codigo}, que fue cancelado. Quisiera acordar el reembolso.`} />
+          </> : <Text style={styles.canceladoNota}>No se te cobra nada.</Text>}
         </FadeInView>
       ) : (
       <FadeInView style={styles.card}>

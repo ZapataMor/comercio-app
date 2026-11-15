@@ -1,3 +1,4 @@
+import { useLectura } from '../useLectura';
 /**
  * Detalle de una propiedad: fotos, precio, datos clave (habitaciones, baños,
  * área o capacidad), descripción, características, condiciones, dónde queda
@@ -5,7 +6,7 @@
  * quien la publicó. El dueño ve además «Editar».
  */
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -60,7 +61,7 @@ export default function PropiedadScreen({ navigation, route }: Props) {
       .catch(e => setError(messageFromError(e, 'No se pudo cargar la propiedad.')));
   }, [token, id, navigation]);
 
-  useEffect(cargar, [cargar]);
+  useLectura(cargar, [cargar]);
   // Si el dueño cambia el precio o la oculta, se ve aquí.
   usePolling(cargar, 60000, ['propiedades']);
 

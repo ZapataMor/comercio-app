@@ -1,3 +1,4 @@
+import { useLectura } from '../useLectura';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { temasDelNegocio, useEnVivo } from '../usePolling';
@@ -196,7 +197,7 @@ export default function MisProductosScreen({ navigation }: Props) {
     [token, negocioId, toast, puedeInventario],
   );
 
-  useEffect(() => cargar(), [cargar]);
+  useLectura(() => cargar(), [cargar]);
   // En vivo: lo que otro del equipo agrega, edita o elimina aparece aquí.
   useEnVivo(temasDelNegocio(['catalogo'], negocioId), () => cargar('silencioso'));
 

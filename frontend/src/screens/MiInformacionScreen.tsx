@@ -209,19 +209,19 @@ export default function MiInformacionScreen(_props: Props) {
     }
     if (cambiaPass) {
       const passErrores: FieldErrors = {};
-      if (!passActual) passErrores.password_actual = 'El campo contrasena actual es obligatorio.';
-      if (!passNueva) passErrores.password = 'El campo nueva contrasena es obligatorio.';
-      if (!passConfirma) passErrores.confirmar = 'Confirma la nueva contrasena.';
+      if (!passActual) passErrores.password_actual = 'El campo contraseña actual es obligatorio.';
+      if (!passNueva) passErrores.password = 'El campo nueva contraseña es obligatorio.';
+      if (!passConfirma) passErrores.confirmar = 'Confirma la nueva contraseña.';
       if (Object.keys(passErrores).length > 0) {
         setErrores(passErrores);
         return;
       }
       if (passNueva !== passConfirma) {
-        setErrores({ confirmar: 'La nueva contrasena y su confirmacion deben ser iguales.' });
+        setErrores({ confirmar: 'La nueva contraseña y su confirmación deben ser iguales.' });
         return;
       }
       if (passNueva.length < 5) {
-        setErrores({ password: 'La nueva contrasena debe tener al menos 5 caracteres.' });
+        setErrores({ password: 'La nueva contraseña debe tener al menos 5 caracteres.' });
         return;
       }
     }

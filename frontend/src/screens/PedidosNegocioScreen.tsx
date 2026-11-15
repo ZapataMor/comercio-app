@@ -1,10 +1,10 @@
+import { useLecturaEnFoco } from '../useLectura';
 /**
  * Pedidos del negocio activo: historial completo por pestañas (en espera, en
  * curso, entregados, cancelados) y el resumen de hoy (pedidos y ventas).
  * El Inicio solo muestra los que esperan; aquí se sigue el pedido después de
  * marcarlo listo y se ven las ventas.
  */
-import { useFocusEffect } from '@react-navigation/native';
 import { temasDelNegocio, useEnVivo } from '../usePolling';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -94,7 +94,7 @@ export default function PedidosNegocioScreen({ navigation }: Props) {
   }, [grupo]);
 
   // Se recarga al volver (p. ej. después de marcar listo o rechazar).
-  useFocusEffect(
+  useLecturaEnFoco(
     useCallback(() => {
       cargar('inicio');
     }, [cargar]),

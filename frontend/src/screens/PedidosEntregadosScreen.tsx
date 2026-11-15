@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useLectura } from '../useLectura';
+import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, Text, View } from 'react-native';
 import { getHistorialEntregas, Pedido } from '../api';
 import { useAuth } from '../AuthContext';
@@ -48,7 +49,7 @@ export default function PedidosEntregadosScreen() {
     [token],
   );
 
-  useEffect(() => {
+  useLectura(() => {
     cargar();
   }, [cargar]);
 

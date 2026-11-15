@@ -43,7 +43,7 @@ class PedidoCancelado extends Notification implements ShouldQueue
         [$titulo, $cuerpo] = match (true) {
             $porAdmin && $paraCliente => ['Tu pedido fue cancelado', 'Vitrina cerró tu pedido'.($motivo ? ": {$motivo}" : '.')],
             $porAdmin => ["Pedido #{$this->pedido->codigo} cancelado", 'Vitrina cerró el pedido'.($motivo ? ": {$motivo}" : '.')],
-            $vencido && $paraCliente => ['Tu pedido no fue recibido', "{$negocio} no recibió tu pedido. No se te cobra nada."],
+            $vencido && $paraCliente => ['Tu pedido no fue recibido', "{$negocio} no recibió tu pedido.".($this->pedido->metodo_pago === 'transferencia' ? ' Si ya transferiste, solicita el reembolso al negocio desde el pedido.' : ' No se te cobra nada.')],
             $vencido => ["Pedido #{$this->pedido->codigo} vencido", 'Nadie lo aceptó a tiempo y se le avisó al cliente.'],
             $paraCliente => ['Tu pedido fue cancelado', "{$negocio} no pudo atenderlo".($motivo ? ": {$motivo}" : '.')],
             default => ["Pedido #{$this->pedido->codigo} cancelado", 'El cliente canceló el pedido'.($motivo ? ": {$motivo}" : '.')],

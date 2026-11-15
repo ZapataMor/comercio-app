@@ -556,7 +556,7 @@ export default function LoginScreen({ navigation }: Props) {
     setErrores({});
     const nuevosErrores: FieldErrors = {};
     if (!usuario.trim()) nuevosErrores.usuario = 'Escribe tu correo, celular o usuario.';
-    if (!password) nuevosErrores.password = 'El campo contrasena es obligatorio.';
+    if (!password) nuevosErrores.password = 'El campo contraseña es obligatorio.';
     if (Object.keys(nuevosErrores).length > 0) {
       setErrores(nuevosErrores);
       return;

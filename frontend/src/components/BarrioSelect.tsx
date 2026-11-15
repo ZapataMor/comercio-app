@@ -1,5 +1,6 @@
+import { useLectura } from '../useLectura';
 import { limpiarCampoDireccion } from '../direccion';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -51,7 +52,7 @@ export default function BarrioSelect({
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
 
-  useEffect(() => {
+  useLectura(() => {
     if (!abierto || barrios !== null) return;
     getBarrios()
       .then(setBarrios)

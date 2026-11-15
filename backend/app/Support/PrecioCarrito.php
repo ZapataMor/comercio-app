@@ -35,7 +35,7 @@ class PrecioCarrito
         try {
             $reserva = self::reserva($item['precio_token']);
             if ($reserva['producto_id'] === $producto->id && $reserva['usuario_id'] === $usuarioId && $reserva['vence'] > now()->timestamp && (float) $reserva['precio'] > 0) {
-                return (float) $reserva['precio'];
+                return (float) $producto->precio;
             }
         } catch (\Throwable) {
             // Una cotización alterada nunca permite fijar el precio desde la app.

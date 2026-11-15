@@ -1,3 +1,4 @@
+import ReembolsosPerfil from './ReembolsosPerfil';
 /**
  * Botón "Mi perfil" de la topbar (parte superior derecha), visible para
  * TODOS los roles. Solo muestra el ícono de la persona; al tocarlo despliega
@@ -161,6 +162,7 @@ export default function HeaderPerfil() {
               onPress={() => elegir(m.abrir)}
             />
           )),
+          negocios.length > 0 && <ReembolsosPerfil />,
           <OpcionMenu icono="salir" titulo="Cerrar sesión" variante="peligro" onPress={() => elegir(salir)} />,
         ]}
       />

@@ -1,9 +1,9 @@
+import { useLecturaEnFoco } from '../useLectura';
 /**
  * «Mis propiedades» (menú del ícono de usuario): las casas y patios que la
  * persona publicó. Desde aquí publica otra, la edita, la oculta cuando se
  * vende o se alquila (y la vuelve a mostrar) o la elimina.
  */
-import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, RefreshControl, Text, View } from 'react-native';
@@ -55,7 +55,7 @@ export default function MisPropiedadesScreen({ navigation }: Props) {
   );
 
   // Al volver de publicar o editar, la lista ya trae el cambio.
-  useFocusEffect(useCallback(() => cargar(), [cargar]));
+  useLecturaEnFoco(useCallback(() => cargar(), [cargar]));
   // Lo cambiado desde otro teléfono también.
   useEnVivo(['propiedades'], () => cargar());
 

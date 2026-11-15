@@ -1,5 +1,6 @@
+import { useLectura } from '../useLectura';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { temasDelNegocio, useEnVivo } from '../usePolling';
 import { ActivityIndicator, FlatList, RefreshControl, Text, View } from 'react-native';
 import { getResenas, ResenaPublica, ResumenResenas } from '../api';
@@ -50,7 +51,7 @@ export default function ResenasScreen({ route }: Props) {
     [token, negocioId, productoId],
   );
 
-  useEffect(() => {
+  useLectura(() => {
     cargar();
   }, [cargar]);
   // En vivo: reseñas nuevas, respuestas del negocio, ocultas por el admin.

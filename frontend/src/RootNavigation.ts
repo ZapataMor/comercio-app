@@ -78,7 +78,7 @@ function navigateFromData(data: PushData, user: Usuario) {
   }
 
   // El cliente canceló un pedido de uno de mis negocios.
-  if (['pedido_cancelado', 'pedido_negocio_actualizado'].includes(data.tipo ?? '') && Number.isFinite(pedidoId)) {
+  if (['pedido_cancelado', 'pedido_negocio_actualizado', 'reembolso_solicitado'].includes(data.tipo ?? '') && Number.isFinite(pedidoId)) {
     const negocioId = Number(data.negocio_id);
     navigationRef.navigate('ComercioPedidoDetalle', {
       pedidoId,

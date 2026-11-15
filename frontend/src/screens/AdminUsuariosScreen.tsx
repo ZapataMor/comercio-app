@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useLectura } from '../useLectura';
+import React, { useCallback, useState } from 'react';
 import { useEnVivo } from '../usePolling';
 import {
   ActivityIndicator,
@@ -92,7 +93,7 @@ export default function AdminUsuariosScreen() {
     [token, toast],
   );
 
-  useEffect(() => {
+  useLectura(() => {
     cargar('administrador');
   }, [cargar]);
 
@@ -103,7 +104,7 @@ export default function AdminUsuariosScreen() {
 
   // Busca 350 ms después de dejar de escribir.
   const primeraVez = React.useRef(true);
-  useEffect(() => {
+  useLectura(() => {
     if (primeraVez.current) {
       primeraVez.current = false;
       return;

@@ -9,9 +9,12 @@ use App\Models\Pedido;
 use App\Models\ReputacionEvento;
 use App\Models\User;
 use App\Notifications\NuevoPedidoParaComercio;
+use App\Notifications\ReembolsoSolicitado;
+use App\Rules\Direccion;
+use App\Rules\Telefono;
 use App\Support\CancelarPedido;
-use App\Support\OpcionesPedido;
 use App\Support\CantidadPedido;
+use App\Support\OpcionesPedido;
 use App\Support\PrecioCarrito;
 use App\Support\Push;
 use App\Support\Reputacion;
@@ -22,8 +25,10 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * API de pedidos del CLIENTE: crear un pedido (desde el carrito de la app),
@@ -49,10 +54,10 @@ class PedidoController extends Controller
             'items.*.extra' => ['nullable', 'array', 'max:30'],
             'items.*.extra.*' => ['string', 'max:100'],
             'metodo_pago' => ['required', Rule::in(Pedido::METODOS_PAGO)],
-            'direccion_entrega' => ['required', 'string', 'max:255', new \App\Rules\Direccion],
+            'direccion_entrega' => ['required', 'string', 'max:255', new Direccion],
             // Dirección guardada que eligió: de ahí sale el punto en el mapa.
             'direccion_id' => ['required', 'integer'],
-            'telefono_contacto' => ['required', 'string', new \App\Rules\Telefono],
+            'telefono_contacto' => ['required', 'string', new Telefono],
             // Identifica el intento de compra: reintentar con la misma clave
             // devuelve el pedido ya creado en vez de duplicarlo.
             'clave_intento' => ['sometimes', 'nullable', 'string', 'min:8', 'max:64'],
@@ -108,7 +113,7 @@ class PedidoController extends Controller
         $subtotal = collect($datos['items'])->sum(fn ($item) => round($item['precio_reservado'] * $item['cantidad'], 2));
         $total = $subtotal + $domicilio;
 
-        if (isset($datos['total_esperado']) && abs((float) $datos['total_esperado'] - $total) >= 0.01) {
+        if (isset($datos['total_esperado']) && $total - (float) $datos['total_esperado'] >= 0.01) {
             return response()->json([
                 'message' => 'El total cambió desde que armaste el pedido. Revisa el nuevo total y confirma de nuevo.',
                 'codigo' => 'total_cambio',
@@ -156,7 +161,8 @@ class PedidoController extends Controller
             && in_array($pedido->estado, ['tomado', 'recogido', 'en_camino'], true), 403);
         $path = ($pedido->entrega_fotos ?? [])[$tipo] ?? null;
         abort_unless($path, 404);
-        return \Illuminate\Support\Facades\Storage::disk('local')->response($path, null, ['Cache-Control' => 'private, no-store, max-age=0', 'X-Content-Type-Options' => 'nosniff']);
+
+        return Storage::disk('local')->response($path, null, ['Cache-Control' => 'private, no-store, max-age=0', 'X-Content-Type-Options' => 'nosniff']);
     }
 
     private function pedidoCreado(Pedido $pedido): JsonResponse
@@ -180,16 +186,16 @@ class PedidoController extends Controller
             $faltanFotos = config('vitrina.fotos_entrega_obligatorias')
                 && count(array_intersect(['frente', 'izquierda', 'derecha'], array_keys($direccion?->fotos ?? []))) !== 3;
             if (! $direccion || ! $direccion->tieneUbicacion() || $faltanFotos) {
-                throw \Illuminate\Validation\ValidationException::withMessages(['direccion_id' => $faltanFotos
+                throw ValidationException::withMessages(['direccion_id' => $faltanFotos
                     ? 'Edita la dirección: marca tu casa en el mapa y añade las tres fotos.'
                     : 'Edita la dirección: marca tu casa en el mapa.']);
             }
             validator(['direccion' => $direccion->direccion, 'barrio' => $direccion->barrio], [
-                'direccion' => ['required', 'max:255', new \App\Rules\Direccion],
+                'direccion' => ['required', 'max:255', new Direccion],
                 'barrio' => ['required', 'regex:/\A[\p{L}\p{N}-]+\z/u'],
             ])->validate();
             if ($datos['direccion_entrega'] !== $direccion->direccion) {
-                throw \Illuminate\Validation\ValidationException::withMessages(['direccion_entrega' => 'La dirección no coincide con la ubicación seleccionada.']);
+                throw ValidationException::withMessages(['direccion_entrega' => 'La dirección no coincide con la ubicación seleccionada.']);
             }
             $pedido = Pedido::create([
                 'negocio_id' => $negocio->id,
@@ -261,6 +267,41 @@ class PedidoController extends Controller
         ]);
     }
 
+    /** El cliente declara que ya transfirió; esto solicita, no ejecuta, la devolución. */
+    public function solicitarReembolso(Request $request, int $id): JsonResponse
+    {
+        $pedido = $request->user()->pedidos()->findOrFail($id);
+        abort_unless($pedido->estado === 'cancelado' && $pedido->metodo_pago === 'transferencia', 422,
+            'Solo puedes solicitar el reembolso de un pedido cancelado pagado por transferencia.');
+        // Actualización condicional: un reintento nunca genera dos solicitudes.
+        $nuevo = Pedido::whereKey($id)->where('estado', 'cancelado')
+            ->whereNull('reembolso_solicitado_at')->update(['reembolso_solicitado_at' => now()]);
+        if ($nuevo) {
+            Push::enviar($pedido->negocio?->miembrosActivos()->get(), new ReembolsoSolicitado($pedido));
+        }
+
+        return response()->json(['message' => 'Solicitud de reembolso registrada. Contacta al negocio para acordar la devolución.']);
+    }
+
+    /** Bandeja persistente del equipo, accesible desde Mi perfil. */
+    public function reembolsos(Request $request): JsonResponse
+    {
+        $negocios = $request->user()->negociosActivos()->get()
+            ->filter(fn (Negocio $n) => $n->puede($request->user(), 'gestionar_pedidos'))->pluck('id');
+        $pedidos = Pedido::whereIn('negocio_id', $negocios)->whereNotNull('reembolso_solicitado_at')
+            ->with(['negocio', 'cliente'])->orderByDesc('reembolso_solicitado_at')->paginate(20);
+
+        return response()->json([
+            'solicitudes' => $pedidos->getCollection()->map(fn (Pedido $p) => [
+                'id' => $p->id, 'codigo' => $p->codigo, 'negocio_id' => $p->negocio_id,
+                'negocio' => $p->negocio?->nombre, 'cliente' => $p->cliente?->nombre_completo,
+                'telefono' => $p->telefono_contacto,
+                'fecha' => $p->reembolso_solicitado_at,
+            ]),
+            'pagina' => $pedidos->currentPage(), 'ultima_pagina' => $pedidos->lastPage(), 'total' => $pedidos->total(),
+        ]);
+    }
+
     /** Seguimiento de un pedido propio. */
     public function show(Request $request, int $id): JsonResponse
     {
@@ -286,6 +327,7 @@ class PedidoController extends Controller
             'costo_domicilio' => (float) $pedido->costo_domicilio,
             'total' => (float) $pedido->total,
             'metodo_pago' => $pedido->metodo_pago,
+            'reembolso_solicitado' => $pedido->reembolso_solicitado_at !== null,
             'direccion_entrega' => $pedido->direccion_entrega,
             'minutos_recogida' => $pedido->minutos_recogida,
             'fecha' => $pedido->created_at->format('d/m/Y H:i'),

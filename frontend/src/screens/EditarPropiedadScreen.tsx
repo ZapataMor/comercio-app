@@ -1,3 +1,4 @@
+import { useLectura } from '../useLectura';
 /**
  * Publicar o editar una propiedad: tipo (casa en venta, casa en alquiler o
  * patio para eventos), fotos, precio, datos de la casa o del patio, qué
@@ -6,7 +7,7 @@
  * las habitaciones.
  */
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -97,12 +98,14 @@ export default function EditarPropiedadScreen({ navigation, route }: Props) {
   const [guardando, setGuardando] = useState(false);
   const [errores, setErrores] = useState<FieldErrors>({});
 
-  useEffect(() => {
+  const [propiedadCargada, setPropiedadCargada] = useState<number | null>(null);
+  useLectura(() => {
     navigation.setOptions({ title: id ? 'Editar propiedad' : 'Publicar propiedad' });
     getOpcionesPropiedad(token).then(setOpciones).catch(() => {});
-    if (!id) return;
+    if (!id || propiedadCargada === id) return;
     getPropiedad(token, id)
       .then(p => {
+        setPropiedadCargada(id);
         setTipo(p.tipo);
         setTitulo(p.titulo);
         setDescripcion(p.descripcion);
@@ -128,7 +131,7 @@ export default function EditarPropiedadScreen({ navigation, route }: Props) {
         navigation.goBack();
       })
       .finally(() => setCargando(false));
-  }, [id, token, navigation, toast]);
+  }, [id, token, navigation, toast, propiedadCargada]);
 
   const esPatio = tipo === 'eventos';
   const listaCaracteristicas = opciones?.caracteristicas[tipo] ?? [];

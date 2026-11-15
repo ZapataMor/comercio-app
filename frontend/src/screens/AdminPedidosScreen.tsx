@@ -1,5 +1,6 @@
+import { useLectura } from '../useLectura';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useEnVivo } from '../usePolling';
 import { ActivityIndicator, FlatList, RefreshControl, Text, TouchableOpacity, View } from 'react-native';
 import { AdminPedido, cerrarPedidoAdmin, getAdminPedidos } from '../api';
@@ -57,7 +58,7 @@ export default function AdminPedidosScreen(_props: Props) {
     }
   }, [auth]);
 
-  useEffect(() => {
+  useLectura(() => {
     cargar();
   }, [cargar]);
   // En vivo: cada pedido que cambia de estado.

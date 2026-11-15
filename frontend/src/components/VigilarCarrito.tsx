@@ -57,9 +57,9 @@ export default function VigilarCarrito() {
     <Modal visible transparent animationType="fade" onRequestClose={() => {}}>
       <View style={styles.fondo}><View style={styles.caja}>
         <Text style={styles.titulo}>Cambió el precio de {cambio.nombre}</Text>
-        <Text style={styles.texto}>El precio del catálogo pasó de {cop(cambio.precio)} a {cop(cambio.precioVigente!)}. Tu carrito conserva {cop(cambio.precio)} hasta que venza su hora de vigencia.</Text>
-        <Text style={styles.texto}>¿Quieres conservar este producto o eliminarlo?</Text>
-        <TouchableOpacity style={styles.boton} onPress={() => cart.resolverCambioPrecio(cambio.producto_id, true)}><Text style={styles.botonTexto}>Conservar en el carrito</Text></TouchableOpacity>
+        <Text style={styles.texto}>El precio del catálogo pasó de {cop(cambio.precio)} a {cop(cambio.precioVigente!)}. </Text>
+        <Text style={styles.texto}>¿Quieres conservar este producto al nuevo precio o quitarlo del carrito?</Text>
+        <TouchableOpacity style={styles.boton} onPress={() => cart.resolverCambioPrecio(cambio.producto_id, true)}><Text style={styles.botonTexto}>Aceptar nuevo precio</Text></TouchableOpacity>
         <TouchableOpacity onPress={() => cart.resolverCambioPrecio(cambio.producto_id, false)}><Text style={styles.eliminar}>Eliminar producto</Text></TouchableOpacity>
       </View></View>
     </Modal>

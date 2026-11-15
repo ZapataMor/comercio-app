@@ -1,6 +1,7 @@
+import { useLectura } from '../useLectura';
 import CantidadPeso from './CantidadPeso';
 import { esPorPeso } from '../cantidades';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { ajustarMiPedido, getCatalogo, Producto, SeguimientoPedido } from '../api';
 import { useAuth } from '../AuthContext';
@@ -25,13 +26,18 @@ export default function AjustarPedido({ pedido, visible, onCerrar, onGuardado }:
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState('');
   const [personalizar, setPersonalizar] = useState<string | null>(null);
-  useEffect(() => {
+  const borrador = useRef('');
+  if (!visible) borrador.current = '';
+  useLectura(() => {
     if (!visible || !token || !pedido.negocio_id) return;
     let activo = true;
+    const claveBorrador = `${pedido.id}:${pedido.faltante_version}`;
     setCargando(true); setError('');
     getCatalogo(token, pedido.negocio_id).then(d => {
       if (!activo) return;
       setProductos(d.productos);
+      if (borrador.current === claveBorrador) return;
+      borrador.current = claveBorrador;
       setLineas(referencia.current.items.filter(i => i.producto_id).map((i, idx) => {
         const p = d.productos.find(v => v.id === i.producto_id);
         return { linea: `original-${idx}`, producto_id: i.producto_id!, nombre: i.nombre,

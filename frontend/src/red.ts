@@ -19,6 +19,21 @@ export function iniciarMonitorRed() {
     publicar({ sinInternet, aviso: sinInternet ? 'Sin internet. Revisa tus datos móviles o el Wi-Fi.' : '' });
   });
 }
+const reintentos = new Set<() => void>();
+export function alReintentarRed(listener: () => void) {
+  reintentos.add(listener);
+  return () => { reintentos.delete(listener); };
+}
+export async function reintentarRed() {
+  try {
+    const info = await NetInfo.refresh();
+    const sinInternet = info.isConnected === false || info.isInternetReachable === false;
+    publicar({ sinInternet, aviso: sinInternet ? 'Sin internet. Revisa tus datos móviles o el Wi-Fi.' : '' });
+    if (!sinInternet) reintentos.forEach(listener => listener());
+  } catch {
+    publicar({ ...estado, aviso: 'No pudimos comprobar la conexión. Inténtalo de nuevo.' });
+  }
+}
 export class ErrorRed extends Error {}
 
 // El plazo cubre también la descarga del cuerpo. La carrera garantiza el fin
