@@ -32,5 +32,8 @@ class DatabaseSeeder extends Seeder
 
         // Una receta preferida de cliente@demo.co para ver la recomendación.
         $this->call(RecetasDemoSeeder::class);
+
+        // Casas en venta y en alquiler y patios para eventos (sección Propiedades).
+        $this->call(PropiedadesDemoSeeder::class);
     }
 }

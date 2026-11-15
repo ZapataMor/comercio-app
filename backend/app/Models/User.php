@@ -130,6 +130,12 @@ class User extends Authenticatable
         return $this->hasMany(Pedido::class, 'user_id');
     }
 
+    /** Casas en venta o alquiler y patios para eventos que ha publicado. */
+    public function propiedades(): HasMany
+    {
+        return $this->hasMany(Propiedad::class);
+    }
+
     /** Ubicaciones guardadas por el cliente para sus pedidos. */
     public function clienteDirecciones(): HasMany
     {

@@ -24,6 +24,7 @@ import {
 } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale, Skeleton } from '../components/anim';
+import ExplorarPropiedades from '../components/ExplorarPropiedades';
 import Icon, { IconName } from '../components/Icon';
 import { PuntajeResenas } from '../components/Resenas';
 import { RootStackParamList } from '../navTypes';
@@ -94,8 +95,19 @@ function filasBusqueda(negocios: NegocioLista[], productos: ProductoConNegocio[]
   ];
 }
 
+/**
+ * Explorar del cliente: el catálogo elegido en el desplegable de la topbar.
+ * Productos y Servicios listan negocios; Propiedades, casas y patios.
+ */
 export default function ExplorarScreen({ navigation, route }: Props) {
   const seccion = route.params?.seccion ?? 'productos';
+  if (seccion === 'propiedades') {
+    return <ExplorarPropiedades navigation={navigation} />;
+  }
+  return <ExplorarNegocios key={seccion} navigation={navigation} seccion={seccion} />;
+}
+
+function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigation']; seccion: 'productos' | 'servicios' }) {
   const { c } = useTheme();
   const styles = useStyles();
   const { auth } = useAuth();

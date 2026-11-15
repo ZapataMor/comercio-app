@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\InvitacionController;
 use App\Http\Controllers\Api\PedidoController as ApiPedidoController;
 use App\Http\Controllers\Api\PedidoIncidenciaController;
 use App\Http\Controllers\Api\PedidoReporteController;
+use App\Http\Controllers\Api\PropiedadController;
 use App\Http\Controllers\Api\RecetaPreferidaController;
 use App\Http\Controllers\Api\RecuperarClaveController;
 use App\Http\Controllers\Api\ResenaController;
@@ -96,6 +97,18 @@ Route::middleware(['auth:sanctum', 'throttle:api-usuario'])->group(function () {
     Route::get('/negocios/mapa', [CatalogoController::class, 'mapa']);
     // Búsqueda de productos (por relevancia) con el negocio que los vende.
     Route::get('/productos', [CatalogoController::class, 'buscarProductos']);
+
+    // --- Propiedades: casas en venta o alquiler y patios para eventos ---
+    // Cualquier persona publica las suyas; el cliente las ve en «Propiedades».
+    Route::get('/propiedades', [PropiedadController::class, 'index']);
+    Route::get('/propiedades/mapa', [PropiedadController::class, 'mapa']);
+    Route::get('/propiedades/opciones', [PropiedadController::class, 'opciones']);
+    Route::get('/propiedades/mias', [PropiedadController::class, 'mias']);
+    Route::post('/propiedades', [PropiedadController::class, 'store']);
+    Route::get('/propiedades/{id}', [PropiedadController::class, 'show']);
+    Route::put('/propiedades/{id}', [PropiedadController::class, 'update']);
+    Route::put('/propiedades/{id}/disponibilidad', [PropiedadController::class, 'disponibilidad']);
+    Route::delete('/propiedades/{id}', [PropiedadController::class, 'destroy']);
 
     // --- Mis negocios (modelo unificado) ---
     // Cualquier usuario puede crear negocios y trabajar en otros. No hay

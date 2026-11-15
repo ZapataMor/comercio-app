@@ -13,8 +13,9 @@
  * empieza a recogerse deja pasar los toques: se puede tocar enseguida otro
  * botón de la topbar sin esperar a que termine la animación.
  *
- * Con `texto` el botón es una píldora con nombre (los filtros del Mapa), y
- * con OpcionCheck el menú sirve para marcar varias opciones sin cerrarse.
+ * Con `texto` el botón es una píldora con nombre (los filtros del Mapa; con
+ * `enTopbar`, en los colores de la topbar: el catálogo de Explorar), y con
+ * OpcionCheck el menú sirve para marcar varias opciones sin cerrarse.
  */
 import React, {
   createContext,
@@ -59,6 +60,8 @@ type Props = {
   texto?: string;
   /** Hacia dónde crece el menú desde el botón (por defecto, hacia la izquierda: bordes derechos alineados). */
   alinear?: 'derecha' | 'izquierda';
+  /** Píldora con texto en los colores de la topbar (no clara, como sobre el mapa). */
+  enTopbar?: boolean;
 };
 
 /**
@@ -157,6 +160,7 @@ export default function MenuDesplegable(props: Props) {
         ancho={actuales.ancho ?? 240}
         texto={actuales.texto}
         alinear={actuales.alinear}
+        enTopbar={actuales.enTopbar}
         // Solo si sigue siendo este menú (no otro abierto mientras se recogía).
         onCerrado={() => setAncla(a => (a === ancla ? null : a))}
       />,
@@ -167,7 +171,7 @@ export default function MenuDesplegable(props: Props) {
   return (
     // PressableScale no reenvía la ref: este View es el que se mide.
     <View ref={boton} collapsable={false}>
-      <BotonMenu icono={icono} etiqueta={etiqueta} texto={props.texto} abierto={!!ancla} onPress={abrir} />
+      <BotonMenu icono={icono} etiqueta={etiqueta} texto={props.texto} enTopbar={props.enTopbar} abierto={!!ancla} onPress={abrir} />
     </View>
   );
 }
@@ -177,17 +181,39 @@ function BotonMenu({
   icono,
   etiqueta,
   texto,
+  enTopbar,
   abierto,
   onPress,
 }: {
   icono: IconName;
   etiqueta: string;
   texto?: string;
+  enTopbar?: boolean;
   abierto: boolean;
   onPress: () => void;
 }) {
   const { c } = useTheme();
   const styles = useStyles();
+  if (texto && enTopbar) {
+    return (
+      <PressableScale
+        style={styles.pildoraTopbar}
+        scaleTo={0.94}
+        hitSlop={6}
+        accessibilityRole="button"
+        accessibilityLabel={etiqueta}
+        accessibilityState={{ expanded: abierto }}
+        onPress={onPress}>
+        <Icon name={icono} size={15} color={c.onHeader} strokeWidth={2} />
+        <Text style={styles.pildoraTopbarTxt} numberOfLines={1}>
+          {texto}
+        </Text>
+        <View style={abierto ? styles.flechaArriba : styles.flechaAbajo}>
+          <Icon name="chevron" size={12} color={c.onHeader} strokeWidth={2.4} />
+        </View>
+      </PressableScale>
+    );
+  }
   if (texto) {
     return (
       <PressableScale
@@ -221,7 +247,7 @@ function BotonMenu({
 
 type MenuProps = Omit<Props, 'ancho'> & { ancho: number; ancla: Ancla; onCerrado: () => void };
 
-function Menu({ ancla, icono, etiqueta, renglones, ancho, texto, alinear, onCerrado }: MenuProps) {
+function Menu({ ancla, icono, etiqueta, renglones, ancho, texto, alinear, enTopbar, onCerrado }: MenuProps) {
   const styles = useStyles();
   const { width, height } = useWindowDimensions();
   const capa = useContext(CapaContext);
@@ -365,10 +391,10 @@ function Menu({ ancla, icono, etiqueta, renglones, ancho, texto, alinear, onCerr
       <View
         style={[
           styles.botonNitido,
-          texto ? styles.sinFondo : null,
+          texto && !enTopbar ? styles.sinFondo : null,
           { left: x, top: y, width: ancla.w, height: ancla.h },
         ]}>
-        <BotonMenu icono={icono} etiqueta={etiqueta} texto={texto} abierto onPress={() => cerrar()} />
+        <BotonMenu icono={icono} etiqueta={etiqueta} texto={texto} enTopbar={enTopbar} abierto onPress={() => cerrar()} />
       </View>
       <Animated.View
         style={[
@@ -537,6 +563,16 @@ const useStyles = makeStyles((c, shadow) => ({
     ...shadow.card,
   },
   pildoraTxt: { color: c.textStrong, fontFamily: font.semibold, fontSize: 13.5, maxWidth: 160 },
+  pildoraTopbar: {
+    height: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: radius.pill,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  pildoraTopbarTxt: { color: c.onHeader, fontFamily: font.semibold, fontSize: 13 },
   flechaAbajo: { transform: [{ rotate: '90deg' }] },
   flechaArriba: { transform: [{ rotate: '-90deg' }] },
   // Crece desde la esquina del ícono.

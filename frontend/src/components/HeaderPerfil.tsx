@@ -66,6 +66,8 @@ function modulosPara(roles: string[], enNegocio: boolean, serDomiciliario: () =>
   ];
   if (roles.includes('usuario')) {
     modulos.push({ titulo: 'Mis direcciones', icono: 'ubicacion', abrir: () => navigationRef.navigate('MisDirecciones') });
+    // Casas en venta o alquiler y patios para eventos que publica.
+    modulos.push({ titulo: 'Mis propiedades', icono: 'casa', abrir: () => navigationRef.navigate('MisPropiedades') });
   }
   if (roles.includes('domiciliario')) {
     modulos.push({ titulo: 'Mis entregas', icono: 'moto', abrir: abrirEntregas });

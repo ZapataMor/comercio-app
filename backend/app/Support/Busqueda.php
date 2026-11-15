@@ -5,11 +5,13 @@ namespace App\Support;
 use App\Models\Categoria;
 use App\Models\Negocio;
 use App\Models\Producto;
+use App\Models\Propiedad;
 use App\Models\Servicio;
 use App\Models\TipoNegocio;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 /**
@@ -34,7 +36,7 @@ use Illuminate\Support\Str;
 class Busqueda
 {
     /** Modelos con columna `busqueda`; de ellos sale el vocabulario. */
-    public const MODELOS = [Producto::class, Servicio::class, Negocio::class, Categoria::class, TipoNegocio::class];
+    public const MODELOS = [Producto::class, Servicio::class, Negocio::class, Categoria::class, TipoNegocio::class, Propiedad::class];
 
     private const CACHE_VOCABULARIO = 'busqueda.vocabulario';
 
@@ -229,6 +231,10 @@ class Busqueda
     {
         $total = 0;
         foreach (self::MODELOS as $modelo) {
+            // Una migración vieja reindexa antes de que existan las tablas nuevas.
+            if (! Schema::hasTable((new $modelo)->getTable())) {
+                continue;
+            }
             $consulta = $modelo::query();
             if (method_exists($modelo, 'bootSoftDeletes')) {
                 $consulta->withTrashed();

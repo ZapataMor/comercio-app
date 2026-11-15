@@ -2006,3 +2006,106 @@ export async function registrarLlegadaCita(token: string, negocioId: number, id:
 export async function actualizarPermisosMiembro(token: string, negocioId: number, userId: number, permisos: PermisosNegocio): Promise<void> {
   await authSend('PUT', `/api/negocios/${negocioId}/miembros/${userId}/permisos`, token, { permisos });
 }
+
+// --- Propiedades: casas en venta o alquiler y patios para eventos ---
+
+export type TipoPropiedad = 'venta' | 'alquiler' | 'eventos';
+
+/** Lo que muestran la tarjeta del listado y el pin del mapa. */
+export type PropiedadResumen = Coordenadas & {
+  id: number;
+  tipo: TipoPropiedad;
+  titulo: string;
+  /** Pesos: precio de venta, canon mensual o valor por evento. */
+  precio: number;
+  negociable: boolean;
+  direccion: string;
+  barrio: string;
+  habitaciones: number | null;
+  banos: number | null;
+  area_m2: number | null;
+  /** Patios: cuántas personas caben. */
+  capacidad: number | null;
+  foto: string | null;
+  publicada_at: string | null;
+};
+
+export type Propiedad = PropiedadResumen & {
+  descripcion: string;
+  estrato: number | null;
+  caracteristicas: string[];
+  condiciones: string | null;
+  contacto_nombre: string;
+  contacto_telefono: string;
+  galeria: string[];
+  disponible: boolean;
+  es_mia: boolean;
+  actualizada_at: string | null;
+};
+
+export type FiltrosPropiedades = { tipo?: TipoPropiedad | null; buscar?: string; precioMax?: number | null; habitaciones?: number | null };
+export type PaginaPropiedades = { propiedades: PropiedadResumen[]; pagina: number; ultimaPagina: number; total: number };
+
+export async function getPropiedades(token: string, filtros: FiltrosPropiedades = {}, pagina = 1): Promise<PaginaPropiedades> {
+  const params = new URLSearchParams();
+  if (filtros.tipo) params.set('tipo', filtros.tipo);
+  if (filtros.buscar?.trim()) params.set('buscar', filtros.buscar.trim());
+  if (filtros.precioMax) params.set('precio_max', String(filtros.precioMax));
+  if (filtros.habitaciones) params.set('habitaciones', String(filtros.habitaciones));
+  if (pagina > 1) params.set('page', String(pagina));
+  const q = params.toString();
+  const d = await authGet(`/api/propiedades${q ? `?${q}` : ''}`, token);
+  const propiedades = (d.propiedades ?? []) as PropiedadResumen[];
+  return {
+    propiedades,
+    pagina: d.meta?.pagina ?? 1,
+    ultimaPagina: d.meta?.ultima_pagina ?? 1,
+    total: d.meta?.total ?? propiedades.length,
+  };
+}
+
+/** Todas las publicadas, para el mapa de propiedades. */
+export async function getPropiedadesMapa(token: string): Promise<PropiedadResumen[]> {
+  return ((await authGet('/api/propiedades/mapa', token)).propiedades ?? []) as PropiedadResumen[];
+}
+
+export type OpcionesPropiedad = { caracteristicas: Record<TipoPropiedad, string[]>; max_fotos: number };
+export async function getOpcionesPropiedad(token: string): Promise<OpcionesPropiedad> {
+  return (await authGet('/api/propiedades/opciones', token)) as OpcionesPropiedad;
+}
+
+export async function getPropiedad(token: string, id: number): Promise<Propiedad> {
+  return (await authGet(`/api/propiedades/${id}`, token)).propiedad as Propiedad;
+}
+
+export async function getMisPropiedades(token: string): Promise<Propiedad[]> {
+  return ((await authGet('/api/propiedades/mias', token)).propiedades ?? []) as Propiedad[];
+}
+
+/** Lo que se envía al publicar o editar (las fotos nuevas van aparte). */
+export type DatosPropiedad = Omit<
+  Propiedad,
+  'id' | 'foto' | 'publicada_at' | 'actualizada_at' | 'es_mia'
+>;
+
+export async function guardarPropiedad(token: string, datos: DatosPropiedad, id?: number, nuevasFotos: string[] = []): Promise<Propiedad> {
+  const { galeria, caracteristicas, ...campos } = datos;
+  const d = await authUpload(
+    id ? 'PUT' : 'POST',
+    `/api/propiedades${id ? `/${id}` : ''}`,
+    token,
+    { ...campos, caracteristicas: JSON.stringify(caracteristicas), conservar_imagenes: JSON.stringify(galeria) },
+    undefined,
+    nuevasFotos,
+  );
+  return d.propiedad as Propiedad;
+}
+
+/** Ocultar (vendida, alquilada o en pausa) o volver a publicar. */
+export async function cambiarDisponibilidadPropiedad(token: string, id: number, disponible: boolean): Promise<Propiedad> {
+  return (await authSend('PUT', `/api/propiedades/${id}/disponibilidad`, token, { disponible })).propiedad as Propiedad;
+}
+
+export async function eliminarPropiedad(token: string, id: number): Promise<void> {
+  await authSend('DELETE', `/api/propiedades/${id}`, token);
+}

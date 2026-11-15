@@ -1,6 +1,9 @@
 // Rutas de navegación de la app (React Navigation - native stack).
 import { ComercioPedido, Producto, Servicio } from './api';
 
+/** Catálogo que ve el cliente en Explorar (el desplegable junto al perfil). */
+export type SeccionCatalogo = 'productos' | 'servicios' | 'propiedades';
+
 export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
@@ -33,9 +36,15 @@ export type RootStackParamList = {
   // Historial de pedidos del negocio activo (pestañas) y ventas de hoy.
   PedidosNegocio: undefined;
   // Cliente
-  Explorar: { seccion?: 'productos' | 'servicios' } | undefined;
+  Explorar: { seccion?: SeccionCatalogo } | undefined;
   // Mapa de negocios; `admin` suma a los domiciliarios en vivo.
   Mapa: { admin?: boolean } | undefined;
+  // Propiedades: mapa con sus propios filtros, detalle, y las que publico.
+  MapaPropiedades: undefined;
+  Propiedad: { id: number; titulo: string };
+  MisPropiedades: undefined;
+  // Sin `id`: publicar una nueva.
+  EditarPropiedad: { id?: number } | undefined;
   // `productoId` opcional: al entrar desde una búsqueda de producto, el catálogo
   // resalta y hace scroll hasta ese producto.
   Negocio: { id: number; nombre: string; productoId?: number; seccion?: 'productos' | 'servicios' };

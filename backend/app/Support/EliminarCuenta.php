@@ -8,6 +8,7 @@ use App\Models\Pedido;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
@@ -96,6 +97,10 @@ class EliminarCuenta
             $user->negocios()->detach();
             $user->invitacionesTrabajo()->delete();
             $user->clienteDirecciones()->delete();
+            // Sus propiedades dejan de publicarse (con su teléfono y sus fotos).
+            $fotos = $user->propiedades()->pluck('galeria')->flatten()->filter()->all();
+            $user->propiedades()->delete();
+            DB::afterCommit(fn () => Storage::disk('public')->delete(array_map(fn ($f) => substr((string) $f, strlen('/storage/')), $fotos)));
             $user->deviceTokens()->delete();
             $user->tokens()->delete();
             \App\Models\CodigoTelefono::where('user_id', $user->id)->delete();

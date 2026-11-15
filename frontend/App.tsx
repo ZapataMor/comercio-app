@@ -69,6 +69,10 @@ import CheckoutScreen from './src/screens/CheckoutScreen';
 import MisPedidosScreen from './src/screens/MisPedidosScreen';
 import PedidoDetalleScreen from './src/screens/PedidoDetalleScreen';
 import MapaScreen from './src/screens/MapaScreen';
+import MapaPropiedadesScreen from './src/screens/MapaPropiedadesScreen';
+import PropiedadScreen from './src/screens/PropiedadScreen';
+import MisPropiedadesScreen from './src/screens/MisPropiedadesScreen';
+import EditarPropiedadScreen from './src/screens/EditarPropiedadScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -159,7 +163,7 @@ function Navegacion() {
                   component={ExplorarScreen}
                   options={({ route, navigation }) => ({
                     title: 'Vitrina', headerTitle: tituloVitrina,
-                    headerRight: () => <HeaderCatalogo seccion={route.params?.seccion ?? 'productos'} onCambiar={() => navigation.setParams({ seccion: route.params?.seccion === 'servicios' ? 'productos' : 'servicios' })} />,
+                    headerRight: () => <HeaderCatalogo seccion={route.params?.seccion ?? 'productos'} onCambiar={seccion => navigation.setParams({ seccion })} />,
                   })}
                 />
                 <Stack.Screen
@@ -177,6 +181,11 @@ function Navegacion() {
                 <Stack.Screen name="Checkout" component={CheckoutScreen} options={{ title: 'Confirmar pedido' }} />
                 <Stack.Screen name="MisPedidos" component={MisPedidosScreen} options={{ title: 'Mis pedidos' }} />
                 <Stack.Screen name="PedidoDetalle" component={PedidoDetalleScreen} options={{ title: 'Seguimiento' }} />
+                {/* Propiedades: casas en venta o alquiler y patios para eventos. */}
+                <Stack.Screen name="MapaPropiedades" component={MapaPropiedadesScreen} options={{ title: 'Mapa de propiedades' }} />
+                <Stack.Screen name="Propiedad" component={PropiedadScreen} options={({ route }) => ({ title: route.params.titulo })} />
+                <Stack.Screen name="MisPropiedades" component={MisPropiedadesScreen} options={{ title: 'Mis propiedades' }} />
+                <Stack.Screen name="EditarPropiedad" component={EditarPropiedadScreen} options={{ title: 'Publicar propiedad' }} />
               </>
             )}
 
@@ -257,7 +266,7 @@ function Navegacion() {
         )}
       </Stack.Navigator>
         </NavigationContainer>
-        <BarraCliente ruta={ruta?.name} seccion={ruta?.name === 'Negocio' ? ruta.params.seccion : undefined} />
+        <BarraCliente ruta={ruta?.name} seccion={ruta?.name === 'Negocio' || ruta?.name === 'Explorar' ? ruta.params?.seccion : undefined} />
       </AppDesenfocable>
       </CapaMenus>
     </FlyToCartProvider>

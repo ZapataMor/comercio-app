@@ -42,7 +42,13 @@ export type IconName =
   | 'escudo'
   | 'estrella'
   | 'alerta'
-  | 'salir';
+  | 'salir'
+  | 'llave'
+  | 'fiesta'
+  | 'cama'
+  | 'ducha'
+  | 'area'
+  | 'whatsapp';
 
 const GLYPHS: Record<IconName, React.ReactNode> = {
   'sin-internet': <><Path d="M2 2l20 20M3 8a16 16 0 0 1 18 0M6 12a10 10 0 0 1 12 0M9 16a5 5 0 0 1 6 0" /><Circle cx="12" cy="20" r="1" /></>,
@@ -231,6 +237,53 @@ const GLYPHS: Record<IconName, React.ReactNode> = {
       <Path d="M10.3 4.1 2.6 17.5a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 4.1a2 2 0 0 0-3.4 0z" />
       <Path d="M12 9.5v4" />
       <Path d="M12 17h.01" />
+    </>
+  ),
+  // Propiedades: alquiler (llave), patios para eventos (globos), habitaciones,
+  // baños y área.
+  llave: (
+    <>
+      <Circle cx="7.5" cy="15.5" r="4.5" />
+      <Path d="M10.7 12.3 20 3" />
+      <Path d="M17 6l3 3" />
+      <Path d="M14.5 8.5l2.5 2.5" />
+    </>
+  ),
+  fiesta: (
+    <>
+      <Path d="M9 3.5c-2.8 0-5 2.3-5 5.2C4 12 6.6 14.8 9 15.5c2.4-.7 5-3.5 5-6.8 0-2.9-2.2-5.2-5-5.2z" />
+      <Path d="M9 15.5 8 17.2h2L9 15.5" />
+      <Path d="M9 17.2c0 1.8 1.2 2.4 1.2 3.8" />
+      <Path d="M16.5 7.5c-1.1.6-1.9 1.9-1.9 3.4 0 2.5 2 4.6 3.9 5.1 1.9-.5 3.5-2.6 3.5-5.1 0-2.6-1.7-4.2-3.7-4.2" />
+      <Path d="M18.5 16v5" />
+    </>
+  ),
+  cama: (
+    <>
+      <Path d="M3 18V6" />
+      <Path d="M3 13h18v5" />
+      <Path d="M21 13v-2a3 3 0 0 0-3-3h-7v5" />
+      <Circle cx="7" cy="10" r="2" />
+      <Path d="M3 18h18" />
+    </>
+  ),
+  ducha: (
+    <>
+      <Path d="M4 21V7a4 4 0 0 1 8 0" />
+      <Path d="M9 7h6" />
+      <Path d="M10.5 11v.01M13.5 11v.01M10.5 14v.01M13.5 14v.01M12 17v.01M15 17v.01M16.5 13v.01" />
+    </>
+  ),
+  area: (
+    <>
+      <Rect x="4" y="4" width="16" height="16" rx="1.5" />
+      <Path d="M4 9h3M4 14h3M9 4v3M14 4v3" />
+    </>
+  ),
+  whatsapp: (
+    <>
+      <Path d="M20.5 11.6a8.5 8.5 0 0 1-12.6 7.4L3.5 20.5l1.6-4.2A8.5 8.5 0 1 1 20.5 11.6z" />
+      <Path d="M9 8.8c0 3.3 2.7 6.2 6 6.2l1.2-1.5-2-1-1 .9c-1-.5-2-1.5-2.5-2.5l.9-1-1-2z" />
     </>
   ),
   // Cerrar sesión: puerta con flecha hacia afuera.

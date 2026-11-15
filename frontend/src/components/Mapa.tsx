@@ -5,6 +5,7 @@
  *  - <MapaVitrina>: el mapa con el estilo del modo (día/noche), centrado en
  *    Maicao por defecto. Se mueve con su ref: irA() y encuadrar().
  *  - <PinNegocio> / <PinDomiciliario>: marcadores con el look de la app.
+ *  - <PinPropiedad>: el precio de una casa o un patio en una píldora.
  *  - abrirComoLlegar(): abre la ruta en la app de Google Maps (gratis: no
  *    usa la API de rutas, solo un enlace).
  *  - haceCuanto(): "ahora mismo" / "hace 40 s" / "hace 2 min".
@@ -20,8 +21,9 @@ import {
 } from '@maplibre/maplibre-react-native';
 import React, { ReactNode, Ref, useEffect, useImperativeHandle, useRef } from 'react';
 import { Image, Linking, StyleProp, Text, View, ViewStyle } from 'react-native';
-import { Coordenadas, imagenUrl, UbicacionEnVivo } from '../api';
-import { font, makeStyles, radius, useTheme } from '../theme';
+import { Coordenadas, imagenUrl, TipoPropiedad, UbicacionEnVivo } from '../api';
+import { precioCorto, tipoPropiedad } from '../propiedades';
+import { Colores, font, makeStyles, radius, useTheme } from '../theme';
 import { ESTILOS_MAPA } from './estiloMapa';
 import Icon from './Icon';
 
@@ -261,6 +263,54 @@ export function PinDomiciliario({
   );
 }
 
+/** Color de cada tipo de propiedad en el mapa (legible en los dos modos). */
+export function colorPropiedad(c: Colores, tipo: TipoPropiedad): string {
+  return tipo === 'venta' ? c.success : tipo === 'alquiler' ? c.info : c.accent;
+}
+
+/**
+ * Marcador de una propiedad: su precio corto en una píldora con el ícono y
+ * el borde del color de su tipo. Seleccionada, se rellena y queda encima.
+ */
+export function PinPropiedad({
+  punto,
+  tipo,
+  precio,
+  nombre,
+  seleccionado,
+  onPress,
+}: {
+  punto: Coordenadas;
+  tipo: TipoPropiedad;
+  precio: number;
+  nombre: string;
+  seleccionado?: boolean;
+  onPress?: () => void;
+}) {
+  const { c } = useTheme();
+  const styles = useStyles();
+  const color = colorPropiedad(c, tipo);
+  const fondo = seleccionado ? c.brand : c.surface;
+  const texto = seleccionado ? c.onBrand : c.textStrong;
+
+  return (
+    <Marker
+      lngLat={lngLat(punto)}
+      anchor="bottom"
+      style={seleccionado ? styles.encima : styles.medio}
+      onPress={onPress && alTocarPin(onPress)}
+      accessibilityLabel={`${tipoPropiedad(tipo).texto}: ${nombre}, ${precioCorto(precio)}`}>
+      <View style={styles.pin}>
+        <View style={[styles.precio, { backgroundColor: fondo, borderColor: color }, seleccionado && styles.precioGrande]}>
+          <Icon name={tipoPropiedad(tipo).icono} size={seleccionado ? 15 : 13} color={seleccionado ? c.onBrand : color} strokeWidth={2.2} />
+          <Text style={[styles.precioTxt, { color: texto }, seleccionado && styles.precioTxtGrande]}>{precioCorto(precio)}</Text>
+        </View>
+        <View style={[styles.punta, { borderTopColor: color }]} />
+      </View>
+    </Marker>
+  );
+}
+
 /** "ahora mismo" / "hace 40 s" / "hace 2 min". */
 export function haceCuanto(segundos: number): string {
   if (segundos < 15) return 'ahora mismo';
@@ -360,6 +410,19 @@ const useStyles = makeStyles((c, shadow) => ({
     ...shadow.soft,
   },
   gotaGrande: { width: 50, height: 50, borderRadius: 25 },
+  precio: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    ...shadow.soft,
+  },
+  precioGrande: { paddingHorizontal: 12, paddingVertical: 7 },
+  precioTxt: { fontFamily: font.bold, fontSize: 12 },
+  precioTxtGrande: { fontSize: 14 },
   gotaEntrega: { backgroundColor: c.accent, borderColor: c.surface },
   foto: { width: '100%', height: '100%' },
   fotoCerrado: { opacity: 0.5 },

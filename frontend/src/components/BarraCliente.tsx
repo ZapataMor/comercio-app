@@ -8,7 +8,8 @@
  *    cliente la ve al pasar a Explorar.
  *  - En "Carrito", "Confirmar pedido" (Checkout) y "Mis pedidos" la barra no
  *    se muestra: son pasos de compra/consulta y sobraría un botón flotante.
- *  - Dentro del catálogo de servicios de una tienda tampoco se muestra.
+ *  - Dentro del catálogo de servicios de una tienda tampoco se muestra, ni
+ *    en Explorar viendo Propiedades (ahí no se compra nada).
  *  - En el Mapa tampoco: ahí estorba ver los negocios.
  *  - El botón Carrito es, además, el DESTINO de la animación del paquete:
  *    registra su posición y rebota cuando un paquete aterriza.
@@ -18,6 +19,7 @@ import { Animated, Easing, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../AuthContext';
 import { useCart } from '../CartContext';
+import { SeccionCatalogo } from '../navTypes';
 import { navigationRef } from '../RootNavigation';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { PressableScale } from './anim';
@@ -31,13 +33,13 @@ const RUTAS_CLIENTE = new Set([
   'PedidoDetalle',
 ]);
 
-type Props = { ruta?: string; seccion?: 'productos' | 'servicios' };
+type Props = { ruta?: string; seccion?: SeccionCatalogo };
 
 export default function BarraCliente({ ruta, seccion }: Props) {
   const { auth } = useAuth();
   const esCliente = auth?.user.roles.includes('usuario') ?? false;
 
-  if (!esCliente || !ruta || !RUTAS_CLIENTE.has(ruta) || (ruta === 'Negocio' && seccion === 'servicios')) {
+  if (!esCliente || !ruta || !RUTAS_CLIENTE.has(ruta) || (ruta === 'Negocio' && seccion === 'servicios') || seccion === 'propiedades') {
     return null;
   }
   return <Barra ruta={ruta} />;

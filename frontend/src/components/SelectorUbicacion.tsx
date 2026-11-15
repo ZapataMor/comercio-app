@@ -17,7 +17,7 @@ type Props = {
   tipo?: Tipo;
 };
 
-type Tipo = 'negocio' | 'entrega';
+type Tipo = 'negocio' | 'entrega' | 'propiedad';
 
 const TEXTOS: Record<Tipo, { label: string; fijar: string; paraQue: string; ayuda: string; estoyAqui: string; icono: IconName }> = {
   negocio: {
@@ -36,11 +36,19 @@ const TEXTOS: Record<Tipo, { label: string; fijar: string; paraQue: string; ayud
     estoyAqui: 'Estoy ahí: usar mi ubicación',
     icono: 'casa',
   },
+  propiedad: {
+    label: 'Ubicación en el mapa *',
+    fijar: 'Marcar en el mapa',
+    paraQue: 'Así sale en el mapa de propiedades y te encuentran fácil.',
+    ayuda: 'Mueve el mapa hasta que el pin quede en la entrada de la propiedad.',
+    estoyAqui: 'Estoy en la propiedad: usar mi ubicación',
+    icono: 'casa',
+  },
 };
 
 /**
- * Punto en el mapa de un negocio (Mi Tienda) o de una dirección de entrega
- * (cliente). Se fija moviendo el mapa bajo un pin fijo en el centro, o con
+ * Punto en el mapa de un negocio (Mi Tienda), de una dirección de entrega
+ * (cliente) o de una propiedad que se publica. Se fija moviendo el mapa bajo un pin fijo en el centro, o con
  * "usar mi ubicación" si la persona está en el sitio.
  */
 export default function SelectorUbicacion({ valor, onCambiar, disabled, tipo = 'negocio' }: Props) {
@@ -62,7 +70,7 @@ export default function SelectorUbicacion({ valor, onCambiar, disabled, tipo = '
               vista={vistaDe(valor, ZOOM.cuadra)}
               quieto
               recortado>
-              {tipo === 'entrega' ? <PinEntrega punto={valor} /> : <PinNegocio punto={valor} nombre="Mi negocio" />}
+              {tipo === 'negocio' ? <PinNegocio punto={valor} nombre="Mi negocio" /> : <PinEntrega punto={valor} nombre={tipo === 'propiedad' ? 'Mi propiedad' : undefined} />}
             </MapaVitrina>
           </View>
           <View style={styles.acciones}>

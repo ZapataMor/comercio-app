@@ -31,7 +31,7 @@ use Throwable;
  *
  * El aviso solo dice QUÉ cambió (el «tema») y de quién; la app vuelve a pedir
  * a la API lo que tenga en pantalla. Canales:
- *  - catalogo            público: negocios, productos, reseñas, tarifa, barrios.
+ *  - catalogo            público: negocios, productos, reseñas, tarifa, barrios, propiedades.
  *  - usuario.{id}        privado: mis pedidos, citas, invitaciones, perfil, negocios.
  *  - negocio.{id}        privado, del equipo: pedidos, citas, equipo, catálogo.
  *  - domiciliarios       privado: pedidos disponibles para tomar.
@@ -181,6 +181,12 @@ class EnVivo
         self::avisar([self::CATALOGO, self::negocio($negocioId)], 'catalogo', ['negocio_id' => $negocioId]);
     }
 
+    /** Alguien publicó, cambió u ocultó una propiedad: el listado, el mapa y sus «Mis propiedades». */
+    public static function propiedades(?int $userId): void
+    {
+        self::avisar([self::CATALOGO, self::usuario($userId)], 'propiedades');
+    }
+
     /** Miembros, permisos o invitaciones de un negocio; y la lista de negocios de cada afectado. */
     public static function equipo(?int $negocioId, array $usuarios = []): void
     {
@@ -290,6 +296,8 @@ class EnVivo
                 'antes' => fn (Request $r) => self::negociosDe($yo($r)),
                 'despues' => function (Request $r, Response $res, array $negocios) {
                     self::avisar(self::ADMIN, 'usuarios');
+                    // Sus propiedades dejan de publicarse.
+                    self::avisar(self::CATALOGO, 'propiedades');
                     foreach ($negocios ?: [null] as $negocioId) {
                         self::datosNegocio($negocioId);
                     }
@@ -356,6 +364,12 @@ class EnVivo
             CategoriaController::class.'@store' => ['despues' => fn (Request $r) => self::catalogo($negocioRuta($r))],
             CategoriaController::class.'@update' => ['despues' => fn (Request $r) => self::catalogo($negocioRuta($r))],
             CategoriaController::class.'@destroy' => ['despues' => fn (Request $r) => self::catalogo($negocioRuta($r))],
+
+            // --- Propiedades (casas y patios que publica una persona) ---
+            Api\PropiedadController::class.'@store' => ['despues' => fn (Request $r) => self::propiedades($yo($r))],
+            Api\PropiedadController::class.'@update' => ['despues' => fn (Request $r) => self::propiedades($yo($r))],
+            Api\PropiedadController::class.'@disponibilidad' => ['despues' => fn (Request $r) => self::propiedades($yo($r))],
+            Api\PropiedadController::class.'@destroy' => ['despues' => fn (Request $r) => self::propiedades($yo($r))],
 
             // --- Pedidos: cliente ---
             Api\PedidoController::class.'@store' => ['despues' => fn (Request $r, Response $res) => self::pedido($json($res, 'id'))],
