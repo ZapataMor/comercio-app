@@ -7,7 +7,7 @@ import { useLectura } from '../useLectura';
  * las habitaciones.
  */
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -35,6 +35,7 @@ import {
 import { useAuth } from '../AuthContext';
 import { PressableScale } from '../components/anim';
 import BarrioSelect from '../components/BarrioSelect';
+import { useConfirmar } from '../components/Confirmacion';
 import CamposDireccion from '../components/CamposDireccion';
 import FieldError from '../components/FieldError';
 import Icon from '../components/Icon';
@@ -96,6 +97,8 @@ export default function EditarPropiedadScreen({ navigation, route }: Props) {
   const [galeria, setGaleria] = useState<string[]>([]);
   const [nuevas, setNuevas] = useState<string[]>([]);
   const [guardando, setGuardando] = useState(false);
+  // Fotos enviadas de cuántas, mientras se sube (con datos móviles tarda).
+  const [avance, setAvance] = useState<{ hechas: number; total: number } | null>(null);
   const [errores, setErrores] = useState<FieldErrors>({});
 
   const [propiedadCargada, setPropiedadCargada] = useState<number | null>(null);
@@ -132,6 +135,38 @@ export default function EditarPropiedadScreen({ navigation, route }: Props) {
       })
       .finally(() => setCargando(false));
   }, [id, token, navigation, toast, propiedadCargada]);
+
+  // Un «atrás» de más no bota las fotos y los datos: si hay cambios, se pregunta.
+  const confirmar = useConfirmar();
+  const formulario = JSON.stringify([
+    tipo, titulo, descripcion, precio, negociable, habitaciones, banos, area, estrato, capacidad, caracteristicas,
+    condiciones, direccion, barrio, ubicacion, contactoNombre, contactoTelefono, disponible, galeria, nuevas,
+  ]);
+  const formularioInicial = useRef<string | null>(null);
+  const salirSinPreguntar = useRef(false);
+  useEffect(() => {
+    if (!cargando && formularioInicial.current === null) formularioInicial.current = formulario;
+  }, [cargando, formulario]);
+  const hayCambios = formularioInicial.current !== null && formulario !== formularioInicial.current;
+  useEffect(
+    () =>
+      navigation.addListener('beforeRemove', e => {
+        if (!hayCambios || salirSinPreguntar.current) return;
+        e.preventDefault();
+        confirmar({
+          icono: 'alerta',
+          titulo: id ? '¿Salir sin guardar los cambios?' : '¿Salir sin publicar?',
+          texto: id ? 'Los cambios que hiciste se pierden.' : 'Las fotos y los datos que llenaste se pierden.',
+          textoBoton: 'Salir sin guardar',
+          peligro: true,
+          accion: () => {
+            salirSinPreguntar.current = true;
+            navigation.dispatch(e.data.action);
+          },
+        });
+      }),
+    [navigation, hayCambios, confirmar, id],
+  );
 
   const esPatio = tipo === 'eventos';
   const listaCaracteristicas = opciones?.caracteristicas[tipo] ?? [];
@@ -229,14 +264,25 @@ export default function EditarPropiedadScreen({ navigation, route }: Props) {
     };
     setGuardando(true);
     try {
-      const p = await guardarPropiedad(token, datos, id, nuevas);
-      toast.exito(id ? 'Cambios guardados' : '¡Propiedad publicada!', id ? undefined : 'Ya aparece en Propiedades y en su mapa.');
+      const { propiedad: p, fotosFallidas } = await guardarPropiedad(token, datos, id, nuevas, (hechas, total) =>
+        setAvance({ hechas, total }),
+      );
+      if (fotosFallidas > 0) {
+        toast.info(
+          id ? 'Cambios guardados, faltan fotos' : 'Publicada, faltan fotos',
+          `${fotosFallidas === 1 ? 'Una foto no se pudo subir' : `${fotosFallidas} fotos no se pudieron subir`}. Añádelas de nuevo desde «Editar».`,
+        );
+      } else {
+        toast.exito(id ? 'Cambios guardados' : '¡Propiedad publicada!', id ? undefined : 'Ya aparece en Propiedades y en su mapa.');
+      }
+      salirSinPreguntar.current = true;
       navigation.replace('Propiedad', { id: p.id, titulo: p.titulo });
     } catch (err) {
       setErrores(fieldErrorsFromError(err));
       toast.error('No se pudo guardar', messageFromError(err, 'Intenta de nuevo.'));
     } finally {
       setGuardando(false);
+      setAvance(null);
     }
   }
 
@@ -444,7 +490,18 @@ export default function EditarPropiedadScreen({ navigation, route }: Props) {
         </View>
 
         <PressableScale style={[styles.boton, guardando && styles.botonOcupado]} disabled={guardando} onPress={guardar}>
-          {guardando ? <ActivityIndicator color={c.onBrand} /> : <Text style={styles.botonTxt}>{id ? 'Guardar cambios' : 'Publicar propiedad'}</Text>}
+          {guardando ? (
+            <View style={styles.subiendo}>
+              <ActivityIndicator color={c.onBrand} />
+              {!!avance?.total && (
+                <Text style={styles.botonTxt}>
+                  Subiendo foto {Math.min(avance.hechas + 1, avance.total)} de {avance.total}…
+                </Text>
+              )}
+            </View>
+          ) : (
+            <Text style={styles.botonTxt}>{id ? 'Guardar cambios' : 'Publicar propiedad'}</Text>
+          )}
         </PressableScale>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -529,6 +586,7 @@ const useStyles = makeStyles((c, shadow) => ({
   chipTxt: { color: c.text, fontFamily: font.medium, fontSize: 13 },
   chipTxtActivo: { color: c.onBrand, fontFamily: font.semibold },
   boton: { backgroundColor: c.brand, borderRadius: radius.md, paddingVertical: 16, alignItems: 'center', ...shadow.soft },
-  botonOcupado: { opacity: 0.7 },
+  botonOcupado: { opacity: 0.85 },
+  subiendo: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   botonTxt: { color: c.onBrand, fontFamily: font.bold, fontSize: 16 },
 }));

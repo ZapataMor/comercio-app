@@ -54,9 +54,17 @@ export default function MapaPropiedadesScreen({ navigation }: Props) {
   const [conPermiso, setConPermiso] = useState(false);
   const [ubicando, setUbicando] = useState(false);
 
+  // Al llegar, encuadra todas: a la distancia de la ciudad los pines de precio se tapan.
+  const encuadrado = useRef(false);
   useLectura(() => {
     getPropiedadesMapa(token)
-      .then(setPropiedades)
+      .then(lista => {
+        setPropiedades(lista);
+        if (!encuadrado.current && lista.length > 1) {
+          encuadrado.current = true;
+          mapa.current?.encuadrar(lista, { top: 150, right: 70, bottom: 90, left: 70 });
+        }
+      })
       .catch(e => toast.error('No se pudo cargar el mapa', e instanceof Error ? e.message : 'Error'))
       .finally(() => setCargando(false));
   }, [token, toast]);

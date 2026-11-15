@@ -176,3 +176,27 @@ it('el seeder demo publica casas y patios sin duplicar', function () {
         ->and(Propiedad::where('tipo', 'eventos')->whereNull('capacidad')->count())->toBe(0)
         ->and(Propiedad::first()->galeria)->toHaveCount(3);
 });
+
+it('las fotos se suben de a una hasta el máximo, solo por el dueño', function () {
+    $dueno = User::factory()->create();
+    $propiedad = publicarPropiedad($dueno);
+
+    Sanctum::actingAs(User::factory()->create());
+    $this->post("/api/propiedades/{$propiedad->id}/fotos", ['foto' => UploadedFile::fake()->image('sala.jpg')], ['Accept' => 'application/json'])
+        ->assertNotFound();
+
+    Sanctum::actingAs($dueno);
+    $this->post("/api/propiedades/{$propiedad->id}/fotos", ['foto' => UploadedFile::fake()->create('nota.pdf', 10, 'application/pdf')], ['Accept' => 'application/json'])
+        ->assertUnprocessable()->assertJsonValidationErrors(['foto']);
+    $this->post("/api/propiedades/{$propiedad->id}/fotos", ['foto' => UploadedFile::fake()->image('grande.jpg')->size(11000)], ['Accept' => 'application/json'])
+        ->assertUnprocessable()->assertJsonValidationErrors(['foto']);
+
+    for ($i = 2; $i <= 10; $i++) {
+        $res = $this->post("/api/propiedades/{$propiedad->id}/fotos", ['foto' => UploadedFile::fake()->image("f{$i}.jpg")], ['Accept' => 'application/json'])
+            ->assertOk()->assertJsonCount($i, 'propiedad.galeria');
+    }
+    // La primera sigue siendo la portada.
+    expect($res->json('propiedad.foto'))->toBe('/storage/propiedades/demo.jpg');
+    $this->post("/api/propiedades/{$propiedad->id}/fotos", ['foto' => UploadedFile::fake()->image('once.jpg')], ['Accept' => 'application/json'])
+        ->assertUnprocessable();
+});

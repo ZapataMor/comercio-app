@@ -1,6 +1,8 @@
 import NetInfo from '@react-native-community/netinfo';
 
 export const TIEMPO_PETICION_MS = 20000;
+/** Subir fotos (varios MB con datos móviles) tarda mucho más que una petición normal. */
+export const TIEMPO_SUBIDA_MS = 120000;
 type EstadoRed = { sinInternet: boolean; aviso: string };
 let estado: EstadoRed = { sinInternet: false, aviso: '' };
 const listeners = new Set<(value: EstadoRed) => void>();
@@ -38,7 +40,7 @@ export class ErrorRed extends Error {}
 
 // El plazo cubre también la descarga del cuerpo. La carrera garantiza el fin
 // incluso si una implementación nativa no respeta AbortController.
-export async function solicitar(url: string, options: RequestInit = {}): Promise<Response> {
+export async function solicitar(url: string, options: RequestInit = {}, plazoMs = TIEMPO_PETICION_MS): Promise<Response> {
   if (estado.sinInternet) {
     throw new ErrorRed('Sin internet. Revisa tu conexión antes de intentarlo de nuevo.');
   }
@@ -73,7 +75,7 @@ export async function solicitar(url: string, options: RequestInit = {}): Promise
         timer = setTimeout(() => {
           reject(fallo('La solicitud tardó demasiado. No pudimos confirmar el resultado. Revisa si el cambio se realizó antes de intentarlo de nuevo.'));
           controller.abort();
-        }, TIEMPO_PETICION_MS);
+        }, plazoMs);
         dejarDeObservar = observarRed(value => {
           if (value.sinInternet) {
             reject(new ErrorRed('Te quedaste sin internet. No pudimos confirmar la solicitud. Revisa tu conexión y el estado de la operación.'));

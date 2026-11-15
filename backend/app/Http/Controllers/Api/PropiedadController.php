@@ -7,6 +7,7 @@ use App\Models\Propiedad;
 use App\Rules\Direccion;
 use App\Rules\Telefono;
 use App\Support\Busqueda;
+use App\Support\FotoOptimizada;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -25,6 +26,9 @@ class PropiedadController extends Controller
     private const MAX_FOTOS = 10;
 
     private const POR_PAGINA = 20;
+
+    /** Peso máximo de cada foto (el servidor admite 12 MB por archivo). */
+    private const MAX_KB_FOTO = 10240;
 
     /** Listado del cliente, con filtros. Primero las más recientes. */
     public function index(Request $request): JsonResponse
@@ -113,6 +117,25 @@ class PropiedadController extends Controller
         return response()->json(['propiedad' => $this->detalle($this->guardar($request, $propiedad), true)]);
     }
 
+    /**
+     * Añade una foto al final de la galería. La app sube las fotos de a una:
+     * varias fotos del celular juntas pasan del límite de una petición.
+     */
+    public function agregarFoto(Request $request, int $id): JsonResponse
+    {
+        $propiedad = $this->propia($request, $id);
+        $request->validate(['foto' => ['required', 'image', 'max:'.self::MAX_KB_FOTO]], [
+            'foto.max' => 'Cada foto puede pesar hasta 10 MB.',
+        ]);
+        $galeria = $propiedad->galeria ?? [];
+        abort_if(count($galeria) >= self::MAX_FOTOS, 422, 'Puedes mostrar hasta '.self::MAX_FOTOS.' fotos por propiedad.');
+        $galeria[] = FotoOptimizada::guardar($request->file('foto'), 'propiedades');
+        $propiedad->galeria = $galeria;
+        $propiedad->save();
+
+        return response()->json(['propiedad' => $this->detalle($propiedad, true)]);
+    }
+
     /** Ocultar (vendida, alquilada, en pausa) o volver a publicar. */
     public function disponibilidad(Request $request, int $id): JsonResponse
     {
@@ -158,7 +181,7 @@ class PropiedadController extends Controller
 
         $propiedad->fill($datos);
         foreach ($nuevas as $foto) {
-            $conservar[] = '/storage/'.$foto->store('propiedades', 'public');
+            $conservar[] = FotoOptimizada::guardar($foto, 'propiedades');
         }
         $propiedad->galeria = array_values($conservar);
         $propiedad->save();
@@ -207,7 +230,7 @@ class PropiedadController extends Controller
             'contacto_telefono' => ['required', 'string', new Telefono],
             'disponible' => ['sometimes', 'boolean'],
             'imagenes' => ['sometimes', 'array', 'max:'.self::MAX_FOTOS],
-            'imagenes.*' => ['image', 'max:6144'],
+            'imagenes.*' => ['image', 'max:'.self::MAX_KB_FOTO],
             'conservar_imagenes' => ['sometimes', 'array', 'max:'.self::MAX_FOTOS],
             'conservar_imagenes.*' => ['string', Rule::in($propiedad->galeria ?? [])],
         ], [

@@ -369,6 +369,7 @@ class EnVivo
             Api\PropiedadController::class.'@store' => ['despues' => fn (Request $r) => self::propiedades($yo($r))],
             Api\PropiedadController::class.'@update' => ['despues' => fn (Request $r) => self::propiedades($yo($r))],
             Api\PropiedadController::class.'@disponibilidad' => ['despues' => fn (Request $r) => self::propiedades($yo($r))],
+            Api\PropiedadController::class.'@agregarFoto' => ['despues' => fn (Request $r) => self::propiedades($yo($r))],
             Api\PropiedadController::class.'@destroy' => ['despues' => fn (Request $r) => self::propiedades($yo($r))],
 
             // --- Pedidos: cliente ---

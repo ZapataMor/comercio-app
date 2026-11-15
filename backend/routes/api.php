@@ -108,6 +108,8 @@ Route::middleware(['auth:sanctum', 'throttle:api-usuario'])->group(function () {
     Route::get('/propiedades/{id}', [PropiedadController::class, 'show']);
     Route::put('/propiedades/{id}', [PropiedadController::class, 'update']);
     Route::put('/propiedades/{id}/disponibilidad', [PropiedadController::class, 'disponibilidad']);
+    // Las fotos se suben de a una (varias juntas pasan del límite de la petición).
+    Route::post('/propiedades/{id}/fotos', [PropiedadController::class, 'agregarFoto']);
     Route::delete('/propiedades/{id}', [PropiedadController::class, 'destroy']);
 
     // --- Mis negocios (modelo unificado) ---

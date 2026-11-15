@@ -1,4 +1,4 @@
-import { solicitar, ErrorRed } from './red';
+import { solicitar, ErrorRed, TIEMPO_SUBIDA_MS } from './red';
 import { API_URL } from './config';
 import type { OpcionesLinea } from './opcionesProducto';
 
@@ -565,7 +565,7 @@ async function authUpload(
       method: 'POST', // siempre POST; el PUT real se simula con _method
       headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
       body: form,
-    });
+    }, TIEMPO_SUBIDA_MS);
   } catch (error) {
     if (error instanceof ErrorRed) throw error;
     throw new Error('No se pudo conectar con el servidor.');
@@ -573,6 +573,8 @@ async function authUpload(
   const data = await res.json().catch(() => ({} as any));
   if (!res.ok) {
     if (res.status === 401) onTokenRechazado?.(token);
+    // El servidor web corta lo que pasa de su límite antes de llegar a Laravel (sin JSON).
+    if (res.status === 413) throw new ApiError('Las fotos pesan demasiado. Prueba con menos fotos o más livianas.', 413);
     const errors = validationErrors(data);
     throw new ApiError(firstValidationMessage(errors) ?? data?.message ?? 'Error en la petición.', res.status, errors);
   }
@@ -2090,17 +2092,45 @@ export type DatosPropiedad = Omit<
   'id' | 'foto' | 'publicada_at' | 'actualizada_at' | 'es_mia'
 >;
 
-export async function guardarPropiedad(token: string, datos: DatosPropiedad, id?: number, nuevasFotos: string[] = []): Promise<Propiedad> {
+/**
+ * Publica o edita una propiedad y sube sus fotos nuevas DE A UNA: varias
+ * fotos del celular en una sola petición pasan del límite del servidor. Con
+ * los datos va solo la primera foto nueva, y únicamente si no queda ninguna
+ * guardada (sin fotos no se publica). Devuelve cuántas fotos no se subieron:
+ * la propiedad igual queda guardada.
+ */
+export async function guardarPropiedad(
+  token: string,
+  datos: DatosPropiedad,
+  id?: number,
+  nuevasFotos: string[] = [],
+  /** Para mostrar «Subiendo foto 2 de 4»: (fotos ya enviadas, total). */
+  onAvance?: (hechas: number, total: number) => void,
+): Promise<{ propiedad: Propiedad; fotosFallidas: number }> {
   const { galeria, caracteristicas, ...campos } = datos;
+  const conDatos = galeria.length === 0 ? nuevasFotos.slice(0, 1) : [];
+  onAvance?.(0, nuevasFotos.length);
   const d = await authUpload(
     id ? 'PUT' : 'POST',
     `/api/propiedades${id ? `/${id}` : ''}`,
     token,
     { ...campos, caracteristicas: JSON.stringify(caracteristicas), conservar_imagenes: JSON.stringify(galeria) },
     undefined,
-    nuevasFotos,
+    conDatos,
   );
-  return d.propiedad as Propiedad;
+  let propiedad = d.propiedad as Propiedad;
+  let fotosFallidas = 0;
+  let hechas = conDatos.length;
+  for (const uri of nuevasFotos.slice(conDatos.length)) {
+    onAvance?.(hechas++, nuevasFotos.length);
+    try {
+      const r = await authUpload('POST', `/api/propiedades/${propiedad.id}/fotos`, token, {}, undefined, undefined, { foto: uri });
+      propiedad = r.propiedad as Propiedad;
+    } catch {
+      fotosFallidas++;
+    }
+  }
+  return { propiedad, fotosFallidas };
 }
 
 /** Ocultar (vendida, alquilada o en pausa) o volver a publicar. */

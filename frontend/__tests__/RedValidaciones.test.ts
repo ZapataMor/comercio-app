@@ -1,6 +1,6 @@
 import NetInfo from '@react-native-community/netinfo';
 import { direccionValida, separarDireccion, telefonoValido, unirDireccion } from '../src/direccion';
-import { alReintentarRed, reintentarRed, iniciarMonitorRed, solicitar, TIEMPO_PETICION_MS } from '../src/red';
+import { alReintentarRed, reintentarRed, iniciarMonitorRed, solicitar, TIEMPO_PETICION_MS, TIEMPO_SUBIDA_MS } from '../src/red';
 
 const fetchOriginal = globalThis.fetch;
 
@@ -68,4 +68,14 @@ test('reintentar comprueba la conexión y refresca lecturas sin repetir escritur
   expect(leer).toHaveBeenCalledTimes(1);
   expect(globalThis.fetch).toHaveBeenCalledTimes(1);
   quitar();
+});
+
+test('una subida de fotos tiene más plazo que una petición normal', async () => {
+  globalThis.fetch = jest.fn(() => new Promise(() => {}));
+  let terminada = false;
+  const subida = solicitar('/api/propiedades', {}, TIEMPO_SUBIDA_MS).catch(e => { terminada = true; return e; });
+  await jest.advanceTimersByTimeAsync(TIEMPO_PETICION_MS + 1000);
+  expect(terminada).toBe(false);
+  await jest.advanceTimersByTimeAsync(TIEMPO_SUBIDA_MS);
+  expect((await subida).message).toContain('tardó demasiado');
 });
