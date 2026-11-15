@@ -101,6 +101,28 @@ test('si el cliente queda conforme, suben el negocio y el domiciliario', functio
         ->assertJsonPath('calificacion.domiciliario_caritas.2.texto', 'Bien cuidado');
 });
 
+test('el cliente puede calificar solo al domiciliario: el negocio no cambia', function () {
+    $cliente = repUsuario();
+    $negocio = repNegocio();
+    $domi = repUsuario('domiciliario');
+    $pedido = repPedido($negocio, $cliente, 'entregado', $domi);
+    Sanctum::actingAs($cliente);
+    $antes = puntaje($negocio);
+
+    $this->postJson("/api/pedidos/{$pedido->id}/calificacion", [
+        'domiciliario_caritas' => caritas(5, 4, 5),
+    ])->assertCreated();
+
+    expect(puntaje($negocio))->toBe($antes)
+        ->and(puntaje($domi))->toBe(83)
+        ->and(ReputacionEvento::where('pedido_id', $pedido->id)->where('tipo', Reputacion::NEGOCIO)->count())->toBe(0);
+
+    $this->getJson("/api/pedidos/{$pedido->id}")
+        ->assertJsonPath('puede_calificar', false)
+        ->assertJsonPath('calificacion.negocio_ok', null)
+        ->assertJsonPath('calificacion.domiciliario_ok', true);
+});
+
 test('los problemas que reporta el cliente bajan a quien corresponde', function () {
     $cliente = repUsuario();
     $negocio = repNegocio();

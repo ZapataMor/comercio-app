@@ -13,16 +13,9 @@ import { CartItem } from '../CartContext';
 import { OpcionesLinea } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { PressableScale } from './anim';
+import AjusteIngredientes from './AjusteIngredientes';
 import ChipsEleccion from './ChipsEleccion';
 import Icon from './Icon';
-
-type Estado = 'sin' | 'normal' | 'extra';
-
-const ESTADOS: { valor: Estado; texto: string }[] = [
-  { valor: 'sin', texto: 'Sin' },
-  { valor: 'normal', texto: 'Normal' },
-  { valor: 'extra', texto: 'Extra' },
-];
 
 /** `ajustar` cambia las unidades que ya están; `agregar` es para una unidad más. */
 export type ModoHoja = 'ajustar' | 'agregar';
@@ -61,15 +54,6 @@ function Contenido({ item, modo, onCerrar, onGuardar }: { item: CartItem } & Omi
   // Si la cantidad baja a mano con la hoja abierta no puede quedar por encima.
   useEffect(() => setUnidades(n => Math.min(n, item.cantidad)), [item.cantidad]);
 
-  const estadoDe = (ingrediente: string): Estado =>
-    sin.includes(ingrediente) ? 'sin' : extra.includes(ingrediente) ? 'extra' : 'normal';
-
-  function marcar(ingrediente: string, estado: Estado) {
-    const sinEste = (lista: string[]) => lista.filter(i => i !== ingrediente);
-    setSin(estado === 'sin' ? [...sinEste(sin), ingrediente] : sinEste(sin));
-    setExtra(estado === 'extra' ? [...sinEste(extra), ingrediente] : sinEste(extra));
-  }
-
   function guardar() {
     onGuardar(item.linea, { talla, color, sin, extra }, unidades);
   }
@@ -86,47 +70,15 @@ function Contenido({ item, modo, onCerrar, onGuardar }: { item: CartItem } & Omi
           {ingredientes.length > 0 && (
             <>
               <Text style={styles.ayuda}>Quita lo que no quieras o pide más de lo que trae.</Text>
-              {ingredientes.map(ingrediente => {
-                const estado = estadoDe(ingrediente);
-                return (
-                  <View key={ingrediente} style={styles.ingrediente}>
-                    <Text
-                      style={[styles.ingredienteTxt, estado === 'sin' && styles.ingredienteQuitado]}
-                      numberOfLines={2}>
-                      {ingrediente}
-                    </Text>
-                    <View style={styles.segmento}>
-                      {ESTADOS.map(({ valor, texto }) => {
-                        const activo = estado === valor;
-                        return (
-                          <Pressable
-                            key={valor}
-                            style={[
-                              styles.opcion,
-                              activo && styles.opcionOn,
-                              activo && valor === 'sin' && styles.opcionSin,
-                              activo && valor === 'extra' && styles.opcionExtra,
-                            ]}
-                            accessibilityRole="radio"
-                            accessibilityState={{ selected: activo }}
-                            accessibilityLabel={`${ingrediente}: ${texto}`}
-                            onPress={() => marcar(ingrediente, valor)}>
-                            <Text
-                              style={[
-                                styles.opcionTxt,
-                                activo && styles.opcionTxtOn,
-                                activo && valor === 'sin' && styles.opcionTxtSin,
-                                activo && valor === 'extra' && styles.opcionTxtExtra,
-                              ]}>
-                              {texto}
-                            </Text>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  </View>
-                );
-              })}
+              <AjusteIngredientes
+                ingredientes={ingredientes}
+                sin={sin}
+                extra={extra}
+                onChange={(nuevoSin, nuevoExtra) => {
+                  setSin(nuevoSin);
+                  setExtra(nuevoExtra);
+                }}
+              />
             </>
           )}
 
@@ -199,30 +151,6 @@ const useStyles = makeStyles((c, shadow) => ({
   titulo: { color: c.textStrong, fontFamily: font.display, fontSize: 19, lineHeight: 25, marginBottom: 4 },
   lista: { flexGrow: 0, marginBottom: 14 },
   ayuda: { color: c.muted, fontFamily: font.regular, fontSize: 13, lineHeight: 18, marginBottom: 8 },
-  ingrediente: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: c.border,
-  },
-  ingredienteTxt: { flex: 1, color: c.text, fontFamily: font.medium, fontSize: 15 },
-  ingredienteQuitado: { color: c.mutedSoft, textDecorationLine: 'line-through' },
-  segmento: {
-    flexDirection: 'row',
-    padding: 3,
-    borderRadius: radius.pill,
-    backgroundColor: c.surface2,
-  },
-  opcion: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: radius.pill },
-  opcionOn: { backgroundColor: c.surface, ...shadow.low },
-  opcionSin: { backgroundColor: c.dangerSoft },
-  opcionExtra: { backgroundColor: c.accentSoft },
-  opcionTxt: { color: c.muted, fontFamily: font.medium, fontSize: 12 },
-  opcionTxtOn: { color: c.textStrong, fontFamily: font.semibold },
-  opcionTxtSin: { color: c.danger },
-  opcionTxtExtra: { color: c.goldText },
   unidades: {
     flexDirection: 'row',
     alignItems: 'center',

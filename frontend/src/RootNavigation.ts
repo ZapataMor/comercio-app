@@ -60,7 +60,7 @@ function navigateFromData(data: PushData, user: Usuario) {
 
   const roles = user.roles ?? [];
   const pedidoId = Number(data.pedido_id);
-  if (data.tipo === 'precio_carrito') { navigationRef.navigate('Carrito'); return; }
+  if (data.tipo === 'precio_carrito' || data.tipo === 'carrito_por_vencer') { navigationRef.navigate('Carrito'); return; }
 
   if (data.tipo === 'estado_pedido' && roles.includes('usuario') && Number.isFinite(pedidoId)) {
     navigationRef.navigate('PedidoDetalle', { id: pedidoId });

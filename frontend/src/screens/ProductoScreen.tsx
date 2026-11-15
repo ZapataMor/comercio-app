@@ -7,6 +7,7 @@ import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import CantidadPeso from '../components/CantidadPeso';
 import { esPorPeso } from '../cantidades';
+import AjusteIngredientes from '../components/AjusteIngredientes';
 import ChipsEleccion from '../components/ChipsEleccion';
 import { useFlyToCart } from '../components/FlyToCart';
 import Icon from '../components/Icon';
@@ -28,8 +29,9 @@ const ESPERA_VUELO = 350;
 
 /**
  * Detalle de un producto del catálogo. Lo que se ve depende de su tipo: la ropa
- * muestra tallas y colores para elegir, la comida sus ingredientes (se ajustan
- * en el carrito) y los demás tipos su información.
+ * muestra tallas y colores para elegir, la comida sus ingredientes (cada uno se
+ * deja normal, se quita o se pide extra aquí mismo, antes de agregarlo) y los
+ * demás tipos su información.
  */
 export default function ProductoScreen({ navigation, route }: Props) {
   const { c } = useTheme();
@@ -72,6 +74,8 @@ export default function ProductoScreen({ navigation, route }: Props) {
   const [talla, setTalla] = useState(tallas.length === 1 ? tallas[0] : undefined);
   const [color, setColor] = useState(colores.length === 1 ? colores[0] : undefined);
   const [cantidad, setCantidad] = useState(1);
+  const [sin, setSin] = useState<string[]>([]);
+  const [extra, setExtra] = useState<string[]>([]);
   const [avisarFaltantes, setAvisarFaltantes] = useState(false);
 
   const faltaTalla = tallas.length > 0 && !talla;
@@ -84,7 +88,7 @@ export default function ProductoScreen({ navigation, route }: Props) {
     }
     const desde = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
     agregar(producto, {
-      opciones: { talla, color },
+      opciones: { talla, color, sin, extra },
       cantidad,
       alAgregar: () => {
         navigation.goBack();
@@ -132,9 +136,17 @@ export default function ProductoScreen({ navigation, route }: Props) {
 
           {ingredientes.length > 0 && (
             <View style={styles.seccion}>
-              <Text style={styles.seccionTitulo}>Ingredientes</Text>
-              <Text style={styles.lista}>{ingredientes.join(' · ')}</Text>
-              <Text style={styles.nota}>En el carrito puedes quitar los que no quieras o pedir más.</Text>
+              <Text style={styles.seccionTitulo}>Personalízalo</Text>
+              <Text style={styles.nota}>Quita lo que no quieras o pide más de lo que trae.</Text>
+              <AjusteIngredientes
+                ingredientes={ingredientes}
+                sin={sin}
+                extra={extra}
+                onChange={(nuevoSin, nuevoExtra) => {
+                  setSin(nuevoSin);
+                  setExtra(nuevoExtra);
+                }}
+              />
             </View>
           )}
 
@@ -208,7 +220,7 @@ const useStyles = makeStyles((c, shadow) => ({
   seccion: { marginTop: 22 },
   seccionTitulo: { color: c.textStrong, fontFamily: font.semibold, fontSize: 14, marginBottom: 8 },
   lista: { color: c.text, fontFamily: font.regular, fontSize: 15, lineHeight: 24 },
-  nota: { color: c.muted, fontFamily: font.regular, fontSize: 13, lineHeight: 18, marginTop: 8 },
+  nota: { color: c.muted, fontFamily: font.regular, fontSize: 13, lineHeight: 18, marginBottom: 4 },
   barra: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1,6 +1,3 @@
-import CamposDireccion from '../components/CamposDireccion';
-import { normalizarDireccion } from '../direccion';
-import { direccionValida, errorDireccion } from '../direccion';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
 import {
@@ -18,7 +15,6 @@ import {
 import { pedirCodigoRegistro, register, verificarTelefonoRegistro } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
-import BarrioSelect from '../components/BarrioSelect';
 import FieldError from '../components/FieldError';
 import Icon from '../components/Icon';
 import { VitrinaMark } from '../components/Logo';
@@ -47,8 +43,6 @@ export default function RegisterScreen({ navigation }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmar, setConfirmar] = useState('');
-  const [direccion, setDireccion] = useState('');
-  const [barrio, setBarrio] = useState('');
   // Celular confirmado por WhatsApp y el token que pide /register.
   const [celular, setCelular] = useState<{ telefono: string; token: string } | null>(null);
   // Autorización del tratamiento de datos (Ley 1581): casilla sin marcar por defecto.
@@ -73,8 +67,6 @@ export default function RegisterScreen({ navigation }: Props) {
     if (!nombre.trim()) nuevosErrores.name = 'El campo nombre es obligatorio.';
     if (!apellidos.trim()) nuevosErrores.apellidos = 'El campo apellidos es obligatorio.';
     if (!password) nuevosErrores.password = 'El campo contraseña es obligatorio.';
-    if (!direccionValida(direccion)) nuevosErrores.direccion = errorDireccion;
-    if (!barrio.trim()) nuevosErrores.barrio = 'El campo barrio es obligatorio.';
     if (!aceptaTerminos) {
       nuevosErrores.acepta_terminos = 'Debes aceptar la política de privacidad para crear la cuenta.';
     }
@@ -99,8 +91,6 @@ export default function RegisterScreen({ navigation }: Props) {
         apellidos: apellidos.trim(),
         email: email.trim() || null,
         password,
-        direccion: normalizarDireccion(direccion),
-        barrio: barrio.trim(),
         telefono: celular.telefono,
         verificacion: celular.token,
         acepta_terminos: aceptaTerminos,
@@ -244,21 +234,6 @@ export default function RegisterScreen({ navigation }: Props) {
             editable={!cargando}
           />
           <FieldError mensaje={errores.confirmar} />
-
-          <Text style={styles.label}>Dirección</Text>
-          <CamposDireccion value={direccion} onChangeText={valor => { setDireccion(valor); limpiarError('direccion'); }} editable={!cargando} />
-          <FieldError mensaje={errores.direccion} />
-
-          <Text style={styles.label}>Barrio</Text>
-          <BarrioSelect
-            valor={barrio}
-            onSeleccionar={nombre => {
-              setBarrio(nombre);
-              limpiarError('barrio');
-            }}
-            disabled={cargando}
-          />
-          <FieldError mensaje={errores.barrio} />
 
           <View style={styles.terminosRow}>
             <TouchableOpacity

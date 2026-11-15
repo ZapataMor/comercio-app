@@ -28,11 +28,10 @@ import { FadeInView, PressableScale } from '../components/anim';
 import { useFlyToCart } from '../components/FlyToCart';
 import Icon from '../components/Icon';
 import BotonesContacto from '../components/BotonesContacto';
-import { NivelBadge } from '../components/Reputacion';
 import RecetasPreferidas from '../components/RecetasPreferidas';
 import { PuntajeResenas } from '../components/Resenas';
 import { RootStackParamList } from '../navTypes';
-import { OpcionesLinea, pideEleccion, precioDe } from '../opcionesProducto';
+import { ingredientesDe, OpcionesLinea, pideEleccion, precioDe } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 import { useAgregarAlCarrito } from '../useAgregarAlCarrito';
@@ -217,8 +216,10 @@ export default function NegocioScreen({ navigation, route }: Props) {
       toast.info('Negocio cerrado', 'Puedes ver el catálogo, pero no hacer pedidos.');
       return;
     }
-    // Hay que elegir talla o color: eso se hace en el detalle del producto.
-    if (pideEleccion(p)) {
+    // Hay que elegir peso, talla o color, o se puede quitar o pedir extra un
+    // ingrediente: eso se hace en la ficha, antes de mandarlo al carrito. Una
+    // receta preferida ya trae sus ingredientes elegidos y entra directo.
+    if (pideEleccion(p) || (!opciones && ingredientesDe(p).length > 0)) {
       verProducto(p);
       return;
     }
@@ -284,7 +285,6 @@ export default function NegocioScreen({ navigation, route }: Props) {
                 {seccion === 'productos' && !!negocio.tiempo_preparacion && (
                   <Text style={styles.dato}>· ~{negocio.tiempo_preparacion} min</Text>
                 )}
-                <NivelBadge reputacion={negocio.reputacion} />
               </View>
               <PressableScale
                 style={styles.resenas}

@@ -311,8 +311,9 @@ export async function register(body: {
   /** Opcional: se puede entrar con el celular verificado. */
   email?: string | null;
   password: string;
-  direccion: string;
-  barrio: string;
+  /** Opcionales: la dirección se pide en el primer pedido. */
+  direccion?: string;
+  barrio?: string;
   telefono: string;
   /** Token de verificarTelefono(): el número se confirmó por WhatsApp. */
   verificacion: string;
@@ -1678,7 +1679,8 @@ export type AspectoCaritas = {
 export type CaritaDada = { clave: string; nombre: string; nota: NotaCarita; texto: string };
 
 export type CalificacionPedido = {
-  negocio_ok: boolean;
+  /** null desde que el cliente solo califica al domiciliario. */
+  negocio_ok: boolean | null;
   negocio_problemas: string[];
   domiciliario_ok: boolean | null;
   /** null en calificaciones de antes de las caritas. */
@@ -1740,7 +1742,7 @@ export type NuevaResena = {
 };
 
 export type NuevaCalificacion = {
-  negocio_ok: boolean;
+  negocio_ok?: boolean;
   negocio_problemas?: string[];
   /** { amabilidad: 5, rapidez: 4, estado_producto: 5 }; no hace falta si nunca llegó. */
   domiciliario_caritas?: Record<string, NotaCarita>;

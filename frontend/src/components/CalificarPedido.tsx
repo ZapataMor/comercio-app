@@ -1,9 +1,9 @@
 /**
- * Calificación del cliente al terminar un pedido: ¿el negocio cumplió? (si
- * algo falló, el cliente elige qué) y al domiciliario lo califica con
- * caritas de 1 a 5 en amabilidad, rapidez y estado del producto. Lo grave
- * (no llegó, llegó abierto, cobró de más) va aparte. Cada respuesta sube o
- * baja su nivel de confiabilidad (ver Reputacion.tsx).
+ * Primer paso al terminar un pedido: el cliente califica al domiciliario con
+ * caritas de 1 a 5 en amabilidad, rapidez y estado del producto. Lo grave (no
+ * llegó, llegó abierto, cobró de más) va aparte. A la tienda y a sus productos
+ * los valora después, con estrellas (ResenarPedido). Las caritas alimentan la
+ * confiabilidad del domiciliario, un dato interno que el cliente no ve.
  */
 import React, { useState } from 'react';
 import { ActivityIndicator, Text, TextInput, View } from 'react-native';
@@ -12,7 +12,6 @@ import {
   calificarPedido,
   CalificacionPedido,
   NotaCarita,
-  OpcionProblema,
   SeguimientoPedido,
 } from '../api';
 import { useAuth } from '../AuthContext';
@@ -22,10 +21,6 @@ import { animarDespliegue, Desplegable, FadeInView, PressableScale } from './ani
 import Carita, { colorCarita } from './Carita';
 import Icon from './Icon';
 
-type Respuesta = { ok: boolean | null; problemas: string[] };
-
-const VACIA: Respuesta = { ok: null, problemas: [] };
-
 const NOTAS: NotaCarita[] = [1, 2, 3, 4, 5];
 
 export default function CalificarPedido({ pedido, onEnviado }: { pedido: SeguimientoPedido; onEnviado: () => void }) {
@@ -33,23 +28,19 @@ export default function CalificarPedido({ pedido, onEnviado }: { pedido: Seguimi
   const styles = useStyles();
   const { auth } = useAuth();
   const toast = useToast();
-  const [negocio, setNegocio] = useState<Respuesta>(VACIA);
   const [caritas, setCaritas] = useState<Record<string, NotaCarita>>({});
   const [graves, setGraves] = useState<string[]>([]);
   const [verGraves, setVerGraves] = useState(false);
   const [comentario, setComentario] = useState('');
   const [enviando, setEnviando] = useState(false);
 
-  const conDomiciliario = !!pedido.domiciliario;
   const opciones = pedido.opciones_problemas;
   const aspectos = pedido.aspectos_domiciliario ?? [];
   // Si nunca llegó, no hay trato, rapidez ni estado que calificar.
   const noLlego = graves.includes('no_llego');
-  const completa = (r: Respuesta) => r.ok === true || (r.ok === false && r.problemas.length > 0);
-  const domiListo = !conDomiciliario || noLlego || aspectos.every(a => caritas[a.clave]);
-  const lista = completa(negocio) && domiListo;
+  const lista = noLlego || aspectos.every(a => caritas[a.clave]);
   const caritaBaja = !noLlego && Object.values(caritas).some(n => n <= 2);
-  const hayQueja = negocio.ok === false || graves.length > 0 || caritaBaja;
+  const hayQueja = graves.length > 0 || caritaBaja;
 
   function alternarGrave(clave: string) {
     animarDespliegue();
@@ -61,10 +52,8 @@ export default function CalificarPedido({ pedido, onEnviado }: { pedido: Seguimi
     setEnviando(true);
     try {
       const msg = await calificarPedido(auth!.token, pedido.id, {
-        negocio_ok: negocio.ok!,
-        negocio_problemas: negocio.ok ? undefined : negocio.problemas,
-        domiciliario_caritas: conDomiciliario && !noLlego ? caritas : undefined,
-        domiciliario_problemas: conDomiciliario && graves.length > 0 ? graves : undefined,
+        domiciliario_caritas: !noLlego ? caritas : undefined,
+        domiciliario_problemas: graves.length > 0 ? graves : undefined,
         comentario: comentario.trim() || undefined,
       });
       toast.exito('Calificación enviada', msg);
@@ -78,23 +67,12 @@ export default function CalificarPedido({ pedido, onEnviado }: { pedido: Seguimi
   return (
     <FadeInView style={styles.card}>
       <View style={styles.cabecera}>
-        <Icon name="escudo" size={18} color={c.accent} />
-        <Text style={styles.titulo}>¿Cómo te fue?</Text>
+        <Icon name="moto" size={18} color={c.accent} />
+        <Text style={styles.titulo}>¿Cómo te atendió el domiciliario?</Text>
       </View>
-      <Text style={styles.sub}>Tu respuesta sube o baja el nivel de confiabilidad de quienes te atendieron.</Text>
+      <Text style={styles.sub}>{pedido.domiciliario} · Después podrás calificar la tienda y sus productos.</Text>
 
-      <Pregunta
-        titulo={`El negocio · ${pedido.negocio ?? ''}`}
-        opciones={opciones?.negocio ?? []}
-        valor={negocio}
-        onChange={setNegocio}
-      />
-
-      {conDomiciliario && (
         <View style={styles.pregunta}>
-          <Text style={styles.preguntaTitulo} numberOfLines={1}>
-            El domiciliario · {pedido.domiciliario}
-          </Text>
 
           <Desplegable abierto={!noLlego}>
             {aspectos.map(a => (
@@ -140,7 +118,6 @@ export default function CalificarPedido({ pedido, onEnviado }: { pedido: Seguimi
             {noLlego && <Text style={styles.nota}>Como no te llegó, no hace falta calificarlo con caritas.</Text>}
           </Desplegable>
         </View>
-      )}
 
       {hayQueja && (
         <TextInput
@@ -158,67 +135,9 @@ export default function CalificarPedido({ pedido, onEnviado }: { pedido: Seguimi
         style={[styles.enviar, !lista && styles.enviarOff]}
         onPress={enviar}
         disabled={!lista || enviando}>
-        {enviando ? <ActivityIndicator color={c.onBrand} /> : <Text style={styles.enviarTxt}>Enviar calificación</Text>}
+        {enviando ? <ActivityIndicator color={c.onBrand} /> : <Text style={styles.enviarTxt}>Enviar y seguir</Text>}
       </PressableScale>
     </FadeInView>
-  );
-}
-
-/** "Todo bien" / "Hubo un problema" y, si falló, qué falló (varias). */
-function Pregunta({
-  titulo,
-  opciones,
-  valor,
-  onChange,
-}: {
-  titulo: string;
-  opciones: OpcionProblema[];
-  valor: Respuesta;
-  onChange: (r: Respuesta) => void;
-}) {
-  const { c } = useTheme();
-  const styles = useStyles();
-
-  function alternar(clave: string) {
-    const problemas = valor.problemas.includes(clave)
-      ? valor.problemas.filter(p => p !== clave)
-      : [...valor.problemas, clave];
-    onChange({ ok: false, problemas });
-  }
-
-  return (
-    <View style={styles.pregunta}>
-      <Text style={styles.preguntaTitulo} numberOfLines={1}>{titulo}</Text>
-      <View style={styles.opcionesFila}>
-        <PressableScale
-          style={[styles.opcion, valor.ok === true && { backgroundColor: c.successSoft, borderColor: c.success }]}
-          onPress={() => onChange({ ok: true, problemas: [] })}>
-          <Icon name="check" size={16} color={valor.ok === true ? c.success : c.muted} />
-          <Text style={[styles.opcionTxt, valor.ok === true && { color: c.success }]}>Todo bien</Text>
-        </PressableScale>
-        <PressableScale
-          style={[styles.opcion, valor.ok === false && { backgroundColor: c.dangerSoft, borderColor: c.danger }]}
-          onPress={() => onChange({ ok: false, problemas: valor.ok === false ? valor.problemas : [] })}>
-          <Icon name="alerta" size={16} color={valor.ok === false ? c.danger : c.muted} />
-          <Text style={[styles.opcionTxt, valor.ok === false && { color: c.danger }]}>Hubo un problema</Text>
-        </PressableScale>
-      </View>
-      {valor.ok === false && (
-        <View style={styles.chips}>
-          {opciones.map(o => {
-            const activo = valor.problemas.includes(o.clave);
-            return (
-              <PressableScale
-                key={o.clave}
-                style={[styles.chip, activo && styles.chipOn]}
-                onPress={() => alternar(o.clave)}>
-                <Text style={[styles.chipTxt, activo && styles.chipTxtOn]}>{o.label}</Text>
-              </PressableScale>
-            );
-          })}
-        </View>
-      )}
-    </View>
   );
 }
 
@@ -275,11 +194,9 @@ function FilaCaritas({
 /** Lo que el cliente ya contestó (después de calificar). */
 export function ResumenCalificacion({
   calificacion,
-  negocio,
   domiciliario,
 }: {
   calificacion: CalificacionPedido;
-  negocio: string | null;
   domiciliario: string | null;
 }) {
   const { c } = useTheme();
@@ -300,10 +217,9 @@ export function ResumenCalificacion({
   return (
     <FadeInView style={styles.card}>
       <View style={styles.cabecera}>
-        <Icon name="escudo" size={18} color={c.accent} />
-        <Text style={styles.titulo}>Tu calificación</Text>
+        <Icon name="moto" size={18} color={c.accent} />
+        <Text style={styles.titulo}>Tu calificación al domiciliario</Text>
       </View>
-      {fila(negocio, calificacion.negocio_ok, calificacion.negocio_problemas)}
       {caritas?.length ? (
         <>
           <Text style={[styles.resumenTxt, styles.resumenQuien, styles.resumenDomi]}>{domiciliario}</Text>
@@ -323,7 +239,7 @@ export function ResumenCalificacion({
         fila(domiciliario, calificacion.domiciliario_ok, calificacion.domiciliario_problemas)
       )}
       {!!calificacion.comentario && <Text style={styles.resumenComentario}>“{calificacion.comentario}”</Text>}
-      <Text style={styles.gracias}>Gracias: así Vitrina sabe en quién confiar.</Text>
+      <Text style={styles.gracias}>Gracias por calificar.</Text>
     </FadeInView>
   );
 }
@@ -337,19 +253,11 @@ const useStyles = makeStyles((c, shadow) => ({
   titulo: { fontFamily: font.bold, color: c.textStrong, fontSize: 16 },
   sub: { color: c.muted, fontSize: 13, marginTop: 4, fontFamily: font.regular },
   pregunta: { marginTop: 16 },
-  preguntaTitulo: { fontFamily: font.semibold, color: c.text, marginBottom: 8 },
-  opcionesFila: { flexDirection: 'row', gap: 8 },
-  opcion: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    borderWidth: 1, borderColor: c.borderStrong, borderRadius: radius.sm, paddingVertical: 11,
-  },
-  opcionTxt: { fontFamily: font.semibold, color: c.text, fontSize: 14 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   chip: {
     borderWidth: 1, borderColor: c.borderStrong, borderRadius: radius.pill,
     paddingHorizontal: 12, paddingVertical: 7,
   },
-  chipOn: { backgroundColor: c.brand, borderColor: c.brand },
   chipGrave: { backgroundColor: c.danger, borderColor: c.danger },
   chipTxt: { color: c.text, fontSize: 13, fontFamily: font.medium },
   chipTxtOn: { color: c.onBrand },

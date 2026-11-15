@@ -10,7 +10,7 @@ beforeEach(function () {
     }
 });
 
-test('el cliente debe registrar direccion, barrio y telefono', function () {
+test('el registro exige el telefono, pero no la dirección (se pide en el primer pedido)', function () {
     $this->postJson('/api/register', [
         'name' => 'Cliente',
         'apellidos' => 'Pérez',
@@ -18,7 +18,37 @@ test('el cliente debe registrar direccion, barrio y telefono', function () {
         'password' => 'password123',
         'password_confirmation' => 'password123',
     ])->assertStatus(422)
-        ->assertJsonValidationErrors(['direccion', 'barrio', 'telefono']);
+        ->assertJsonValidationErrors(['telefono'])
+        ->assertJsonMissingValidationErrors(['direccion', 'barrio']);
+});
+
+test('se puede crear la cuenta sin dirección: no queda ninguna guardada', function () {
+    $this->postJson('/api/register', [
+        'name' => 'Cliente',
+        'apellidos' => 'Pérez',
+        'password' => 'password123',
+        'password_confirmation' => 'password123',
+        'telefono' => '3001234567',
+        'acepta_terminos' => true,
+        'verificacion' => verificacionTelefono('3001234567'),
+    ])->assertCreated()
+        ->assertJsonPath('user.direccion', null);
+
+    expect(\App\Models\User::where('telefono', '3001234567')->first()->clienteDirecciones()->count())->toBe(0);
+});
+
+test('una dirección sin barrio no se acepta en el registro', function () {
+    $this->postJson('/api/register', [
+        'name' => 'Cliente',
+        'apellidos' => 'Pérez',
+        'password' => 'password123',
+        'password_confirmation' => 'password123',
+        'direccion' => 'Calle 10 # 20-30',
+        'telefono' => '3001234567',
+        'acepta_terminos' => true,
+        'verificacion' => verificacionTelefono('3001234567'),
+    ])->assertStatus(422)
+        ->assertJsonValidationErrors(['barrio']);
 });
 
 test('el registro exige los apellidos en su propio campo', function () {

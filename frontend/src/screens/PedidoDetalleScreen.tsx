@@ -14,7 +14,6 @@ import { VerCodigo } from '../components/CodigoPedido';
 import Icon from '../components/Icon';
 import { haceCuanto, MapaSeguimiento, NotaEnVivo } from '../components/Mapa';
 import MotivoCancelacion from '../components/MotivoCancelacion';
-import { NivelBadge } from '../components/Reputacion';
 import ResenarPedido from '../components/ResenarPedido';
 import AjustarPedido from '../components/AjustarPedido';
 import ReportarPedido from '../components/ReportarPedido';
@@ -144,6 +143,9 @@ export default function PedidoDetalleScreen({ route }: Props) {
     return <ActivityIndicator size="large" color={c.accent} style={{ marginTop: 40 }} />;
   }
   if (error) return <ErrorCarga mensaje={error} />;
+  // Con domiciliario, las caritas van primero; sin él, directo a las estrellas.
+  const calificaDomiciliario = !!pedido?.puede_calificar && !!pedido.domiciliario;
+
   if (!pedido) {
     return <Text style={styles.error}>No se encontró el pedido.</Text>;
   }
@@ -170,23 +172,20 @@ export default function PedidoDetalleScreen({ route }: Props) {
       <View style={[styles.sub, styles.fila]}>
         <Icon name="tienda" size={14} color={c.muted} />
         <Text style={styles.sub}>{pedido.negocio}</Text>
-        <NivelBadge reputacion={pedido.negocio_reputacion} />
       </View>
 
-      {/* Al terminar: el cliente califica al negocio y al domiciliario. */}
-      {pedido.puede_calificar ? (
+      {/* Al terminar, en dos pasos: primero las caritas del domiciliario y,
+          ya enviadas, las estrellas de la tienda y de lo que compró. */}
+      {calificaDomiciliario ? (
         <CalificarPedido pedido={pedido} onEnviado={() => cargarPedido()} />
-      ) : pedido.calificacion ? (
-        <ResumenCalificacion
-          calificacion={pedido.calificacion}
-          negocio={pedido.negocio}
-          domiciliario={pedido.domiciliario}
-        />
-      ) : null}
-
-      {/* Estrellas y comentario públicos de la tienda y de lo que compró. */}
-      <ResenarPedido pedido={pedido} onGuardado={() => cargarPedido()} />
-      <ReportarPedido id={pedido.id} objetivos={pedido.domiciliario ? ['negocio', 'domiciliario'] : ['negocio']} />
+      ) : (
+        <>
+          {!!pedido.calificacion?.domiciliario_caritas?.length && (
+            <ResumenCalificacion calificacion={pedido.calificacion} domiciliario={pedido.domiciliario} />
+          )}
+          <ResenarPedido pedido={pedido} onGuardado={() => cargarPedido()} />
+        </>
+      )}
 
       {/* Cancelado: en vez de la línea de tiempo, quién y por qué. */}
       {pedido.estado === 'cancelado' ? (
@@ -249,7 +248,6 @@ export default function PedidoDetalleScreen({ route }: Props) {
         {!!pedido.domiciliario && (
           <View style={[styles.fila, styles.domiFila]}>
             <Text style={[styles.nota, styles.notaInline]}>Domiciliario: {pedido.domiciliario}</Text>
-            <NivelBadge reputacion={pedido.domiciliario_reputacion} />
           </View>
         )}
         {!!pedido.codigo_entrega && (
@@ -370,6 +368,13 @@ export default function PedidoDetalleScreen({ route }: Props) {
           <Text style={[styles.info, { flex: 1 }]}>{pedido.direccion_entrega}</Text>
         </View>
       </FadeInView>
+
+      {/* Al final, para cuando algo no salió bien. */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitulo}>¿Problemas con tu pedido?</Text>
+        <Text style={styles.lineaTxt}>Si algo no salió como esperabas, cuéntanos y lo revisamos.</Text>
+        <ReportarPedido id={pedido.id} objetivos={pedido.domiciliario ? ['negocio', 'domiciliario'] : ['negocio']} />
+      </View>
     </ScrollView>
   );
 }

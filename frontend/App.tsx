@@ -16,6 +16,8 @@ import { PedidoPendienteProvider } from './src/PedidoPendienteContext';
 import VigilarCarrito from './src/components/VigilarCarrito';
 import EnvioPedidoAviso from './src/components/EnvioPedidoAviso';
 import AvisoPedidoNuevo from './src/components/AvisoPedidoNuevo';
+import AvisoCarritoPorVencer from './src/components/AvisoCarritoPorVencer';
+import AvisoCompletarInfo from './src/components/AvisoCompletarInfo';
 import BarraCliente from './src/components/BarraCliente';
 import { ConfirmacionProvider } from './src/components/Confirmacion';
 import ConfirmarCierre from './src/components/ConfirmarCierre';
@@ -97,7 +99,8 @@ function temaNavegacion(c: Colores, noche: boolean): Theme {
   };
 }
 
-function Navegacion() {
+/** `listo`: ya terminó el splash (los avisos emergentes esperan a que acabe). */
+function Navegacion({ listo }: { listo: boolean }) {
   const { c, modo } = useTheme();
   const styles = useStyles();
   const { auth, cargando } = useAuth();
@@ -169,12 +172,14 @@ function Navegacion() {
                 <Stack.Screen
                   name="Negocio"
                   component={NegocioScreen}
-                  options={({ route }) => ({ title: route.params.nombre })}
+                  // El nombre de la tienda va en el título grande de la
+                  // pantalla; arriba, la marca, como en Explorar.
+                  options={({ route }) => ({ title: route.params.nombre, headerTitle: tituloVitrina })}
                 />
                 <Stack.Screen
                   name="Producto"
                   component={ProductoScreen}
-                  options={({ route }) => ({ title: route.params.negocioNombre })}
+                  options={({ route }) => ({ title: route.params.negocioNombre, headerTitle: tituloVitrina })}
                 />
                 <Stack.Screen name="Carrito" component={CarritoScreen} options={{ title: 'Carrito' }} />
                 <Stack.Screen name="MisDirecciones" component={MisDireccionesScreen} options={{ title: 'Mis direcciones' }} />
@@ -267,6 +272,7 @@ function Navegacion() {
       </Stack.Navigator>
         </NavigationContainer>
         <BarraCliente ruta={ruta?.name} seccion={ruta?.name === 'Negocio' || ruta?.name === 'Explorar' ? ruta.params?.seccion : undefined} />
+        <AvisoCompletarInfo ruta={ruta?.name} listo={listo} />
       </AppDesenfocable>
       </CapaMenus>
     </FlyToCartProvider>
@@ -407,9 +413,10 @@ function AppContenido() {
                 {!splashVisible && <OfertaBridge />}
                 {!splashVisible && <CierreBridge />}
                 <View style={styles.raiz}>
-                  <Navegacion />
+                  <Navegacion listo={!splashVisible} />
                   {!splashVisible && <EnvioPedidoAviso />}
                   {!splashVisible && <VigilarCarrito />}
+                  <AvisoCarritoPorVencer listo={!splashVisible} />
                   {splashVisible && <SplashVitrina onFin={ocultarSplash} />}
                 </View>
                 </PedidoPendienteProvider>

@@ -456,8 +456,9 @@ class PedidoController extends Controller
         $pideCaritas = $conDomiciliario && ! $noLlego;
 
         $reglas = [
-            'negocio_ok' => ['required', 'boolean'],
-            'negocio_problemas' => [Rule::requiredIf(! $request->boolean('negocio_ok')), 'array'],
+            // Opcional: la app ya no lo pregunta (la tienda se valora con su reseña).
+            'negocio_ok' => ['sometimes', 'nullable', 'boolean'],
+            'negocio_problemas' => [Rule::requiredIf($request->input('negocio_ok') !== null && ! $request->boolean('negocio_ok')), 'array'],
             'negocio_problemas.*' => [Rule::in(array_keys(Reputacion::PROBLEMAS_CLIENTE[Reputacion::NEGOCIO]))],
             'domiciliario_caritas' => [Rule::requiredIf($pideCaritas), 'array:'.implode(',', $aspectos)],
             'domiciliario_problemas' => ['nullable', 'array'],
@@ -476,9 +477,10 @@ class PedidoController extends Controller
 
         $datos = $request->validate($reglas, $mensajes);
 
-        $negocioProblemas = $datos['negocio_ok']
-            ? []
-            : array_values(array_unique($datos['negocio_problemas']));
+        $negocioOk = $datos['negocio_ok'] ?? null;
+        $negocioProblemas = $negocioOk === false
+            ? array_values(array_unique($datos['negocio_problemas']))
+            : [];
         $domiciliarioProblemas = $conDomiciliario
             ? array_values(array_unique($datos['domiciliario_problemas'] ?? []))
             : [];
@@ -488,10 +490,10 @@ class PedidoController extends Controller
             : null;
         $comentario = filled($datos['comentario'] ?? null) ? trim($datos['comentario']) : null;
 
-        DB::transaction(function () use ($pedido, $datos, $conDomiciliario, $negocioProblemas, $domiciliarioProblemas, $caritas, $comentario) {
+        DB::transaction(function () use ($pedido, $negocioOk, $conDomiciliario, $negocioProblemas, $domiciliarioProblemas, $caritas, $comentario) {
             $pedido->calificacion()->create([
                 'user_id' => $pedido->user_id,
-                'negocio_ok' => $datos['negocio_ok'],
+                'negocio_ok' => $negocioOk,
                 'negocio_problemas' => $negocioProblemas ?: null,
                 // "Cumplió": nada grave y ninguna carita por debajo de 3.
                 'domiciliario_ok' => $conDomiciliario ? (! $domiciliarioProblemas && min($caritas) >= 3) : null,
@@ -503,7 +505,8 @@ class PedidoController extends Controller
             // El comentario del cliente acompaña las quejas (lo ve el admin).
             $nota = $comentario ? Str::limit($comentario, 250) : null;
 
-            foreach ($negocioProblemas ?: ['cliente_conforme'] as $motivo) {
+            // Solo si respondió por el negocio (clientes con una versión anterior).
+            foreach ($negocioOk === null ? [] : ($negocioProblemas ?: ['cliente_conforme']) as $motivo) {
                 Reputacion::registrar(
                     Reputacion::NEGOCIO, $pedido->negocio, $motivo, $pedido,
                     ReputacionEvento::ORIGEN_CLIENTE, $negocioProblemas ? $nota : null,

@@ -355,17 +355,22 @@ export default function CheckoutScreen({ navigation }: Props) {
           <ActivityIndicator color={c.accent} />
         </View>
       ) : (
-        <View style={styles.ubicaciones}>
+        // Todas en un mismo contenedor, separadas; se editan manteniendo
+        // presionada la dirección (se abre la edición encima de la pantalla).
+        <View style={styles.direcciones}>
           {direcciones.map(d => {
             const activa = seleccion === d.id;
             return (
-              <View key={d.id}>
               <TouchableOpacity
-                style={[styles.ubicacion, activa && styles.ubicacionOn]}
+                key={d.id}
+                style={[styles.ubicacion, styles.direccion, activa && styles.ubicacionOn]}
                 onPress={() => {
                   setSeleccion(d.id);
                   limpiarError('ubicacion');
-                }}>
+                }}
+                onLongPress={() => setEditandoDireccion(d)}
+                delayLongPress={350}
+                accessibilityHint="Mantén presionado para editarla">
                 <View style={styles.ubicacionIcono}>
                   <Icon name={activa ? 'check' : 'ubicacion'} size={18} color={activa ? c.onAccent : c.muted} />
                 </View>
@@ -378,13 +383,11 @@ export default function CheckoutScreen({ navigation }: Props) {
                   </Text>
                 </View>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setEditandoDireccion(d)} accessibilityLabel={`Editar ${d.nombre || d.direccion}`}><Text style={styles.editarDireccion}>Editar dirección</Text></TouchableOpacity>
-              </View>
             );
           })}
 
           <TouchableOpacity
-            style={[styles.ubicacion, seleccion === 'nueva' && styles.ubicacionOn]}
+            style={[styles.ubicacion, styles.direccion, seleccion === 'nueva' && styles.ubicacionOn]}
             onPress={() => {
               setSeleccion('nueva');
               limpiarError('ubicacion');
@@ -401,6 +404,10 @@ export default function CheckoutScreen({ navigation }: Props) {
               </Text>
             </View>
           </TouchableOpacity>
+
+          {direcciones.length > 0 && (
+            <Text style={styles.pistaEditar}>Mantén presionado para editar</Text>
+          )}
         </View>
       )}
       <FieldError mensaje={errores.ubicacion} />
@@ -545,7 +552,12 @@ const useStyles = makeStyles((c, shadow) => ({
   ubicacionTituloOn: { color: c.onAccent },
   ubicacionDetalle: { color: c.muted, fontFamily: font.regular, fontSize: 12, marginTop: 2 },
   ubicacionDetalleOn: { color: c.onAccent },
-  editarDireccion: { color: c.accent, fontFamily: font.semibold, paddingVertical: 10, paddingHorizontal: 12 },
+  direcciones: {
+    gap: 8, marginBottom: 12, padding: 8, borderRadius: radius.lg,
+    backgroundColor: c.surface, borderWidth: 1, borderColor: c.border,
+  },
+  direccion: { backgroundColor: c.bg, borderColor: c.border },
+  pistaEditar: { textAlign: 'center', color: c.muted, fontFamily: font.regular, fontSize: 12, paddingTop: 2, paddingBottom: 4 },
   nuevaBox: { marginBottom: 2 },
   nuevoMapa: { marginTop: 10 },
   pagos: { flexDirection: 'row', gap: 10, marginBottom: 20 },

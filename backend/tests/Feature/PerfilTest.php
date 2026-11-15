@@ -92,12 +92,13 @@ test('un cliente actualiza su dirección, barrio y teléfono', function () {
     ]);
 });
 
-test('a un cliente se le exigen dirección, barrio y teléfono', function () {
+test('a un cliente se le exige el teléfono; la dirección va en "Mis direcciones"', function () {
     $user = usuarioPerfil();
 
     $this->putJson('/api/perfil', ['name' => $user->name, 'email' => $user->email])
         ->assertStatus(422)
-        ->assertJsonValidationErrors(['direccion', 'barrio', 'telefono']);
+        ->assertJsonValidationErrors(['telefono'])
+        ->assertJsonMissingValidationErrors(['direccion', 'barrio']);
 });
 
 test('quien no es cliente (domiciliario) puede actualizar sin datos de contacto', function () {

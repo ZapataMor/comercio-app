@@ -1,6 +1,4 @@
-import CamposDireccion from '../components/CamposDireccion';
-import { normalizarDireccion } from '../direccion';
-import { direccionValida, errorDireccion, telefonoValido, errorTelefono } from '../direccion';
+import { telefonoValido, errorTelefono } from '../direccion';
 /**
  * Mi información — datos PERSONALES de la cuenta (cualquier rol).
  *
@@ -27,7 +25,6 @@ import {
 import { actualizarPerfil, dejarDeSerDomiciliario, desactivarNegocio, eliminarCuenta, eliminarNegocio, Negocio, pedirCodigoTelefonoPerfil, Usuario, verificarTelefonoPerfil } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
-import BarrioSelect from '../components/BarrioSelect';
 import { useConfirmar } from '../components/Confirmacion';
 import FieldError from '../components/FieldError';
 import Icon, { IconName } from '../components/Icon';
@@ -89,8 +86,6 @@ export default function MiInformacionScreen(_props: Props) {
   const [apellidos, setApellidos] = useState(user.apellidos ?? '');
   const [email, setEmail] = useState(user.email ?? '');
   const [telefono, setTelefono] = useState(user.telefono ?? '');
-  const [direccion, setDireccion] = useState(user.direccion ?? '');
-  const [barrio, setBarrio] = useState(user.barrio ?? '');
   const [passActual, setPassActual] = useState('');
   const [passNueva, setPassNueva] = useState('');
   const [passConfirma, setPassConfirma] = useState('');
@@ -170,8 +165,6 @@ export default function MiInformacionScreen(_props: Props) {
     setApellidos(u.apellidos ?? '');
     setEmail(u.email ?? '');
     setTelefono(u.telefono ?? '');
-    setDireccion(u.direccion ?? '');
-    setBarrio(u.barrio ?? '');
     setPassActual('');
     setPassNueva('');
     setPassConfirma('');
@@ -197,12 +190,7 @@ export default function MiInformacionScreen(_props: Props) {
     const conservaCelular = !!user.telefono_verificado && telefono === (user.telefono ?? '');
     if (!email.trim() && !conservaCelular) nuevosErrores.email = 'El campo correo es obligatorio.';
     if (telefono && !telefonoValido(telefono)) nuevosErrores.telefono = errorTelefono;
-    if (direccion && !direccionValida(direccion)) nuevosErrores.direccion = errorDireccion;
-    if (esCliente) {
-      if (!telefonoValido(telefono)) nuevosErrores.telefono = errorTelefono;
-      if (!direccionValida(direccion)) nuevosErrores.direccion = errorDireccion;
-      if (!barrio.trim()) nuevosErrores.barrio = 'El campo barrio es obligatorio.';
-    }
+    if (esCliente && !telefonoValido(telefono)) nuevosErrores.telefono = errorTelefono;
     if (Object.keys(nuevosErrores).length > 0) {
       setErrores(nuevosErrores);
       return;
@@ -232,13 +220,8 @@ export default function MiInformacionScreen(_props: Props) {
         name: nombre.trim(),
         apellidos: apellidos.trim(),
         email: email.trim(),
-        ...(esCliente || telefono.trim() || direccion.trim() || barrio.trim()
-          ? {
-              telefono: telefono.trim(),
-              direccion: normalizarDireccion(direccion),
-              barrio: barrio.trim(),
-            }
-          : {}),
+        // La dirección se maneja en "Mis direcciones".
+        ...(esCliente || telefono.trim() ? { telefono: telefono.trim() } : {}),
         ...(cambiaPass ? { password: passNueva, password_actual: passActual } : {}),
       });
       actualizarUsuario(actualizado);
@@ -290,16 +273,6 @@ export default function MiInformacionScreen(_props: Props) {
           </View>
         </FadeInView>
 
-        <FadeInView delay={60}>
-          <Text style={styles.seccion}>Mi dirección</Text>
-          {esCliente ? (
-            <Text style={styles.ayuda}>Se usa como tu ubicación principal para los pedidos.</Text>
-          ) : null}
-          <View style={styles.tarjeta}>
-            <Dato icono="ubicacion" etiqueta="Dirección" valor={user.direccion} />
-            <Dato icono="casa" etiqueta="Barrio" valor={user.barrio} ultimo />
-          </View>
-        </FadeInView>
 
         {!!codigoPublico && (
           <FadeInView delay={90}>
@@ -502,25 +475,6 @@ export default function MiInformacionScreen(_props: Props) {
           </View>
         </FadeInView>
 
-        <FadeInView delay={60}>
-          <Text style={styles.seccion}>Mi dirección</Text>
-          <View style={styles.tarjeta}>
-            <Text style={styles.label}>Dirección</Text>
-            <CamposDireccion value={direccion} onChangeText={valor => { setDireccion(valor); limpiarError('direccion'); }} editable={!guardando} />
-            <FieldError mensaje={errores.direccion} />
-            <Text style={styles.label}>Barrio</Text>
-            <BarrioSelect
-              valor={barrio}
-              onSeleccionar={valor => {
-                setBarrio(valor);
-                limpiarError('barrio');
-              }}
-              placeholder="Tu barrio"
-              disabled={guardando}
-            />
-            <FieldError mensaje={errores.barrio} />
-          </View>
-        </FadeInView>
 
         <FadeInView delay={90}>
           <Text style={styles.seccion}>Cambiar contraseña</Text>
