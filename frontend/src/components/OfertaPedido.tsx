@@ -11,7 +11,7 @@
  *
  * Como vive en toda la app, también envía la posición del domiciliario cuando el
  * servidor lo pide (en turno, con entregas o debiendo dinero): no importa en qué
- * pantalla esté. Solo con la app abierta (ver ubicacion.ts).
+ * pantalla esté, y sigue con la app en segundo plano (ver ubicacion.ts).
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { AppState, Modal, Text, View } from 'react-native';

@@ -3,9 +3,14 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- Mapa: el domiciliario comparte su GPS mientras trabaja (solo con la app abierta). -->
+    <!-- Mapa: el domiciliario comparte su GPS mientras trabaja, también con la app en
+         segundo plano gracias a un servicio en primer plano de tipo "location"
+         (src/servicioUbicacion.ts). No hace falta ACCESS_BACKGROUND_LOCATION: el
+         servicio se inicia con la app a la vista. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
     <application
       android:name=".MainApplication"
@@ -20,6 +25,15 @@
         android:name="com.google.firebase.messaging.default_notification_channel_id"
         android:value="@string/default_notification_channel_id"
         tools:replace="android:value" />
+
+      <!-- Servicio en primer plano de Notifee: Notifee lo declara "shortService"
+           (Android lo corta a los 3 min); aquí es "location" para el GPS del
+           domiciliario con la app en segundo plano. -->
+      <service
+        android:name="app.notifee.core.ForegroundService"
+        android:exported="false"
+        android:foregroundServiceType="location"
+        tools:replace="android:foregroundServiceType" />
 
       <activity
         android:name=".MainActivity"

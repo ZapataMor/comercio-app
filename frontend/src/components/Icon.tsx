@@ -48,6 +48,7 @@ export type IconName =
   | 'cama'
   | 'ducha'
   | 'area'
+  | 'refrescar'
   | 'whatsapp';
 
 const GLYPHS: Record<IconName, React.ReactNode> = {
@@ -284,6 +285,13 @@ const GLYPHS: Record<IconName, React.ReactNode> = {
     <>
       <Path d="M20.5 11.6a8.5 8.5 0 0 1-12.6 7.4L3.5 20.5l1.6-4.2A8.5 8.5 0 1 1 20.5 11.6z" />
       <Path d="M9 8.8c0 3.3 2.7 6.2 6 6.2l1.2-1.5-2-1-1 .9c-1-.5-2-1.5-2.5-2.5l.9-1-1-2z" />
+    </>
+  ),
+  // Actualizar: flecha en círculo.
+  refrescar: (
+    <>
+      <Path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+      <Path d="M21 3v5h-5" />
     </>
   ),
   // Cerrar sesión: puerta con flecha hacia afuera.

@@ -19,11 +19,12 @@ import {
   Marker,
   NativeUserLocation,
 } from '@maplibre/maplibre-react-native';
-import React, { ReactNode, Ref, useEffect, useImperativeHandle, useRef } from 'react';
-import { Image, Linking, StyleProp, Text, View, ViewStyle } from 'react-native';
+import React, { ReactNode, Ref, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { ActivityIndicator, Image, Linking, StyleProp, Text, View, ViewStyle } from 'react-native';
 import { Coordenadas, imagenUrl, TipoPropiedad, UbicacionEnVivo } from '../api';
 import { precioCorto, tipoPropiedad } from '../propiedades';
 import { Colores, font, makeStyles, radius, useTheme } from '../theme';
+import { PressableScale } from './anim';
 import { ESTILOS_MAPA } from './estiloMapa';
 import Icon from './Icon';
 
@@ -330,35 +331,77 @@ export function abrirComoLlegar(destino: Coordenadas | string) {
 /** Aire alrededor de los pines al encuadrarlos (el de arriba mide más). */
 const MARGEN_SEGUIMIENTO: Margen = { top: 70, right: 60, bottom: 50, left: 60 };
 
+/** Lo mínimo que gira el botón de refrescar, para que se note que hizo algo. */
+const REFRESCO_MIN_MS = 600;
+
 /**
  * Mapa pequeño del seguimiento: el domiciliario (en vivo), el negocio y, si
  * se conoce, la puerta de la entrega. Encuadra a todos cada vez que llega una posición nueva, hasta que la
  * persona mueve el mapa con el dedo.
+ *
+ * Con `onRefrescar` muestra un botón encima del mapa: pide la posición más
+ * reciente y vuelve a encuadrar a todos (aunque la persona haya movido el mapa).
  */
 export function MapaSeguimiento({
   domiciliario,
   negocio,
   entrega,
   alto = 220,
+  onRefrescar,
 }: {
   domiciliario?: UbicacionEnVivo | null;
   /** A dónde va el pedido. */
   entrega?: Coordenadas | null;
   negocio?: { punto: Coordenadas; nombre: string; imagen?: string | null } | null;
   alto?: number;
+  onRefrescar?: () => Promise<unknown> | void;
 }) {
+  const { c } = useTheme();
   const styles = useStyles();
   const mapa = useRef<MapaRef>(null);
   const tocado = useRef(false);
+  const [refrescando, setRefrescando] = useState(false);
   const puntos = [domiciliario, negocio?.punto, entrega].filter((p): p is Coordenadas => !!p);
   const clave = puntos.map(p => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join('|');
+  // Tras refrescar se encuadra con los puntos nuevos, no con los de antes del toque.
+  const puntosRef = useRef(puntos);
+  puntosRef.current = puntos;
+  const montado = useRef(true);
+  useEffect(
+    () => () => {
+      montado.current = false;
+    },
+    [],
+  );
+
+  const encuadrar = (lista: Coordenadas[]) => {
+    if (lista.length === 0) return;
+    if (lista.length === 1) mapa.current?.irA(lista[0], ZOOM.zona);
+    else mapa.current?.encuadrar(lista, MARGEN_SEGUIMIENTO);
+  };
 
   useEffect(() => {
-    if (tocado.current || puntos.length === 0) return;
-    if (puntos.length === 1) mapa.current?.irA(puntos[0], ZOOM.zona);
-    else mapa.current?.encuadrar(puntos, MARGEN_SEGUIMIENTO);
+    if (tocado.current) return;
+    encuadrar(puntos);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clave]);
+
+  async function refrescar() {
+    if (!onRefrescar || refrescando) return;
+    setRefrescando(true);
+    tocado.current = false;
+    const desde = Date.now();
+    try {
+      await onRefrescar();
+    } finally {
+      const falta = REFRESCO_MIN_MS - (Date.now() - desde);
+      if (falta > 0) await new Promise<void>(r => setTimeout(r, falta));
+      if (montado.current) {
+        setRefrescando(false);
+        encuadrar(puntosRef.current);
+      }
+    }
+  }
 
   return (
     <View style={[styles.marco, { height: alto }]}>
@@ -375,17 +418,36 @@ export function MapaSeguimiento({
         {!!entrega && <PinEntrega punto={entrega} />}
         {!!domiciliario && <PinDomiciliario punto={domiciliario} />}
       </MapaVitrina>
+      {!!onRefrescar && (
+        <PressableScale
+          onPress={refrescar}
+          disabled={refrescando}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Actualizar ubicación del domiciliario"
+          accessibilityState={{ busy: refrescando }}
+          style={styles.refrescar}>
+          {refrescando ? (
+            <ActivityIndicator size="small" color={c.accent} />
+          ) : (
+            <Icon name="refrescar" size={20} color={c.text} />
+          )}
+        </PressableScale>
+      )}
     </View>
   );
 }
 
-/** Nota bajo el mapa en vivo: cuándo se actualizó la posición. */
-export function NotaEnVivo({ texto }: { texto: string }) {
+/**
+ * Nota bajo el mapa en vivo: cuándo se actualizó la posición. `vieja`: hace
+ * rato no llega una nueva (sin señal o sin datos): el punto pasa a amarillo.
+ */
+export function NotaEnVivo({ texto, vieja = false }: { texto: string; vieja?: boolean }) {
   const { c } = useTheme();
   const styles = useStyles();
   return (
     <View style={styles.notaFila}>
-      <View style={[styles.punto, { backgroundColor: c.success }]} />
+      <View style={[styles.punto, { backgroundColor: vieja ? c.warning : c.success }]} />
       <Text style={styles.nota}>{texto}</Text>
     </View>
   );
@@ -450,6 +512,20 @@ const useStyles = makeStyles((c, shadow) => ({
   motoApagada: { backgroundColor: c.surface2 },
   marco: { borderRadius: radius.md, overflow: 'hidden', marginTop: 4, backgroundColor: c.surface2 },
   lleno: { flex: 1 },
+  refrescar: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: c.surface,
+    borderWidth: 1,
+    borderColor: c.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadow.soft,
+  },
   notaFila: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
   punto: { width: 8, height: 8, borderRadius: 4 },
   nota: { color: c.muted, fontSize: 12, fontFamily: font.medium },

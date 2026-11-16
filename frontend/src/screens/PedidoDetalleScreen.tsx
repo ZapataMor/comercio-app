@@ -25,6 +25,12 @@ import { usePolling } from '../usePolling';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PedidoDetalle'>;
 
+/**
+ * Más que esto sin posición nueva es raro (moviéndose llega cada 5-10 s y
+ * quieto cada 30 s, ver ubicacion.ts): sin señal o sin datos.
+ */
+const UBICACION_VIEJA_S = 60;
+
 const LABEL: Record<string, string> = {
   pendiente: 'Pendiente',
   aceptado: 'En preparación',
@@ -123,6 +129,22 @@ export default function PedidoDetalleScreen({ route }: Props) {
         .finally(() => setCargando(false)),
     [auth, id],
   );
+
+  // Botón «actualizar» del seguimiento: la posición más reciente del
+  // domiciliario. Si falla (sin red) avisa y deja el mapa como estaba.
+  const [actualizando, setActualizando] = useState(false);
+  const refrescarUbicacion = useCallback(async () => {
+    setActualizando(true);
+    try {
+      const p = await getPedido(auth!.token, id);
+      setPedido(p);
+      setError(null);
+    } catch (e) {
+      toast.error('No se pudo actualizar la ubicación', messageFromError(e));
+    } finally {
+      setActualizando(false);
+    }
+  }, [auth, id, toast]);
 
   // La pantalla de carga solo sale con un pedido nuevo (al entrar o si un
   // push abre otro); al volver aquí o tras una acción se actualiza en su sitio.
@@ -300,16 +322,35 @@ export default function PedidoDetalleScreen({ route }: Props) {
                     ? { punto: pedido.negocio_ubicacion, nombre: pedido.negocio ?? 'Negocio' }
                     : null
                 }
+                onRefrescar={refrescarUbicacion}
               />
-              <NotaEnVivo texto={`Ubicación del domiciliario ${haceCuanto(pedido.domiciliario_ubicacion.hace_segundos)}`} />
+              <NotaEnVivo
+                texto={`Ubicación del domiciliario ${haceCuanto(pedido.domiciliario_ubicacion.hace_segundos)}`}
+                vieja={pedido.domiciliario_ubicacion.hace_segundos > UBICACION_VIEJA_S}
+              />
             </>
           ) : (
-            <View style={styles.fila}>
-              <Icon name="moto" size={15} color={c.muted} />
-              <Text style={[styles.lineaTxt, { flex: 1 }]}>
-                En cuanto el domiciliario comparta su ubicación, lo verás aquí en el mapa.
-              </Text>
-            </View>
+            <>
+              <View style={styles.fila}>
+                <Icon name="moto" size={15} color={c.muted} />
+                <Text style={[styles.lineaTxt, { flex: 1 }]}>
+                  En cuanto el domiciliario comparta su ubicación, lo verás aquí en el mapa.
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={refrescarUbicacion}
+                disabled={actualizando}
+                accessibilityRole="button"
+                accessibilityLabel="Actualizar ubicación del domiciliario"
+                style={styles.actualizar}>
+                {actualizando ? (
+                  <ActivityIndicator size="small" color={c.accent} />
+                ) : (
+                  <Icon name="refrescar" size={16} color={c.accent} />
+                )}
+                <Text style={styles.actualizarTxt}>Actualizar</Text>
+              </TouchableOpacity>
+            </>
           )}
         </FadeInView>
       )}
@@ -384,6 +425,19 @@ const useStyles = makeStyles((c, shadow) => ({
   titulo: { fontSize: 22, fontFamily: font.display, color: c.textStrong },
   sub: { color: c.muted, marginTop: 2, marginBottom: 16, fontFamily: font.medium },
   fila: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  actualizar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: c.border,
+  },
+  actualizarTxt: { color: c.accent, fontFamily: font.semibold, fontSize: 13 },
   card: { backgroundColor: c.surface, borderRadius: radius.md, padding: 16, marginBottom: 14, ...shadow.soft },
   cardTitulo: { fontFamily: font.bold, color: c.text, marginBottom: 12 },
   paso: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
