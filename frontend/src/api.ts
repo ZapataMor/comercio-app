@@ -541,7 +541,6 @@ async function authUpload(
   imagenesUri?: string[],
   archivos?: Record<string, string>,
 ): Promise<any> {
-  const form = new FormData();
   // Las fotos se achican en el teléfono antes de subirlas (ver src/fotos.ts).
   if (imagenUri) imagenUri = await comprimirFoto(imagenUri);
   if (imagenesUri) imagenesUri = await Promise.all(imagenesUri.map(comprimirFoto));
@@ -550,6 +549,7 @@ async function authUpload(
       await Promise.all(Object.entries(archivos).map(async ([campo, uri]) => [campo, await comprimirFoto(uri)] as const)),
     );
   }
+  const form = new FormData();
   if (metodo === 'PUT') {
     form.append('_method', 'PUT');
   }

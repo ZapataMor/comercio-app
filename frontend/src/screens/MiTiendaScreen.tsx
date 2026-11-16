@@ -11,7 +11,7 @@ import { direccionValida, errorDireccion, telefonoValido, errorTelefono } from '
  *    en secciones. También crea OTRO negocio (`nuevo`).
  */
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -117,6 +117,30 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
   // URI local de una imagen recién elegida (sin subir aún). null = sin cambios.
   const [imagenUri, setImagenUri] = useState<string | null>(null);
   const [errores, setErrores] = useState<FieldErrors>({});
+  const [pasoGuia, setPasoGuia] = useState(0);
+  const scrollFormulario = useRef<ScrollView>(null);
+  const guia = creando;
+
+  function irAlPaso(paso: number) {
+    setPasoGuia(paso);
+    scrollFormulario.current?.scrollTo({ y: 0, animated: true });
+  }
+
+  function siguientePaso() {
+    if (pasoGuia === 0) {
+      if (!nombre.trim()) { setErrores({ nombre: 'El campo nombre del negocio es obligatorio.' }); return; }
+      if (!categorias.length && !categoriaPersonalizada.trim()) {
+        setErrores({ categorias: 'Selecciona al menos una categoría para el negocio.' }); return;
+      }
+    }
+    if (pasoGuia === 1) {
+      if (!direccionValida(direccion)) { setErrores({ direccion: errorDireccion }); return; }
+      if (!barrio.trim()) { setErrores({ barrio: 'Elige el barrio donde queda el negocio.' }); return; }
+      if (telefono && !telefonoValido(telefono)) { setErrores({ telefono: errorTelefono }); return; }
+    }
+    setErrores({});
+    irAlPaso(pasoGuia + 1);
+  }
 
   function limpiarError(campo: string) {
     setErrores(prev => {
@@ -226,6 +250,11 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
       const campos = fieldErrorsFromError(e, { categoria: 'categorias', 'categorias.0': 'categorias' });
       if (Object.keys(campos).length > 0) {
         setErrores(campos);
+        if (guia) {
+          const keys = Object.keys(campos);
+          irAlPaso(keys.some(k => ['nombre', 'descripcion', 'categorias', 'imagen'].includes(k)) ? 0
+            : keys.some(k => ['direccion', 'barrio', 'telefono', 'lat', 'lng'].includes(k)) ? 1 : 2);
+        }
       } else {
         toast.error('No se pudo guardar', messageFromError(e, 'Error'));
       }
@@ -368,7 +397,15 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView ref={scrollFormulario} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        {guia && <View style={styles.aviso} accessibilityLiveRegion="polite">
+          <Text style={styles.seccionTitulo}>{`Paso ${pasoGuia + 1} de 3`}</Text>
+          <Text style={styles.avisoTxt}>{[
+            'Empieza aquí: escribe el nombre y elige qué vende tu negocio. Una foto y una descripción ayudan a reconocerlo.',
+            'Señala dónde queda tu negocio y cómo contactarlo. Fija el punto exacto en el mapa para facilitar la recogida.',
+            'Define un tiempo de preparación realista y tu horario, o elige abrir y cerrar a mano. Después de crear el negocio, añade tus productos desde Mis productos.',
+          ][pasoGuia]}</Text>
+        </View>}
         {!negocio && (
           <View style={styles.aviso}>
             <Text style={styles.avisoTxt}>
@@ -379,7 +416,7 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
           </View>
         )}
 
-        <View style={styles.seccion}>
+        {(!guia || pasoGuia === 0) && <View style={[styles.seccion, guia && { borderWidth: 2, borderColor: c.accent }]}>
           <Text style={styles.seccionTitulo}>Tu negocio</Text>
           <SelectorImagen
             label="Foto del negocio"
@@ -444,9 +481,9 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
             editable={!guardando}
           />
           <FieldError mensaje={errores.descripcion} />
-        </View>
+        </View>}
 
-        <View style={styles.seccion}>
+        {(!guia || pasoGuia === 1) && <View style={[styles.seccion, guia && { borderWidth: 2, borderColor: c.accent }]}>
           <Text style={styles.seccionTitulo}>Ubicación y contacto</Text>
           <Text style={styles.label}>Dirección</Text>
           <CamposDireccion value={direccion} onChangeText={valor => { setDireccion(valor); limpiarError('direccion'); }} editable={!guardando} />
@@ -489,9 +526,9 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
             editable={!guardando}
           />
           <FieldError mensaje={errores.telefono} />
-        </View>
+        </View>}
 
-        <View style={styles.seccion}>
+        {(!guia || pasoGuia === 2) && <View style={[styles.seccion, guia && { borderWidth: 2, borderColor: c.accent }]}>
           <Text style={styles.seccionTitulo}>Atención</Text>
           <Text style={styles.label}>Tiempo promedio de preparación (minutos)</Text>
           <TextInput
@@ -538,8 +575,11 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
               thumbColor={c.switchThumb}
             />
           </View>
-        </View>
+        </View>}
 
+        {guia && pasoGuia < 2 ? <PressableScale style={styles.boton} onPress={siguientePaso} accessibilityRole="button">
+          <Text style={styles.botonTexto}>Siguiente</Text>
+        </PressableScale> :
         <PressableScale
           style={[styles.boton, guardando && styles.botonDisabled]}
           onPress={onGuardar}
@@ -549,7 +589,11 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
           ) : (
             <Text style={styles.botonTexto}>{negocio ? 'Guardar cambios' : 'Crear negocio'}</Text>
           )}
-        </PressableScale>
+        </PressableScale>}
+
+        {guia && pasoGuia > 0 && <TouchableOpacity onPress={() => irAlPaso(pasoGuia - 1)} disabled={guardando} accessibilityRole="button">
+          <Text style={styles.cancelar}>Anterior</Text>
+        </TouchableOpacity>}
 
         {negocio && (
           <TouchableOpacity onPress={() => setModo('ver')} disabled={guardando}>

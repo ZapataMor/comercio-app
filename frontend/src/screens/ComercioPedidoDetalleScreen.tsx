@@ -380,9 +380,9 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
         <FadeInView delay={60} style={[styles.card, styles.dineroCard]}>
           <View style={styles.filaInfo}>
             <Icon name="efectivo" size={18} color={c.accent} />
-            <Text style={styles.dineroTitulo}>¿{pedido.domiciliario} te entregó los {cop(pedido.total)}?</Text>
+            <Text style={styles.dineroTitulo}>¿{pedido.domiciliario} te entregó los {cop(pedido.subtotal ?? pedido.total - (pedido.costo_domicilio ?? 0))} de los productos?</Text>
           </View>
-          <Text style={styles.dineroSub}>Respóndelo cuando te pague. Afecta su nivel de confiabilidad.</Text>
+          <Text style={styles.dineroSub}>El domiciliario conserva el valor del domicilio y te entrega el valor de los productos. Confirma solo cuando recibas ese dinero. Afecta su nivel de confiabilidad.</Text>
           <View style={styles.dineroFila}>
             <PressableScale style={[styles.dineroBtn, { backgroundColor: c.success }]} onPress={() => onDinero('recibido')}>
               <Text style={styles.dineroBtnTxt}>Sí, completo</Text>
