@@ -1,7 +1,7 @@
 import { esPorPeso } from '../cantidades';
 /**
- * Hoja para ajustar una línea del carrito. En la comida, cada ingrediente que
- * trae el producto se deja normal, se quita o se pide con extra; en la ropa se
+ * Hoja para ajustar una línea del carrito. En la comida se quitan ingredientes
+ * (los que se pueden quitar) y se piden extras con su precio; en la ropa se
  * cambia la talla o el color. Si la línea tiene varias unidades se puede aplicar
  * solo a algunas: "de las 3 hamburguesas, 1 sin tomate". También pregunta cómo
  * quiere el cliente una unidad más, partiendo de lo que ya tiene la línea.
@@ -10,12 +10,12 @@ import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CartItem } from '../CartContext';
-import { OpcionesLinea } from '../opcionesProducto';
+import { cop, costoExtras, OpcionesLinea } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { PressableScale } from './anim';
-import AjusteIngredientes from './AjusteIngredientes';
 import ChipsEleccion from './ChipsEleccion';
 import Icon from './Icon';
+import PersonalizarComida from './PersonalizarComida';
 
 /** `ajustar` cambia las unidades que ya están; `agregar` es para una unidad más. */
 export type ModoHoja = 'ajustar' | 'agregar';
@@ -42,11 +42,12 @@ function Contenido({ item, modo, onCerrar, onGuardar }: { item: CartItem } & Omi
   const insets = useSafeAreaInsets();
   const agregando = modo === 'agregar';
   const ingredientes = item.ingredientes ?? [];
+  const extrasDisponibles = item.extrasDisponibles ?? [];
   const tallas = item.tallas ?? [];
   const colores = item.colores ?? [];
 
   const [sin, setSin] = useState(item.opciones?.sin ?? []);
-  const [extra, setExtra] = useState(item.opciones?.extra ?? []);
+  const [extras, setExtras] = useState(item.opciones?.extras ?? []);
   const [talla, setTalla] = useState(item.opciones?.talla);
   const [color, setColor] = useState(item.opciones?.color);
   const [unidades, setUnidades] = useState(item.cantidad);
@@ -55,7 +56,7 @@ function Contenido({ item, modo, onCerrar, onGuardar }: { item: CartItem } & Omi
   useEffect(() => setUnidades(n => Math.min(n, item.cantidad)), [item.cantidad]);
 
   function guardar() {
-    onGuardar(item.linea, { talla, color, sin, extra }, unidades);
+    onGuardar(item.linea, { talla, color, sin, extras }, unidades);
   }
 
   return (
@@ -67,19 +68,18 @@ function Contenido({ item, modo, onCerrar, onGuardar }: { item: CartItem } & Omi
         {agregando && <Text style={styles.ayuda}>Agregas una unidad más: elige cómo la quieres.</Text>}
 
         <ScrollView style={styles.lista} showsVerticalScrollIndicator={false}>
-          {ingredientes.length > 0 && (
-            <>
-              <Text style={styles.ayuda}>Quita lo que no quieras o pide más de lo que trae.</Text>
-              <AjusteIngredientes
-                ingredientes={ingredientes}
-                sin={sin}
-                extra={extra}
-                onChange={(nuevoSin, nuevoExtra) => {
-                  setSin(nuevoSin);
-                  setExtra(nuevoExtra);
-                }}
-              />
-            </>
+          {(ingredientes.length > 0 || extrasDisponibles.length > 0) && (
+            <PersonalizarComida
+              ingredientes={ingredientes}
+              fijos={item.ingredientesFijos}
+              extrasDisponibles={extrasDisponibles}
+              sin={sin}
+              extras={extras}
+              onChange={(nuevoSin, nuevosExtras) => {
+                setSin(nuevoSin);
+                setExtras(nuevosExtras);
+              }}
+            />
           )}
 
           {tallas.length > 0 && (
@@ -116,7 +116,10 @@ function Contenido({ item, modo, onCerrar, onGuardar }: { item: CartItem } & Omi
         )}
 
         <PressableScale style={styles.boton} onPress={guardar}>
-          <Text style={styles.botonTxt}>{agregando ? 'Agregar' : 'Guardar'}</Text>
+          <Text style={styles.botonTxt}>
+            {agregando ? 'Agregar' : 'Guardar'}
+            {costoExtras({ extras }) > 0 ? ` · ${cop(item.precio + costoExtras({ extras }))} c/u` : ''}
+          </Text>
         </PressableScale>
         <TouchableOpacity onPress={onCerrar}>
           <Text style={styles.cancelar}>Cancelar</Text>

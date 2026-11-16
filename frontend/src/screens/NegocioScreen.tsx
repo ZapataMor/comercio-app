@@ -25,13 +25,14 @@ import {
 } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
+import FichaProducto from '../components/FichaProducto';
 import { useFlyToCart } from '../components/FlyToCart';
 import Icon from '../components/Icon';
 import BotonesContacto from '../components/BotonesContacto';
 import RecetasPreferidas from '../components/RecetasPreferidas';
 import { PuntajeResenas } from '../components/Resenas';
 import { RootStackParamList } from '../navTypes';
-import { ingredientesDe, OpcionesLinea, pideEleccion, precioDe } from '../opcionesProducto';
+import { OpcionesLinea, precioDe, sePersonaliza } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 import { useAgregarAlCarrito } from '../useAgregarAlCarrito';
@@ -126,6 +127,9 @@ export default function NegocioScreen({ navigation, route }: Props) {
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [servicioSeleccionado, setServicioSeleccionado] = useState<Servicio | null>(null);
   const [recetas, setRecetas] = useState<RecetaPreferida[]>([]);
+  // Producto abierto en la ficha (modal). La ficha sigue al catálogo en vivo:
+  // si el producto ya no está, se queda con lo último que se vio y lo dice.
+  const [ficha, setFicha] = useState<Producto | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const catalogo = useMemo<CatalogoFila[]>(() => seccion === 'servicios'
@@ -203,12 +207,7 @@ export default function NegocioScreen({ navigation, route }: Props) {
   }, [productoId, catalogo]);
 
   function verProducto(p: Producto) {
-    navigation.navigate('Producto', {
-      negocioId: id,
-      negocioNombre: nombre,
-      abierto: negocioAbierto,
-      producto: p,
-    });
+    setFicha(p);
   }
 
   function onAgregar(p: Producto, e: GestureResponderEvent, opciones?: OpcionesLinea) {
@@ -216,10 +215,10 @@ export default function NegocioScreen({ navigation, route }: Props) {
       toast.info('Negocio cerrado', 'Puedes ver el catálogo, pero no hacer pedidos.');
       return;
     }
-    // Hay que elegir peso, talla o color, o se puede quitar o pedir extra un
-    // ingrediente: eso se hace en la ficha, antes de mandarlo al carrito. Una
-    // receta preferida ya trae sus ingredientes elegidos y entra directo.
-    if (pideEleccion(p) || (!opciones && ingredientesDe(p).length > 0)) {
+    // Hay que elegir peso, talla o color, o se pueden quitar ingredientes o
+    // pedir extras: eso se hace en la ficha, antes de mandarlo al carrito. Una
+    // receta preferida ya trae lo suyo elegido y entra directo.
+    if (!opciones && sePersonaliza(p)) {
       verProducto(p);
       return;
     }
@@ -238,6 +237,7 @@ export default function NegocioScreen({ navigation, route }: Props) {
   }
 
   const portada = imagenUrl(negocio?.imagen);
+  const fichaVigente = ficha ? productos.find(p => p.id === ficha.id) : undefined;
   const etiquetas = negocio ? categoriasNegocio(negocio).join(' · ') : '';
 
   return (
@@ -354,6 +354,18 @@ export default function NegocioScreen({ navigation, route }: Props) {
         )
       }
     />
+    {ficha && (
+      <FichaProducto
+        key={ficha.id}
+        producto={fichaVigente ?? ficha}
+        retirado={!fichaVigente}
+        abierto={negocioAbierto}
+        negocioId={id}
+        negocioNombre={nombre}
+        onCerrar={() => setFicha(null)}
+        onVerResenas={() => navigation.navigate('Resenas', { negocioId: id, productoId: ficha.id, titulo: ficha.nombre })}
+      />
+    )}
     <Modal visible={!!servicioSeleccionado} transparent animationType="slide" onRequestClose={() => setServicioSeleccionado(null)}>
       <View style={styles.fondoDetalle}>
         <ScrollView style={styles.detalleServicio} contentContainerStyle={styles.detalleContenido}>

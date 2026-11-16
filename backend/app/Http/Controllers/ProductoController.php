@@ -177,6 +177,14 @@ class ProductoController extends Controller
             // Colores disponibles (ropa y calzado).
             'colores' => ['sometimes', 'nullable', 'array', 'max:30'],
             'colores.*' => ['nullable', 'string', 'max:100'],
+            // Comida: ingredientes que el cliente no puede quitar (de los de `atributos`).
+            'ingredientes_fijos' => ['sometimes', 'nullable', 'array', 'max:30'],
+            'ingredientes_fijos.*' => ['nullable', 'string', 'max:100'],
+            // Comida: extras que se piden aparte, con su precio por porción
+            // (0 = gratis), en pesos sin puntos ni comas.
+            'extras' => ['sometimes', 'nullable', 'array', 'max:20'],
+            'extras.*.nombre' => ['nullable', 'string', 'max:100'],
+            'extras.*.precio' => ['nullable', 'integer', 'min:0', 'max:1000000'],
             // Cómo se selecciona la cantidad: cantidad | peso | volumen | longitud.
             'tipo_venta' => ['sometimes', Rule::in(Producto::TIPOS_VENTA)],
             // Etiqueta de la medida del precio: 'unidad', 'kg', 'litro', 'metro', 'combo'...
@@ -199,7 +207,7 @@ class ProductoController extends Controller
      */
     private function normalizarAtributos(array $data): array
     {
-        foreach (['atributos', 'colores'] as $campo) {
+        foreach (['atributos', 'colores', 'ingredientes_fijos'] as $campo) {
             if (! array_key_exists($campo, $data)) {
                 continue;
             }
@@ -208,6 +216,22 @@ class ProductoController extends Controller
                 ->map(fn ($a) => trim((string) $a))
                 ->filter()
                 ->unique()
+                ->values()
+                ->all();
+        }
+
+        // Un ingrediente fijo tiene que estar entre los ingredientes.
+        if (isset($data['ingredientes_fijos'], $data['atributos'])) {
+            $data['ingredientes_fijos'] = array_values(array_intersect($data['ingredientes_fijos'], $data['atributos']));
+        }
+
+        if (array_key_exists('extras', $data)) {
+            // Sin nombre no es un extra; con el mismo nombre (sin importar
+            // mayúsculas) vale el primero, para que el cliente no vea dos iguales.
+            $data['extras'] = collect($data['extras'] ?? [])
+                ->map(fn ($e) => ['nombre' => trim((string) ($e['nombre'] ?? '')), 'precio' => (int) ($e['precio'] ?? 0)])
+                ->filter(fn ($e) => $e['nombre'] !== '')
+                ->unique(fn ($e) => mb_strtolower($e['nombre']))
                 ->values()
                 ->all();
         }

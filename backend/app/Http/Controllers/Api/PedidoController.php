@@ -48,9 +48,14 @@ class PedidoController extends Controller
             // Ropa y calzado.
             'items.*.talla' => ['nullable', 'string', 'max:100'],
             'items.*.color' => ['nullable', 'string', 'max:100'],
-            // Comida: ingredientes que no quiere o de los que quiere más.
+            // Comida: ingredientes que no quiere y extras que pide aparte, con
+            // cuántas porciones de cada uno (el precio lo pone el producto).
             'items.*.sin' => ['nullable', 'array', 'max:30'],
             'items.*.sin.*' => ['string', 'max:100'],
+            'items.*.extras' => ['nullable', 'array', 'max:20'],
+            'items.*.extras.*.nombre' => ['required', 'string', 'max:100'],
+            'items.*.extras.*.cantidad' => ['required', 'integer', 'min:0', 'max:'.OpcionesPedido::MAX_PORCIONES_EXTRA],
+            // De versiones anteriores de la app; ya no cuenta.
             'items.*.extra' => ['nullable', 'array', 'max:30'],
             'items.*.extra.*' => ['string', 'max:100'],
             'metodo_pago' => ['required', Rule::in(Pedido::METODOS_PAGO)],
@@ -107,7 +112,11 @@ class PedidoController extends Controller
         // pedido (si el admin la cambia después, este pedido no cambia).
         $domicilio = Ajuste::tarifaDomicilio();
         foreach ($datos['items'] as &$item) {
-            $item['precio_reservado'] = PrecioCarrito::deItem($productos[$item['producto_id']], $item, $request->user()->id);
+            // Cada unidad cuesta el producto más los extras que lleva.
+            $producto = $productos[$item['producto_id']];
+            $item['opciones'] = OpcionesPedido::normalizar($producto, $item);
+            $item['precio_reservado'] = PrecioCarrito::deItem($producto, $item, $request->user()->id)
+                + OpcionesPedido::costoExtras($item['opciones']);
         }
         unset($item);
         $subtotal = collect($datos['items'])->sum(fn ($item) => round($item['precio_reservado'] * $item['cantidad'], 2));
@@ -221,7 +230,7 @@ class PedidoController extends Controller
                     'precio' => $item['precio_reservado'],
                     'cantidad' => $item['cantidad'],
                     'unidad_medida' => $productos[$item['producto_id']]->unidad_medida,
-                    'opciones' => OpcionesPedido::normalizar($p, $item),
+                    'opciones' => $item['opciones'],
                 ]);
             }
 

@@ -43,6 +43,8 @@ class Producto extends Model
         'tipo_producto_id',
         'atributos',
         'colores',
+        'ingredientes_fijos',
+        'extras',
     ];
 
     /** Tipos de venta válidos (cómo se selecciona la cantidad del producto). */
@@ -55,6 +57,8 @@ class Producto extends Model
             'disponible' => 'boolean',
             'atributos' => 'array',
             'colores' => 'array',
+            'ingredientes_fijos' => 'array',
+            'extras' => 'array',
             'resenas_total' => 'integer',
         ];
     }

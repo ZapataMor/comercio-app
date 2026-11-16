@@ -7,7 +7,7 @@ import { ajustarMiPedido, getCatalogo, Producto, SeguimientoPedido } from '../ap
 import { useAuth } from '../AuthContext';
 import { CartItem } from '../CartContext';
 import { messageFromError } from '../formErrors';
-import { coloresDe, detalleOpciones, ingredientesDe, OpcionesLinea, tallasDe } from '../opcionesProducto';
+import { coloresDe, costoExtras, detalleOpciones, extrasDe, ingredientesDe, ingredientesFijosDe, OpcionesLinea, precioLinea, precioUnitario, sePersonaliza, tallasDe } from '../opcionesProducto';
 import { font, makeStyles, radius } from '../theme';
 import PersonalizarLinea from './PersonalizarLinea';
 
@@ -40,9 +40,11 @@ export default function AjustarPedido({ pedido, visible, onCerrar, onGuardado }:
       borrador.current = claveBorrador;
       setLineas(referencia.current.items.filter(i => i.producto_id).map((i, idx) => {
         const p = d.productos.find(v => v.id === i.producto_id);
+        // El precio guardado incluye los extras de la línea: aquí va sin ellos.
         return { linea: `original-${idx}`, producto_id: i.producto_id!, nombre: i.nombre,
-          precio: i.precio, cantidad: i.cantidad, opciones: i.opciones, tipo_venta: p?.tipo_venta, unidad_medida: i.unidad_medida ?? p?.unidad_medida,
-          ingredientes: p ? ingredientesDe(p) : [], tallas: p ? tallasDe(p) : [], colores: p ? coloresDe(p) : [] };
+          precio: i.precio - costoExtras(i.opciones), cantidad: i.cantidad, opciones: i.opciones, tipo_venta: p?.tipo_venta, unidad_medida: i.unidad_medida ?? p?.unidad_medida,
+          ingredientes: p ? ingredientesDe(p) : [], ingredientesFijos: p ? ingredientesFijosDe(p) : [], extrasDisponibles: p ? extrasDe(p) : [],
+          tallas: p ? tallasDe(p) : [], colores: p ? coloresDe(p) : [] };
       }));
     }).catch(e => { if (activo) setError(messageFromError(e)); }).finally(() => { if (activo) setCargando(false); });
     return () => { activo = false; };
@@ -53,12 +55,18 @@ export default function AjustarPedido({ pedido, visible, onCerrar, onGuardado }:
     if (tallas.length) opciones.talla = tallas[0];
     if (colores.length) opciones.color = colores[0];
     const linea = `nueva-${Date.now()}-${Math.random()}`;
-    const precioAnterior = pedido.items.find(i => i.producto_id === p.id)?.precio;
+    const precioAnterior = precioBase(p.id);
     setLineas(prev => [...prev, { linea, producto_id: p.id, nombre: p.nombre, precio: precioAnterior ?? p.precio,
-      cantidad: 1, tipo_venta: p.tipo_venta, unidad_medida: p.unidad_medida, opciones, ingredientes: ingredientesDe(p), tallas, colores }]);
-    if (tallas.length || colores.length || ingredientesDe(p).length) setPersonalizar(linea);
+      cantidad: 1, tipo_venta: p.tipo_venta, unidad_medida: p.unidad_medida, opciones, ingredientes: ingredientesDe(p),
+      ingredientesFijos: ingredientesFijosDe(p), extrasDisponibles: extrasDe(p), tallas, colores }]);
+    if (sePersonaliza(p)) setPersonalizar(linea);
   }
-  const total = lineas.reduce((s, i) => s + Math.round(i.precio * i.cantidad * 100) / 100, pedido.costo_domicilio);
+  /** Precio con el que se pidió el producto, sin los extras de esa línea. */
+  function precioBase(productoId: number) {
+    const anterior = pedido.items.find(i => i.producto_id === productoId);
+    return anterior ? anterior.precio - costoExtras(anterior.opciones) : undefined;
+  }
+  const total = lineas.reduce((s, i) => s + precioLinea(i), pedido.costo_domicilio);
   const noDisponibles = lineas.some(i => !productos.some(p => p.id === i.producto_id && p.disponible));
   async function guardar() {
     if (!auth || enviando || !pedido.faltante_version) return;
@@ -76,7 +84,7 @@ export default function AjustarPedido({ pedido, visible, onCerrar, onGuardado }:
       <Text style={styles.texto}>Quita los productos agotados, elige alternativas o ajusta los ingredientes. Revisa el total antes de confirmar.</Text>
       {cargando && <ActivityIndicator />}
       {lineas.map(i => <View key={i.linea} style={styles.card}>
-        <Text style={styles.nombre}>{i.nombre} · {cop(i.precio)}</Text>
+        <Text style={styles.nombre}>{i.nombre} · {cop(precioUnitario(i))}</Text>
         {!productos.some(p => p.id === i.producto_id && p.disponible) && <Text style={styles.error}>Agotado. Quita este producto o elige otro.</Text>}
         {!!detalleOpciones(i.opciones) && <Text style={styles.texto}>{detalleOpciones(i.opciones)}</Text>}
         <View style={styles.fila}>
@@ -87,10 +95,10 @@ export default function AjustarPedido({ pedido, visible, onCerrar, onGuardado }:
           </>}
           <TouchableOpacity disabled={enviando} onPress={() => setLineas(prev => prev.filter(v => v.linea !== i.linea))}><Text style={styles.error}>Quitar</Text></TouchableOpacity>
         </View>
-        {!!(i.ingredientes?.length || i.tallas?.length || i.colores?.length) && <TouchableOpacity disabled={enviando} onPress={() => setPersonalizar(i.linea)}><Text style={styles.enlace}>Cambiar ingredientes u opciones</Text></TouchableOpacity>}
+        {!!(i.ingredientes?.length || i.extrasDisponibles?.length || i.tallas?.length || i.colores?.length) && <TouchableOpacity disabled={enviando} onPress={() => setPersonalizar(i.linea)}><Text style={styles.enlace}>Cambiar ingredientes u opciones</Text></TouchableOpacity>}
       </View>)}
       <Text style={styles.nombre}>Agregar una alternativa</Text>
-      {productos.filter(p => p.disponible).map(p => <TouchableOpacity key={p.id} disabled={enviando} onPress={() => agregar(p)}><Text style={styles.enlace}>+ {p.nombre} · {cop(pedido.items.find(i => i.producto_id === p.id)?.precio ?? p.precio)}</Text></TouchableOpacity>)}
+      {productos.filter(p => p.disponible).map(p => <TouchableOpacity key={p.id} disabled={enviando} onPress={() => agregar(p)}><Text style={styles.enlace}>+ {p.nombre} · {cop(precioBase(p.id) ?? p.precio)}</Text></TouchableOpacity>)}
       <Text style={styles.nombre}>Total con domicilio: {cop(total)}</Text>
       {!!error && <Text style={styles.error}>{error}</Text>}
       <TouchableOpacity style={styles.boton} disabled={enviando || cargando || !lineas.length || noDisponibles} onPress={guardar}><Text style={styles.botonTexto}>{enviando ? 'Confirmando…' : 'Confirmar nueva elección'}</Text></TouchableOpacity>

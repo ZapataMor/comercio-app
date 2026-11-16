@@ -113,32 +113,127 @@ test('el peso rechaza cantidades fuera del rango o con precisión excesiva', fun
     pedir($this->negocio, ['producto_id' => $producto->id, 'cantidad' => $cantidad])->assertUnprocessable();
 })->with([0, -0.5, 0.0001, 0.1234, 100]);
 
-test('la comida se pide sin ingredientes o con más de los que trae', function () {
+test('la comida se pide sin ingredientes y con extras que suman su precio', function () {
+    $this->hamburguesa->update([
+        'ingredientes_fijos' => ['Pan', 'Carne'],
+        'extras' => [['nombre' => 'Queso', 'precio' => 2500], ['nombre' => 'Salsa', 'precio' => 0]],
+    ]);
+
     pedir($this->negocio, [
         'producto_id' => $this->hamburguesa->id,
-        'cantidad' => 1,
+        'cantidad' => 2,
         'sin' => ['Lechuga', 'Tomate'],
-        'extra' => ['Queso'],
+        'extras' => [['nombre' => 'Queso', 'cantidad' => 2], ['nombre' => 'Salsa', 'cantidad' => 1]],
     ])->assertCreated();
 
-    $item = $this->negocio->pedidos()->first()->items()->first();
+    $pedido = $this->negocio->pedidos()->first();
+    $item = $pedido->items()->first();
 
-    expect($item->opciones)->toBe(['sin' => ['Lechuga', 'Tomate'], 'extra' => ['Queso']]);
-    expect($item->detalle())->toBe('Sin lechuga, tomate · Extra queso');
+    expect($item->opciones)->toBe([
+        'sin' => ['Lechuga', 'Tomate'],
+        'extras' => [
+            ['nombre' => 'Queso', 'cantidad' => 2, 'precio' => 2500],
+            ['nombre' => 'Salsa', 'cantidad' => 1, 'precio' => 0],
+        ],
+    ]);
+    // Cada hamburguesa: 15.000 + 2 quesos de 2.500.
+    expect((float) $item->precio)->toBe(20000.0)
+        ->and((float) $pedido->subtotal)->toBe(40000.0)
+        ->and($item->detalle())->toBe('Sin lechuga, tomate · Extras: queso x2, salsa');
 });
 
-test('solo se aceptan ingredientes que vienen incluidos en el producto', function () {
+test('no se quitan ingredientes fijos ni se cobran extras que el producto no ofrece', function () {
+    $this->hamburguesa->update([
+        'ingredientes_fijos' => ['Carne'],
+        'extras' => [['nombre' => 'Queso', 'precio' => 2500]],
+    ]);
+
     pedir($this->negocio, [
         'producto_id' => $this->hamburguesa->id,
         'cantidad' => 1,
-        'sin' => ['Cebolla', 'Lechuga'],
-        'extra' => ['Tocineta', 'Lechuga'],
+        'sin' => ['Carne', 'Cebolla', 'Lechuga'],
+        // El precio lo pone el producto, no la app.
+        'extras' => [['nombre' => 'Tocineta', 'cantidad' => 1], ['nombre' => 'Queso', 'cantidad' => 10, 'precio' => 1]],
+        'extra' => ['Lechuga'],
     ])->assertCreated();
 
     $item = $this->negocio->pedidos()->first()->items()->first();
 
-    // Cebolla y tocineta no vienen en la hamburguesa, y lechuga no puede ser las dos cosas.
-    expect($item->opciones)->toBe(['sin' => ['Lechuga']]);
+    // Carne es fija, cebolla no viene en la hamburguesa y `extra` es de la app anterior.
+    expect($item->opciones)->toBe([
+        'sin' => ['Lechuga'],
+        'extras' => [['nombre' => 'Queso', 'cantidad' => 10, 'precio' => 2500]],
+    ])->and((float) $item->precio)->toBe(40000.0);
+});
+
+test('un extra no pasa del tope de porciones', function () {
+    $this->hamburguesa->update(['extras' => [['nombre' => 'Queso', 'precio' => 2500]]]);
+
+    pedir($this->negocio, [
+        'producto_id' => $this->hamburguesa->id, 'cantidad' => 1,
+        'extras' => [['nombre' => 'Queso', 'cantidad' => 11]],
+    ])->assertUnprocessable()->assertJsonValidationErrors('items.0.extras.0.cantidad');
+});
+
+test('si un extra subió de precio el pedido espera a que el cliente vea el nuevo total', function () {
+    $this->hamburguesa->update(['extras' => [['nombre' => 'Queso', 'precio' => 3000]]]);
+    $cliente = User::factory()->create();
+    $cliente->assignRole('usuario');
+    Sanctum::actingAs($cliente);
+
+    test()->postJson('/api/pedidos', [
+        'negocio_id' => $this->negocio->id,
+        'items' => [['producto_id' => $this->hamburguesa->id, 'cantidad' => 1, 'extras' => [['nombre' => 'Queso', 'cantidad' => 1]]]],
+        'metodo_pago' => 'efectivo',
+        ...direccionPedidoPrueba(null, 'Calle 1 #10-20'),
+        'telefono_contacto' => '3001234567',
+        // Lo que vio el cliente cuando el queso costaba 2.500.
+        'total_esperado' => 17500 + App\Models\Ajuste::tarifaDomicilio(),
+    ])->assertStatus(409)->assertJsonPath('codigo', 'total_cambio')->assertJsonPath('subtotal', 18000);
+
+    expect($this->negocio->pedidos()->count())->toBe(0);
+});
+
+test('el ajuste por faltantes respeta el precio del plato y cobra los extras nuevos', function () {
+    $this->hamburguesa->update(['extras' => [['nombre' => 'Queso', 'precio' => 2500], ['nombre' => 'Papas', 'precio' => 3000]]]);
+    $id = pedir($this->negocio, [
+        'producto_id' => $this->hamburguesa->id, 'cantidad' => 1, 'extras' => [['nombre' => 'Queso', 'cantidad' => 1]],
+    ])->assertCreated()->json('id');
+    $pedido = $this->negocio->pedidos()->findOrFail($id);
+    $pedido->update(['estado' => 'aceptado', 'faltante_motivo' => 'Se acabó el queso', 'faltante_version' => 'v1']);
+    // El negocio sube el plato después del pedido: el cliente conserva su precio.
+    $this->hamburguesa->update(['precio' => 18000]);
+
+    $this->putJson("/api/pedidos/{$id}/ajuste", [
+        'items' => [['producto_id' => $this->hamburguesa->id, 'cantidad' => 1, 'extras' => [['nombre' => 'Papas', 'cantidad' => 2]]]],
+        'total_esperado' => 21000 + (float) $pedido->costo_domicilio, 'faltante_version' => 'v1',
+    ])->assertOk();
+
+    $item = $pedido->fresh()->items->first();
+    expect((float) $item->precio)->toBe(21000.0)
+        ->and($item->detalle())->toBe('Extras: papas x2');
+});
+
+test('el comerciante guarda ingredientes fijos y extras limpios', function () {
+    Sanctum::actingAs($this->dueno);
+
+    test()->putJson("/api/negocios/{$this->negocio->id}/productos/{$this->hamburguesa->id}", [
+        'atributos' => ['Pan', 'Carne', 'Tomate'],
+        'ingredientes_fijos' => ['Carne', ' Carne ', 'Tocineta'],
+        'extras' => [
+            ['nombre' => ' Queso ', 'precio' => 2500],
+            ['nombre' => 'queso', 'precio' => 1000],
+            ['nombre' => '', 'precio' => 500],
+            ['nombre' => 'Salsa', 'precio' => 0],
+        ],
+    ])
+        ->assertOk()
+        ->assertJsonPath('producto.ingredientes_fijos', ['Carne'])
+        ->assertJsonPath('producto.extras', [['nombre' => 'Queso', 'precio' => 2500], ['nombre' => 'Salsa', 'precio' => 0]]);
+
+    test()->putJson("/api/negocios/{$this->negocio->id}/productos/{$this->hamburguesa->id}", [
+        'extras' => [['nombre' => 'Queso', 'precio' => -1]],
+    ])->assertUnprocessable()->assertJsonValidationErrors('extras.0.precio');
 });
 
 test('el mismo producto puede ir en dos líneas con opciones distintas', function () {

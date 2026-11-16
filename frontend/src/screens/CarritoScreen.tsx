@@ -10,7 +10,7 @@ import { esPorPeso } from '../cantidades';
 import Icon from '../components/Icon';
 import PersonalizarLinea, { ModoHoja } from '../components/PersonalizarLinea';
 import { RootStackParamList } from '../navTypes';
-import { detalleOpciones } from '../opcionesProducto';
+import { detalleOpciones, precioLinea } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Carrito'>;
@@ -21,7 +21,7 @@ function cop(n: number) {
 
 /** Texto del enlace para ajustar la línea, según lo que se pueda cambiar. */
 function textoAjuste(i: CartItem): string | null {
-  if (i.ingredientes?.length) return 'Personalizar';
+  if ((i.ingredientes?.length ?? 0) > (i.ingredientesFijos?.length ?? 0) || i.extrasDisponibles?.length) return 'Personalizar';
   const cambiaTalla = (i.tallas?.length ?? 0) > 1;
   const cambiaColor = (i.colores?.length ?? 0) > 1;
   if (cambiaTalla && cambiaColor) return 'Cambiar talla o color';
@@ -111,7 +111,7 @@ function LineaCarrito({ item, onAjustar, onAgregarOtra }: LineaProps) {
           {saliendo ? (
             <Text style={styles.deshacer} numberOfLines={2}>Toca + para conservarlo</Text>
           ) : (
-            <Text style={styles.precio}>{cop(item.precio * item.cantidad)}</Text>
+            <Text style={styles.precio}>{cop(precioLinea(item))}</Text>
           )}
           <View style={styles.qtyRow}>
             {esPorPeso(item) && !saliendo ? <CantidadPeso cantidad={item.cantidad} unidad={item.unidad_medida ?? 'kg'} onChange={n => fijarCantidad(item.linea, n)} /> : <>

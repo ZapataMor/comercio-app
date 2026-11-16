@@ -37,6 +37,7 @@ import { useNegocio } from '../NegocioContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import { useConfirmar } from '../components/Confirmacion';
 import { Dropdown } from '../components/Dropdown';
+import EditorComida, { DatosComida } from '../components/EditorComida';
 import FieldError from '../components/FieldError';
 import Icon from '../components/Icon';
 import ListaAtributos from '../components/ListaAtributos';
@@ -63,6 +64,11 @@ function unidadDesdeProducto(p: Producto | null): UnidadKey {
   if (p?.unidad_medida === 'kg') return 'kilos';
   if (p?.unidad_medida === 'libra') return 'libras';
   return 'cantidad';
+}
+
+/** El primer error de una lista (ej. "extras.2.precio"), si el servidor lo señaló así. */
+function errorDeLista(errores: FieldErrors, prefijo: string) {
+  return Object.entries(errores).find(([campo]) => campo.startsWith(prefijo))?.[1];
 }
 
 function precioCOP(n: number) {
@@ -106,6 +112,8 @@ export default function MisProductosScreen({ navigation }: Props) {
   // Colores disponibles (solo los tipos con colores: ropa y calzado).
   const [colores, setColores] = useState<string[]>([]);
   const [coloresIniciales, setColoresIniciales] = useState<string[]>([]);
+  // Comida: ingredientes (se pueden quitar o van fijos) y extras con precio.
+  const [comida, setComida] = useState<DatosComida>({ ingredientes: [], fijos: [], extras: [] });
   const [imagenUri, setImagenUri] = useState<string | null>(null);
   const [disponible, setDisponible] = useState(true);
   const [guardando, setGuardando] = useState(false);
@@ -213,6 +221,7 @@ export default function MisProductosScreen({ navigation }: Props) {
     setAtributosIniciales([]);
     setColores([]);
     setColoresIniciales([]);
+    setComida({ ingredientes: [], fijos: [], extras: [] });
     setImagenUri(null);
     setDisponible(true);
     setErrores({});
@@ -231,6 +240,7 @@ export default function MisProductosScreen({ navigation }: Props) {
     setAtributosIniciales(p.atributos ?? []);
     setColores(p.colores ?? []);
     setColoresIniciales(p.colores ?? []);
+    setComida({ ingredientes: p.atributos ?? [], fijos: p.ingredientes_fijos ?? [], extras: p.extras ?? [] });
     setImagenUri(null);
     setDisponible(p.disponible);
     setErrores({});
@@ -260,8 +270,15 @@ export default function MisProductosScreen({ navigation }: Props) {
       setErrores({ precio: 'El precio debe ser mayor que 0 pesos.' }); return;
     }
     const u = UNIDADES.find(x => x.value === unidad)!;
+    const esComida = tipos.find(t => t.id === tipoId)?.slug === 'comida';
+    if (esComida && comida.extras.some(e => e.precio == null)) {
+      setErrores({ extras: 'Escribe el precio de cada extra, sin puntos ni comas (0 si es gratis).' });
+      return;
+    }
     // Atributos limpios: sin espacios sobrantes, vacíos ni repetidos.
-    const atributosLimpios = [...new Set(atributos.map(a => a.trim()).filter(Boolean))];
+    const atributosLimpios = [...new Set((esComida ? comida.ingredientes : atributos).map(a => a.trim()).filter(Boolean))];
+    const fijosLimpios = esComida ? comida.fijos.filter(f => atributosLimpios.includes(f)) : [];
+    const extrasLimpios = esComida ? comida.extras.map(e => ({ nombre: e.nombre, precio: e.precio ?? 0 })) : [];
     const coloresLimpios = [...new Set(colores.map(a => a.trim()).filter(Boolean))];
     setGuardando(true);
     try {
@@ -275,6 +292,8 @@ export default function MisProductosScreen({ navigation }: Props) {
         // null (y no []) para que también se limpien al subir con imagen.
         atributos: atributosLimpios.length ? atributosLimpios : null,
         colores: coloresLimpios.length ? coloresLimpios : null,
+        ingredientes_fijos: fijosLimpios.length ? fijosLimpios : null,
+        extras: extrasLimpios.length ? extrasLimpios : null,
         disponible,
       };
       if (editando) {
@@ -421,6 +440,7 @@ export default function MisProductosScreen({ navigation }: Props) {
                   setAtributosIniciales([]);
                   setColores([]);
                   setColoresIniciales([]);
+                  setComida({ ingredientes: [], fijos: [], extras: [] });
                   limpiarError('tipo_producto');
                 }}
                 placeholder="¿Qué vas a vender?"
@@ -468,7 +488,23 @@ export default function MisProductosScreen({ navigation }: Props) {
               />
               <FieldError mensaje={errores.descripcion} />
 
-              {tipoSeleccionado && (
+              {tipoSeleccionado?.slug === 'comida' && (
+                <>
+                  <EditorComida
+                    key={`comida-${editando?.id ?? 'nuevo'}-${tipoSeleccionado.id}`}
+                    ingredientes={editando?.tipo_producto?.id === tipoSeleccionado.id ? editando.atributos : []}
+                    fijos={editando?.tipo_producto?.id === tipoSeleccionado.id ? editando.ingredientes_fijos : []}
+                    extras={editando?.tipo_producto?.id === tipoSeleccionado.id ? editando.extras : []}
+                    onChange={datos => {
+                      setComida(datos);
+                      limpiarError('extras');
+                    }}
+                    disabled={guardando}
+                  />
+                  <FieldError mensaje={errores.atributos ?? errores.extras ?? errorDeLista(errores, 'extras.')} />
+                </>
+              )}
+              {tipoSeleccionado && tipoSeleccionado.slug !== 'comida' && (
                 <>
                   <ListaAtributos
                     key={`${editando?.id ?? 'nuevo'}-${tipoSeleccionado.id}`}
@@ -480,11 +516,6 @@ export default function MisProductosScreen({ navigation }: Props) {
                     disabled={guardando}
                   />
                   <FieldError mensaje={errores.atributos} />
-                  {tipoSeleccionado.slug === 'comida' && (
-                    <Text style={styles.ayudaGrupo}>
-                      El cliente podrá quitar estos ingredientes o pedir más de ellos en su pedido.
-                    </Text>
-                  )}
                   {tipoSeleccionado.sugerencias_colores && (
                     <>
                       <ListaAtributos

@@ -1,11 +1,19 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
-import { Producto } from './api';
+import { ExtraProducto, Producto } from './api';
 import { cantidadValida, esPorPeso, redondearCantidad } from './cantidades';
 import { useAuth } from './AuthContext';
 import { animarDespliegue } from './components/anim';
-import { coloresDe, ingredientesDe, OpcionesLinea, tallasDe } from './opcionesProducto';
+import {
+  coloresDe,
+  extrasDe,
+  ingredientesDe,
+  ingredientesFijosDe,
+  OpcionesLinea,
+  precioLinea,
+  tallasDe,
+} from './opcionesProducto';
 
 /** Tiempo que una línea sigue en el carrito después de quitarla (ms). */
 export const DURACION_RETIRO = 3000;
@@ -28,6 +36,8 @@ export type CartItem = {
   opciones?: OpcionesLinea;
   // Copia de lo que se puede elegir: el carrito se edita sin volver al catálogo.
   ingredientes?: string[];
+  ingredientesFijos?: string[];
+  extrasDisponibles?: ExtraProducto[];
   tallas?: string[];
   colores?: string[];
   /** Hora en que sale del carrito; mientras tanto ya no se cuenta ni se pide. */
@@ -94,7 +104,9 @@ const claveCarrito = (userId: number) => `carrito:${userId}`;
 
 function claveLinea(productoId: number, o?: OpcionesLinea) {
   const lista = (v?: string[]) => [...(v ?? [])].sort().join(',');
-  return [productoId, o?.talla ?? '', o?.color ?? '', lista(o?.sin), lista(o?.extra)].join('|');
+  // El precio de un extra no separa líneas: solo cuáles y cuántas porciones.
+  const extras = lista(o?.extras?.map(e => `${e.nombre}:${e.cantidad}`));
+  return [productoId, o?.talla ?? '', o?.color ?? '', lista(o?.sin), lista(o?.extra), extras].join('|');
 }
 
 /** Deja solo lo elegido: sin nada elegido, dos líneas son la misma. */
@@ -104,6 +116,8 @@ function limpiarOpciones(o?: OpcionesLinea): OpcionesLinea | undefined {
   if (o?.color) limpias.color = o.color;
   if (o?.sin?.length) limpias.sin = o.sin;
   if (o?.extra?.length) limpias.extra = o.extra;
+  const extras = o?.extras?.filter(e => e.cantidad > 0);
+  if (extras?.length) limpias.extras = extras;
   return Object.keys(limpias).length ? limpias : undefined;
 }
 
@@ -122,6 +136,8 @@ function crearLinea(p: Producto, opciones?: OpcionesLinea, cantidad = 1): CartIt
     imagen: p.imagen ?? null,
     opciones: limpias,
     ingredientes: ingredientesDe(p),
+    ingredientesFijos: ingredientesFijosDe(p),
+    extrasDisponibles: extrasDe(p),
     tallas: tallasDe(p),
     colores: coloresDe(p),
   };
@@ -342,9 +358,21 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setLineas(prev => prev.map(i => {
       const p = catalogo.get(i.producto_id);
       if (!p) return i;
+      // Los extras siguen al catálogo: lo que se puede elegir y lo que vale cada
+      // porción (el servidor cobra siempre el precio vigente del extra).
+      const extrasDisponibles = extrasDe(p);
+      const vigente = new Map(extrasDisponibles.map(e => [e.nombre, e.precio]));
+      const extras = i.opciones?.extras?.map(e => ({ ...e, precio: vigente.get(e.nombre) ?? e.precio }));
+      const conExtras = {
+        ...i,
+        ingredientes: ingredientesDe(p),
+        ingredientesFijos: ingredientesFijosDe(p),
+        extrasDisponibles,
+        ...(extras ? { opciones: { ...i.opciones, extras } } : {}),
+      };
       const baja = p.precio <= i.precio;
-      if (p.precio === i.precioVigente && p.precio >= i.precio) return i;
-      return { ...i, precioVigente: p.precio,
+      if (p.precio === i.precioVigente && p.precio >= i.precio) return conExtras;
+      return { ...conExtras, precioVigente: p.precio,
         tipo_venta: p.tipo_venta, unidad_medida: p.unidad_medida,
         // La cotización corresponde siempre al precio vigente. No al anterior.
         precio_token: p.precio_token, precio_vence_at: p.precio_vence_at,
@@ -368,7 +396,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   const count = items.reduce((s, i) => s + (esPorPeso(i) ? 1 : i.cantidad), 0);
-  const total = items.reduce((s, i) => s + Math.round(i.precio * i.cantidad * 100) / 100, 0);
+  const total = items.reduce((s, i) => s + precioLinea(i), 0);
 
   return (
     <CartContext.Provider

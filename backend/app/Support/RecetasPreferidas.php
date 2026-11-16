@@ -11,7 +11,7 @@ use Illuminate\Support\Collection;
 
 /**
  * Recetas preferidas del cliente en una tienda: un plato con los mismos
- * ingredientes quitados o con extra en MIN_PEDIDOS pedidos entregados o más.
+ * ingredientes quitados y los mismos extras en MIN_PEDIDOS pedidos entregados o más.
  *
  * No se guardan aparte: salen del historial, así que aparecen solas al
  * entregarse el pedido y se van con él. Cada pedido cuenta una vez, aunque
@@ -27,7 +27,7 @@ class RecetasPreferidas
     /**
      * Primero las que más ha pedido y, a igualdad, la más reciente.
      *
-     * @return Collection<int, array{producto: Producto, opciones: array{sin?: array<int, string>, extra?: array<int, string>}, veces: int}>
+     * @return Collection<int, array{producto: Producto, opciones: array{sin?: array<int, string>, extras?: array<int, array{nombre: string, cantidad: int, precio: float}>}, veces: int}>
      */
     public static function de(User $cliente, Negocio $negocio): Collection
     {

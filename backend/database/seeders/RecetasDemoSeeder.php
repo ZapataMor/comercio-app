@@ -33,15 +33,22 @@ class RecetasDemoSeeder extends Seeder
             return;
         }
 
-        $opciones = ['sin' => [$plato->atributos[2]], 'extra' => [$plato->atributos[1]]];
+        // Sin un ingrediente que se pueda quitar y, si el plato tiene extras, con el primero.
+        $quitable = collect($plato->atributos)->diff($plato->ingredientes_fijos ?? [])->values()->get(1);
+        $extra = $plato->extras[0] ?? null;
+        $opciones = array_filter([
+            'sin' => $quitable ? [$quitable] : [],
+            'extras' => $extra ? [['nombre' => $extra['nombre'], 'cantidad' => 1, 'precio' => (float) $extra['precio']]] : [],
+        ]);
+        $precio = (float) $plato->precio + (float) ($extra['precio'] ?? 0);
 
         foreach ([9, 3] as $dias) {
             $pedido = $plato->negocio->pedidos()->create([
                 'user_id' => $cliente->id,
                 'estado' => 'entregado',
                 'metodo_pago' => 'efectivo',
-                'subtotal' => $plato->precio,
-                'total' => $plato->precio,
+                'subtotal' => $precio,
+                'total' => $precio,
                 'direccion_entrega' => 'Calle 12 #9-40',
                 'telefono_contacto' => '3001234567',
                 'entregado_at' => now()->subDays($dias),
@@ -50,7 +57,7 @@ class RecetasDemoSeeder extends Seeder
             $pedido->items()->create([
                 'producto_id' => $plato->id,
                 'nombre' => $plato->nombre,
-                'precio' => $plato->precio,
+                'precio' => $precio,
                 'cantidad' => 1,
                 'opciones' => $opciones,
             ]);

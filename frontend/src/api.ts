@@ -190,9 +190,16 @@ export type Producto = {
   atributos?: string[];
   /** Colores disponibles (ropa y calzado). */
   colores?: string[];
+  /** Comida: de los ingredientes, los que el cliente no puede quitar. */
+  ingredientes_fijos?: string[];
+  /** Comida: extras que se piden aparte, con su precio por porción (0 = gratis). */
+  extras?: ExtraProducto[];
   /** Tipo global; null en productos creados antes de existir esta función. */
   tipo_producto?: { id: number; nombre: string; slug: string; atributo_label: string } | null;
 };
+
+/** Un extra que ofrece un plato: "Porción de papas", $3.000 cada una. */
+export type ExtraProducto = { nombre: string; precio: number };
 
 /** Negocio tal como aparece en la lista de "Explorar". */
 export type NegocioLista = {
@@ -549,7 +556,10 @@ async function authUpload(
   for (const [k, v] of Object.entries(campos)) {
     if (v === undefined) continue;
     if (Array.isArray(v)) {
-      v.forEach(item => form.append(`${k}[]`, String(item)));
+      // Una lista de objetos (los extras de un plato) va campo por campo: extras[0][nombre].
+      v.forEach((item, i) => item && typeof item === 'object'
+        ? Object.entries(item).forEach(([campo, valor]) => form.append(`${k}[${i}][${campo}]`, String(valor)))
+        : form.append(`${k}[]`, String(item)));
     } else if (typeof v === 'boolean') form.append(k, v ? '1' : '0');
     else if (v === null) form.append(k, ''); // '' -> null en el backend
     else form.append(k, String(v));
@@ -819,6 +829,10 @@ export type ProductoInput = {
   /** Ingredientes, usos, tallas... `null` los borra (lista vacía). */
   atributos?: string[] | null;
   colores?: string[] | null;
+  /** Comida: ingredientes que el cliente no puede quitar. */
+  ingredientes_fijos?: string[] | null;
+  /** Comida: extras con su precio por porción. */
+  extras?: ExtraProducto[] | null;
 };
 
 /** Tipos globales de producto con su configuración de atributos. */
@@ -1219,7 +1233,7 @@ export async function getEstadoNegocio(token: string, id: number): Promise<Estad
 /** Un plato que el cliente ya pidió varias veces con los mismos ajustes. */
 export type RecetaPreferida = {
   producto: Producto;
-  opciones: Pick<OpcionesLinea, 'sin' | 'extra'>;
+  opciones: Pick<OpcionesLinea, 'sin' | 'extras'>;
   /** En cuántos pedidos entregados. */
   veces: number;
 };

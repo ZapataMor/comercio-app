@@ -47,6 +47,8 @@ class PedidoIncidenciaController extends Controller
             'items.*.cantidad' => ['required', 'numeric', 'min:0.001', 'max:99'],
             'items.*.talla' => ['nullable', 'string', 'max:100'], 'items.*.color' => ['nullable', 'string', 'max:100'],
             'items.*.sin' => ['nullable', 'array', 'max:30'], 'items.*.sin.*' => ['string', 'max:100'],
+            'items.*.extras' => ['nullable', 'array', 'max:20'], 'items.*.extras.*.nombre' => ['required', 'string', 'max:100'],
+            'items.*.extras.*.cantidad' => ['required', 'integer', 'min:0', 'max:'.OpcionesPedido::MAX_PORCIONES_EXTRA],
             'items.*.extra' => ['nullable', 'array', 'max:30'], 'items.*.extra.*' => ['string', 'max:100'],
             'total_esperado' => ['required', 'numeric', 'min:0'],
             'faltante_version' => ['required', 'string'],
@@ -65,11 +67,16 @@ class PedidoIncidenciaController extends Controller
                 abort_unless($producto && $producto->disponible, 422, 'Uno de los productos ya no está disponible. Elige otro.');
                 abort_if($problema = OpcionesPedido::problema($producto, $item), 422, $problema ?? 'Opciones no disponibles.');
                 CantidadPedido::validar($producto, $item['cantidad']);
+                // Se respeta el precio con el que pidió el producto (sin los
+                // extras de esa línea); los extras se cobran a su precio actual.
+                $anterior = $anteriores->get($producto->id);
+                $base = $anterior ? (float) $anterior->precio - OpcionesPedido::costoExtras($anterior->opciones) : (float) $producto->precio;
+                $opciones = OpcionesPedido::normalizar($producto, $item);
                 $lineas[] = [
                     'unidad_medida' => $producto->unidad_medida,
                     'producto_id' => $producto->id, 'nombre' => $producto->nombre, 'cantidad' => $item['cantidad'],
-                    'precio' => (float) ($anteriores->get($producto->id)?->precio ?? $producto->precio),
-                    'opciones' => OpcionesPedido::normalizar($producto, $item),
+                    'precio' => round($base + OpcionesPedido::costoExtras($opciones), 2),
+                    'opciones' => $opciones,
                 ];
             }
             $subtotal = collect($lineas)->sum(fn ($i) => round($i['cantidad'] * $i['precio'], 2));

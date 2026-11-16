@@ -1,11 +1,11 @@
 /**
  * Lo que el cliente ya pidió varias veces en esta tienda con los mismos ajustes
- * ("Sin tomate · Extra queso"). Un toque lo agrega al carrito tal cual.
+ * ("Sin tomate · Extras: queso x2"). Un toque lo agrega al carrito tal cual.
  */
 import React from 'react';
 import { GestureResponderEvent, Image, ScrollView, Text, View } from 'react-native';
 import { imagenUrl, RecetaPreferida } from '../api';
-import { detalleOpciones, precioDe } from '../opcionesProducto';
+import { cop, costoExtras, detalleOpciones, precioDe } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { PressableScale } from './anim';
 import Icon from './Icon';
@@ -55,7 +55,7 @@ export default function RecetasPreferidas({ recetas, abierto, onAgregar }: Props
                 <Text style={styles.nombre} numberOfLines={1}>{producto.nombre}</Text>
                 <Text style={styles.detalle} numberOfLines={2}>{detalle}</Text>
                 <Text style={styles.veces} numberOfLines={1}>
-                  {precioDe(producto)} · Pedida {veces} veces
+                  {costoExtras(opciones) > 0 ? cop(producto.precio + costoExtras(opciones)) : precioDe(producto)} · Pedida {veces} veces
                 </Text>
               </View>
               {abierto && (

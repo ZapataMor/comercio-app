@@ -32,7 +32,7 @@ import {
 import { useAuth } from '../AuthContext';
 import { useCart } from '../CartContext';
 import { usePedidoPendiente } from '../PedidoPendienteContext';
-import { detalleOpciones } from '../opcionesProducto';
+import { detalleOpciones, precioLinea } from '../opcionesProducto';
 import { FadeInView, PressableScale } from '../components/anim';
 import BarrioSelect from '../components/BarrioSelect';
 import { useConfirmar } from '../components/Confirmacion';
@@ -326,7 +326,7 @@ export default function CheckoutScreen({ navigation }: Props) {
                 <Text style={styles.lineaTxt}>{textoCantidad(i)} {i.nombre}</Text>
                 {!!detalle && <Text style={styles.lineaDetalle}>{detalle}</Text>}
               </View>
-              <Text style={styles.lineaTxt}>{cop(i.precio * i.cantidad)}</Text>
+              <Text style={styles.lineaTxt}>{cop(precioLinea(i))}</Text>
             </View>
           );
         })}

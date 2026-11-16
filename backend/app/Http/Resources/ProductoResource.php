@@ -36,6 +36,12 @@ class ProductoResource extends JsonResource
             'atributos' => $this->atributos ?? [],
             // Solo ropa y calzado: ahí `atributos` son las tallas.
             'colores' => $this->colores ?? [],
+            // Solo comida: ingredientes que el cliente no puede quitar y extras
+            // que pide aparte, cada uno con su precio por porción.
+            'ingredientes_fijos' => $this->ingredientes_fijos ?? [],
+            'extras' => collect($this->extras ?? [])
+                ->map(fn ($e) => ['nombre' => $e['nombre'], 'precio' => (float) ($e['precio'] ?? 0)])
+                ->values()->all(),
             // Solo incluye la categoría si fue cargada (evita consultas N+1).
             'categoria' => new CategoriaResource($this->whenLoaded('categoria')),
             // Tipo global (Comida, Medicamento...); null en productos antiguos.

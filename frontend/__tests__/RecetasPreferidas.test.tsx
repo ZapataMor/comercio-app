@@ -49,7 +49,7 @@ const hamburguesa = {
 
 const receta: RecetaPreferida = {
   producto: hamburguesa,
-  opciones: { sin: ['Tomate'], extra: ['Queso'] },
+  opciones: { sin: ['Tomate'], extras: [{ nombre: 'Queso', cantidad: 2, precio: 2500 }] },
   veces: 3,
 };
 
@@ -72,7 +72,7 @@ const textos = () => raiz.root.findAllByType(Text).map(t => [t.props.children].f
 const tocarReceta = () =>
   act(async () => {
     raiz.root
-      .find(h => typeof h.props.onPress === 'function' && h.props.accessibilityLabel === 'Agregar Hamburguesa: Sin tomate · Extra queso')
+      .find(h => typeof h.props.onPress === 'function' && h.props.accessibilityLabel === 'Agregar Hamburguesa: Sin tomate · Extras: queso x2')
       .props.onPress({ nativeEvent: { pageX: 10, pageY: 20 } });
   });
 
@@ -83,8 +83,9 @@ test('muestra la receta con sus ajustes y cuántas veces la ha pedido', async ()
 
   expect(mockRecetas).toHaveBeenCalledWith('t', 9);
   expect(textos()).toContain('Tus recetas preferidas');
-  expect(textos()).toContain('Sin tomate · Extra queso');
-  expect(textos().join(' ')).toContain('Pedida 3 veces');
+  expect(textos()).toContain('Sin tomate · Extras: queso x2');
+  // El precio que ve incluye los dos quesos.
+  expect(textos().join(' ')).toContain('$20.000 · Pedida 3 veces');
 });
 
 test('sin recetas la sección no aparece', async () => {

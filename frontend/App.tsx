@@ -54,7 +54,6 @@ import ComercioPedidoDetalleScreen from './src/screens/ComercioPedidoDetalleScre
 import PedidosNegocioScreen from './src/screens/PedidosNegocioScreen';
 import ExplorarScreen from './src/screens/ExplorarScreen';
 import NegocioScreen from './src/screens/NegocioScreen';
-import ProductoScreen from './src/screens/ProductoScreen';
 import AdminTableroScreen from './src/screens/AdminTableroScreen';
 import AdminUsuariosScreen from './src/screens/AdminUsuariosScreen';
 import AdminNegociosScreen from './src/screens/AdminNegociosScreen';
@@ -175,11 +174,6 @@ function Navegacion({ listo }: { listo: boolean }) {
                   // El nombre de la tienda va en el título grande de la
                   // pantalla; arriba, la marca, como en Explorar.
                   options={({ route }) => ({ title: route.params.nombre, headerTitle: tituloVitrina })}
-                />
-                <Stack.Screen
-                  name="Producto"
-                  component={ProductoScreen}
-                  options={({ route }) => ({ title: route.params.negocioNombre, headerTitle: tituloVitrina })}
                 />
                 <Stack.Screen name="Carrito" component={CarritoScreen} options={{ title: 'Carrito' }} />
                 <Stack.Screen name="MisDirecciones" component={MisDireccionesScreen} options={{ title: 'Mis direcciones' }} />

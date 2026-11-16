@@ -7,14 +7,19 @@ use App\Models\TipoProducto;
 
 /**
  * Lo que el cliente puede elegir en una línea del pedido, según el tipo del
- * producto: talla y color (ropa y calzado) o ingredientes que quita o de los
- * que quiere más (comida). Los demás tipos no tienen opciones.
+ * producto: talla y color (ropa y calzado) o, en la comida, los ingredientes
+ * que quita (solo los que se pueden quitar) y los extras que pide aparte, con
+ * cuántas porciones de cada uno. Los demás tipos no tienen opciones.
  *
  * El carrito vive en el teléfono y su copia del producto puede estar vieja:
- * aquí se compara siempre contra el producto actual.
+ * aquí se compara siempre contra el producto actual, y el precio de cada extra
+ * sale del producto, nunca de lo que mande la app.
  */
 class OpcionesPedido
 {
+    /** Porciones máximas de un mismo extra en una unidad del producto. */
+    public const MAX_PORCIONES_EXTRA = 10;
+
     /**
      * Mensaje para el cliente si la línea no se puede pedir así, o null si está
      * bien. Solo la talla y el color lo impiden: sin ellos el negocio no sabría
@@ -34,11 +39,12 @@ class OpcionesPedido
 
     /**
      * Opciones listas para guardar en la línea, o null si no hay ninguna.
-     * De los ingredientes solo pasan los que trae el producto: si el negocio
-     * quitó uno después de que el cliente lo marcó, simplemente se ignora.
+     * De los ingredientes solo pasan los que trae el producto y se pueden
+     * quitar, y de los extras solo los que ofrece hoy, con su precio de hoy: si
+     * el negocio quitó uno después de que el cliente lo marcó, se ignora.
      *
      * @param  array<string, mixed>  $item
-     * @return array{talla?: string, color?: string, sin?: array<int, string>, extra?: array<int, string>}|null
+     * @return array{talla?: string, color?: string, sin?: array<int, string>, extras?: array<int, array{nombre: string, cantidad: int, precio: float}>}|null
      */
     public static function normalizar(Producto $producto, array $item): ?array
     {
@@ -47,7 +53,10 @@ class OpcionesPedido
                 'talla' => $item['talla'] ?? null,
                 'color' => $item['color'] ?? null,
             ],
-            TipoProducto::SLUG_COMIDA => self::ingredientes($producto, $item),
+            TipoProducto::SLUG_COMIDA => [
+                'sin' => self::sinIngredientes($producto, $item['sin'] ?? []),
+                'extras' => self::extras($producto, $item['extras'] ?? []),
+            ],
             default => [],
         };
 
@@ -55,18 +64,50 @@ class OpcionesPedido
     }
 
     /**
-     * @param  array<string, mixed>  $item
-     * @return array{sin: array<int, string>, extra: array<int, string>}
+     * Lo que suman los extras a UNA unidad del producto, según las opciones ya
+     * normalizadas (o las guardadas en una línea).
+     *
+     * @param  array<string, mixed>|null  $opciones
      */
-    private static function ingredientes(Producto $producto, array $item): array
+    public static function costoExtras(?array $opciones): float
     {
-        $incluidos = $producto->atributos ?? [];
-        $sin = array_values(array_intersect($incluidos, $item['sin'] ?? []));
+        return round(collect($opciones['extras'] ?? [])
+            ->sum(fn ($extra) => (float) ($extra['precio'] ?? 0) * (int) ($extra['cantidad'] ?? 0)), 2);
+    }
 
-        return [
-            'sin' => $sin,
-            'extra' => array_values(array_diff(array_intersect($incluidos, $item['extra'] ?? []), $sin)),
-        ];
+    /**
+     * @param  array<int, mixed>  $pedidos
+     * @return array<int, string>
+     */
+    private static function sinIngredientes(Producto $producto, array $pedidos): array
+    {
+        $quitables = array_diff($producto->atributos ?? [], $producto->ingredientes_fijos ?? []);
+
+        return array_values(array_intersect($quitables, $pedidos));
+    }
+
+    /**
+     * Los extras del producto con las porciones pedidas, en el orden del
+     * producto. Un nombre repetido en la app cuenta una sola vez.
+     *
+     * @param  array<int, mixed>  $pedidos
+     * @return array<int, array{nombre: string, cantidad: int, precio: float}>
+     */
+    private static function extras(Producto $producto, array $pedidos): array
+    {
+        $porciones = collect($pedidos)
+            ->filter(fn ($e) => is_array($e) && isset($e['nombre']))
+            ->mapWithKeys(fn ($e) => [(string) $e['nombre'] => (int) ($e['cantidad'] ?? 0)]);
+
+        return collect($producto->extras ?? [])
+            ->map(fn ($extra) => [
+                'nombre' => $extra['nombre'],
+                'cantidad' => min(self::MAX_PORCIONES_EXTRA, max(0, $porciones->get($extra['nombre'], 0))),
+                'precio' => (float) ($extra['precio'] ?? 0),
+            ])
+            ->filter(fn ($extra) => $extra['cantidad'] > 0)
+            ->values()
+            ->all();
     }
 
     /** @param  array<int, string>  $disponibles */

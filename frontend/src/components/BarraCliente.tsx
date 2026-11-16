@@ -35,6 +35,10 @@ const RUTAS_CLIENTE = new Set([
   'PedidoDetalle',
 ]);
 
+/** Alto de los botones y su distancia al borde inferior (sobre el área segura). */
+export const ALTO_BARRA_CLIENTE = 54;
+export const MARGEN_BARRA_CLIENTE = 14;
+
 type Props = { ruta?: string; seccion?: SeccionCatalogo };
 
 export default function BarraCliente({ ruta, seccion }: Props) {
@@ -57,7 +61,7 @@ function Barra({ ruta }: { ruta: string }) {
   const enSeguimiento = ruta === 'PedidoDetalle';
   const mostrarCarrito = !enSeguimiento || cart.count > 0;
   const mostrarPedidos = !enSeguimiento;
-  const bottom = insets.bottom + 14;
+  const bottom = insets.bottom + MARGEN_BARRA_CLIENTE;
 
   // --- Destino del paquete volador: centro del botón Carrito ---
   const carritoRef = useRef<View>(null);
@@ -178,7 +182,7 @@ const useStyles = makeStyles((c, shadow) => ({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    height: 54,
+    height: ALTO_BARRA_CLIENTE,
     borderRadius: radius.lg,
   },
   botonCarrito: { backgroundColor: c.accent, ...shadow.gold },

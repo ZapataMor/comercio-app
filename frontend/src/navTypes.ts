@@ -1,5 +1,5 @@
 // Rutas de navegación de la app (React Navigation - native stack).
-import { ComercioPedido, Producto, Servicio } from './api';
+import { ComercioPedido, Servicio } from './api';
 
 /** Catálogo que ve el cliente en Explorar (el desplegable junto al perfil). */
 export type SeccionCatalogo = 'productos' | 'servicios' | 'propiedades';
@@ -49,7 +49,6 @@ export type RootStackParamList = {
   // resalta y hace scroll hasta ese producto.
   Negocio: { id: number; nombre: string; productoId?: number; seccion?: 'productos' | 'servicios' };
   // Detalle de un producto del catálogo; `abierto`: si el negocio recibe pedidos.
-  Producto: { negocioId: number; negocioNombre: string; abierto: boolean; producto: Producto };
   // Reseñas de una tienda o, con `productoId`, de uno de sus productos.
   Resenas: { negocioId: number; titulo: string; productoId?: number };
   Carrito: undefined;

@@ -33,8 +33,15 @@ function platoDe(Negocio $negocio, array $cambios = []): Producto
         'precio' => 15000,
         'tipo_producto_id' => TipoProducto::where('slug', TipoProducto::SLUG_COMIDA)->value('id'),
         'atributos' => ['Pan', 'Carne', 'Lechuga', 'Tomate', 'Queso'],
+        'extras' => [['nombre' => 'Queso', 'precio' => 2500], ['nombre' => 'Papas', 'precio' => 3000]],
         ...$cambios,
     ]);
+}
+
+/** Opciones de una línea con `n` porciones de queso, como las guarda el pedido. */
+function conQueso(int $n = 1, array $mas = []): array
+{
+    return [...$mas, 'extras' => [['nombre' => 'Queso', 'cantidad' => $n, 'precio' => 2500]]];
 }
 
 /** Pedido del cliente con una línea por cada `[producto, opciones]`. */
@@ -67,7 +74,7 @@ function recetasEn(Negocio $negocio)
 }
 
 test('pedir dos veces el plato con los mismos ajustes lo vuelve receta preferida', function () {
-    $ajustes = ['sin' => ['Lechuga'], 'extra' => ['Queso']];
+    $ajustes = conQueso(2, ['sin' => ['Lechuga']]);
     pedidoDe($this->cliente, $this->negocio, [[$this->hamburguesa, $ajustes]]);
     pedidoDe($this->cliente, $this->negocio, [[$this->hamburguesa, $ajustes]]);
 
@@ -75,8 +82,18 @@ test('pedir dos veces el plato con los mismos ajustes lo vuelve receta preferida
         ->assertJsonCount(1, 'recetas')
         ->assertJsonPath('recetas.0.producto.id', $this->hamburguesa->id)
         ->assertJsonPath('recetas.0.producto.tipo_producto.slug', 'comida')
-        ->assertJsonPath('recetas.0.opciones', $ajustes)
+        ->assertJsonPath('recetas.0.opciones.sin', ['Lechuga'])
+        ->assertJsonPath('recetas.0.opciones.extras.0.nombre', 'Queso')
+        ->assertJsonPath('recetas.0.opciones.extras.0.cantidad', 2)
         ->assertJsonPath('recetas.0.veces', 2);
+    expect((float) recetasEn($this->negocio)->json('recetas.0.opciones.extras.0.precio'))->toBe(2500.0);
+});
+
+test('el mismo extra con otra cantidad es otra receta', function () {
+    pedidoDe($this->cliente, $this->negocio, [[$this->hamburguesa, conQueso(1)]]);
+    pedidoDe($this->cliente, $this->negocio, [[$this->hamburguesa, conQueso(2)]]);
+
+    recetasEn($this->negocio)->assertJsonCount(0, 'recetas');
 });
 
 test('una sola vez no es receta preferida', function () {
@@ -148,14 +165,27 @@ test('un plato que ya no se vende no se recomienda', function (string $como) {
 })->with(['agotado', 'eliminado']);
 
 test('un ingrediente que el negocio quitó deja de contar', function () {
-    pedidoDe($this->cliente, $this->negocio, [[$this->hamburguesa, ['sin' => ['Tomate'], 'extra' => ['Queso']]]]);
-    pedidoDe($this->cliente, $this->negocio, [[$this->hamburguesa, ['sin' => ['Tomate'], 'extra' => ['Queso']]]]);
+    pedidoDe($this->cliente, $this->negocio, [[$this->hamburguesa, conQueso(1, ['sin' => ['Tomate']])]]);
+    pedidoDe($this->cliente, $this->negocio, [[$this->hamburguesa, conQueso(1, ['sin' => ['Tomate']])]]);
 
+    // Ya no trae tomate: queda la receta con el queso.
     $this->hamburguesa->update(['atributos' => ['Pan', 'Carne', 'Queso']]);
 
-    recetasEn($this->negocio)->assertJsonPath('recetas.0.opciones', ['extra' => ['Queso']]);
+    recetasEn($this->negocio)
+        ->assertJsonPath('recetas.0.opciones.sin', null)
+        ->assertJsonPath('recetas.0.opciones.extras.0.nombre', 'Queso');
 
-    $this->hamburguesa->update(['atributos' => ['Pan', 'Carne']]);
+    // Tampoco ofrece queso aparte: no queda nada que recomendar.
+    $this->hamburguesa->update(['extras' => [['nombre' => 'Papas', 'precio' => 3000]]]);
+
+    recetasEn($this->negocio)->assertJsonCount(0, 'recetas');
+});
+
+test('un ingrediente fijo no cuenta como quitado', function () {
+    pedidoDe($this->cliente, $this->negocio, [[$this->hamburguesa, ['sin' => ['Carne']]]]);
+    pedidoDe($this->cliente, $this->negocio, [[$this->hamburguesa, ['sin' => ['Carne']]]]);
+
+    $this->hamburguesa->update(['ingredientes_fijos' => ['Carne']]);
 
     recetasEn($this->negocio)->assertJsonCount(0, 'recetas');
 });
@@ -179,9 +209,9 @@ test('primero va la receta que más ha pedido', function () {
 
     pedidoDe($this->cliente, $this->negocio, [[$this->hamburguesa, ['sin' => ['Tomate']]]]);
     pedidoDe($this->cliente, $this->negocio, [[$this->hamburguesa, ['sin' => ['Tomate']]]]);
-    pedidoDe($this->cliente, $this->negocio, [[$pizza, ['extra' => ['Queso']]]]);
-    pedidoDe($this->cliente, $this->negocio, [[$pizza, ['extra' => ['Queso']]]]);
-    pedidoDe($this->cliente, $this->negocio, [[$pizza, ['extra' => ['Queso']]]]);
+    pedidoDe($this->cliente, $this->negocio, [[$pizza, conQueso()]]);
+    pedidoDe($this->cliente, $this->negocio, [[$pizza, conQueso()]]);
+    pedidoDe($this->cliente, $this->negocio, [[$pizza, conQueso()]]);
 
     recetasEn($this->negocio)
         ->assertJsonPath('recetas.0.producto.nombre', 'Pizza')

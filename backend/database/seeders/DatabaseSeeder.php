@@ -27,6 +27,9 @@ class DatabaseSeeder extends Seeder
         // (ingredientes, tallas, colores, usos...) y servicios con cita.
         $this->call(NegociosDemoSeeder::class);
 
+        // Ingredientes fijos y extras con precio de los platos (hamburguesas, picadas...).
+        $this->call(ExtrasComidaDemoSeeder::class);
+
         // Clientes de prueba con reseñas de tiendas y productos.
         $this->call(ResenasDemoSeeder::class);
 

@@ -35,18 +35,23 @@ class PedidoItem extends Model
 
     /**
      * Lo que pidió el cliente en esta línea, para leerlo de corrido.
-     * Ej: "Talla M · Negro" o "Sin lechuga, tomate · Extra queso".
+     * Ej: "Talla M · Negro" o "Sin lechuga, tomate · Extras: queso x2, tocineta".
+     * `extra` (sin cantidades ni precio) es de los pedidos anteriores a los extras.
      */
     public function detalle(): ?string
     {
         $o = $this->opciones ?? [];
         $lista = fn (string $clave) => mb_strtolower(implode(', ', $o[$clave]));
+        $extras = collect($o['extras'] ?? [])
+            ->map(fn ($e) => mb_strtolower($e['nombre']).((int) $e['cantidad'] > 1 ? " x{$e['cantidad']}" : ''))
+            ->implode(', ');
 
         $partes = array_filter([
             isset($o['talla']) ? "Talla {$o['talla']}" : null,
             $o['color'] ?? null,
             empty($o['sin']) ? null : 'Sin '.$lista('sin'),
             empty($o['extra']) ? null : 'Extra '.$lista('extra'),
+            $extras === '' ? null : "Extras: {$extras}",
         ]);
 
         return $partes ? implode(' · ', $partes) : null;

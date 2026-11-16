@@ -438,3 +438,76 @@ test('un carrito antiguo sin fecha de vencimiento se descarta', async () => {
 
   expect(cart.current.count).toBe(0);
 });
+
+const conExtras: Producto = {
+  ...hamburguesa,
+  id: 3,
+  ingredientes_fijos: ['Pan'],
+  extras: [{ nombre: 'Queso', precio: 2500 }, { nombre: 'Salsa', precio: 0 }],
+};
+
+test('los extras suman su precio a la línea; otra cantidad de extras es otra línea', async () => {
+  const cart = await montar();
+  act(() => {
+    cart.current.agregar(1, 'Tienda', conExtras, { extras: [{ nombre: 'Queso', cantidad: 2, precio: 2500 }] }, 2);
+  });
+  act(() => {
+    cart.current.agregar(1, 'Tienda', conExtras, { extras: [{ nombre: 'Queso', cantidad: 1, precio: 2500 }] });
+  });
+  act(() => {
+    cart.current.agregar(1, 'Tienda', conExtras, { extras: [{ nombre: 'Queso', cantidad: 2, precio: 2500 }] });
+  });
+
+  expect(cart.current.items.map(i => i.cantidad)).toEqual([3, 1]);
+  // 3 × (15.000 + 5.000) + 1 × (15.000 + 2.500)
+  expect(cart.current.total).toBe(77500);
+  expect(cart.current.items[0].extrasDisponibles).toEqual(conExtras.extras);
+  expect(cart.current.items[0].ingredientesFijos).toEqual(['Pan']);
+  expect(detalleOpciones(cart.current.items[0].opciones)).toBe('Extras: queso x2');
+});
+
+test('un extra en cero no cuenta: la línea es la del plato como viene', async () => {
+  const cart = await montar();
+  act(() => {
+    cart.current.agregar(1, 'Tienda', conExtras, { sin: [], extras: [] });
+  });
+  act(() => {
+    cart.current.agregar(1, 'Tienda', conExtras);
+  });
+
+  expect(cart.current.items).toHaveLength(1);
+  expect(cart.current.items[0].opciones).toBeUndefined();
+});
+
+test('desde el carrito se cambian los extras y el precio de la línea sigue', async () => {
+  const cart = await montarCarrito();
+  act(() => {
+    cart.current.agregar(1, 'Tienda', conExtras);
+  });
+
+  tocar({ texto: 'Personalizar' });
+  // El pan es fijo: no tiene Sin / Con.
+  expect(raiz.root.findAll(n => n.props.accessibilityLabel === 'Pan: Sin')).toHaveLength(0);
+  tocar({ etiqueta: 'Agregar una porción de Queso' });
+  tocar({ etiqueta: 'Tomate: Sin' });
+  tocar({ texto: 'Guardar' });
+
+  expect(cart.current.items[0].opciones).toEqual({
+    sin: ['Tomate'],
+    extras: [{ nombre: 'Queso', cantidad: 1, precio: 2500 }],
+  });
+  expect(cart.current.total).toBe(17500);
+});
+
+test('si el negocio cambia el precio de un extra, la línea lo cobra al nuevo', async () => {
+  const cart = await montar();
+  act(() => {
+    cart.current.agregar(1, 'Tienda', conExtras, { extras: [{ nombre: 'Queso', cantidad: 1, precio: 2500 }] });
+  });
+  act(() => {
+    cart.current.revisarPrecios([{ ...conExtras, extras: [{ nombre: 'Queso', precio: 3000 }] }]);
+  });
+
+  expect(cart.current.items[0].opciones?.extras?.[0].precio).toBe(3000);
+  expect(cart.current.total).toBe(18000);
+});
