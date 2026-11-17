@@ -26,6 +26,12 @@ jest.mock('@react-native-async-storage/async-storage', () => {
   };
 });
 
+// Desenfoque nativo de la tarjeta del login: en los tests, una vista común.
+jest.mock('@react-native-community/blur/src/fabric/BlurViewNativeComponentAndroid', () => {
+  const { View } = require('react-native');
+  return { __esModule: true, default: View };
+});
+
 jest.mock('@notifee/react-native', () => ({
   __esModule: true,
   default: {

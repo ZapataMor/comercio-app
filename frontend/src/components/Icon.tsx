@@ -51,6 +51,8 @@ export type IconName =
   | 'refrescar'
   | 'ojo'
   | 'ojo-cerrado'
+  | 'sobre'
+  | 'candado'
   | 'girar-derecha'
   | 'girar-izquierda'
   | 'recto'
@@ -316,6 +318,19 @@ const GLYPHS: Record<IconName, React.ReactNode> = {
       <Path d="M6.6 6.6A17.6 17.6 0 0 0 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6" />
       <Path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
       <Path d="M2 2l20 20" />
+    </>
+  ),
+  // Campos del login: correo (sobre) y contraseña (candado).
+  sobre: (
+    <>
+      <Rect x="3" y="5" width="18" height="14" rx="2" />
+      <Path d="M3 7l9 6 9-6" />
+    </>
+  ),
+  candado: (
+    <>
+      <Rect x="4" y="11" width="16" height="10" rx="2" />
+      <Path d="M8 11V7a4 4 0 0 1 8 0v4" />
     </>
   ),
   // Indicaciones de «Cómo llegar»: girar, seguir derecho, vuelta en U,

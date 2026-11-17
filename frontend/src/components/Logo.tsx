@@ -233,6 +233,8 @@ type LogoProps = {
    * oscuros pásale un tono claro (p. ej. marca.arena).
    */
   textColor?: string;
+  /** Recuadro de fondo detrás del símbolo (por defecto, sí). */
+  chip?: boolean;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -240,7 +242,7 @@ type LogoProps = {
  * Logo completo: símbolo sobre su chip + nombre «vıtrına» en Sora Bold con
  * las tildes ◆ terracota, según el vector oficial (caja 512×160).
  */
-export function VitrinaLogo({ height = 48, modo, textColor, style }: LogoProps) {
+export function VitrinaLogo({ height = 48, modo, textColor, chip = true, style }: LogoProps) {
   const modoHora = useModoVitrina();
   const m = modo ?? modoHora;
   const width = (height * 512) / 160;
@@ -249,14 +251,16 @@ export function VitrinaLogo({ height = 48, modo, textColor, style }: LogoProps) 
     <View style={style}>
       <Svg width={width} height={height} viewBox="0 0 512 160">
         {/* Chip del símbolo: mantiene el contraste día/noche en cualquier fondo. */}
-        <Rect
-          x={0}
-          y={5}
-          width={150}
-          height={150}
-          rx={33}
-          fill={m === 'noche' ? marca.indigo : marca.arena}
-        />
+        {chip && (
+          <Rect
+            x={0}
+            y={5}
+            width={150}
+            height={150}
+            rx={33}
+            fill={m === 'noche' ? marca.indigo : marca.arena}
+          />
+        )}
         <G transform="translate(0,5) scale(0.75)">
           <Simbolo modo={m} />
         </G>

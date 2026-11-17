@@ -117,6 +117,104 @@ const noche: Colores = {
 
 export const paletas: Record<ModoVitrina, Colores> = { dia, noche };
 
+/**
+ * Colores propios del login (fondo de fotos con filtro de cine y tarjeta de
+ * vidrio). Lo que ya existe en la paleta general se reutiliza; aquí van solo
+ * los tonos que el login usa y la app no.
+ */
+export type ColoresLogin = {
+  /** Baño de color a pantalla completa sobre la foto. */
+  bano: string;
+  /** Tono de la viñeta y de los velos superior e inferior. */
+  sombraEscena: string;
+  /** Opacidad de la viñeta en el borde. */
+  vinetaOp: number;
+  /** Opacidad del grano de película. */
+  granoOp: number;
+  /** Opacidad del velo superior (detrás de la barra de estado). */
+  veloArribaOp: number;
+  /** Nombre y dirección del lugar de la foto. */
+  lugar: string;
+  /** Sombra exterior de la tarjeta de vidrio. */
+  tarjetaSombra: string;
+  /** Luz interior que cae desde arriba en la tarjeta. */
+  tarjetaLuz: string;
+  /** Sombra interior que sube desde abajo en la tarjeta. */
+  tarjetaSombraInterior: string;
+  /** Rótulos y enlaces de la tarjeta. */
+  rotulo: string;
+  /** Fondo del campo hundido. */
+  campo: string;
+  /** Sombra interior (arriba) del campo hundido. */
+  campoHundido: string;
+  /** Filo de luz (abajo) del campo hundido. */
+  campoFilo: string;
+  /** Ícono a la izquierda del campo (sobre, candado). */
+  campoIcono: string;
+  /** Texto escrito en el campo. */
+  campoTexto: string;
+  /** Texto de ejemplo del campo. */
+  campoEjemplo: string;
+  /** Cursor del campo. */
+  cursor: string;
+  /** Ojo de ver/ocultar la contraseña. */
+  ojo: string;
+  /** Borde y anillo del campo con foco. */
+  foco: string;
+  /** Botón «Entrar» y su texto. */
+  boton: string;
+  botonTexto: string;
+};
+
+export const paletasLogin: Record<ModoVitrina, ColoresLogin> = {
+  dia: {
+    bano: 'rgba(242,169,59,0.10)', // marca.sol al 10 %
+    sombraEscena: dia.textStrong, // #1F1B16
+    vinetaOp: 0.68,
+    granoOp: 0.55,
+    veloArribaOp: 0.45,
+    lugar: marca.arena,
+    tarjetaSombra: 'rgba(31,27,22,0.45)',
+    tarjetaLuz: 'rgba(255,255,255,0.55)',
+    tarjetaSombraInterior: 'rgba(31,27,22,0.34)',
+    rotulo: dia.textStrong,
+    campo: 'rgba(247,235,216,0.6)',
+    campoHundido: 'rgba(31,27,22,0.22)',
+    campoFilo: 'rgba(255,255,255,0.6)',
+    campoIcono: '#C4461F', // terracota oscura
+    campoTexto: marca.tinta, // #22264F
+    campoEjemplo: '#7A5410',
+    cursor: marca.terracota, // #E2572B
+    ojo: marca.tinta,
+    foco: dia.accent, // #E8A019
+    boton: dia.brand, // #262019
+    botonTexto: dia.onBrand, // #FFFFFF
+  },
+  noche: {
+    bano: 'rgba(26,31,61,0.22)', // marca.indigo al 22 %
+    sombraEscena: '#050714',
+    vinetaOp: 0.74,
+    granoOp: 0.5,
+    veloArribaOp: 0.5,
+    lugar: marca.arena,
+    tarjetaSombra: 'rgba(5,7,20,0.7)',
+    tarjetaLuz: 'rgba(230,235,244,0.2)', // marca.luna al 20 %
+    tarjetaSombraInterior: 'rgba(5,7,20,0.55)',
+    rotulo: noche.textStrong, // #F7EBD8
+    campo: 'rgba(26,31,61,0.5)',
+    campoHundido: 'rgba(5,7,20,0.45)',
+    campoFilo: 'rgba(230,235,244,0.14)',
+    campoIcono: noche.goldText, // #EE7F57
+    campoTexto: marca.arena,
+    campoEjemplo: noche.muted, // #A0A5C2
+    cursor: marca.sol, // #F2A93B
+    ojo: marca.luna, // #E6EBF4
+    foco: noche.accent, // #E2572B
+    boton: noche.brand, // #F7EBD8
+    botonTexto: noche.onBrand, // #1A1F3D
+  },
+};
+
 type ColorEstado = { fg: string; bg: string };
 
 /** Color por estado del pedido (texto + fondo del chip), por modo. */
@@ -228,6 +326,8 @@ export type Tema = {
   c: Colores;
   shadow: Sombras;
   estadoColor: (e?: string | null) => ColorEstado;
+  /** Colores propios del login. */
+  login: ColoresLogin;
 };
 
 function crearTema(modo: ModoVitrina): Tema {
@@ -237,6 +337,7 @@ function crearTema(modo: ModoVitrina): Tema {
     c,
     shadow: sombras[modo],
     estadoColor: e => (e && estados[modo][e]) || { fg: c.muted, bg: c.surface2 },
+    login: paletasLogin[modo],
   };
 }
 
@@ -260,14 +361,14 @@ export function useTheme(): Tema {
  * StyleSheet del modo vigente; cada modo se crea una sola vez y se cachea.
  */
 export function makeStyles<T extends StyleSheet.NamedStyles<T>>(
-  crear: (c: Colores, shadow: Sombras) => T,
+  crear: (c: Colores, shadow: Sombras, login: ColoresLogin) => T,
 ): () => T {
   const cache: Partial<Record<ModoVitrina, T>> = {};
   return function useStyles() {
     const { modo } = useTheme();
     let estilos = cache[modo];
     if (!estilos) {
-      estilos = StyleSheet.create(crear(paletas[modo], sombras[modo]));
+      estilos = StyleSheet.create(crear(paletas[modo], sombras[modo], paletasLogin[modo]));
       cache[modo] = estilos;
     }
     return estilos;
