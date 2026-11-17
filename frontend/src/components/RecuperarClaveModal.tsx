@@ -21,6 +21,7 @@ import {
 import { identidadDe, pedirCodigoClave, restablecerClave } from '../api';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { font, makeStyles, radius, useTheme } from '../theme';
+import CampoClave from './CampoClave';
 import FieldError from './FieldError';
 
 type Props = {
@@ -170,27 +171,25 @@ export default function RecuperarClaveModal({ visible, identificadorInicial, onC
                   maxLength={6}
                 />
                 <FieldError mensaje={errores.codigo} />
-                <TextInput
+                <CampoClave
                   style={styles.input}
                   value={clave}
                   onChangeText={v => {
                     setClave(v);
                     limpiar('password');
                   }}
-                  secureTextEntry
                   placeholder="Contraseña nueva (mínimo 5)"
                   placeholderTextColor={c.mutedSoft}
                   editable={!cargando}
                 />
                 <FieldError mensaje={errores.password} />
-                <TextInput
+                <CampoClave
                   style={styles.input}
                   value={confirmar}
                   onChangeText={v => {
                     setConfirmar(v);
                     limpiar('confirmar');
                   }}
-                  secureTextEntry
                   placeholder="Repite la contraseña nueva"
                   placeholderTextColor={c.mutedSoft}
                   editable={!cargando}

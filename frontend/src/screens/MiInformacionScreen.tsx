@@ -25,6 +25,7 @@ import {
 import { actualizarPerfil, dejarDeSerDomiciliario, desactivarNegocio, eliminarCuenta, eliminarNegocio, Negocio, pedirCodigoTelefonoPerfil, Usuario, verificarTelefonoPerfil } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
+import CampoClave from '../components/CampoClave';
 import { useConfirmar } from '../components/Confirmacion';
 import FieldError from '../components/FieldError';
 import Icon, { IconName } from '../components/Icon';
@@ -367,14 +368,13 @@ export default function MiInformacionScreen(_props: Props) {
                 conservan sin tus datos. Si eres el único dueño de un negocio, se cierra y deja de verse.
                 No se puede deshacer.
               </Text>
-              <TextInput
+              <CampoClave
                 style={styles.inputModal}
                 value={clave}
                 onChangeText={v => {
                   setClave(v);
                   setErrorClave(undefined);
                 }}
-                secureTextEntry
                 placeholder="Tu contraseña"
                 placeholderTextColor={c.mutedSoft}
                 editable={!enviando}
@@ -481,7 +481,7 @@ export default function MiInformacionScreen(_props: Props) {
           <Text style={styles.ayuda}>Opcional: déjalo vacío para no cambiarla.</Text>
           <View style={styles.tarjeta}>
             <Text style={styles.label}>Contraseña actual</Text>
-            <TextInput
+            <CampoClave
               style={styles.input}
               value={passActual}
               onChangeText={valor => {
@@ -490,12 +490,11 @@ export default function MiInformacionScreen(_props: Props) {
               }}
               placeholder="••••••••"
               placeholderTextColor={c.mutedSoft}
-              secureTextEntry
               editable={!guardando}
             />
             <FieldError mensaje={errores.password_actual} />
             <Text style={styles.label}>Nueva contraseña</Text>
-            <TextInput
+            <CampoClave
               style={styles.input}
               value={passNueva}
               onChangeText={valor => {
@@ -504,12 +503,11 @@ export default function MiInformacionScreen(_props: Props) {
               }}
               placeholder="Mínimo 5 caracteres"
               placeholderTextColor={c.mutedSoft}
-              secureTextEntry
               editable={!guardando}
             />
             <FieldError mensaje={errores.password} />
             <Text style={styles.label}>Confirmar nueva contraseña</Text>
-            <TextInput
+            <CampoClave
               style={[styles.input, styles.inputUltimo]}
               value={passConfirma}
               onChangeText={valor => {
@@ -518,7 +516,6 @@ export default function MiInformacionScreen(_props: Props) {
               }}
               placeholder="Repite la nueva contraseña"
               placeholderTextColor={c.mutedSoft}
-              secureTextEntry
               editable={!guardando}
             />
             <FieldError mensaje={errores.confirmar} />

@@ -15,6 +15,7 @@ import {
 import { pedirCodigoRegistro, register, verificarTelefonoRegistro } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
+import CampoClave from '../components/CampoClave';
 import FieldError from '../components/FieldError';
 import Icon from '../components/Icon';
 import { VitrinaMark } from '../components/Logo';
@@ -206,14 +207,13 @@ export default function RegisterScreen({ navigation }: Props) {
           <Text style={styles.ayudaCampo}>Otra forma de entrar y de recuperar tu contraseña.</Text>
 
           <Text style={styles.label}>Contraseña</Text>
-          <TextInput
+          <CampoClave
             style={styles.input}
             value={password}
             onChangeText={valor => {
               setPassword(valor);
               limpiarError('password');
             }}
-            secureTextEntry
             placeholder="Mínimo 5 caracteres"
             placeholderTextColor={c.mutedSoft}
             editable={!cargando}
@@ -221,14 +221,13 @@ export default function RegisterScreen({ navigation }: Props) {
           <FieldError mensaje={errores.password} />
 
           <Text style={styles.label}>Confirmar contraseña</Text>
-          <TextInput
+          <CampoClave
             style={styles.input}
             value={confirmar}
             onChangeText={valor => {
               setConfirmar(valor);
               limpiarError('confirmar');
             }}
-            secureTextEntry
             placeholder="Repite la contraseña"
             placeholderTextColor={c.mutedSoft}
             editable={!cargando}
