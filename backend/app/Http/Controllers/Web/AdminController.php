@@ -70,7 +70,8 @@ class AdminController extends Controller
         }
 
         // Solo los usuarios del tipo seleccionado.
-        $usuarios = User::deTipo($rolActual)->orderBy('name')->get();
+        $request->validate(['buscar' => ['nullable', 'string', 'max:100']]);
+        $usuarios = User::deTipo($rolActual)->when($request->buscar, fn ($q, $v) => $q->where(fn ($q) => $q->where('name', 'like', '%'.$v.'%')->orWhere('username', 'like', '%'.$v.'%')->orWhere('email', 'like', '%'.$v.'%')->orWhere('telefono', 'like', '%'.$v.'%')))->orderBy('name')->paginate(25)->withQueryString();
         $tipos = User::TIPOS;
 
         return view('admin.usuarios', compact('usuarios', 'roles', 'rolActual', 'conteos', 'tipos'));
@@ -111,6 +112,7 @@ class AdminController extends Controller
     {
         $datos = $request->validate([
             'rol' => ['required', Rule::in(self::ROLES)],
+            'motivo' => ['required', 'string', 'max:255'],
         ]);
 
         // Salvaguarda: un admin no puede quitarse a sí mismo el rol de admin

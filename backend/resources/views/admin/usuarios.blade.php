@@ -9,6 +9,7 @@
     <h2 class="text-xl font-bold">Usuarios</h2>
 </div>
 
+<form class="filters" method="GET"><input type="hidden" name="rol" value="{{ $rolActual }}"><label>Buscar usuario<input name="buscar" value="{{ request('buscar') }}" placeholder="Nombre, usuario, correo o teléfono"></label><button>Buscar</button></form>
 {{-- Crear nuevo usuario --}}
 <div class="bg-white rounded-2xl shadow p-5 mb-5">
     <details @if ($errors->any()) open @endif>
@@ -23,7 +24,7 @@
             <div class="grid sm:grid-cols-2 gap-3">
                 <input name="username" value="{{ old('username') }}" required placeholder="Usuario" aria-label="Usuario" autocomplete="off" minlength="3" maxlength="50" pattern="[A-Za-z0-9][A-Za-z0-9_.-]*"
                        class="rounded-lg border border-slate-300 px-3 py-2">
-                <input name="password" type="password" required placeholder="Contraseña (mín. 8)" aria-label="Contraseña" autocomplete="new-password" minlength="5"
+                <input name="password" type="password" required placeholder="Contraseña (mín. 5)" aria-label="Contraseña" autocomplete="new-password" minlength="5"
                        class="rounded-lg border border-slate-300 px-3 py-2">
                 <select name="rol" class="rounded-lg border border-slate-300 px-3 py-2">
                     @foreach ($roles as $rol)
@@ -54,10 +55,10 @@
     @forelse ($usuarios as $u)
         <div class="flex items-center justify-between p-4 gap-3">
             <div class="min-w-0">
-                <p class="font-medium truncate">{{ $u->name }}</p>
+                <p class="font-medium truncate"><a href="{{ route('admin.usuario', $u) }}">{{ $u->nombre_completo }}</a> @if($u->suspendido_at)<span class="badge">Suspendido</span>@endif</p>
                 <p class="text-slate-500 text-sm truncate">{{ $u->username ?? $u->email }}</p>
             </div>
-            <form method="POST" action="{{ route('admin.usuarios.rol', $u->id) }}" class="flex items-center gap-2 shrink-0">
+            <form method="POST" action="{{ route('admin.usuarios.rol', $u->id) }}" class="flex flex-wrap items-center gap-2" data-confirm="¿Confirmas el cambio de rol de esta cuenta?">
                 @csrf
                 @method('PUT')
                 <select name="rol" class="rounded-lg border border-slate-300 px-2 py-1.5 text-sm">
@@ -65,7 +66,7 @@
                         <option value="{{ $rol }}" @selected($u->tipoCuenta() === $rol)>{{ $tipos[$rol] }}</option>
                     @endforeach
                 </select>
-                <button class="text-sm bg-slate-800 hover:bg-slate-900 text-white rounded-lg px-3 py-1.5">Guardar</button>
+                <input name="motivo" aria-label="Motivo del cambio de rol" placeholder="Motivo del cambio" required maxlength="255"><button class="text-sm bg-slate-800 hover:bg-slate-900 text-white rounded-lg px-3 py-1.5">Guardar</button>
             </form>
         </div>
     @empty
@@ -76,4 +77,5 @@
 <p class="text-slate-400 text-xs mt-3">
     Nota: por seguridad, no puedes quitarte a ti mismo el rol de administrador.
 </p>
+{{ $usuarios->links() }}
 @endsection
