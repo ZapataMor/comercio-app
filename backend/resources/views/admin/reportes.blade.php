@@ -13,12 +13,13 @@
     <article class="bg-white rounded-2xl shadow p-5 mb-4">
         <h3 class="font-bold">Pedido #{{ $reporte->pedido?->codigo }} · {{ ucfirst($reporte->objetivo) }}</h3>
         <p class="text-sm text-slate-500">{{ $reporte->created_at->format('d/m/Y H:i') }} · {{ $reporte->pedido?->estadoLabel() }}</p>
+        @if($reporte->pedido)<p><a href="{{ route('admin.pedido',$reporte->pedido) }}">Abrir pedido y revisar incidencia →</a></p>@endif
         <p class="mt-2">Cliente: {{ $reporte->pedido?->cliente?->nombre_completo }} (ID {{ $reporte->pedido?->user_id }})</p>
         <p>Comercio: {{ $reporte->pedido?->negocio?->nombre }} (ID {{ $reporte->pedido?->negocio_id }})</p>
         <p>Domiciliario: {{ $reporte->pedido?->domiciliario?->nombre_completo ?? 'Sin asignar' }}</p>
         <p class="mt-3 whitespace-pre-line">{{ $reporte->motivo }}</p>
         @if ($reporte->resuelto_at)
-            <p class="mt-3 font-semibold">Resolución: {{ $reporte->resolucion }}</p>
+            <p class="mt-3 font-semibold">Resolución: {{ $reporte->resolucion }}</p><p>Atendido el {{ $reporte->resuelto_at->format('d/m/Y H:i') }} por administrador #{{ $reporte->resuelto_por }}</p>
         @else
             <form method="POST" action="{{ route('admin.reportes.resolver', $reporte->id) }}" class="mt-4">
                 @csrf @method('PUT')
