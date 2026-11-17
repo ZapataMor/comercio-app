@@ -132,28 +132,40 @@ export async function actualizarCanalesEnVivo(): Promise<Usuario | null> {
   return user;
 }
 
-/** Conecta con la sesión actual (o la cambia). Devuelve mis datos actuales. */
-export async function conectarEnVivo(token: string): Promise<Usuario | null> {
-  if (token === tokenActual && cliente) return actualizarCanalesEnVivo();
-  desconectarEnVivo();
-  tokenActual = token;
-
-  const { host, puerto, tls } = servidorEnVivo();
-  cliente = new Pusher(EN_VIVO_KEY, {
+/**
+ * Opciones del cliente de Pusher para esta API.
+ *
+ * Transportes: en pusher-js 8 el WebSocket se llama 'ws' y el cifrado lo pone
+ * `forceTLS`. Con solo ['wss'] no queda ningún transporte válido y la conexión
+ * pasa directo a 'failed', sin error visible. Así pasó hasta el 2026-11-16
+ * contra el VPS (https).
+ */
+export function opcionesEnVivo(token: string, apiUrl: string = API_URL) {
+  const { host, puerto, tls } = servidorEnVivo(apiUrl);
+  return {
     // pusher-js lo exige, pero con wsHost propio no se usa.
     cluster: 'mt1',
     wsHost: host,
     wsPort: puerto,
     wssPort: puerto,
     forceTLS: tls,
-    enabledTransports: tls ? ['wss'] : ['ws'],
-    disableStats: true,
+    enabledTransports: ['ws', 'wss'] as ('ws' | 'wss')[],
+    enableStats: false,
     channelAuthorization: {
-      endpoint: `${API_URL}/api/broadcasting/auth`,
-      transport: 'ajax',
+      endpoint: `${apiUrl}/api/broadcasting/auth`,
+      transport: 'ajax' as const,
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
     },
-  });
+  };
+}
+
+/** Conecta con la sesión actual (o la cambia). Devuelve mis datos actuales. */
+export async function conectarEnVivo(token: string): Promise<Usuario | null> {
+  if (token === tokenActual && cliente) return actualizarCanalesEnVivo();
+  desconectarEnVivo();
+  tokenActual = token;
+
+  cliente = new Pusher(EN_VIVO_KEY, opcionesEnVivo(token));
 
   cliente.connection.bind('state_change', ({ current }: { current: string }) => {
     const antes = conectado;

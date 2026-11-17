@@ -2,7 +2,7 @@
  * Cambios en vivo: a qué servidor de WebSockets se conecta la app y qué
  * avisos le llegan a cada pantalla.
  */
-import { alCambiarEnVivo, clasePusher, servidorEnVivo, simularAvisoEnVivo } from '../src/enVivo';
+import { alCambiarEnVivo, clasePusher, opcionesEnVivo, servidorEnVivo, simularAvisoEnVivo } from '../src/enVivo';
 import { temasDelNegocio } from '../src/usePolling';
 
 test('en desarrollo usa ws en el puerto de Reverb del mismo host', () => {
@@ -44,4 +44,17 @@ test('toma el cliente de pusher-js tal como lo exporta su versión de React Nati
   expect(clasePusher({ default: Fn })).toBe(Fn);
   expect(clasePusher(Fn)).toBe(Fn);
   expect(() => clasePusher({})).toThrow();
+});
+
+test('se conecta por WebSocket ("ws"; el cifrado lo pone forceTLS), también contra el VPS con https', () => {
+  // Con solo ['wss'] pusher-js 8 no encuentra transporte y queda en 'failed'
+  // sin avisar: así estuvo la app contra el VPS hasta el 2026-11-16.
+  const vps = opcionesEnVivo('t', 'https://vitrina.example');
+  expect(vps.enabledTransports).toContain('ws');
+  expect(vps).toMatchObject({ wsHost: 'vitrina.example', wssPort: 443, forceTLS: true });
+  expect(vps.channelAuthorization.endpoint).toBe('https://vitrina.example/api/broadcasting/auth');
+
+  const local = opcionesEnVivo('t', 'http://localhost:8000');
+  expect(local.enabledTransports).toContain('ws');
+  expect(local).toMatchObject({ wsHost: 'localhost', wsPort: 8080, forceTLS: false });
 });
