@@ -21,6 +21,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import {
@@ -102,8 +103,13 @@ export function NegocioProvider({ children }: { children: React.ReactNode }) {
   const token = auth?.token ?? null;
 
   const [negocios, setNegocios] = useState<Negocio[]>([]);
-  // La lista ya llegó del servidor en esta sesión (antes de eso está vacía).
-  const [cargados, setCargados] = useState(false);
+  // Sesión (token) de la que es la lista que llegó del servidor; null mientras
+  // no llega. Es una ref y no un estado para que, al pasar directo de una
+  // cuenta a otra (AuthContext), quede en null antes de que la lista de la
+  // anterior se pueda guardar en la sesión de la nueva.
+  const listaDe = useRef<string | null>(null);
+  const tokenVigente = useRef(token);
+  tokenVigente.current = token;
   const [activoId, setActivoId] = useState<number | null>(null);
   const [codigoPublico, setCodigoPublico] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
@@ -115,8 +121,8 @@ export function NegocioProvider({ children }: { children: React.ReactNode }) {
 
   const recargar = useCallback(async () => {
     if (!token) {
+      listaDe.current = null;
       setNegocios([]);
-      setCargados(false);
       setActivoId(null);
       setCodigoPublico(null);
       return;
@@ -127,8 +133,10 @@ export function NegocioProvider({ children }: { children: React.ReactNode }) {
         getMisNegocios(token),
         AsyncStorage.getItem(CLAVE_ACTIVO).catch(() => null),
       ]);
+      // Respuesta de una cuenta de la que ya se salió: no es de esta sesión.
+      if (tokenVigente.current !== token) return;
+      listaDe.current = token;
       setNegocios(lista);
-      setCargados(true);
       setCodigoPublico(codigo);
       // Conserva el activo si sigue siendo mío. Al abrir la app o iniciar
       // sesión (aún no hay activo) toma el primero que creé; sin negocios
@@ -141,14 +149,17 @@ export function NegocioProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Silencioso: si falla, los negocios quedan como estaban.
     } finally {
-      setCargando(false);
+      if (tokenVigente.current === token) setCargando(false);
     }
   }, [token]);
 
-  // Carga inicial (y al cambiar de sesión).
+  // Carga inicial (y al cambiar de sesión). Al pasar directo de una cuenta a
+  // otra, los negocios de la anterior no se muestran mientras llegan los nuevos.
   useEffect(() => {
+    listaDe.current = null;
     setActivoId(null);
-    setCargados(false);
+    setNegocios([]);
+    setCodigoPublico(null);
     recargar();
   }, [recargar]);
 
@@ -167,14 +178,14 @@ export function NegocioProvider({ children }: { children: React.ReactNode }) {
   // pantalla arranco la próxima vez que abra la app (rutaInicio), sin
   // esperar a que la lista llegue del servidor.
   useEffect(() => {
-    if (!auth || !cargados) {
+    if (!auth || listaDe.current !== auth.token) {
       return;
     }
     const actuales = resumen(negocios);
     if (!mismosNegocios(actuales, auth.user.negocios)) {
       actualizarUsuario({ ...auth.user, negocios: actuales });
     }
-  }, [auth, cargados, negocios, actualizarUsuario]);
+  }, [auth, negocios, actualizarUsuario]);
 
   const negocio = useMemo(
     () => negocios.find(n => n.id === activoId) ?? null,

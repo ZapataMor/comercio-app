@@ -9,23 +9,29 @@ import ReembolsosPerfil from './ReembolsosPerfil';
  * tiene además "Mis entregas", y al cliente que aún no lo es se le ofrece
  * "Ser domiciliario" en un recuadro destacado.
  *
+ * Varias cuentas, como en Instagram (ver AuthContext): bajo la cuenta activa
+ * salen las demás con la sesión abierta en el teléfono (un toque y cambia) y
+ * "Agregar cuenta". Con más de una, "Cerrar sesión" sigue con otra de las
+ * guardadas y aparece también "Cerrar todas las sesiones".
+ *
  * Al domiciliario se le muestran al lado su nivel de confiabilidad
  * (HeaderConfiabilidad) y su turno (HeaderTurno).
  */
 import React from 'react';
 import { Linking, Text, View } from 'react-native';
-import { ApiError, hacerseDomiciliario } from '../api';
-import { useAuth } from '../AuthContext';
+import { ApiError, hacerseDomiciliario, Usuario } from '../api';
+import { Cuenta, useAuth } from '../AuthContext';
 import { WEB_URL } from '../config';
 import { messageFromError } from '../formErrors';
 import { useNegocio } from '../NegocioContext';
 import { abrirEntregas, navigationRef } from '../RootNavigation';
-import { font, makeStyles, radius } from '../theme';
+import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
+import { PressableScale } from './anim';
 import { useConfirmar } from './Confirmacion';
 import HeaderConfiabilidad from './HeaderConfiabilidad';
 import HeaderTurno from './HeaderTurno';
-import { IconName } from './Icon';
+import Icon, { IconName } from './Icon';
 import MenuDesplegable, { OpcionMenu } from './MenuDesplegable';
 
 type Modulo = {
@@ -88,13 +94,47 @@ function modulosPara(roles: string[], enNegocio: boolean, serDomiciliario: () =>
   return modulos;
 }
 
+const nombreCompleto = (u: Usuario) => [u.name, u.apellidos].filter(Boolean).join(' ');
+const inicial = (u: Usuario) => u.name.trim().charAt(0).toUpperCase() || '?';
+/** Correo o, si se registró con el celular, el celular. */
+const contacto = (u: Usuario) => u.email || u.telefono || '';
+
 export default function HeaderPerfil() {
   const styles = useStyles();
-  const { auth, actualizarUsuario, salir } = useAuth();
+  const { c } = useTheme();
+  const { auth, cuentas, actualizarUsuario, cambiarCuenta, agregarCuenta, salir, salirDeTodas } = useAuth();
   const { negocios } = useNegocio();
   const toast = useToast();
   const confirmar = useConfirmar();
   const user = auth?.user;
+  // Las demás cuentas con la sesión abierta en este teléfono (la más reciente primero).
+  const otras = cuentas.filter(cuenta => cuenta.user.id !== user?.id);
+
+  function cambiarA(cuenta: Cuenta) {
+    cambiarCuenta(cuenta.user.id);
+    toast.info('Cambiaste de cuenta', `Ahora estás como ${nombreCompleto(cuenta.user)}.`);
+  }
+
+  function cerrarSesion() {
+    const siguiente = salir();
+    if (siguiente) {
+      toast.info('Sesión cerrada', `Sigues como ${nombreCompleto(siguiente.user)}.`);
+    }
+  }
+
+  function cerrarTodas() {
+    confirmar({
+      icono: 'salir',
+      titulo: '¿Cerrar todas las sesiones?',
+      texto:
+        `Saldrás de las ${cuentas.length} cuentas abiertas en este teléfono. ` +
+        'Para volver a entrar a cada una necesitarás su contraseña.',
+      textoBoton: 'Cerrar todas',
+      textoCancelar: 'Cancelar',
+      peligro: true,
+      accion: salirDeTodas,
+    });
+  }
 
   /** "Ser domiciliario": se confirma y, ya activo, lleva a "Mis entregas". */
   function serDomiciliario() {
@@ -141,18 +181,40 @@ export default function HeaderPerfil() {
           !!user && (
             <View style={styles.cabecera}>
               <View style={styles.avatar}>
-                <Text style={styles.avatarTxt}>{user.name.trim().charAt(0).toUpperCase() || '?'}</Text>
+                <Text style={styles.avatarTxt}>{inicial(user)}</Text>
               </View>
               <View style={styles.cabeceraTexto}>
                 <Text style={styles.nombre} numberOfLines={1}>
-                  {[user.name, user.apellidos].filter(Boolean).join(' ')}
+                  {nombreCompleto(user)}
                 </Text>
                 <Text style={styles.email} numberOfLines={1}>
-                  {user.email}
+                  {contacto(user)}
                 </Text>
               </View>
+              {/* con varias cuentas, marca cuál es la activa */}
+              {otras.length > 0 && <Icon name="check" size={18} color={c.success} strokeWidth={2} />}
             </View>
           ),
+          ...otras.map(cuenta => (
+            <PressableScale
+              style={styles.cuenta}
+              accessibilityRole="button"
+              accessibilityLabel={`Cambiar a la cuenta de ${nombreCompleto(cuenta.user)}`}
+              onPress={() => elegir(() => cambiarA(cuenta))}>
+              <View style={[styles.avatar, styles.avatarOtra]}>
+                <Text style={[styles.avatarTxt, styles.avatarOtraTxt]}>{inicial(cuenta.user)}</Text>
+              </View>
+              <View style={styles.cabeceraTexto}>
+                <Text style={styles.cuentaNombre} numberOfLines={1}>
+                  {nombreCompleto(cuenta.user)}
+                </Text>
+                <Text style={styles.email} numberOfLines={1}>
+                  {contacto(cuenta.user)}
+                </Text>
+              </View>
+            </PressableScale>
+          )),
+          <OpcionMenu icono="mas" titulo="Agregar cuenta" onPress={() => elegir(agregarCuenta)} />,
           ...modulosPara(user?.roles ?? [], enSusNegocios(negocios.length > 0), serDomiciliario).map(m => (
             <OpcionMenu
               icono={m.icono}
@@ -163,7 +225,21 @@ export default function HeaderPerfil() {
             />
           )),
           negocios.length > 0 && <ReembolsosPerfil />,
-          <OpcionMenu icono="salir" titulo="Cerrar sesión" variante="peligro" onPress={() => elegir(salir)} />,
+          <OpcionMenu
+            icono="salir"
+            titulo="Cerrar sesión"
+            detalle={otras.length > 0 ? `Sigues como ${otras[0].user.name.trim()}` : undefined}
+            variante="peligro"
+            onPress={() => elegir(cerrarSesion)}
+          />,
+          otras.length > 0 && (
+            <OpcionMenu
+              icono="salir"
+              titulo="Cerrar todas las sesiones"
+              variante="peligro"
+              onPress={() => elegir(cerrarTodas)}
+            />
+          ),
         ]}
       />
     </View>
@@ -181,4 +257,12 @@ const useStyles = makeStyles(c => ({
   cabeceraTexto: { flex: 1 },
   nombre: { fontSize: 14, fontFamily: font.bold, color: c.textStrong },
   email: { fontSize: 12, fontFamily: font.regular, color: c.muted, marginTop: 1 },
+  // Otra cuenta guardada: renglón como las opciones del menú, con su inicial.
+  cuenta: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, paddingHorizontal: 10,
+    borderRadius: radius.md, backgroundColor: c.bg, borderWidth: 1, borderColor: c.border,
+  },
+  avatarOtra: { width: 30, height: 30, backgroundColor: c.accentSoft },
+  avatarOtraTxt: { color: c.textStrong, fontSize: 13 },
+  cuentaNombre: { fontSize: 14, fontFamily: font.semibold, color: c.textStrong },
 }));

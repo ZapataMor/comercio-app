@@ -113,3 +113,18 @@ test('quien entra después de otro no hereda la pantalla de la cuenta anterior',
   await entrar(cliente);
   expect(rutaActual()).toBe('Explorar');
 });
+
+test('al cambiar de cuenta sin cerrar sesión, cada una arranca en su pantalla', async () => {
+  await abrirApp();
+  await yEsperar(() => mockSesion.entrar('t-comerciante', comerciante));
+  expect(rutaActual()).toBe('Home');
+
+  await yEsperar(() => mockSesion.agregarCuenta());
+  expect(rutaActual()).toBe('Login');
+
+  await yEsperar(() => mockSesion.entrar('t-cliente', cliente));
+  expect(rutaActual()).toBe('Explorar');
+
+  await yEsperar(() => mockSesion.cambiarCuenta(comerciante.id));
+  expect(rutaActual()).toBe('Home');
+});

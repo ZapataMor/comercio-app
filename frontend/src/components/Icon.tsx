@@ -49,6 +49,8 @@ export type IconName =
   | 'ducha'
   | 'area'
   | 'refrescar'
+  | 'ojo'
+  | 'ojo-cerrado'
   | 'whatsapp';
 
 const GLYPHS: Record<IconName, React.ReactNode> = {
@@ -292,6 +294,22 @@ const GLYPHS: Record<IconName, React.ReactNode> = {
     <>
       <Path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
       <Path d="M21 3v5h-5" />
+    </>
+  ),
+  // Ver la contraseña: ojo abierto.
+  ojo: (
+    <>
+      <Path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+      <Circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  // Ocultar la contraseña: ojo tachado.
+  'ojo-cerrado': (
+    <>
+      <Path d="M10.6 5.1A10.9 10.9 0 0 1 12 5c6.4 0 10 7 10 7a17.8 17.8 0 0 1-2.9 3.9" />
+      <Path d="M6.6 6.6A17.6 17.6 0 0 0 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6" />
+      <Path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+      <Path d="M2 2l20 20" />
     </>
   ),
   // Cerrar sesión: puerta con flecha hacia afuera.

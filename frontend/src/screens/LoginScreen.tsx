@@ -3,11 +3,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  BackHandler,
   Easing,
   Keyboard,
   KeyboardAvoidingView,
   LayoutChangeEvent,
   Platform,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -27,10 +29,11 @@ import Svg, {
   Rect,
   Stop,
 } from 'react-native-svg';
-import { login } from '../api';
+import { login, Usuario } from '../api';
 import { useAuth } from '../AuthContext';
 import { PressableScale } from '../components/anim';
 import FieldError from '../components/FieldError';
+import Icon from '../components/Icon';
 import { marca, ModoVitrina, useModoVitrina } from '../components/Logo';
 import RecuperarClaveModal from '../components/RecuperarClaveModal';
 import { useToast } from '../Toast';
@@ -53,6 +56,10 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 //   · Día   (05:00–17:59): atardecer ámbar con sol, paleta Ámbar & Grafito.
 //   · Noche (18:00–04:59): luna plateada y estrellas, paleta nocturna del kit
 //     de marca (índigo, arena, luna y terracota).
+//
+// Con cuentas guardadas en el teléfono (ver AuthContext), arriba del
+// formulario sale «Continuar como» para volver a cualquiera con un toque.
+// Si se llegó desde «Agregar cuenta», «atrás» vuelve a la cuenta anterior.
 // ─────────────────────────────────────────────────────────────
 const c = paletas.dia; // la escena de día parte de la paleta diurna de la app
 const ORO = c.accent; // #E8A019
@@ -426,8 +433,13 @@ function Marca({ p }: { p: Paleta }) {
   );
 }
 
+/** Primer nombre, para la píldora de una cuenta guardada. */
+function primerNombre(user: Usuario): string {
+  return user.name.trim().split(/\s+/)[0] || user.email || user.telefono || 'Cuenta';
+}
+
 export default function LoginScreen({ navigation }: Props) {
-  const { entrar: guardarSesion } = useAuth();
+  const { entrar: guardarSesion, cuentas, agregando, cambiarCuenta } = useAuth();
   const insets = useSafeAreaInsets();
   const modo = useModoVitrina();
   const p = PALETA[modo];
@@ -435,6 +447,8 @@ export default function LoginScreen({ navigation }: Props) {
   // Correo, celular o nombre de usuario.
   const [usuario, setUsuario] = useState('');
   const [password, setPassword] = useState('');
+  // Ojo del campo de contraseña: la muestra mientras está encendido.
+  const [verClave, setVerClave] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errores, setErrores] = useState<FieldErrors>({});
@@ -546,6 +560,19 @@ export default function LoginScreen({ navigation }: Props) {
       ocultar.remove();
     };
   }, [anim]);
+
+  // Desde «Agregar cuenta», «atrás» vuelve a la cuenta de la que venía (la
+  // más reciente). Solo en esta pantalla: en el registro, «atrás» regresa aquí.
+  useEffect(() => {
+    const anterior = agregando ? cuentas[0] : undefined;
+    if (!anterior) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (!navigation.isFocused()) return false;
+      cambiarCuenta(anterior.user.id);
+      return true;
+    });
+    return () => sub.remove();
+  }, [agregando, cuentas, cambiarCuenta, navigation]);
 
   function enfocar(v: Animated.Value, encendido: boolean) {
     Animated.timing(v, { toValue: encendido ? 1 : 0, duration: 180, easing: EASE, useNativeDriver: true }).start();
@@ -687,7 +714,15 @@ export default function LoginScreen({ navigation }: Props) {
 
         {/* ══ Contenido ══ */}
         <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={styles.contenido}>
+          {/* Desplazable por si no cabe (teclado abierto, cuentas guardadas);
+              cuando cabe, queda centrado igual que en el diseño. */}
+          <ScrollView
+            style={styles.fill}
+            contentContainerStyle={styles.contenido}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+            overScrollMode="never">
             {/* marca, bajando con rebote */}
             <Animated.View style={[styles.marca, { opacity: logoOp, transform: [{ translateY: logoTy }] }]}>
               <Marca p={p} />
@@ -704,6 +739,42 @@ export default function LoginScreen({ navigation }: Props) {
               {error ? <Text style={[styles.error, e.error]}>{error}</Text> : null}
 
               <Animated.View style={bloque(1)}>
+                {/* cuentas con la sesión abierta en este teléfono: a un toque */}
+                {cuentas.length > 0 ? (
+                  <>
+                    <Text style={[styles.label, e.label]}>CONTINUAR COMO</Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      keyboardShouldPersistTaps="handled"
+                      contentContainerStyle={styles.cuentas}>
+                      {cuentas.map(cuenta => (
+                        <PressableScale
+                          key={cuenta.user.id}
+                          style={[styles.cuenta, e.cuenta]}
+                          onPress={() => cambiarCuenta(cuenta.user.id)}
+                          disabled={cargando}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Continuar como ${[cuenta.user.name, cuenta.user.apellidos].filter(Boolean).join(' ')}`}>
+                          <View style={[styles.cuentaAvatar, e.cuentaAvatar]}>
+                            <Text style={[styles.cuentaInicial, e.cuentaInicial]}>
+                              {cuenta.user.name.trim().charAt(0).toUpperCase() || '?'}
+                            </Text>
+                          </View>
+                          <Text style={[styles.cuentaNombre, e.cuentaNombre]} numberOfLines={1}>
+                            {primerNombre(cuenta.user)}
+                          </Text>
+                        </PressableScale>
+                      ))}
+                    </ScrollView>
+                    <View style={styles.separador}>
+                      <View style={[styles.separadorLinea, e.separadorLinea]} />
+                      <Text style={[styles.separadorTxt, e.label]}>o entra con otra cuenta</Text>
+                      <View style={[styles.separadorLinea, e.separadorLinea]} />
+                    </View>
+                  </>
+                ) : null}
+
                 <Text style={[styles.label, e.label]}>CORREO, CELULAR O USUARIO</Text>
                 <View style={styles.inputWrapEmail}>
                   <TextInput
@@ -729,19 +800,30 @@ export default function LoginScreen({ navigation }: Props) {
                 <Text style={[styles.label, e.label]}>CONTRASEÑA</Text>
                 <View style={styles.inputWrapPass}>
                   <TextInput
-                    style={[styles.input, e.input]}
+                    style={[styles.input, styles.inputClave, e.input]}
                     cursorColor={p.inputTexto}
                     value={password}
                     onChangeText={valor => {
                       setPassword(valor);
                       limpiarError('password');
                     }}
-                    secureTextEntry
+                    secureTextEntry={!verClave}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    accessibilityLabel="Contraseña"
                     editable={!cargando}
                     onFocus={() => enfocar(anim.focoPass, true)}
                     onBlur={() => enfocar(anim.focoPass, false)}
                   />
                   <Animated.View pointerEvents="none" style={[styles.inputFoco, e.inputFoco, { opacity: anim.focoPass }]} />
+                  {/* ojo: muestra u oculta la contraseña */}
+                  <TouchableOpacity
+                    style={styles.ojo}
+                    onPress={() => setVerClave(v => !v)}
+                    accessibilityRole="button"
+                    accessibilityLabel={verClave ? 'Ocultar contraseña' : 'Mostrar contraseña'}>
+                    <Icon name={verClave ? 'ojo-cerrado' : 'ojo'} size={20} color={p.label} />
+                  </TouchableOpacity>
                 </View>
                 <FieldError mensaje={errores.password} />
               </Animated.View>
@@ -786,7 +868,7 @@ export default function LoginScreen({ navigation }: Props) {
                 </TouchableOpacity>
               </Animated.View>
             </Animated.View>
-          </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </View>
       <RecuperarClaveModal
@@ -821,7 +903,7 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   contenido: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: 26,
     paddingBottom: 170, // deja respirar el skyline bajo la tarjeta
@@ -880,6 +962,46 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: font.regular,
   },
+  // Deja lugar al ojo a la derecha del campo de contraseña.
+  inputClave: { paddingRight: 48 },
+  ojo: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // «Continuar como»: píldoras de las cuentas guardadas.
+  cuentas: { gap: 8 },
+  cuenta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    height: 42,
+    maxWidth: 170,
+    paddingLeft: 5,
+    paddingRight: 14,
+    borderWidth: 1,
+    borderRadius: radius.pill,
+  },
+  cuentaAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cuentaInicial: {
+    fontFamily: font.displayExtra,
+    fontSize: 13,
+    includeFontPadding: false,
+  },
+  cuentaNombre: { flexShrink: 1, fontFamily: font.semibold, fontSize: 14 },
+  separador: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16, marginBottom: 14 },
+  separadorLinea: { flex: 1, height: 1 },
+  separadorTxt: { fontFamily: font.medium, fontSize: 12 },
   // Foco: borde de acento + anillo de 3px + resplandor (box-shadow del diseño).
   inputFoco: {
     position: 'absolute',
@@ -946,6 +1068,11 @@ function crearEstilos(p: Paleta) {
     botonTexto: { color: p.botonTexto },
     hint: { color: p.hint },
     error: { backgroundColor: p.errorFondo, color: p.errorTexto },
+    cuenta: { backgroundColor: p.input, borderColor: p.inputBorde },
+    cuentaAvatar: { backgroundColor: p.chip },
+    cuentaInicial: { color: p.chipV },
+    cuentaNombre: { color: p.inputTexto },
+    separadorLinea: { backgroundColor: p.inputBorde },
   });
 }
 
