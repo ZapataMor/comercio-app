@@ -13,7 +13,8 @@ import { getPropiedadesMapa, imagenUrl, PropiedadResumen, TipoPropiedad } from '
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import Icon from '../components/Icon';
-import { abrirComoLlegar, MapaRef, MapaVitrina, PinPropiedad, ZOOM } from '../components/Mapa';
+import { MapaRef, MapaVitrina, PinPropiedad, ZOOM } from '../components/Mapa';
+import { comoLlegar } from '../comoLlegar';
 import MenuDesplegable, { OpcionMenu } from '../components/MenuDesplegable';
 import { RootStackParamList } from '../navTypes';
 import {
@@ -271,7 +272,14 @@ function TarjetaMapa({ propiedad: p, onVer }: { propiedad: PropiedadResumen; onV
         </View>
       </PressableScale>
       <View style={styles.botones}>
-        <PressableScale style={styles.secundario} onPress={() => abrirComoLlegar(p)}>
+        <PressableScale
+          style={styles.secundario}
+          onPress={() =>
+            comoLlegar(
+              { punto: { lat: p.lat, lng: p.lng }, nombre: p.titulo, tipo: 'propiedad', detalle: [p.direccion, p.barrio].filter(Boolean).join(' · ') },
+              { elegirModo: true },
+            )
+          }>
           <Icon name="ubicacion" size={15} color={c.text} />
           <Text style={styles.secundarioTxt}>Cómo llegar</Text>
         </PressableScale>

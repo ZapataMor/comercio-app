@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\PropiedadController;
 use App\Http\Controllers\Api\RecetaPreferidaController;
 use App\Http\Controllers\Api\RecuperarClaveController;
 use App\Http\Controllers\Api\ResenaController;
+use App\Http\Controllers\Api\RutaController;
 use App\Http\Controllers\Api\TelefonoController;
 use App\Http\Controllers\Api\TrabajadorController;
 use App\Http\Controllers\AuthController;
@@ -95,6 +96,8 @@ Route::middleware(['auth:sanctum', 'throttle:api-usuario'])->group(function () {
     Route::get('/negocios', [CatalogoController::class, 'index']);
     // Negocios con su pin, para el mapa (sin paginar).
     Route::get('/negocios/mapa', [CatalogoController::class, 'mapa']);
+    // «Cómo llegar» dentro de la app: ruta por calles con sus indicaciones.
+    Route::post('/ruta', RutaController::class)->middleware('throttle:rutas');
     // Búsqueda de productos (por relevancia) con el negocio que los vende.
     Route::get('/productos', [CatalogoController::class, 'buscarProductos']);
 

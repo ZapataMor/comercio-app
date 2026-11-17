@@ -1,5 +1,17 @@
 // Rutas de navegación de la app (React Navigation - native stack).
-import { ComercioPedido, Servicio } from './api';
+import { ComercioPedido, Coordenadas, ModoRuta, Servicio } from './api';
+
+/** A dónde lleva «Cómo llegar» (pantalla Ruta). */
+export type DestinoRuta = {
+  punto: Coordenadas;
+  nombre: string;
+  /** Qué pin se dibuja en el destino. */
+  tipo: 'negocio' | 'entrega' | 'propiedad';
+  /** Dirección en texto (se muestra debajo del nombre). */
+  detalle?: string | null;
+  /** Foto del negocio para su pin. */
+  imagen?: string | null;
+};
 
 /** Catálogo que ve el cliente en Explorar (el desplegable junto al perfil). */
 export type SeccionCatalogo = 'productos' | 'servicios' | 'propiedades';
@@ -41,6 +53,9 @@ export type RootStackParamList = {
   Mapa: { admin?: boolean } | undefined;
   // Propiedades: mapa con sus propios filtros, detalle, y las que publico.
   MapaPropiedades: undefined;
+  // «Cómo llegar» dentro de la app: ruta por calles con indicaciones.
+  // `modo`: con cuál arranca; `elegirModo`: deja cambiar entre moto y a pie.
+  Ruta: { destino: DestinoRuta; modo?: ModoRuta; elegirModo?: boolean };
   Propiedad: { id: number; titulo: string };
   MisPropiedades: undefined;
   // Sin `id`: publicar una nueva.

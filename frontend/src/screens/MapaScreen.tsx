@@ -15,8 +15,8 @@ import {
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import Icon from '../components/Icon';
+import { comoLlegar } from '../comoLlegar';
 import {
-  abrirComoLlegar,
   haceCuanto,
   MapaRef,
   MapaVitrina,
@@ -367,7 +367,20 @@ function TarjetaNegocio({ negocio, onVerTienda }: { negocio: NegocioMapa; onVerT
         </Text>
       </View>
       <View style={styles.botones}>
-        <PressableScale style={styles.secundario} onPress={() => abrirComoLlegar(negocio)}>
+        <PressableScale
+          style={styles.secundario}
+          onPress={() =>
+            comoLlegar(
+              {
+                punto: { lat: negocio.lat, lng: negocio.lng },
+                nombre: negocio.nombre,
+                tipo: 'negocio',
+                detalle: negocio.direccion,
+                imagen: negocio.imagen,
+              },
+              { elegirModo: true },
+            )
+          }>
           <Icon name="ubicacion" size={15} color={c.text} />
           <Text style={styles.secundarioTxt}>Cómo llegar</Text>
         </PressableScale>

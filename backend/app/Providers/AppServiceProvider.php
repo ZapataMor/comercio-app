@@ -106,5 +106,10 @@ class AppServiceProvider extends ServiceProvider
         // minuto) para que el cliente lo vea avanzar seguido; esto deja margen
         // y frena un celular que se quede enviando en bucle.
         RateLimiter::for('ubicacion', fn (Request $r) => Limit::perMinute(60)->by('ubicacion|'.$r->user()?->id));
+
+        // Rutas de «Cómo llegar»: la app recalcula solo al desviarse (como
+        // mucho una vez cada pocos segundos); el servidor de rutas es compartido.
+        RateLimiter::for('rutas', fn (Request $r) => Limit::perMinute(20)->by('rutas|'.$r->user()?->id)
+            ->response(fn () => response()->json(['message' => 'Demasiadas rutas seguidas. Espera un momento.'], 429)));
     }
 }

@@ -70,6 +70,7 @@ import CheckoutScreen from './src/screens/CheckoutScreen';
 import MisPedidosScreen from './src/screens/MisPedidosScreen';
 import PedidoDetalleScreen from './src/screens/PedidoDetalleScreen';
 import MapaScreen from './src/screens/MapaScreen';
+import RutaScreen from './src/screens/RutaScreen';
 import MapaPropiedadesScreen from './src/screens/MapaPropiedadesScreen';
 import PropiedadScreen from './src/screens/PropiedadScreen';
 import MisPropiedadesScreen from './src/screens/MisPropiedadesScreen';
@@ -216,6 +217,8 @@ function Navegacion({ listo }: { listo: boolean }) {
             {(roles.includes('usuario') || roles.includes('administrador')) && (
               <Stack.Screen name="Mapa" component={MapaScreen} options={{ title: 'Mapa' }} />
             )}
+            {/* «Cómo llegar» dentro de la app (cliente y domiciliario). */}
+            <Stack.Screen name="Ruta" component={RutaScreen} options={{ title: 'Cómo llegar' }} />
 
             {/* Negocios: cualquier usuario puede crear los suyos o trabajar en
                 otros (el acceso lo decide la membresía, no un rol global). */}

@@ -41,6 +41,17 @@ return [
         'version' => env('WHATSAPP_API_VERSION', 'v23.0'),
     ],
 
+    // Rutas por calles dentro de la app («Cómo llegar»), con OSRM sobre
+    // OpenStreetMap. Cada modo es la dirección base hasta el perfil (sin las
+    // coordenadas). Los servidores públicos de prueba no piden clave, pero
+    // aceptan pocas peticiones y no garantizan nada: para el piloto, un OSRM
+    // propio (ej. http://127.0.0.1:5000/route/v1/driving con el mapa de La Guajira).
+    'rutas' => [
+        'moto' => env('RUTAS_URL_MOTO', 'https://router.project-osrm.org/route/v1/driving'),
+        'pie' => env('RUTAS_URL_PIE', 'https://routing.openstreetmap.de/routed-foot/route/v1/foot'),
+        'timeout' => (int) env('RUTAS_TIMEOUT', 8),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

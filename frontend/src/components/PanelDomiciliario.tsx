@@ -36,7 +36,8 @@ import { useConfirmar } from './Confirmacion';
 import { publicarMiReputacion } from './HeaderConfiabilidad';
 import { publicarTurno } from './HeaderTurno';
 import Icon, { IconName } from './Icon';
-import { abrirComoLlegar } from './Mapa';
+import type { DestinoRuta } from '../navTypes';
+import { comoLlegar } from '../comoLlegar';
 import MinutosRecogida from './MinutosRecogida';
 import ReportarPedido from './ReportarPedido';
 
@@ -51,6 +52,23 @@ type Props = {
 
 function cop(n: number) {
   return '$' + Math.round(n).toLocaleString('es-CO');
+}
+
+/**
+ * A dónde lleva «Cómo llegar»: al negocio antes de recoger (o al devolver o
+ * llevar el efectivo), luego al cliente. Con el punto en el mapa, la ruta se
+ * traza dentro de la app; sin él, solo con la dirección, se abre Google Maps.
+ */
+function destinoEntrega(p: Pedido, haciaNegocio: boolean): DestinoRuta | string {
+  if (haciaNegocio) {
+    const n = p.negocio;
+    return n?.lat != null && n?.lng != null
+      ? { punto: { lat: n.lat, lng: n.lng }, nombre: n.nombre, tipo: 'negocio', detalle: n.direccion }
+      : `${n?.direccion ?? n?.nombre ?? ''}, Maicao, La Guajira`;
+  }
+  return p.entrega_ubicacion
+    ? { punto: p.entrega_ubicacion, nombre: p.cliente?.name ?? 'Cliente', tipo: 'entrega', detalle: p.direccion_entrega }
+    : `${p.direccion_entrega}, Maicao, La Guajira`;
 }
 
 /**
@@ -287,18 +305,10 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
                       activa={!haciaNegocio}
                       hecha={p.estado === 'entregado'}
                     />
-                    {/* Abre la ruta en el mapa: al negocio antes de recoger, luego al cliente. */}
+                    {/* La ruta dentro de la app: al negocio antes de recoger, luego al cliente. */}
                     <PressableScale
                       style={styles.comoLlegar}
-                      onPress={() =>
-                        abrirComoLlegar(
-                          !haciaNegocio
-                            ? p.entrega_ubicacion ?? `${p.direccion_entrega}, Maicao, La Guajira`
-                            : p.negocio?.lat != null && p.negocio?.lng != null
-                              ? { lat: p.negocio.lat, lng: p.negocio.lng }
-                              : `${p.negocio?.direccion ?? p.negocio?.nombre ?? ''}, Maicao, La Guajira`,
-                        )
-                      }>
+                      onPress={() => comoLlegar(destinoEntrega(p, haciaNegocio), { modo: 'moto' })}>
                       <Icon name="mapa" size={15} color={c.goldText} />
                       <Text style={styles.comoLlegarTxt}>{haciaNegocio ? 'Cómo llegar al negocio' : 'Cómo llegar al cliente'}</Text>
                     </PressableScale>

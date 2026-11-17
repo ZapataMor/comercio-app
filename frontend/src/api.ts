@@ -1606,6 +1606,47 @@ export async function enviarUbicacion(token: string, punto: Coordenadas): Promis
   return !!d.compartir;
 }
 
+// ---------- «Cómo llegar» dentro de la app ----------
+
+/** moto: por calles en vehículo (respeta los sentidos). pie: caminando. */
+export type ModoRuta = 'moto' | 'pie';
+
+/** Ícono de cada indicación (lo decide el backend según la maniobra). */
+export type IconoPaso = 'salida' | 'llegada' | 'derecha' | 'izquierda' | 'recto' | 'vuelta' | 'glorieta';
+
+export type PasoRuta = {
+  /** "Gira a la derecha por la Carrera 15". */
+  texto: string;
+  icono: IconoPaso;
+  calle: string | null;
+  /** A cuántos metros del inicio de la ruta está esta maniobra. */
+  en_m: number;
+  punto: Coordenadas;
+};
+
+export type Ruta = {
+  modo: ModoRuta;
+  distancia_m: number;
+  duracion_s: number;
+  /** La línea para dibujar, en [lng, lat] (GeoJSON). */
+  linea: [number, number][];
+  pasos: PasoRuta[];
+};
+
+/**
+ * Ruta por calles desde `desde` hasta `hasta` (OSRM en el backend). Va por
+ * POST para que la posición no quede en los registros del servidor.
+ */
+export function calcularRuta(token: string, desde: Coordenadas, hasta: Coordenadas, modo: ModoRuta): Promise<Ruta> {
+  return authSend('POST', '/api/ruta', token, {
+    desde_lat: desde.lat,
+    desde_lng: desde.lng,
+    hasta_lat: hasta.lat,
+    hasta_lng: hasta.lng,
+    modo,
+  });
+}
+
 /** Mi nivel de confiabilidad como domiciliario y sus últimos eventos. */
 export function getMiReputacion(token: string): Promise<ReputacionDetalle> {
   return authGet('/api/domiciliario/reputacion', token);

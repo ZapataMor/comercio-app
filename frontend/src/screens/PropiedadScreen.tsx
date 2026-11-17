@@ -24,7 +24,8 @@ import { useAuth } from '../AuthContext';
 import { PressableScale } from '../components/anim';
 import { telefonoInternacional } from '../components/BotonesContacto';
 import Icon, { IconName } from '../components/Icon';
-import { abrirComoLlegar, colorPropiedad, MapaVitrina, PinPropiedad, vistaDe, ZOOM } from '../components/Mapa';
+import { colorPropiedad, MapaVitrina, PinPropiedad, vistaDe, ZOOM } from '../components/Mapa';
+import { comoLlegar } from '../comoLlegar';
 import { messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
 import { haceCuantoPublicada, periodoPrecio, pesos, tipoPropiedad } from '../propiedades';
@@ -186,7 +187,14 @@ export default function PropiedadScreen({ navigation, route }: Props) {
             </MapaVitrina>
           </View>
           <View style={styles.botonesMapa}>
-            <PressableScale style={styles.secundario} onPress={() => abrirComoLlegar(punto)}>
+            <PressableScale
+              style={styles.secundario}
+              onPress={() =>
+                comoLlegar(
+                  { punto, nombre: p.titulo, tipo: 'propiedad', detalle: [p.direccion, p.barrio].filter(Boolean).join(' · ') },
+                  { elegirModo: true },
+                )
+              }>
               <Icon name="ubicacion" size={15} color={c.text} />
               <Text style={styles.secundarioTxt}>Cómo llegar</Text>
             </PressableScale>

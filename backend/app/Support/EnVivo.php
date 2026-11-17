@@ -266,6 +266,8 @@ class EnVivo
             Api\TrabajadorController::class.'@resolverCodigo' => null,
             // El carrito vive en el teléfono; esto solo recalcula precios.
             Api\CarritoController::class.'@actualizar' => null,
+            // «Cómo llegar»: solo calcula la ruta (va por POST para no dejar la posición en los logs).
+            Api\RutaController::class => null,
             Web\AuthWebController::class.'@login' => null,
             Web\AuthWebController::class.'@logout' => null,
 

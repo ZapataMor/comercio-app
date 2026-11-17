@@ -94,7 +94,9 @@ jest.mock('@maplibre/maplibre-react-native', () => {
   const Marker = props => React.createElement(View, null, props.children);
   const Nada = () => null;
   const LogManager = { onLog: jest.fn() };
-  return { __esModule: true, Map, Marker, Camera: Nada, NativeUserLocation: Nada, LogManager };
+  // La línea de la ruta (RutaScreen): una fuente con sus capas.
+  const GeoJSONSource = props => React.createElement(View, null, props.children);
+  return { __esModule: true, Map, Marker, Camera: Nada, NativeUserLocation: Nada, LogManager, GeoJSONSource, Layer: Nada };
 });
 
 jest.mock('@react-native-community/netinfo', () => require('@react-native-community/netinfo/jest/netinfo-mock.js'));

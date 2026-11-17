@@ -6,8 +6,8 @@
  *    Maicao por defecto. Se mueve con su ref: irA() y encuadrar().
  *  - <PinNegocio> / <PinDomiciliario>: marcadores con el look de la app.
  *  - <PinPropiedad>: el precio de una casa o un patio en una píldora.
- *  - abrirComoLlegar(): abre la ruta en la app de Google Maps (gratis: no
- *    usa la API de rutas, solo un enlace).
+ *  - abrirEnGoogleMaps(): la ruta en Google Maps (solo un enlace). La de
+ *    dentro de la app la abre comoLlegar() (src/comoLlegar.ts).
  *  - haceCuanto(): "ahora mismo" / "hace 40 s" / "hace 2 min".
  */
 import {
@@ -21,7 +21,7 @@ import {
 } from '@maplibre/maplibre-react-native';
 import React, { ReactNode, Ref, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Linking, StyleProp, Text, View, ViewStyle } from 'react-native';
-import { Coordenadas, imagenUrl, TipoPropiedad, UbicacionEnVivo } from '../api';
+import { Coordenadas, imagenUrl, ModoRuta, TipoPropiedad, UbicacionEnVivo } from '../api';
 import { precioCorto, tipoPropiedad } from '../propiedades';
 import { Colores, font, makeStyles, radius, useTheme } from '../theme';
 import { distanciaMetros } from '../ubicacion';
@@ -330,9 +330,10 @@ export function haceCuanto(segundos: number): string {
  * Abre la ruta hasta `destino` en Google Maps (o en el navegador si no está
  * instalada). Con texto, Google busca la dirección por su cuenta.
  */
-export function abrirComoLlegar(destino: Coordenadas | string) {
+export function abrirEnGoogleMaps(destino: Coordenadas | string, modo: ModoRuta = 'moto') {
   const valor = typeof destino === 'string' ? encodeURIComponent(destino) : `${destino.lat},${destino.lng}`;
-  Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${valor}&travelmode=driving`).catch(() => {});
+  const viaje = modo === 'pie' ? 'walking' : 'driving';
+  Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${valor}&travelmode=${viaje}`).catch(() => {});
 }
 
 /** Aire alrededor de los pines al encuadrarlos (el de arriba mide más). */

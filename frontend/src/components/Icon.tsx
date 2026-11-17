@@ -51,6 +51,12 @@ export type IconName =
   | 'refrescar'
   | 'ojo'
   | 'ojo-cerrado'
+  | 'girar-derecha'
+  | 'girar-izquierda'
+  | 'recto'
+  | 'vuelta-u'
+  | 'glorieta'
+  | 'bandera'
   | 'whatsapp';
 
 const GLYPHS: Record<IconName, React.ReactNode> = {
@@ -310,6 +316,45 @@ const GLYPHS: Record<IconName, React.ReactNode> = {
       <Path d="M6.6 6.6A17.6 17.6 0 0 0 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6" />
       <Path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
       <Path d="M2 2l20 20" />
+    </>
+  ),
+  // Indicaciones de «Cómo llegar»: girar, seguir derecho, vuelta en U,
+  // glorieta y la bandera de llegada.
+  'girar-derecha': (
+    <>
+      <Path d="M7 21v-8a4 4 0 0 1 4-4h9" />
+      <Path d="M16 5l4 4-4 4" />
+    </>
+  ),
+  'girar-izquierda': (
+    <>
+      <Path d="M17 21v-8a4 4 0 0 0-4-4H4" />
+      <Path d="M8 5L4 9l4 4" />
+    </>
+  ),
+  recto: (
+    <>
+      <Path d="M12 21V4" />
+      <Path d="M6 10l6-6 6 6" />
+    </>
+  ),
+  'vuelta-u': (
+    <>
+      <Path d="M17 21V10a5 5 0 0 0-10 0v9" />
+      <Path d="M3 15l4 4 4-4" />
+    </>
+  ),
+  glorieta: (
+    <>
+      <Circle cx="12" cy="9" r="5" />
+      <Path d="M12 14v7" />
+      <Path d="M17 4v4h-4" />
+    </>
+  ),
+  bandera: (
+    <>
+      <Path d="M5 21V4" />
+      <Path d="M5 4h12l-2.5 4.5L17 13H5" />
     </>
   ),
   // Cerrar sesión: puerta con flecha hacia afuera.
