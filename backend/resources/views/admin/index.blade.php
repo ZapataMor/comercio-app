@@ -1,37 +1,14 @@
 @extends('layouts.app')
-
-@section('titulo', 'Admin')
-
+@section('titulo', 'Resumen de operación')
 @section('contenido')
 @include('admin._nav')
-
-<h2 class="text-xl font-bold mb-4">Tablero de administración</h2>
-
-<div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-    <div class="bg-white rounded-2xl shadow p-5">
-        <p class="text-3xl font-bold text-indigo-600">{{ $stats['usuarios'] }}</p>
-        <p class="text-slate-500 text-sm mt-1">Usuarios</p>
-    </div>
-    <div class="bg-white rounded-2xl shadow p-5">
-        <p class="text-3xl font-bold text-indigo-600">{{ $stats['negocios'] }}</p>
-        <p class="text-slate-500 text-sm mt-1">Negocios</p>
-    </div>
-    <div class="bg-white rounded-2xl shadow p-5">
-        <p class="text-3xl font-bold text-green-600">{{ $stats['negocios_activos'] }}</p>
-        <p class="text-slate-500 text-sm mt-1">Abiertos</p>
-    </div>
-    <div class="bg-white rounded-2xl shadow p-5">
-        <p class="text-3xl font-bold text-indigo-600">{{ $stats['productos'] }}</p>
-        <p class="text-slate-500 text-sm mt-1">Productos</p>
-    </div>
+<h1>Resumen de operación</h1>
+<p class="muted">{{ now()->format('d/m/Y H:i') }} · <a href="{{ route('admin.panel') }}">Actualizar</a></p>
+<div class="stats">
+@foreach(['pedidos_en_curso'=>['Pedidos en curso','pedidos'],'demorados'=>['Sin cambios hace 30 min o más','pedidos'],'reportes_pendientes'=>['Reportes pendientes','reportes'],'resenas_reportadas'=>['Reseñas reportadas','resenas'],'entregados_hoy'=>['Entregados hoy','pedidos'],'cancelados_hoy'=>['Cancelados hoy','pedidos'],'usuarios'=>['Usuarios','usuarios'],'negocios_activos'=>['Negocios abiertos','negocios']] as $key=>[$label,$ruta])
+<a class="card" href="{{ route('admin.'.$ruta, match($key) {'entregados_hoy'=>['estado'=>'entregado','fecha'=>'resultado','desde'=>now()->toDateString(),'hasta'=>now()->toDateString()], 'cancelados_hoy'=>['estado'=>'cancelado','fecha'=>'resultado','desde'=>now()->toDateString(),'hasta'=>now()->toDateString()], 'demorados'=>['demorados'=>1], 'negocios_activos'=>['abiertos'=>1], default=>[]}) }}"><strong class="stat">{{ $stats[$key] }}</strong><span>{{ $label }}</span></a>
+@endforeach
 </div>
-
-<div class="bg-white rounded-2xl shadow p-6 mt-5">
-    <h3 class="font-bold mb-2">Accesos rápidos</h3>
-    <div class="flex flex-wrap gap-2 text-sm">
-        <a href="{{ route('admin.usuarios') }}" class="text-indigo-600 hover:underline">Gestionar usuarios y roles →</a>
-        <span class="text-slate-300">·</span>
-        <a href="{{ route('admin.negocios') }}" class="text-indigo-600 hover:underline">Ver todos los negocios →</a>
-    </div>
-</div>
+<div class="card"><h2>Ventas de pedidos entregados</h2><p class="stat">$ {{ number_format($stats['ventas_hoy'], 0, ',', '.') }} <small>COP hoy</small></p><p>Este mes: $ {{ number_format($stats['ventas_mes'], 0, ',', '.') }} COP · Incluye domicilio.</p><a href="{{ route('admin.pedidos', ['estado'=>'entregado']) }}">Consultar historial y exportar →</a></div>
+<p class="muted">La alerta de 30 minutos sirve para revisión; no implica por sí sola un incumplimiento.</p>
 @endsection

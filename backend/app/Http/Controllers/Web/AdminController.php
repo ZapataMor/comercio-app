@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Negocio;
+use App\Models\Pedido;
 use App\Models\PedidoReporte;
-use App\Models\Producto;
 use App\Models\User;
 use App\Support\UbicacionDomiciliario;
 use Illuminate\Contracts\View\View;
@@ -46,12 +46,8 @@ class AdminController extends Controller
     /** Tablero con números generales. */
     public function index(): View
     {
-        $stats = [
-            'usuarios' => User::count(),
-            'negocios' => Negocio::count(),
-            'negocios_activos' => Negocio::where('activo', true)->count(),
-            'productos' => Producto::count(),
-        ];
+        $stats = app(\App\Http\Controllers\Api\AdminController::class)->stats()->getData(true);
+        $stats['demorados'] = Pedido::whereIn('estado', Pedido::EN_CURSO)->where('updated_at', '<=', now()->subMinutes(30))->count();
 
         return view('admin.index', compact('stats'));
     }
