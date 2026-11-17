@@ -54,6 +54,11 @@ type Esquina = NonNullable<MapProps['attributionPosition']>;
 export type MapaRef = {
   /** Lleva el centro a un punto, con animación. */
   irA(p: Coordenadas, zoom?: number): void;
+  /**
+   * Mueve solo el centro hasta `p` en `duracion` ms, a velocidad pareja (sin
+   * tocar el zoom): para ir detrás de algo que se desliza al mismo ritmo.
+   */
+  seguir(p: Coordenadas, duracion: number): void;
   /** Encuadra varios puntos a la vez. */
   encuadrar(puntos: Coordenadas[], margen?: Margen): void;
 };
@@ -113,6 +118,7 @@ export function MapaVitrina({
 
   useImperativeHandle(ref, () => ({
     irA: (p, zoom) => camara.current?.easeTo({ center: lngLat(p), zoom, duration: 600 }),
+    seguir: (p, duracion) => camara.current?.easeTo({ center: lngLat(p), duration: duracion, easing: 'linear' }),
     encuadrar: (puntos, margen) => {
       if (puntos.length === 0) return;
       camara.current?.fitBounds(limitesDe(puntos), { padding: margen, duration: 600, easing: 'ease' });
@@ -343,8 +349,10 @@ const REFRESCO_MIN_MS = 600;
 const DESLIZAR_MS = 2000;
 /** Un salto mayor (o la primera posición) se pone de una: deslizarlo engañaría. */
 const SALTO_MAX_M = 1000;
-/** La cámara se reencuadra solo cuando algo se movió esto: si no, el mapa no pararía. */
-const REENCUADRAR_M = 120;
+/** Zoom al ir detrás del domiciliario: unas cuadras alrededor. */
+const ZOOM_SEGUIR = ZOOM.barrio;
+/** Al abrir, se ve todo (moto, negocio y destino) este rato antes de acercarse a la moto. */
+const VER_TODO_MS = 1500;
 
 /**
  * Posición que se va deslizando hacia `destino` (en línea recta, a velocidad
@@ -401,12 +409,16 @@ function PinDomiciliarioSuave({ punto }: { punto: Coordenadas }) {
 
 /**
  * Mapa pequeño del seguimiento: el domiciliario (en vivo, deslizándose entre
- * posiciones), el negocio y, si se conoce, la puerta de la entrega. Encuadra a
- * todos cuando alguno se movió más de REENCUADRAR_M, hasta que la persona mueve
- * el mapa con el dedo.
+ * posiciones), el negocio y, si se conoce, la puerta de la entrega.
+ *
+ * La cámara va detrás del domiciliario: al abrir muestra a todos un momento y
+ * luego se acerca a la moto. Desde ahí, con cada posición nueva se desplaza al
+ * mismo ritmo con que se desliza la moto, así la moto queda en el centro y el
+ * mapa avanza debajo. Si la persona mueve el mapa con el dedo deja de seguirla,
+ * y aparece «Seguir al domiciliario» para volver.
  *
  * Con `onRefrescar` muestra un botón encima del mapa: pide la posición más
- * reciente y vuelve a encuadrar a todos (aunque la persona haya movido el mapa).
+ * reciente y vuelve a seguir al domiciliario.
  */
 export function MapaSeguimiento({
   domiciliario,
@@ -425,13 +437,17 @@ export function MapaSeguimiento({
   const { c } = useTheme();
   const styles = useStyles();
   const mapa = useRef<MapaRef>(null);
-  const tocado = useRef(false);
   const [refrescando, setRefrescando] = useState(false);
+  // ¿La cámara va detrás de la moto? Deja de ir si la persona mueve el mapa.
+  const [siguiendo, setSiguiendo] = useState(true);
+  const siguiendoRef = useRef(siguiendo);
+  siguiendoRef.current = siguiendo;
   const puntos = [domiciliario, negocio?.punto, entrega].filter((p): p is Coordenadas => !!p);
-  const clave = puntos.map(p => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join('|');
-  // Tras refrescar se encuadra con los puntos nuevos, no con los de antes del toque.
-  const puntosRef = useRef(puntos);
-  puntosRef.current = puntos;
+  // La última posición conocida de la moto (para los timers y el botón).
+  const moto = useRef<Coordenadas | null>(domiciliario ?? null);
+  // Dónde quedó la cámara la última vez que se la mandó tras la moto.
+  const camaraEn = useRef<Coordenadas | null>(null);
+  const yaSeAcerco = useRef(false);
   const montado = useRef(true);
   useEffect(
     () => () => {
@@ -439,29 +455,56 @@ export function MapaSeguimiento({
     },
     [],
   );
-  // Con lo que se encuadró la última vez: ver REENCUADRAR_M.
-  const encuadrados = useRef<Coordenadas[] | null>(null);
 
-  const encuadrar = (lista: Coordenadas[]) => {
-    if (lista.length === 0) return;
-    encuadrados.current = lista;
-    if (lista.length === 1) mapa.current?.irA(lista[0], ZOOM.zona);
-    else mapa.current?.encuadrar(lista, MARGEN_SEGUIMIENTO);
+  // Sin moto no hay a quién seguir: se encuadra lo que haya.
+  const encuadrarTodo = () => {
+    if (puntos.length === 0) return;
+    if (puntos.length === 1) mapa.current?.irA(puntos[0], ZOOM.zona);
+    else mapa.current?.encuadrar(puntos, MARGEN_SEGUIMIENTO);
   };
 
+  /** Lleva la cámara a la moto: rápido (`rapido`) o al ritmo con que se desliza. */
+  const irTrasLaMoto = (rapido: boolean) => {
+    const p = moto.current;
+    if (!p) return;
+    if (!yaSeAcerco.current) {
+      yaSeAcerco.current = true;
+      mapa.current?.irA(p, ZOOM_SEGUIR);
+    } else {
+      const lejos = !camaraEn.current || distanciaMetros(camaraEn.current, p) > SALTO_MAX_M;
+      mapa.current?.seguir(p, rapido || lejos ? 600 : DESLIZAR_MS);
+    }
+    camaraEn.current = p;
+  };
+
+  // Al abrir: se ve todo un momento (encuadreInicial) y luego se acerca a la moto.
   useEffect(() => {
-    if (tocado.current) return;
-    const antes = encuadrados.current;
-    const movido =
-      !antes || antes.length !== puntos.length || puntos.some((p, i) => distanciaMetros(p, antes[i]) > REENCUADRAR_M);
-    if (movido) encuadrar(puntos);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clave]);
+    const t = setTimeout(() => {
+      if (montado.current && siguiendoRef.current) irTrasLaMoto(true);
+    }, VER_TODO_MS);
+    return () => clearTimeout(t);
+  }, []);
+
+  // Cada posición nueva: la cámara va detrás, al mismo ritmo que la moto.
+  const lat = domiciliario?.lat;
+  const lng = domiciliario?.lng;
+  useEffect(() => {
+    if (lat == null || lng == null) return;
+    moto.current = { lat, lng };
+    if (siguiendoRef.current && yaSeAcerco.current) irTrasLaMoto(false);
+  }, [lat, lng]);
+
+  /** Vuelve a seguir a la moto (o, sin moto, encuadra lo que haya). */
+  const volverASeguir = () => {
+    setSiguiendo(true);
+    siguiendoRef.current = true;
+    if (moto.current) irTrasLaMoto(true);
+    else encuadrarTodo();
+  };
 
   async function refrescar() {
     if (!onRefrescar || refrescando) return;
     setRefrescando(true);
-    tocado.current = false;
     const desde = Date.now();
     try {
       await onRefrescar();
@@ -470,7 +513,7 @@ export function MapaSeguimiento({
       if (falta > 0) await new Promise<void>(r => setTimeout(r, falta));
       if (montado.current) {
         setRefrescando(false);
-        encuadrar(puntosRef.current);
+        volverASeguir();
       }
     }
   }
@@ -484,7 +527,8 @@ export function MapaSeguimiento({
         vistaInicial={puntos[0] ? vistaDe(puntos[0], ZOOM.zona) : MAICAO}
         encuadreInicial={puntos.length > 1 ? { puntos, margen: MARGEN_SEGUIMIENTO } : undefined}
         onArrastrar={() => {
-          tocado.current = true;
+          siguiendoRef.current = false;
+          setSiguiendo(false);
         }}>
         {!!negocio && <PinNegocio punto={negocio.punto} nombre={negocio.nombre} imagen={negocio.imagen} />}
         {!!entrega && <PinEntrega punto={entrega} />}
@@ -505,6 +549,18 @@ export function MapaSeguimiento({
             <Icon name="refrescar" size={20} color={c.text} />
           )}
         </PressableScale>
+      )}
+      {!siguiendo && !!domiciliario && (
+        <View style={styles.seguirFila} pointerEvents="box-none">
+          <PressableScale
+            onPress={volverASeguir}
+            accessibilityRole="button"
+            accessibilityLabel="Seguir al domiciliario"
+            style={styles.seguir}>
+            <Icon name="moto" size={16} color={c.onAccent} />
+            <Text style={styles.seguirTxt}>Seguir al domiciliario</Text>
+          </PressableScale>
+        </View>
       )}
     </View>
   );
@@ -598,6 +654,18 @@ const useStyles = makeStyles((c, shadow) => ({
     justifyContent: 'center',
     ...shadow.soft,
   },
+  seguirFila: { position: 'absolute', left: 0, right: 0, bottom: 12, alignItems: 'center' },
+  seguir: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    backgroundColor: c.accent,
+    ...shadow.soft,
+  },
+  seguirTxt: { color: c.onAccent, fontFamily: font.semibold, fontSize: 13 },
   notaFila: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
   punto: { width: 8, height: 8, borderRadius: 4 },
   nota: { color: c.muted, fontSize: 12, fontFamily: font.medium },
