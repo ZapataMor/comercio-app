@@ -152,13 +152,24 @@ class AdminController extends Controller
     }
 
     /** Vista global de todos los negocios. */
-    public function negocios(): View
+    public function negocios(Request $request): View
     {
-        $negocios = Negocio::with('user')
-            ->withCount('productos')
-            ->orderBy('nombre')
-            ->get();
+        $request->validate(['buscar' => ['nullable', 'string', 'max:100']]);
+        $query = Negocio::query()
+            ->when($request->boolean('abiertos'), fn ($q) => $q->where('activo', true))
+            ->when($request->buscar, fn ($q, $v) => $q->where('nombre', 'like', '%'.$v.'%'));
+        // El mapa incluye todos los resultados, no solo la página de tarjetas.
+        $ubicaciones = (clone $query)->whereNotNull('lat')->whereNotNull('lng')
+            ->whereBetween('lat', [-90, 90])->whereBetween('lng', [-180, 180])
+            ->orderBy('nombre')->get(['id', 'nombre', 'direccion', 'activo', 'lat', 'lng'])
+            ->map(fn ($n) => [
+                'id' => $n->id, 'nombre' => $n->nombre, 'direccion' => $n->direccion,
+                'activo' => $n->activo, 'lat' => $n->lat, 'lng' => $n->lng,
+                'url' => route('admin.negocio', $n),
+            ]);
+        $negocios = $query->with('user')->withCount('productos')->orderBy('nombre')
+            ->paginate(25)->withQueryString();
 
-        return view('admin.negocios', compact('negocios'));
+        return view('admin.negocios', compact('negocios', 'ubicaciones'));
     }
 }
