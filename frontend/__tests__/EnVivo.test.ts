@@ -2,7 +2,7 @@
  * Cambios en vivo: a qué servidor de WebSockets se conecta la app y qué
  * avisos le llegan a cada pantalla.
  */
-import { alCambiarEnVivo, servidorEnVivo, simularAvisoEnVivo } from '../src/enVivo';
+import { alCambiarEnVivo, clasePusher, servidorEnVivo, simularAvisoEnVivo } from '../src/enVivo';
 import { temasDelNegocio } from '../src/usePolling';
 
 test('en desarrollo usa ws en el puerto de Reverb del mismo host', () => {
@@ -31,4 +31,17 @@ test('los oyentes reciben los avisos hasta que se quitan', () => {
   simularAvisoEnVivo({ tema: 'negocio', negocio_id: 3 });
   expect(oyente).toHaveBeenCalledTimes(1);
   expect(oyente).toHaveBeenCalledWith({ tema: 'negocio', negocio_id: 3 });
+});
+
+test('toma el cliente de pusher-js tal como lo exporta su versión de React Native', () => {
+  // El módulo real (sin simular): exporta { Pusher }, no un default. Con
+  // `import Pusher from` la app nunca llegó a conectarse en vivo.
+  const real = jest.requireActual('pusher-js/react-native');
+  expect(typeof real.default).not.toBe('function');
+  expect(clasePusher(real)).toBe(real.Pusher);
+
+  const Fn = function () {};
+  expect(clasePusher({ default: Fn })).toBe(Fn);
+  expect(clasePusher(Fn)).toBe(Fn);
+  expect(() => clasePusher({})).toThrow();
 });

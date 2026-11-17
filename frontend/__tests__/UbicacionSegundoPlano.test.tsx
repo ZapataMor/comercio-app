@@ -13,7 +13,7 @@ import { ActivityIndicator, AppState, AppStateStatus, Linking, PermissionsAndroi
 import ReactTestRenderer, { act } from 'react-test-renderer';
 import { ApiError, enviarUbicacion } from '../src/api';
 import AvisoUbicacion from '../src/components/AvisoUbicacion';
-import { MapaSeguimiento, NotaEnVivo } from '../src/components/Mapa';
+import { MapaSeguimiento, NotaEnVivo, usePuntoSuave } from '../src/components/Mapa';
 import { ID_AVISO_UBICACION } from '../src/servicioUbicacion';
 import {
   detenerRastreo,
@@ -117,30 +117,36 @@ describe('Compartir la ubicación del domiciliario', () => {
     expect(watch.mock.calls[0][2]).toMatchObject({ enableHighAccuracy: true, distanceFilter: 0 });
   });
 
-  it('en segundo plano sigue enviando: moviéndose cada 5 s como mucho y quieto cada 30 s', async () => {
+  it('en segundo plano sigue enviando: moviéndose cada 2 s como mucho y quieto cada 30 s', async () => {
     await montar();
     await pasarA('background');
 
     expect(clearWatch).not.toHaveBeenCalled();
     expect(detenerServicio).not.toHaveBeenCalled();
+    expect(watch.mock.calls[0][2]).toMatchObject({ interval: 2000, fastestInterval: 1000 });
 
     await leerGps(MAICAO, 0);
     expect(mockEnviar).toHaveBeenCalledTimes(1);
     expect(mockEnviar).toHaveBeenLastCalledWith('t', MAICAO);
 
-    // Se movió 50 m, pero hace menos de 5 s del último envío.
-    await leerGps(norte(50), 3000);
+    // Se movió 20 m, pero hace menos de 2 s del último envío.
+    await leerGps(norte(20), 1000);
     expect(mockEnviar).toHaveBeenCalledTimes(1);
 
-    await leerGps(norte(50), 6000);
+    await leerGps(norte(20), 2000);
     expect(mockEnviar).toHaveBeenCalledTimes(2);
-    expect(mockEnviar).toHaveBeenLastCalledWith('t', norte(50));
+    expect(mockEnviar).toHaveBeenLastCalledWith('t', norte(20));
+
+    // Moviéndose a ~20 km/h: un envío cada 2 s (30 por minuto, dentro del límite de 60).
+    await leerGps(norte(31), 4000);
+    await leerGps(norte(42), 6000);
+    expect(mockEnviar).toHaveBeenCalledTimes(4);
 
     // Quieto (2 m es ruido del GPS): espera 30 s para reenviar.
-    await leerGps(norte(52), 16000);
-    expect(mockEnviar).toHaveBeenCalledTimes(2);
-    await leerGps(norte(52), 37000);
-    expect(mockEnviar).toHaveBeenCalledTimes(3);
+    await leerGps(norte(44), 16000);
+    expect(mockEnviar).toHaveBeenCalledTimes(4);
+    await leerGps(norte(44), 37000);
+    expect(mockEnviar).toHaveBeenCalledTimes(5);
   });
 
   it('sin red reintenta con la siguiente lectura', async () => {
@@ -416,5 +422,64 @@ describe('Botón «actualizar» del mapa de seguimiento', () => {
 
     expect(fresca).toBeTruthy();
     expect(colorDelPunto()).not.toBe(fresca);
+  });
+});
+
+describe('La moto se desliza entre posiciones en el mapa del cliente', () => {
+  let visto: { lat: number; lng: number } | null = null;
+  function Moto({ punto }: { punto: { lat: number; lng: number } | null }) {
+    visto = usePuntoSuave(punto);
+    return null;
+  }
+
+  it('avanza de a poco hasta la nueva posición en ~2 s, en vez de saltar', async () => {
+    await act(async () => {
+      raiz = ReactTestRenderer.create(<Moto punto={MAICAO} />);
+    });
+    expect(visto).toEqual(MAICAO);
+
+    const destino = norte(40);
+    await act(async () => raiz.update(<Moto punto={destino} />));
+    await act(async () => {
+      jest.advanceTimersByTime(1000);
+    });
+    // A mitad de camino: ni en el origen ni en el destino.
+    expect(visto!.lat).toBeGreaterThan(MAICAO.lat);
+    expect(visto!.lat).toBeLessThan(destino.lat);
+
+    await act(async () => {
+      jest.advanceTimersByTime(1100);
+    });
+    expect(visto).toEqual(destino);
+  });
+
+  it('un salto grande (más de 1 km) se pone de una', async () => {
+    await act(async () => {
+      raiz = ReactTestRenderer.create(<Moto punto={MAICAO} />);
+    });
+    const lejos = norte(3000);
+    await act(async () => raiz.update(<Moto punto={lejos} />));
+    expect(visto).toEqual(lejos);
+  });
+
+  it('si llega otra posición a mitad de camino, sigue desde donde va (sin volver atrás)', async () => {
+    await act(async () => {
+      raiz = ReactTestRenderer.create(<Moto punto={MAICAO} />);
+    });
+    await act(async () => raiz.update(<Moto punto={norte(40)} />));
+    await act(async () => {
+      jest.advanceTimersByTime(1000);
+    });
+    const aMitad = visto!.lat;
+
+    await act(async () => raiz.update(<Moto punto={norte(80)} />));
+    await act(async () => {
+      jest.advanceTimersByTime(50);
+    });
+    expect(visto!.lat).toBeGreaterThanOrEqual(aMitad);
+    await act(async () => {
+      jest.advanceTimersByTime(2100);
+    });
+    expect(visto).toEqual(norte(80));
   });
 });

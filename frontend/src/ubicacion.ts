@@ -19,14 +19,17 @@ import { detenerServicioUbicacion, iniciarServicioUbicacion } from './servicioUb
  *    domiciliario lo muestra fijo con un botón que lo arregla (AvisoUbicacion).
  */
 
-/** Cada cuánto se le pide una lectura al GPS. */
-const CADA_MS = 10000;
-/** Moviéndose, no se envía más seguido que esto (el backend acepta 20 por minuto). */
-const MIN_ENTRE_ENVIOS_MS = 5000;
+/**
+ * Cada cuánto se le pide una lectura al GPS. Con 2 s el cliente ve la moto
+ * avanzar casi continua (el mapa la desliza entre puntos, ver Mapa.tsx).
+ */
+const CADA_MS = 2000;
+/** Moviéndose, no se envía más seguido que esto (el backend acepta 60 por minuto). */
+const MIN_ENTRE_ENVIOS_MS = 2000;
 /** Quieto, se reenvía la misma posición cada tanto para que no se vea vieja. */
 const SIN_MOVERSE_MS = 30000;
-/** Menos que esto es ruido del GPS, no movimiento. */
-const MOVIMIENTO_M = 10;
+/** Menos que esto es ruido del GPS, no movimiento (a 20 km/h son ~11 m cada 2 s). */
+const MOVIMIENTO_M = 6;
 /** Un envío que no responde en este tiempo se da por perdido. */
 const ENVIO_COLGADO_MS = 30000;
 
@@ -159,8 +162,8 @@ export async function arreglarUbicacion(): Promise<void> {
  * detenerRastreo(): ya no le toca compartir, cerró sesión, o el servidor
  * rechazó la sesión.
  *
- * Cada lectura del GPS (unas cada 10 s) decide si se envía: moviéndose, cada
- * 5 s como mucho; quieto, cada 30 s. No se usan timers de JS porque con la
+ * Cada lectura del GPS (unas cada 2 s) decide si se envía: moviéndose, cada
+ * 2 s como mucho; quieto, cada 30 s. No se usan timers de JS porque con la
  * pantalla apagada Android no los dispara; las lecturas del GPS sí llegan.
  */
 type Rastreo = { token: string; detener: () => void };
@@ -285,7 +288,7 @@ function crearRastreo(token: string): Rastreo {
         }
       },
       // distanceFilter 0: también llegan lecturas estando quieto (para reenviar).
-      { enableHighAccuracy: true, distanceFilter: 0, interval: CADA_MS, fastestInterval: MIN_ENTRE_ENVIOS_MS },
+      { enableHighAccuracy: true, distanceFilter: 0, interval: CADA_MS, fastestInterval: CADA_MS / 2 },
     );
   };
 

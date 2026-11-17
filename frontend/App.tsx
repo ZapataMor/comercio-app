@@ -338,7 +338,11 @@ function EnVivoBridge() {
       desconectarEnVivo();
       return;
     }
-    conectarEnVivo(token).then(aplicar).catch(() => {});
+    // Sin conexión en vivo las pantallas siguen con su refresco de respaldo,
+    // pero que quede en el log: así se descubrió que nunca conectaba.
+    conectarEnVivo(token)
+      .then(aplicar)
+      .catch(e => console.warn('No se pudo conectar a los cambios en vivo.', e));
     return () => desconectarEnVivo();
   }, [token, aplicar]);
 

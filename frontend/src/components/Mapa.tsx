@@ -24,6 +24,7 @@ import { ActivityIndicator, Image, Linking, StyleProp, Text, View, ViewStyle } f
 import { Coordenadas, imagenUrl, TipoPropiedad, UbicacionEnVivo } from '../api';
 import { precioCorto, tipoPropiedad } from '../propiedades';
 import { Colores, font, makeStyles, radius, useTheme } from '../theme';
+import { distanciaMetros } from '../ubicacion';
 import { PressableScale } from './anim';
 import { ESTILOS_MAPA } from './estiloMapa';
 import Icon from './Icon';
@@ -335,9 +336,74 @@ const MARGEN_SEGUIMIENTO: Margen = { top: 70, right: 60, bottom: 50, left: 60 };
 const REFRESCO_MIN_MS = 600;
 
 /**
- * Mapa pequeño del seguimiento: el domiciliario (en vivo), el negocio y, si
- * se conoce, la puerta de la entrega. Encuadra a todos cada vez que llega una posición nueva, hasta que la
- * persona mueve el mapa con el dedo.
+ * Cuánto tarda la moto en deslizarse hasta su nueva posición: lo que tarda en
+ * llegar la siguiente (el domiciliario envía cada ~2 s moviéndose), así se ve
+ * avanzar seguida en vez de a saltos.
+ */
+const DESLIZAR_MS = 2000;
+/** Un salto mayor (o la primera posición) se pone de una: deslizarlo engañaría. */
+const SALTO_MAX_M = 1000;
+/** La cámara se reencuadra solo cuando algo se movió esto: si no, el mapa no pararía. */
+const REENCUADRAR_M = 120;
+
+/**
+ * Posición que se va deslizando hacia `destino` (en línea recta, a velocidad
+ * pareja). Si llega otra antes de terminar, sigue desde donde va.
+ */
+export function usePuntoSuave(destino: Coordenadas | null | undefined, duracionMs = DESLIZAR_MS): Coordenadas | null {
+  const [visible, setVisible] = useState<Coordenadas | null>(destino ? { lat: destino.lat, lng: destino.lng } : null);
+  const actual = useRef<Coordenadas | null>(visible);
+  const lat = destino?.lat;
+  const lng = destino?.lng;
+
+  useEffect(() => {
+    if (lat == null || lng == null) {
+      actual.current = null;
+      setVisible(null);
+      return;
+    }
+    const hasta = { lat, lng };
+    const desde = actual.current;
+    if (desde && desde.lat === lat && desde.lng === lng) return;
+    if (!desde || distanciaMetros(desde, hasta) > SALTO_MAX_M) {
+      actual.current = hasta;
+      setVisible(hasta);
+      return;
+    }
+    const inicio = Date.now();
+    let cuadro: ReturnType<typeof requestAnimationFrame> | null = null;
+    let pintado = 0;
+    const paso = () => {
+      const t = Math.min(1, (Date.now() - inicio) / duracionMs);
+      const punto = { lat: desde.lat + (hasta.lat - desde.lat) * t, lng: desde.lng + (hasta.lng - desde.lng) * t };
+      actual.current = punto;
+      // ~30 cuadros por segundo bastan y no recargan el mapa.
+      if (t === 1 || Date.now() - pintado >= 33) {
+        pintado = Date.now();
+        setVisible(punto);
+      }
+      cuadro = t < 1 ? requestAnimationFrame(paso) : null;
+    };
+    cuadro = requestAnimationFrame(paso);
+    return () => {
+      if (cuadro !== null) cancelAnimationFrame(cuadro);
+    };
+  }, [lat, lng, duracionMs]);
+
+  return visible;
+}
+
+/** La moto del seguimiento, deslizándose entre posiciones (solo ella se repinta). */
+function PinDomiciliarioSuave({ punto }: { punto: Coordenadas }) {
+  const suave = usePuntoSuave(punto);
+  return suave ? <PinDomiciliario punto={suave} /> : null;
+}
+
+/**
+ * Mapa pequeño del seguimiento: el domiciliario (en vivo, deslizándose entre
+ * posiciones), el negocio y, si se conoce, la puerta de la entrega. Encuadra a
+ * todos cuando alguno se movió más de REENCUADRAR_M, hasta que la persona mueve
+ * el mapa con el dedo.
  *
  * Con `onRefrescar` muestra un botón encima del mapa: pide la posición más
  * reciente y vuelve a encuadrar a todos (aunque la persona haya movido el mapa).
@@ -373,16 +439,22 @@ export function MapaSeguimiento({
     },
     [],
   );
+  // Con lo que se encuadró la última vez: ver REENCUADRAR_M.
+  const encuadrados = useRef<Coordenadas[] | null>(null);
 
   const encuadrar = (lista: Coordenadas[]) => {
     if (lista.length === 0) return;
+    encuadrados.current = lista;
     if (lista.length === 1) mapa.current?.irA(lista[0], ZOOM.zona);
     else mapa.current?.encuadrar(lista, MARGEN_SEGUIMIENTO);
   };
 
   useEffect(() => {
     if (tocado.current) return;
-    encuadrar(puntos);
+    const antes = encuadrados.current;
+    const movido =
+      !antes || antes.length !== puntos.length || puntos.some((p, i) => distanciaMetros(p, antes[i]) > REENCUADRAR_M);
+    if (movido) encuadrar(puntos);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clave]);
 
@@ -416,7 +488,7 @@ export function MapaSeguimiento({
         }}>
         {!!negocio && <PinNegocio punto={negocio.punto} nombre={negocio.nombre} imagen={negocio.imagen} />}
         {!!entrega && <PinEntrega punto={entrega} />}
-        {!!domiciliario && <PinDomiciliario punto={domiciliario} />}
+        {!!domiciliario && <PinDomiciliarioSuave punto={domiciliario} />}
       </MapaVitrina>
       {!!onRefrescar && (
         <PressableScale

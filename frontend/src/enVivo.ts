@@ -30,9 +30,28 @@
  * Si no hay conexión con Reverb la app sigue funcionando con el refresco de
  * respaldo de cada pantalla.
  */
-import Pusher from 'pusher-js/react-native';
+import type PusherCliente from 'pusher-js/react-native';
+import * as moduloPusher from 'pusher-js/react-native';
 import { getCanalesEnVivo, Usuario } from './api';
 import { API_URL, EN_VIVO_KEY, EN_VIVO_PUERTO_DESARROLLO } from './config';
+
+/**
+ * La versión de React Native de pusher-js exporta `{ Pusher }` (CommonJS), no
+ * un default, aunque sus tipos digan lo contrario. Con `import Pusher from`
+ * quedaba el objeto y `new Pusher()` lanzaba «Pusher is not a constructor».
+ * Ese error se tragaba, la app nunca se conectó en vivo y todo dependía del
+ * refresco de respaldo (cada 10–15 s). Hasta el 2026-11-16 pasó en todas las
+ * versiones; las pruebas no lo veían porque usan un pusher simulado.
+ */
+export function clasePusher(modulo: unknown): typeof PusherCliente {
+  const m = modulo as { Pusher?: unknown; default?: unknown };
+  const d = m?.default as { Pusher?: unknown } | undefined;
+  const candidato = [m?.Pusher, d?.Pusher, m?.default, modulo].find(x => typeof x === 'function');
+  if (!candidato) throw new Error('pusher-js/react-native no trae el cliente de Pusher.');
+  return candidato as typeof PusherCliente;
+}
+
+const Pusher = clasePusher(moduloPusher);
 
 export type AvisoEnVivo = {
   tema: string;
@@ -44,7 +63,7 @@ export type AvisoEnVivo = {
 type Oyente = (aviso: AvisoEnVivo) => void;
 
 const oyentes = new Set<Oyente>();
-let cliente: Pusher | null = null;
+let cliente: PusherCliente | null = null;
 let tokenActual: string | null = null;
 let suscritos = new Set<string>();
 let conectado = false;
