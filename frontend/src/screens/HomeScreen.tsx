@@ -8,7 +8,6 @@ import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import BotonMantener from '../components/BotonMantener';
 import { PedirCodigo } from '../components/CodigoPedido';
-import HeaderNegocios from '../components/HeaderNegocios';
 import HeaderPerfil from '../components/HeaderPerfil';
 import Icon, { IconName } from '../components/Icon';
 import { IrAExplorar, Saludo } from '../components/SaludoInicio';
@@ -266,7 +265,6 @@ export default function HomeScreen({ navigation }: Props) {
       headerRight: () => (
         <View style={styles.headerDerecha}>
           <HeaderEstadoNegocio />
-          <HeaderNegocios />
           <HeaderPerfil />
         </View>
       ),

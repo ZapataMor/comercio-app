@@ -1,7 +1,6 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
-import HeaderNegocios from '../components/HeaderNegocios';
 import HeaderPerfil from '../components/HeaderPerfil';
 import PanelDomiciliario, { PanelDomiciliarioRef } from '../components/PanelDomiciliario';
 import { IrAExplorar, Saludo } from '../components/SaludoInicio';
@@ -27,7 +26,6 @@ export default function EntregasScreen({ navigation }: Props) {
     navigation.setOptions({
       headerRight: () => (
         <View style={styles.headerDerecha}>
-          <HeaderNegocios />
           <HeaderPerfil />
         </View>
       ),

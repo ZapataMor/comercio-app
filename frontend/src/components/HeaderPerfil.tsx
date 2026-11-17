@@ -15,7 +15,9 @@ import ReembolsosPerfil from './ReembolsosPerfil';
  * guardadas y aparece también "Cerrar todas las sesiones".
  *
  * Al domiciliario se le muestran al lado su nivel de confiabilidad
- * (HeaderConfiabilidad) y su turno (HeaderTurno).
+ * (HeaderConfiabilidad) y su turno (HeaderTurno). Quien tiene negocios ve
+ * siempre, junto al ícono de usuario, el de "Mis negocios" (HeaderNegocios):
+ * en el catálogo, en Explorar o en cualquier pantalla con esta topbar.
  */
 import React from 'react';
 import { Linking, Text, View } from 'react-native';
@@ -30,6 +32,7 @@ import { useToast } from '../Toast';
 import { PressableScale } from './anim';
 import { useConfirmar } from './Confirmacion';
 import HeaderConfiabilidad from './HeaderConfiabilidad';
+import HeaderNegocios from './HeaderNegocios';
 import HeaderTurno from './HeaderTurno';
 import Icon, { IconName } from './Icon';
 import MenuDesplegable, { OpcionMenu } from './MenuDesplegable';
@@ -174,6 +177,7 @@ export default function HeaderPerfil() {
     <View style={styles.fila}>
       <HeaderConfiabilidad />
       <HeaderTurno />
+      <HeaderNegocios />
       <MenuDesplegable
         icono="usuario"
         etiqueta="Mi perfil"

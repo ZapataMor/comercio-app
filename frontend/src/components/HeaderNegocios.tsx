@@ -1,6 +1,6 @@
 /**
- * Botón "Mis negocios" de la topbar del Inicio, entre el Abierto/Cerrado y
- * "Mi perfil". Al tocarlo despliega (como el menú de "Mi perfil") la lista
+ * Botón "Mis negocios" de la topbar, justo antes de "Mi perfil" (lo pone
+ * HeaderPerfil, así sale en todas las pantallas con el ícono de usuario). Al tocarlo despliega (como el menú de "Mi perfil") la lista
  * de los negocios de la persona, con el que gestiona ahora marcado; tocar
  * otro lo deja como negocio activo y el Inicio pasa a administrarlo.
  *
