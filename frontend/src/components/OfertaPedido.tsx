@@ -11,7 +11,7 @@
  *
  * Como vive en toda la app, también envía la posición del domiciliario cuando el
  * servidor lo pide (en turno, con entregas o debiendo dinero): no importa en qué
- * pantalla esté, y sigue con la app en segundo plano (ver ubicacion.ts).
+ * pantalla esté, y sigue con la app en segundo plano o cerrada (ver ubicacion.ts).
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { AppState, Modal, Text, View } from 'react-native';
@@ -46,7 +46,9 @@ export default function OfertaPedido() {
   // Pedido aceptado: se está preguntando en cuántos minutos lo recoge.
   const [porTomar, setPorTomar] = useState<Pedido | null>(null);
   const [tomando, setTomando] = useState(false);
-  const [compartir, setCompartir] = useState(false);
+  // null hasta la primera respuesta: al reabrir la app no se apaga el GPS que
+  // siguió compartiendo con la app cerrada.
+  const [compartir, setCompartir] = useState<boolean | null>(null);
 
   useCompartirUbicacion(token, compartir, motivo =>
     toast.error(

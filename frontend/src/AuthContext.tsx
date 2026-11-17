@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useRef, useState } from 'r
 import { AppState } from 'react-native';
 import { alRechazarToken, Usuario } from './api';
 import { eliminarPush, escucharRotacionToken, registrarPush } from './pushNotifications';
+import { detenerRastreo } from './ubicacion';
 
 type Sesion = { token: string; user: Usuario } | null;
 
@@ -54,6 +55,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       tokenActual.current = null;
+      // El GPS del domiciliario sigue aunque se cierre la app: con la sesión rechazada se apaga.
+      detenerRastreo();
       setAuth(null);
       AsyncStorage.removeItem(CLAVE);
     });
@@ -82,6 +85,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [auth?.token, auth?.user.id]);
 
   const entrar = (token: string, user: Usuario) => {
+    // Otra cuenta: lo que compartía la anterior se apaga.
+    if (tokenActual.current && tokenActual.current !== token) detenerRastreo();
     const sesion = { token, user };
     setAuth(sesion);
     AsyncStorage.setItem(CLAVE, JSON.stringify(sesion));
@@ -99,6 +104,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const salir = () => {
+    // Cerrar sesión SÍ deja de compartir la ubicación (cerrar la app no).
+    detenerRastreo();
     if (auth?.token) {
       eliminarPush(auth.token);
     }

@@ -11,11 +11,18 @@ import notifee from '@notifee/react-native';
 import React from 'react';
 import { ActivityIndicator, AppState, AppStateStatus, Linking, PermissionsAndroid, Platform, StyleSheet, Text, View } from 'react-native';
 import ReactTestRenderer, { act } from 'react-test-renderer';
-import { enviarUbicacion } from '../src/api';
+import { ApiError, enviarUbicacion } from '../src/api';
 import AvisoUbicacion from '../src/components/AvisoUbicacion';
 import { MapaSeguimiento, NotaEnVivo } from '../src/components/Mapa';
 import { ID_AVISO_UBICACION } from '../src/servicioUbicacion';
-import { EstadoUbicacion, ProblemaUbicacion, useCompartirUbicacion, useEstadoUbicacion } from '../src/ubicacion';
+import {
+  detenerRastreo,
+  EstadoUbicacion,
+  ProblemaUbicacion,
+  rastreoActivo,
+  useCompartirUbicacion,
+  useEstadoUbicacion,
+} from '../src/ubicacion';
 
 jest.mock('../src/api', () => ({
   ...jest.requireActual('../src/api'),
@@ -43,7 +50,7 @@ const MAICAO = { lat: 11.3779, lng: -72.2395 };
 const norte = (metros: number) => ({ lat: MAICAO.lat + metros / 111320, lng: MAICAO.lng });
 
 let estadoVisto: EstadoUbicacion | null = null;
-function Compartir({ activo, onProblema }: { activo: boolean; onProblema?: (m: ProblemaUbicacion) => void }) {
+function Compartir({ activo, onProblema }: { activo: boolean | null; onProblema?: (m: ProblemaUbicacion) => void }) {
   useCompartirUbicacion('t', activo, onProblema);
   estadoVisto = useEstadoUbicacion();
   return <AvisoUbicacion />;
@@ -92,6 +99,8 @@ beforeEach(() => {
 
 afterEach(() => {
   act(() => raiz?.unmount());
+  // El rastreo sobrevive al desmontaje (como al cerrar la app): se apaga a mano.
+  act(() => detenerRastreo());
   jest.useRealTimers();
 });
 
@@ -173,12 +182,66 @@ describe('Compartir la ubicación del domiciliario', () => {
     expect(watch).toHaveBeenCalledTimes(1);
   });
 
-  it('al dejar de compartir (fuera de turno, cerró sesión) apaga el GPS y quita el aviso', async () => {
+  it('al dejar de compartir (salió de turno y no lleva nada) apaga el GPS y quita el aviso', async () => {
     await montar();
+
+    await act(async () => raiz.update(<Compartir activo={false} />));
+
+    expect(clearWatch).toHaveBeenCalledWith(1);
+    expect(detenerServicio).toHaveBeenCalledTimes(1);
+    expect(rastreoActivo()).toBe(false);
+  });
+
+  it('CERRAR la app (se desmonta toda la interfaz) no detiene el envío', async () => {
+    await montar();
+    await pasarA('background');
 
     await act(async () => raiz.unmount());
 
+    expect(clearWatch).not.toHaveBeenCalled();
+    expect(detenerServicio).not.toHaveBeenCalled();
+    expect(rastreoActivo()).toBe(true);
+    await leerGps(MAICAO, 0);
+    expect(mockEnviar).toHaveBeenCalledTimes(1);
+    await leerGps(norte(80), 10000);
+    expect(mockEnviar).toHaveBeenCalledTimes(2);
+  });
+
+  it('al reabrir la app se reengancha: no apaga ni duplica el GPS mientras pregunta al servidor', async () => {
+    await montar();
+    await act(async () => raiz.unmount());
+
+    // Reabre: aún no sabe si toca compartir (null) y luego el servidor dice que sí.
+    await act(async () => {
+      raiz = ReactTestRenderer.create(<Compartir activo={null} />);
+    });
+    expect(clearWatch).not.toHaveBeenCalled();
+    await act(async () => raiz.update(<Compartir activo />));
+
+    expect(watch).toHaveBeenCalledTimes(1);
+    expect(mockPedir).toHaveBeenCalledTimes(1);
+    expect(detenerServicio).not.toHaveBeenCalled();
+  });
+
+  it('cerrar sesión sí detiene el envío', async () => {
+    await montar();
+    await act(async () => raiz.unmount());
+
+    await act(async () => detenerRastreo());
+
     expect(clearWatch).toHaveBeenCalledWith(1);
+    expect(detenerServicio).toHaveBeenCalledTimes(1);
+    expect(rastreoActivo()).toBe(false);
+  });
+
+  it('si el servidor rechaza la sesión (401) con la app cerrada, se apaga solo', async () => {
+    await montar();
+    await act(async () => raiz.unmount());
+    mockEnviar.mockRejectedValueOnce(new ApiError('Unauthenticated.', 401));
+
+    await leerGps(MAICAO, 0);
+
+    expect(rastreoActivo()).toBe(false);
     expect(detenerServicio).toHaveBeenCalledTimes(1);
   });
 
