@@ -24,6 +24,7 @@ import {
   tomarPedido,
 } from '../api';
 import { useAuth } from '../AuthContext';
+import AvisoUbicacion from './AvisoUbicacion';
 import { navigationRef } from '../RootNavigation';
 import { Colores, font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
@@ -235,6 +236,8 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
 
   return (
     <>
+      {/* Sin ubicación el cliente no lo ve en el mapa: va antes que todo. */}
+      <AvisoUbicacion />
       {/* Lo que ya tomé va arriba: los disponibles quedan debajo. */}
       {entregas.length > 0 && (
         <>

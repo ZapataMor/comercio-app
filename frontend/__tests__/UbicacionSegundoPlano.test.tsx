@@ -1,19 +1,21 @@
 /**
  * GPS del domiciliario también con la app en segundo plano: el servicio en
  * primer plano de Android, el envío al ritmo de las lecturas del GPS (sin
- * timers de JS) y el botón «actualizar» del mapa que ve el cliente.
+ * timers de JS), el aviso fijo cuando no se puede compartir (sin permiso,
+ * aproximada, GPS apagado) y el botón «actualizar» del mapa que ve el cliente.
  * @format
  */
 
 import Geolocation from '@react-native-community/geolocation';
 import notifee from '@notifee/react-native';
 import React from 'react';
-import { ActivityIndicator, AppState, AppStateStatus, PermissionsAndroid, Platform, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, AppState, AppStateStatus, Linking, PermissionsAndroid, Platform, StyleSheet, Text, View } from 'react-native';
 import ReactTestRenderer, { act } from 'react-test-renderer';
 import { enviarUbicacion } from '../src/api';
+import AvisoUbicacion from '../src/components/AvisoUbicacion';
 import { MapaSeguimiento, NotaEnVivo } from '../src/components/Mapa';
 import { ID_AVISO_UBICACION } from '../src/servicioUbicacion';
-import { ProblemaUbicacion, useCompartirUbicacion } from '../src/ubicacion';
+import { EstadoUbicacion, ProblemaUbicacion, useCompartirUbicacion, useEstadoUbicacion } from '../src/ubicacion';
 
 jest.mock('../src/api', () => ({
   ...jest.requireActual('../src/api'),
@@ -27,16 +29,26 @@ const mostrarAviso = notifee.displayNotification as jest.Mock;
 const detenerServicio = notifee.stopForegroundService as jest.Mock;
 const quitarAviso = notifee.cancelNotification as jest.Mock;
 const cambiosApp = AppState.addEventListener as jest.Mock;
+const FINA = PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION;
+const APROX = PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION;
+const { GRANTED, DENIED, NEVER_ASK_AGAIN } = PermissionsAndroid.RESULTS;
+let mockCheck: jest.SpyInstance;
+let mockPedir: jest.SpyInstance;
+/** Lo que el domiciliario elige en el diálogo de permisos. */
+const elige = (fina: string, aprox: string) => mockPedir.mockResolvedValue({ [FINA]: fina, [APROX]: aprox });
 
 const INICIO = new Date('2026-11-16T15:00:00-05:00').getTime();
 const MAICAO = { lat: 11.3779, lng: -72.2395 };
 /** Un punto `metros` al norte de MAICAO. */
 const norte = (metros: number) => ({ lat: MAICAO.lat + metros / 111320, lng: MAICAO.lng });
 
+let estadoVisto: EstadoUbicacion | null = null;
 function Compartir({ activo, onProblema }: { activo: boolean; onProblema?: (m: ProblemaUbicacion) => void }) {
   useCompartirUbicacion('t', activo, onProblema);
-  return null;
+  estadoVisto = useEstadoUbicacion();
+  return <AvisoUbicacion />;
 }
+const textos = () => raiz.root.findAllByType(Text).map(t => [t.props.children].flat(Infinity).join(''));
 
 let raiz: ReactTestRenderer.ReactTestRenderer;
 
@@ -68,7 +80,12 @@ beforeEach(() => {
   jest.useFakeTimers();
   jest.setSystemTime(INICIO);
   jest.replaceProperty(Platform, 'OS', 'android');
-  jest.spyOn(PermissionsAndroid, 'request').mockResolvedValue(PermissionsAndroid.RESULTS.GRANTED);
+  // Recién instalada: sin permiso hasta que conteste el diálogo.
+  mockCheck = jest.spyOn(PermissionsAndroid, 'check').mockResolvedValue(false);
+  mockPedir = jest.spyOn(PermissionsAndroid, 'requestMultiple');
+  elige(GRANTED, GRANTED);
+  jest.spyOn(Linking, 'openSettings').mockResolvedValue(undefined);
+  jest.spyOn(Linking, 'sendIntent').mockResolvedValue(undefined);
   (AppState as { currentState: AppStateStatus }).currentState = 'active';
   mockEnviar.mockResolvedValue(true);
 });
@@ -165,14 +182,119 @@ describe('Compartir la ubicación del domiciliario', () => {
     expect(detenerServicio).toHaveBeenCalledTimes(1);
   });
 
-  it('sin permiso no arranca nada y avisa una vez', async () => {
-    (PermissionsAndroid.request as jest.Mock).mockResolvedValue(PermissionsAndroid.RESULTS.DENIED);
+  it('pide la ubicación precisa junto con la aproximada (Android 12+ lo exige)', async () => {
+    await montar();
+
+    expect(mockPedir).toHaveBeenCalledWith([FINA, APROX]);
+    expect(estadoVisto).toBe('buscando');
+    await leerGps(MAICAO, 0);
+    expect(estadoVisto).toBe('activa');
+    expect(textos().join(' ')).not.toContain('Tu ubicación no se está compartiendo');
+  });
+
+  it('si ya tenía el permiso no vuelve a preguntar', async () => {
+    mockCheck.mockResolvedValue(true);
+    await montar();
+
+    expect(mockPedir).not.toHaveBeenCalled();
+    expect(watch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Cuando el domiciliario no puede compartir, se lo dice fijo hasta arreglarlo', () => {
+  it('dijo que no: aviso fijo, nada arranca, y el botón vuelve a pedir el permiso', async () => {
+    elige(DENIED, DENIED);
     const problema = jest.fn();
     await montar(problema);
 
     expect(problema).toHaveBeenCalledWith('permiso');
     expect(watch).not.toHaveBeenCalled();
     expect(mostrarAviso).not.toHaveBeenCalled();
+    expect(estadoVisto).toBe('sin-permiso');
+    expect(textos()).toContain('Tu ubicación no se está compartiendo');
+
+    elige(GRANTED, GRANTED);
+    await act(async () => {
+      raiz.root.findByProps({ accessibilityLabel: 'Permitir ubicación' }).props.onPress();
+    });
+
+    expect(mockPedir).toHaveBeenCalledTimes(2);
+    expect(watch).toHaveBeenCalledTimes(1);
+    expect(mostrarAviso).toHaveBeenCalledTimes(1);
+    expect(textos()).not.toContain('Tu ubicación no se está compartiendo');
+  });
+
+  it('eligió «Aproximada»: no comparte y le pide la precisa', async () => {
+    elige(DENIED, GRANTED);
+    await montar();
+
+    expect(estadoVisto).toBe('aproximada');
+    expect(watch).not.toHaveBeenCalled();
+    expect(textos()).toContain('Activa la ubicación precisa');
+  });
+
+  it('Android ya no deja preguntar: el botón abre Ajustes y al volver arranca solo', async () => {
+    elige(NEVER_ASK_AGAIN, NEVER_ASK_AGAIN);
+    await montar();
+
+    expect(estadoVisto).toBe('bloqueado');
+    await act(async () => {
+      raiz.root.findByProps({ accessibilityLabel: 'Abrir ajustes' }).props.onPress();
+    });
+    expect(Linking.openSettings).toHaveBeenCalledTimes(1);
+
+    // Volvió de Ajustes con el permiso activado.
+    mockCheck.mockImplementation(async (p: string) => p === FINA);
+    await pasarA('background');
+    await pasarA('active');
+
+    expect(watch).toHaveBeenCalledTimes(1);
+    expect(mostrarAviso).toHaveBeenCalledTimes(1);
+    expect(estadoVisto).toBe('buscando');
+  });
+
+  it('GPS apagado: aviso con botón a los ajustes de ubicación; al volver pide el GPS otra vez', async () => {
+    await montar();
+    const alFallar = watch.mock.calls[0][1];
+    await act(async () => alFallar({ code: 2, message: 'Location not available (FusedLocationProvider/settings).' }));
+
+    expect(estadoVisto).toBe('gps-apagado');
+    expect(textos()).toContain('No encontramos tu ubicación');
+    await act(async () => {
+      raiz.root.findByProps({ accessibilityLabel: 'Encender ubicación' }).props.onPress();
+    });
+    expect(Linking.sendIntent).toHaveBeenCalledWith('android.settings.LOCATION_SOURCE_SETTINGS');
+
+    // Encendió la ubicación y volvió: la librería no había dejado la solicitud registrada.
+    await pasarA('background');
+    await pasarA('active');
+    expect(clearWatch).toHaveBeenCalledWith(1);
+    expect(watch).toHaveBeenCalledTimes(2);
+
+    await leerGps(MAICAO, 0);
+    expect(estadoVisto).toBe('activa');
+    expect(mockEnviar).toHaveBeenCalledTimes(1);
+  });
+
+  it('le quitan el permiso con la app abierta: apaga todo y lo avisa', async () => {
+    await montar();
+    const alFallar = watch.mock.calls[0][1];
+    await act(async () => alFallar({ code: 1, message: 'Location permission was not granted.' }));
+
+    expect(clearWatch).toHaveBeenCalledWith(1);
+    expect(detenerServicio).toHaveBeenCalledTimes(1);
+    expect(estadoVisto).toBe('sin-permiso');
+  });
+
+  it('si ya no le toca compartir, no hay aviso', async () => {
+    elige(DENIED, DENIED);
+    await montar();
+    expect(estadoVisto).toBe('sin-permiso');
+
+    await act(async () => raiz.update(<Compartir activo={false} />));
+
+    expect(estadoVisto).toBeNull();
+    expect(textos()).toHaveLength(0);
   });
 });
 
