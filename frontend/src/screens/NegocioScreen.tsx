@@ -32,7 +32,7 @@ import BotonesContacto from '../components/BotonesContacto';
 import RecetasPreferidas from '../components/RecetasPreferidas';
 import { PuntajeResenas } from '../components/Resenas';
 import { RootStackParamList } from '../navTypes';
-import { OpcionesLinea, precioDe, sePersonaliza } from '../opcionesProducto';
+import { precioDe } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 import { useAgregarAlCarrito } from '../useAgregarAlCarrito';
@@ -76,34 +76,22 @@ function construirCatalogo(productos: Producto[]): CatalogoFila[] {
 type TarjetaProps = {
   producto: Producto;
   destacado: boolean;
-  /** Con el negocio cerrado el producto se puede ver, pero no agregar. */
-  abierto: boolean;
+  /** Abre la ficha: desde ahí se elige y se agrega al carrito. */
   onVer: () => void;
-  onAgregar: (e: GestureResponderEvent) => void;
 };
 
-function TarjetaProducto({ producto, destacado, abierto, onVer, onAgregar }: TarjetaProps) {
+function TarjetaProducto({ producto, destacado, onVer }: TarjetaProps) {
   const { c } = useTheme();
   const styles = useStyles();
   const uri = imagenUrl(producto.imagen);
 
   return (
-    <PressableScale style={styles.tarjeta} scaleTo={0.98} onPress={onVer}>
+    <PressableScale style={styles.tarjeta} scaleTo={0.98} accessibilityRole="button" onPress={onVer}>
       <View style={[styles.foto, destacado && styles.fotoDestacada]}>
         {uri ? (
           <Image source={{ uri }} style={styles.fotoImagen} resizeMode="cover" />
         ) : (
           <Icon name="caja" size={30} color={c.mutedSoft} />
-        )}
-        {abierto && (
-          <PressableScale
-            style={styles.agregar}
-            hitSlop={8}
-            scaleTo={0.88}
-            accessibilityLabel={`Agregar ${producto.nombre}`}
-            onPress={onAgregar}>
-            <Icon name="mas" size={18} color={c.onBrand} strokeWidth={2.4} />
-          </PressableScale>
         )}
       </View>
       <Text style={styles.nombre} numberOfLines={2}>{producto.nombre}</Text>
@@ -210,23 +198,18 @@ export default function NegocioScreen({ navigation, route }: Props) {
     setFicha(p);
   }
 
-  function onAgregar(p: Producto, e: GestureResponderEvent, opciones?: OpcionesLinea) {
+  /**
+   * Una receta preferida ya trae lo suyo elegido y entra directo al carrito.
+   * Los productos del catálogo se agregan desde su ficha.
+   */
+  function agregarReceta(receta: RecetaPreferida, e: GestureResponderEvent) {
     if (!negocioAbierto) {
       toast.info('Negocio cerrado', 'Puedes ver el catálogo, pero no hacer pedidos.');
       return;
     }
-    // Hay que elegir peso, talla o color, o se pueden quitar ingredientes o
-    // pedir extras: eso se hace en la ficha, antes de mandarlo al carrito. Una
-    // receta preferida ya trae lo suyo elegido y entra directo.
-    if (!opciones && sePersonaliza(p)) {
-      verProducto(p);
-      return;
-    }
-
-    // Punto exacto del toque sobre "+": desde ahí salta el paquetito que vuela
-    // hasta el botón flotante de Carrito.
+    // Desde el punto del toque salta el paquetito que vuela hasta Carrito.
     const desde = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
-    agregar(p, { opciones, alAgregar: () => volar(desde) });
+    agregar(receta.producto, { opciones: receta.opciones, alAgregar: () => volar(desde) });
   }
 
   if (cargando) {
@@ -305,7 +288,7 @@ export default function NegocioScreen({ navigation, route }: Props) {
             {seccion === 'productos' && <RecetasPreferidas
               recetas={recetas}
               abierto={negocioAbierto}
-              onAgregar={(receta, e) => onAgregar(receta.producto, e, receta.opciones)}
+              onAgregar={agregarReceta}
             />}
           </View>
         ) : null
@@ -343,9 +326,7 @@ export default function NegocioScreen({ navigation, route }: Props) {
                 key={p.id}
                 producto={p}
                 destacado={p.id === productoId}
-                abierto={negocioAbierto}
                 onVer={() => verProducto(p)}
-                onAgregar={e => onAgregar(p, e)}
               />
             ))}
             {/* Fila incompleta: el hueco conserva el ancho de la columna. */}
@@ -397,7 +378,7 @@ export default function NegocioScreen({ navigation, route }: Props) {
   );
 }
 
-const useStyles = makeStyles((c, shadow) => ({
+const useStyles = makeStyles(c => ({
   solicitarCita: { backgroundColor: c.accent, borderRadius: radius.md, padding: 14, marginTop: 12, alignItems: 'center' },
   solicitarTexto: { color: c.onBrand, fontFamily: font.semibold },
   container: { flex: 1, backgroundColor: c.bg },
@@ -451,18 +432,6 @@ const useStyles = makeStyles((c, shadow) => ({
   },
   fotoDestacada: { borderWidth: 2, borderColor: c.accent },
   fotoImagen: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%' },
-  agregar: {
-    position: 'absolute',
-    right: 8,
-    bottom: 8,
-    width: 34,
-    height: 34,
-    borderRadius: radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: c.brand,
-    ...shadow.soft,
-  },
   nombre: { color: c.textStrong, fontSize: 14, lineHeight: 19, fontFamily: font.medium, marginTop: 10 },
   precio: { color: c.text, fontSize: 14, fontFamily: font.bold, marginTop: 3 },
   puntaje: { marginTop: 3 },

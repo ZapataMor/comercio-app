@@ -14,10 +14,16 @@ jest.mock('../src/AuthContext', () => ({
   useAuth: () => ({ auth: { token: 't', user: { id: 7 } } }),
 }));
 
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+}));
+
 jest.mock('../src/api', () => ({
   ...jest.requireActual('../src/api'),
   getCatalogo: jest.fn(),
   getRecetasPreferidas: jest.fn(),
+  // Las reseñas de la ficha no son parte de esto: se quedan cargando.
+  getResenas: jest.fn(() => new Promise(() => {})),
 }));
 
 const mockAgregar = jest.fn((..._args: unknown[]) => true);
@@ -121,3 +127,21 @@ test('con la tienda cerrada avisa y no agrega', async () => {
   expect(mockAgregar).not.toHaveBeenCalled();
   expect(mockToast.info).toHaveBeenCalledWith('Negocio cerrado', expect.any(String));
 });
+
+test('las tarjetas del catálogo no tienen botón +: se toca la tarjeta y abre la ficha', async () => {
+  await abrirTienda({ recetas: [] });
+
+  expect(raiz.root.findAll(h => h.props.accessibilityLabel === 'Agregar Hamburguesa')).toHaveLength(0);
+
+  const tarjeta = raiz.root.find(
+    h => typeof h.props.onPress === 'function' && h.props.accessibilityRole === 'button' && textosDe(h).includes('Hamburguesa'),
+  );
+  await act(async () => tarjeta.props.onPress());
+
+  expect(textos()).toContain('Personalízalo');
+  expect(mockAgregar).not.toHaveBeenCalled();
+});
+
+function textosDe(nodo: ReactTestRenderer.ReactTestInstance) {
+  return nodo.findAllByType(Text).map(t => [t.props.children].flat(Infinity).join(''));
+}
