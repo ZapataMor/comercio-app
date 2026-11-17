@@ -9,8 +9,12 @@
     <link rel="stylesheet" href="{{ asset('web-app.css') }}?v={{ filemtime(public_path('web-app.css')) }}">
     <script src="{{ asset('web-theme.js') }}" defer></script>
     <script src="https://cdn.tailwindcss.com"></script>
+@if(request()->routeIs('admin.*'))
+<link rel="stylesheet" href="{{ asset('admin.css') }}">
+<script src="{{ asset('admin.js') }}" defer></script>
+@endif
 </head>
-<body class="web-legacy bg-slate-100 text-slate-800 min-h-screen">
+<body class="{{ request()->routeIs('admin.*') ? 'admin-shell' : '' }} web-legacy bg-slate-100 text-slate-800 min-h-screen">
 
     @auth
     @php $u = auth()->user(); @endphp
@@ -54,6 +58,7 @@
             <div class="mb-4 rounded-lg bg-red-100 text-red-800 px-4 py-3 text-sm">{{ session('error') }}</div>
         @endif
 
+        @if ($errors->any())<div role="alert" class="card admin-error"><strong>Revisa estos datos</strong><ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
         @yield('contenido')
     </main>
 

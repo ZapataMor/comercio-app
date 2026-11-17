@@ -1,11 +1,6 @@
-{{-- Navegación del panel de administrador --}}
-@php $r = request()->route()->getName(); @endphp
-<nav class="flex gap-2 mb-5 text-sm">
-    <a href="{{ route('admin.panel') }}"
-       class="px-3 py-1.5 rounded-lg {{ $r === 'admin.panel' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50' }}">Tablero</a>
-    <a href="{{ route('admin.usuarios') }}"
-       class="px-3 py-1.5 rounded-lg {{ $r === 'admin.usuarios' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50' }}">Usuarios</a>
-    <a href="{{ route('admin.negocios') }}"
-       class="px-3 py-1.5 rounded-lg {{ $r === 'admin.negocios' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50' }}">Negocios</a>
-    <a href="{{ route('admin.reportes') }}" class="px-3 py-1.5 rounded-lg {{ $r === 'admin.reportes' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50' }}">Reportes</a>
+<nav class="admin-nav" aria-label="Administración">
+<div class="nav-label">OPERACIÓN</div>
+@foreach(['panel'=>'Resumen','usuarios'=>'Usuarios','negocios'=>'Negocios','mapa'=>'Domiciliarios','reportes'=>'Reportes','configuracion'=>'Configuración','auditoria'=>'Registro de acciones'] as $ruta=>$label)
+<a href="{{ route('admin.'.$ruta) }}" @class(['selected'=>(request()->routeIs('admin.'.$ruta) || ($ruta==='negocios' && request()->routeIs('admin.negocio*')))]) @if((request()->routeIs('admin.'.$ruta) || ($ruta==='negocios' && request()->routeIs('admin.negocio*')))) aria-current="page" @endif>{{ $label }}</a>
+@endforeach
 </nav>

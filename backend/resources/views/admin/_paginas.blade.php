@@ -1,0 +1,1 @@
+<nav class="filters" aria-label="Paginación"><span>Página {{ $pagina }} de {{ $ultima_pagina }}</span>@if($pagina>1)<a href="{{ request()->fullUrlWithQuery(['page'=>$pagina-1]) }}">Anterior</a>@endif @if($pagina<$ultima_pagina)<a href="{{ request()->fullUrlWithQuery(['page'=>$pagina+1]) }}">Siguiente</a>@endif</nav>

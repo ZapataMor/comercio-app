@@ -447,6 +447,37 @@ class EnVivo
             Api\CitaController::class.'@reprogramar' => ['despues' => fn (Request $r) => self::cita($id($r))],
 
             // --- Administración ---
+            Web\OperacionController::class.'@accion' => ['despues' => function (Request $r) {
+                if (! $r->attributes->get('admin_accion_ok')) {
+                    return;
+                }
+                $id = (int) $r->route('id');
+                switch ($r->route('accion')) {
+                    case 'suspender': case 'reactivar':
+                        self::perfil($id);
+                        self::datosNegocio(null);
+                        break;
+                    case 'cerrar': self::pedido($id);
+                        break;
+                    case 'tarifa': self::avisar([self::CATALOGO, self::ADMIN], 'ajustes');
+                        break;
+                    case 'aprobar-barrio': case 'rechazar-barrio': self::avisar([self::CATALOGO, self::ADMIN], 'barrios');
+                        break;
+                    case 'ocultar': case 'restaurar': self::resenas(Resena::whereKey($id)->value('negocio_id'));
+                        break;
+                    case 'descartar-reportes': self::avisar(self::ADMIN, 'resenas');
+                        break;
+                    case 'vetar': case 'levantar-veto': self::reputacion($r->input('tipo'), $id);
+                        break;
+                    case 'anular-evento':
+                        $evento = ReputacionEvento::find($id);
+                        if ($evento) {
+                            self::reputacion($evento->tipo, $evento->sujeto_id);
+                        }
+                        break;
+                }
+            }],
+
             Api\AdminController::class.'@storeUsuario' => ['despues' => fn () => self::avisar(self::ADMIN, 'usuarios')],
             Api\AdminController::class.'@updateRol' => ['despues' => fn (Request $r) => self::perfil(self::idUsuarioRuta($r))],
             Api\AdminController::class.'@suspender' => ['despues' => function (Request $r) {
