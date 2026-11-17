@@ -1,0 +1,11 @@
+@extends('layouts.app')
+@section('titulo', 'Detalle del pedido')
+@section('contenido')
+@include('admin._nav')
+<h1>Detalle del pedido</h1>
+<p><a href="{{ isset($contextoNegocio) ? route('admin.negocio',[$contextoNegocio,'seccion'=>'pedidos']) : route('admin.pedidos') }}">← {{ isset($contextoNegocio) ? $contextoNegocio->nombre : 'Pedidos' }}</a></p><div class="card"><h2>{{ $pedido->codigo }} · {{ $pedido->estadoLabel() }}</h2><p>{{ $pedido->created_at->format('d/m/Y H:i') }}</p>
+<dl><dt>Negocio</dt><dd>{{ $pedido->nombreNegocio() }} · {{ $pedido->negocio?->telefono }}</dd><dt>Cliente</dt><dd>{{ $pedido->cliente?->nombre_completo }} · {{ $pedido->telefono_contacto }}</dd><dt>Dirección</dt><dd>{{ $pedido->direccion_entrega }}</dd><dt>Domiciliario</dt><dd>{{ $pedido->domiciliario?->nombre_completo ?? 'Sin asignar' }} · {{ $pedido->domiciliario?->telefono }}</dd><dt>Pago</dt><dd>{{ $pedido->metodo_pago }} · $ {{ number_format($pedido->total,0,',','.') }} COP</dd></dl>
+@foreach(['novedad'=>'Novedad','faltante_motivo'=>'Faltantes','motivo_cancelacion'=>'Cancelación','nota_admin'=>'Nota administrativa'] as $campo=>$label)@if($pedido->$campo)<p><strong>{{ $label }}:</strong> {{ $pedido->$campo }}</p>@endif @endforeach
+</div><div class="card"><h2>Productos</h2>@forelse($pedido->items as $item)<p>{{ $item->cantidad }} × {{ $item->nombre ?? $item->nombre_producto ?? 'Producto' }} · $ {{ number_format($item->subtotal(),0,',','.') }} · {{ $item->detalle() }}</p>@empty<p>Sin productos registrados.</p>@endforelse</div>
+@if(in_array($pedido->estado,\App\Models\Pedido::EN_CURSO))<div class="card"><h2>Resolver pedido</h2><p>Confirma lo ocurrido con los participantes antes de cerrarlo.</p><form class="action-form" method="POST" action="{{ route('admin.accion',['cerrar',$pedido->id]) }}" data-confirm="¿Cerrar este pedido con el resultado y motivo indicados?">@csrf<label>Resultado<select name="resultado"><option value="cancelado">Cancelar</option>@if(in_array($pedido->estado,\App\Models\Pedido::CON_CODIGO_ENTREGA))<option value="entregado">Dar por entregado</option>@endif</select></label><label>Motivo<textarea name="motivo" required maxlength="255">{{ old('motivo') }}</textarea></label><button>Confirmar cierre</button></form></div>@endif
+@endsection
