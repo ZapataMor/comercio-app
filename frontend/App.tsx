@@ -4,7 +4,7 @@ import EstadoConexion from './src/components/EstadoConexion';
  * Navegación con React Navigation + sesión persistente (AsyncStorage).
  */
 import { DarkTheme, DefaultTheme, NavigationContainer, Theme } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createNativeStackNavigator, NativeStackHeaderProps } from '@react-navigation/native-stack';
 import React from 'react';
 import { ActivityIndicator, AppState, StatusBar, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -25,6 +25,7 @@ import OfertaPedido from './src/components/OfertaPedido';
 import { AppDesenfocable } from './src/components/Desenfoque';
 import { FlyToCartProvider } from './src/components/FlyToCart';
 import HeaderPerfil from './src/components/HeaderPerfil';
+import HeaderVitrina from './src/components/HeaderVitrina';
 import HeaderCatalogo from './src/components/HeaderCatalogo';
 import { CapaMenus } from './src/components/MenuDesplegable';
 import { VitrinaHeaderLogo } from './src/components/Logo';
@@ -80,6 +81,8 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 // Logo de la marca (día/noche según la hora) como título del header.
 const tituloVitrina = () => <VitrinaHeaderLogo />;
+// Barra superior propia (ver HeaderVitrina).
+const barraVitrina = (props: NativeStackHeaderProps) => <HeaderVitrina {...props} />;
 
 /** Tema de React Navigation alineado con el modo (fondos de transición, header). */
 function temaNavegacion(c: Colores, noche: boolean): Theme {
@@ -140,6 +143,8 @@ function Navegacion({ listo }: { listo: boolean }) {
       <Stack.Navigator
         initialRouteName={inicial}
         screenOptions={{
+          // Barra propia: pegada a los íconos de la barra de estado.
+          header: barraVitrina,
           headerStyle: { backgroundColor: c.header },
           headerTintColor: c.onHeader,
           headerTitleStyle: { fontWeight: '700', fontFamily: font.display, color: c.onHeader },
