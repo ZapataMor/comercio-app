@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Barrio;
 use App\Rules\Direccion;
+use App\Support\FotoOptimizada;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -139,7 +140,7 @@ class ClienteDireccionController extends Controller
     {
         foreach (['frente', 'izquierda', 'derecha'] as $tipo) {
             if ($request->hasFile('foto_'.$tipo)) {
-                $path = $request->file('foto_'.$tipo)->store('referencias-entrega', 'local');
+                $path = FotoOptimizada::guardarEn($request->file('foto_'.$tipo), 'referencias-entrega', 'local');
                 abort_unless($path, 500, 'No se pudo guardar la foto.');
                 $fotos[$tipo] = $path;
             }

@@ -65,6 +65,15 @@ it('un PNG grande queda en JPEG achicado', function () {
     expect($ruta)->toEndWith('.jpg')->and(medidasGuardada($ruta))->toBe([1600, 1600]);
 });
 
+it('guarda en el disco privado y devuelve la ruta relativa', function () {
+    Storage::fake('local');
+    $ruta = FotoOptimizada::guardarEn(jpegDePrueba(3200, 2400), 'referencias-entrega', 'local');
+
+    expect($ruta)->toStartWith('referencias-entrega/')->toEndWith('.jpg')
+        ->and(array_slice(getimagesizefromstring(Storage::disk('local')->get($ruta)), 0, 2))->toBe([1600, 1200]);
+    Storage::disk('public')->assertMissing($ruta);
+});
+
 it('lo que no sabe procesar lo guarda sin tocar', function () {
     $ruta = FotoOptimizada::guardar(UploadedFile::fake()->create('foto.webp', 50, 'image/webp'), 'propiedades');
 

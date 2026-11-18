@@ -202,6 +202,24 @@ test('un propietario crea un producto en su negocio', function () {
         ->assertJsonPath('producto.atributos', ['Carne', 'Papa']);
 });
 
+test('la foto del producto se guarda achicada aunque llegue sin comprimir', function () {
+    \Illuminate\Support\Facades\Storage::fake('public');
+    [, $negocio] = comercianteConNegocio();
+    $comida = TipoProducto::where('slug', 'comida')->firstOrFail();
+
+    $id = $this->post(urlNegocio($negocio, '/productos'), [
+        'nombre' => 'Arepa',
+        'precio' => 3000,
+        'tipo_producto_id' => $comida->id,
+        'imagen' => \Illuminate\Http\UploadedFile::fake()->image('arepa.png', 3000, 2000),
+    ], ['Accept' => 'application/json'])->assertStatus(201)->json('producto.id');
+
+    $ruta = \App\Models\Producto::findOrFail($id)->imagen;
+    $bytes = \Illuminate\Support\Facades\Storage::disk('public')->get($ruta);
+    expect($ruta)->toStartWith('productos/')->toEndWith('.jpg')
+        ->and(array_slice(getimagesizefromstring($bytes), 0, 2))->toBe([1600, 1067]);
+});
+
 test('crear un producto exige el tipo de producto', function () {
     [, $negocio] = comercianteConNegocio();
 

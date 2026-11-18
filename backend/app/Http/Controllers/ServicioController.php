@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Negocio;
 use App\Models\Servicio;
+use App\Support\FotoOptimizada;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -47,7 +48,7 @@ class ServicioController extends Controller
         unset($datos['conservar_imagenes'], $datos['imagenes']);
         $servicio ??= $negocio->servicios()->make();
         $servicio->fill($datos);
-        foreach ($imagenes as $imagen) $conservar[] = '/storage/'.$imagen->store('servicios', 'public');
+        foreach ($imagenes as $imagen) $conservar[] = FotoOptimizada::guardar($imagen, 'servicios');
         $servicio->galeria = array_values($conservar);
         $servicio->save();
         foreach (array_diff($anteriores, $conservar) as $eliminada) Storage::disk('public')->delete(substr($eliminada, strlen('/storage/')));

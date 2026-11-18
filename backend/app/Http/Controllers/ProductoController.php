@@ -8,6 +8,7 @@ use App\Models\Producto;
 use App\Models\User;
 use App\Notifications\PrecioProductoActualizado;
 use App\Support\Busqueda;
+use App\Support\FotoOptimizada;
 use App\Support\Push;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -253,7 +254,7 @@ class ProductoController extends Controller
             Storage::disk('public')->delete($producto->imagen);
         }
 
-        $producto->imagen = $request->file('imagen')->store('productos', 'public');
+        $producto->imagen = FotoOptimizada::guardarEn($request->file('imagen'), 'productos');
         $producto->save();
     }
 

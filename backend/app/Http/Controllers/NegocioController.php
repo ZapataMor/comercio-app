@@ -8,6 +8,7 @@ use App\Models\Negocio;
 use App\Models\Pedido;
 use App\Models\TipoNegocio;
 use App\Support\EliminarNegocio;
+use App\Support\FotoOptimizada;
 use App\Support\HorarioNegocio;
 use App\Support\Reputacion;
 use Illuminate\Http\JsonResponse;
@@ -395,7 +396,7 @@ class NegocioController extends Controller
             Storage::disk('public')->delete($negocio->imagen);
         }
 
-        $negocio->imagen = $request->file('imagen')->store('negocios', 'public');
+        $negocio->imagen = FotoOptimizada::guardarEn($request->file('imagen'), 'negocios');
         $negocio->save();
     }
 }

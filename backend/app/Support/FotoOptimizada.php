@@ -28,19 +28,28 @@ class FotoOptimizada
     /** Devuelve la ruta pública ("/storage/..."). */
     public static function guardar(UploadedFile $foto, string $carpeta): string
     {
+        return '/storage/'.self::guardarEn($foto, $carpeta);
+    }
+
+    /**
+     * Igual que guardar(), pero en el disco indicado y devolviendo la ruta
+     * relativa al disco ("negocios/abc.jpg"), como la da UploadedFile::store().
+     */
+    public static function guardarEn(UploadedFile $foto, string $carpeta, string $disco = 'public'): string
+    {
         try {
-            $ruta = self::optimizar($foto, $carpeta);
+            $ruta = self::optimizar($foto, $carpeta, $disco);
             if ($ruta) {
-                return '/storage/'.$ruta;
+                return $ruta;
             }
         } catch (Throwable) {
             // Se guarda la original.
         }
 
-        return '/storage/'.$foto->store($carpeta, 'public');
+        return (string) $foto->store($carpeta, $disco);
     }
 
-    private static function optimizar(UploadedFile $foto, string $carpeta): ?string
+    private static function optimizar(UploadedFile $foto, string $carpeta, string $disco): ?string
     {
         $archivo = $foto->getRealPath();
         $info = $archivo ? @getimagesize($archivo) : false;
@@ -77,7 +86,9 @@ class FotoOptimizada
         imagedestroy($imagen);
 
         $ruta = trim($carpeta, '/').'/'.Str::random(40).'.jpg';
-        Storage::disk('public')->put($ruta, $bytes);
+        if (! Storage::disk($disco)->put($ruta, $bytes)) {
+            return null;
+        }
 
         return $ruta;
     }
