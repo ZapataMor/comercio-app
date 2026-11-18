@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\DeviceToken;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -32,11 +33,21 @@ class DeviceTokenController extends Controller
 
         // Buscamos por token (es único). Si existe en otro usuario, lo reasignamos
         // al actual. user_id se asigna directo (no va en $fillable, por convención).
-        $device = DeviceToken::firstOrNew(['token' => $datos['token']]);
-        $device->user_id = $request->user()->id;
-        $device->plataforma = $datos['plataforma'] ?? 'android';
-        $device->last_used_at = now();
-        $device->save();
+        // La app puede mandar el mismo token dos veces casi a la vez: si las dos
+        // peticiones lo crean, la segunda choca con el índice único y se
+        // reintenta como actualización en vez de responder 500.
+        $guardar = function () use ($datos, $request) {
+            $device = DeviceToken::firstOrNew(['token' => $datos['token']]);
+            $device->user_id = $request->user()->id;
+            $device->plataforma = $datos['plataforma'] ?? 'android';
+            $device->last_used_at = now();
+            $device->save();
+        };
+        try {
+            $guardar();
+        } catch (UniqueConstraintViolationException) {
+            $guardar();
+        }
 
         return response()->json(['message' => 'Dispositivo registrado para notificaciones.']);
     }

@@ -2209,9 +2209,9 @@ export async function eliminarPropiedad(token: string, id: number): Promise<void
 }
 
 export async function solicitarReembolso(token: string, id: number): Promise<void> {
-  await authSend('POST', `/pedidos/${id}/reembolso`, token);
+  await authSend('POST', `/api/pedidos/${id}/reembolso`, token);
 }
 export type SolicitudReembolso = { id: number; codigo: string; negocio_id: number; negocio: string; cliente: string; telefono: string | null; fecha: string };
 export async function getReembolsos(token: string, pagina = 1): Promise<{ solicitudes: SolicitudReembolso[]; total: number; pagina: number; ultima_pagina: number }> {
-  return authGet(`/negocios/mios/reembolsos?page=${pagina}`, token);
+  return authGet(`/api/negocios/mios/reembolsos?page=${pagina}`, token);
 }
