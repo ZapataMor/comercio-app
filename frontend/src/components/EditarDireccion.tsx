@@ -13,6 +13,7 @@ import { font, makeStyles, radius, useTheme } from '../theme';
 import BarrioSelect from './BarrioSelect';
 import FieldError from './FieldError';
 import SelectorUbicacion from './SelectorUbicacion';
+import { EspacioTecladoModal } from './EspacioTeclado';
 
 export default function EditarDireccion({ direccion, onCerrar, onGuardada }: {
   direccion: ClienteDireccion | null; onCerrar: () => void; onGuardada: (d: ClienteDireccion) => void;
@@ -55,7 +56,7 @@ export default function EditarDireccion({ direccion, onCerrar, onGuardada }: {
     } finally { setGuardando(false); }
   }
   return <Modal visible transparent animationType="fade" onRequestClose={() => { if (!guardando) onCerrar(); }}>
-    <View style={styles.fondo}><ScrollView style={styles.caja} contentContainerStyle={styles.contenido} keyboardShouldPersistTaps="handled">
+    <EspacioTecladoModal style={styles.fondo}><ScrollView style={styles.caja} contentContainerStyle={styles.contenido} keyboardShouldPersistTaps="handled">
       <Text style={styles.titulo}>{direccion ? 'Editar dirección' : 'Agregar dirección'}</Text>
       <Text style={styles.label}>Nombre (opcional)</Text>
       <TextInput style={styles.input} value={nombre} onChangeText={v => setNombre(limpiarTextoDireccion(v))} maxLength={80} placeholder="Mi casa, Mi trabajo…" placeholderTextColor={c.muted} editable={!guardando} />
@@ -76,7 +77,7 @@ export default function EditarDireccion({ direccion, onCerrar, onGuardada }: {
         {guardando ? <ActivityIndicator color={c.onAccent} /> : <Text style={styles.botonTexto}>Guardar dirección</Text>}
       </TouchableOpacity>
       <TouchableOpacity disabled={guardando} onPress={onCerrar}><Text style={styles.enlace}>Cancelar</Text></TouchableOpacity>
-    </ScrollView></View>
+    </ScrollView></EspacioTecladoModal>
   </Modal>;
 }
 const useStyles = makeStyles(c => ({

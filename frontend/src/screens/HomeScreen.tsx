@@ -1,7 +1,7 @@
 import { useLecturaEnFoco } from '../useLectura';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Easing, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Easing, Text, View } from 'react-native';
 import { detenerAlarma } from '../alarmaPedidos';
 import { tienePermiso, aceptarPedido, ComercioPedido, confirmarRecogida, getCitas, getPedidosComercio, getServicios } from '../api';
 import { useAuth } from '../AuthContext';
@@ -17,6 +17,7 @@ import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 import { temasDelNegocio, usePolling } from '../usePolling';
+import { ScrollTeclado } from '../components/EspacioTeclado';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -366,7 +367,7 @@ export default function HomeScreen({ navigation }: Props) {
   ];
 
   return (
-    <ScrollView
+    <ScrollTeclado
       style={styles.container}
       contentContainerStyle={styles.content}
       // Con el teclado abierto, el primer toque debe llegar a "Confirmar".
@@ -510,7 +511,7 @@ export default function HomeScreen({ navigation }: Props) {
         </FadeInView>
       )}
       {/* "Cerrar sesión" vive solo en el menú de Mi perfil (ícono de la topbar). */}
-    </ScrollView>
+    </ScrollTeclado>
   );
 }
 

@@ -34,6 +34,7 @@ import { useNegocio } from '../NegocioContext';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
+import { EspacioTecladoModal } from '../components/EspacioTeclado';
 
 const SIN_PERMISOS: PermisosNegocio = { modificar_inventario: false, gestionar_pedidos: false, cambiar_estado: false, administrador: false };
 const PERMISOS: { clave: keyof PermisosNegocio; titulo: string; detalle: string }[] = [
@@ -362,7 +363,7 @@ export default function EquipoScreen({ navigation }: Props) {
       )}
     </ScrollView>
     <Modal visible={!!seleccionado} transparent animationType="fade" onRequestClose={() => { if (!guardando) setSeleccionado(null); }}>
-      <View style={styles.fondoModal}>
+      <EspacioTecladoModal style={styles.fondoModal}>
         <ScrollView style={styles.modal} contentContainerStyle={{ padding: 20 }} keyboardShouldPersistTaps="handled">
           <Text style={styles.tarjetaTitulo}>{seleccionado?.name}</Text>
           <Text style={styles.ayuda}>{seleccionado?.rol === 'propietario' ? 'Propietario' : seleccionado?.permisos?.administrador ? 'Administrador' : 'Trabajador'} · {seleccionado?.activo ? 'Activo' : 'Suspendido'}</Text>
@@ -374,7 +375,7 @@ export default function EquipoScreen({ navigation }: Props) {
           </TouchableOpacity>}
           <TouchableOpacity disabled={guardando} style={styles.salir} onPress={() => setSeleccionado(null)}><Text style={styles.vacioTxt}>Cerrar</Text></TouchableOpacity>
         </ScrollView>
-      </View>
+      </EspacioTecladoModal>
     </Modal>
     </>
   );

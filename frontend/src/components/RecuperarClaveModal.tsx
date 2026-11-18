@@ -9,9 +9,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   ScrollView,
   Text,
   TextInput,
@@ -23,6 +21,7 @@ import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErro
 import { font, makeStyles, radius, useTheme } from '../theme';
 import CampoClave from './CampoClave';
 import FieldError from './FieldError';
+import { EspacioTecladoModal } from './EspacioTeclado';
 
 type Props = {
   visible: boolean;
@@ -114,7 +113,7 @@ export default function RecuperarClaveModal({ visible, identificadorInicial, onC
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCerrar}>
-      <KeyboardAvoidingView style={styles.fondo} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <EspacioTecladoModal style={styles.fondo}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <View style={styles.caja}>
             <Text style={styles.titulo}>Recuperar contraseña</Text>
@@ -213,7 +212,7 @@ export default function RecuperarClaveModal({ visible, identificadorInicial, onC
             </TouchableOpacity>
           </View>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </EspacioTecladoModal>
     </Modal>
   );
 }

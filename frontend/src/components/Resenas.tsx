@@ -30,6 +30,7 @@ import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 import { PressableScale } from './anim';
 import Icon from './Icon';
+import { useBloqueConTeclado } from './EspacioTeclado';
 
 const ESTRELLA = 'M12 2.8l2.84 5.76 6.36.92-4.6 4.49 1.09 6.33L12 17.31l-5.69 2.99 1.09-6.33-4.6-4.49 6.36-.92z';
 
@@ -230,6 +231,8 @@ export function ResponderResena({
   resenaId: number;
   onRespondida: (respuesta: RespuestaResena) => void;
 }) {
+  // Al escribir la respuesta también se ve «Publicar respuesta».
+  const bloque = useBloqueConTeclado();
   const { c } = useTheme();
   const styles = useStyles();
   const { auth } = useAuth();
@@ -257,11 +260,13 @@ export function ResponderResena({
     );
   }
   return (
-    <View style={styles.responder}>
+    <View ref={bloque.ref} style={styles.responder}>
       <TextInput
         style={styles.input}
         value={texto}
         onChangeText={setTexto}
+        onFocus={bloque.onFocus}
+        onBlur={bloque.onBlur}
         placeholder="Tu respuesta es pública…"
         placeholderTextColor={c.mutedSoft}
         maxLength={500}

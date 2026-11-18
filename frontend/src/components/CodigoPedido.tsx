@@ -9,6 +9,7 @@ import { fieldErrorsFromError, messageFromError } from '../formErrors';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { PressableScale } from './anim';
 import FieldError from './FieldError';
+import { useBloqueConTeclado } from './EspacioTeclado';
 
 /** Lo ve quien tiene que dictar el código. */
 export function VerCodigo({ titulo, codigo, ayuda }: { titulo: string; codigo: string; ayuda: string }) {
@@ -38,6 +39,8 @@ export function PedirCodigo({
   /** Si el código no es correcto, debe lanzar el error para mostrarlo aquí. */
   onConfirmar: (codigo: string) => Promise<void>;
 }) {
+  // Al escribir el código también se ve el botón que lo confirma.
+  const bloque = useBloqueConTeclado();
   const { c } = useTheme();
   const styles = useStyles();
   const [codigo, setCodigo] = useState('');
@@ -74,6 +77,8 @@ export function PedirCodigo({
       placeholderTextColor={c.mutedSoft}
       editable={!enviando}
       accessibilityLabel={titulo}
+      onFocus={bloque.onFocus}
+      onBlur={bloque.onBlur}
     />
   );
   const boton = (
@@ -83,7 +88,7 @@ export function PedirCodigo({
   );
 
   return (
-    <View style={styles.caja}>
+    <View ref={bloque.ref} style={styles.caja}>
       <Text style={styles.titulo}>{titulo}</Text>
       {!!ayuda && <Text style={styles.ayuda}>{ayuda}</Text>}
       {compacto ? (

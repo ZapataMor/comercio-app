@@ -2,13 +2,14 @@ import { useLectura } from '../useLectura';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useState } from 'react';
 import { temasDelNegocio, useEnVivo } from '../usePolling';
-import { ActivityIndicator, FlatList, RefreshControl, Text, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, Text, View } from 'react-native';
 import { getResenas, ResenaPublica, ResumenResenas } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView } from '../components/anim';
 import { Estrellas, promedioTexto, ResponderResena, TarjetaResena } from '../components/Resenas';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
+import { FlatListTeclado } from '../components/EspacioTeclado';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Resenas'>;
 
@@ -82,7 +83,7 @@ export default function ResenasScreen({ route }: Props) {
   }
 
   return (
-    <FlatList
+    <FlatListTeclado
       style={styles.container}
       data={resenas}
       keyExtractor={r => String(r.id)}

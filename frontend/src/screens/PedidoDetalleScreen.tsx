@@ -4,7 +4,7 @@ import ErrorCarga from '../components/ErrorCarga';
 import { textoCantidad } from '../cantidades';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, Text, TouchableOpacity, View } from 'react-native';
 import { cancelarMiPedido, getPedido, solicitarReembolso, SeguimientoPedido } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView } from '../components/anim';
@@ -22,6 +22,7 @@ import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 import { usePolling } from '../usePolling';
+import { ScrollTeclado } from '../components/EspacioTeclado';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PedidoDetalle'>;
 
@@ -173,7 +174,7 @@ export default function PedidoDetalleScreen({ route }: Props) {
   }
 
   return (
-    <ScrollView
+    <ScrollTeclado
       style={styles.container}
       // Con el teclado abierto, tocar una estrella cuenta al primer toque.
       keyboardShouldPersistTaps="handled"
@@ -416,7 +417,7 @@ export default function PedidoDetalleScreen({ route }: Props) {
         <Text style={styles.lineaTxt}>Si algo no salió como esperabas, cuéntanos y lo revisamos.</Text>
         <ReportarPedido id={pedido.id} objetivos={pedido.domiciliario ? ['negocio', 'domiciliario'] : ['negocio']} />
       </View>
-    </ScrollView>
+    </ScrollTeclado>
   );
 }
 

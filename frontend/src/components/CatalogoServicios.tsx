@@ -4,9 +4,7 @@ import { temasDelNegocio, useEnVivo } from '../usePolling';
 import {
   ActivityIndicator,
   Image,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   ScrollView,
   Switch,
   Text,
@@ -31,6 +29,7 @@ import {
 } from '../formErrors';
 import FieldError from './FieldError';
 import SelectorImagen from './SelectorImagen';
+import { EspacioTecladoModal } from './EspacioTeclado';
 
 export default function CatalogoServicios({
   token,
@@ -193,10 +192,7 @@ export default function CatalogoServicios({
           if (!guardando) setModal(false);
         }}
       >
-        <KeyboardAvoidingView
-          style={styles.fondo}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
+        <EspacioTecladoModal style={styles.fondo}>
           <ScrollView
             style={styles.formulario}
             keyboardShouldPersistTaps="handled"
@@ -278,7 +274,7 @@ export default function CatalogoServicios({
               <Text style={styles.nombre}>Cancelar</Text>
             </TouchableOpacity>
           </ScrollView>
-        </KeyboardAvoidingView>
+        </EspacioTecladoModal>
       </Modal>
     </View>
   );

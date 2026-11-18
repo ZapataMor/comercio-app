@@ -33,6 +33,7 @@ import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 import { usePolling } from '../usePolling';
+import { EspacioTecladoModal } from '../components/EspacioTeclado';
 
 type Props = NativeStackScreenProps<
   RootStackParamList,
@@ -418,14 +419,14 @@ export default function CitasScreen({ route, navigation }: Props) {
         )}
       </ScrollView>
       <Modal visible={porReasignar !== null} transparent animationType="slide" onRequestClose={() => { if (!ocupado) setPorReasignar(null); }}>
-        <View style={styles.modalFondo}><ScrollView style={styles.modal} contentContainerStyle={styles.contenido}>
+        <EspacioTecladoModal style={styles.modalFondo}><ScrollView style={styles.modal} contentContainerStyle={styles.contenido}>
           <Text style={styles.nombre}>Reasignar cita</Text>
           <Text style={styles.texto}>Conservaremos la fecha y la hora. El cliente recibirá una notificación con el nuevo profesional.</Text>
           {!!errorReasignar && <Text style={styles.error}>{errorReasignar}</Text>}
           {!equipo.length && <Text style={styles.detalle}>No hay otro trabajador disponible en el equipo. Agrega uno antes de retirar al profesional.</Text>}
           {equipo.map(m => <TouchableOpacity key={m.id} style={styles.secundario} disabled={ocupado} onPress={() => reasignar(m.id)}><Text style={styles.enlace}>{m.name}</Text></TouchableOpacity>)}
           <TouchableOpacity disabled={ocupado} onPress={() => setPorReasignar(null)}><Text style={styles.enlace}>Volver</Text></TouchableOpacity>
-        </ScrollView></View>
+        </ScrollView></EspacioTecladoModal>
       </Modal>
       <Modal
         visible={servicios !== null}
@@ -433,7 +434,7 @@ export default function CitasScreen({ route, navigation }: Props) {
         animationType="slide"
         onRequestClose={() => setServicios(null)}
       >
-        <View style={styles.modalFondo}>
+        <EspacioTecladoModal style={styles.modalFondo}>
           <ScrollView
             style={styles.modal}
             contentContainerStyle={styles.contenido}
@@ -469,7 +470,7 @@ export default function CitasScreen({ route, navigation }: Props) {
               <Text style={styles.enlace}>Volver</Text>
             </TouchableOpacity>
           </ScrollView>
-        </View>
+        </EspacioTecladoModal>
       </Modal>
       <Modal
         visible={!!decision}
@@ -479,7 +480,7 @@ export default function CitasScreen({ route, navigation }: Props) {
           if (!ocupado) setDecision(null);
         }}
       >
-        <View style={styles.modalFondo}>
+        <EspacioTecladoModal style={styles.modalFondo}>
           <View style={[styles.modal, styles.contenido]}>
             <Text style={styles.nombre}>
               {decision?.estado === 'rechazada'
@@ -518,7 +519,7 @@ export default function CitasScreen({ route, navigation }: Props) {
               <Text style={styles.enlace}>Volver</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </EspacioTecladoModal>
       </Modal>
     </>
   );

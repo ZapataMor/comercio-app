@@ -14,6 +14,7 @@ import {
 import { Barrio, getBarrios } from '../api';
 import Icon from './Icon';
 import { font, makeStyles, radius, useTheme } from '../theme';
+import { EspacioTecladoModal } from './EspacioTeclado';
 
 /** Quita tildes y baja a minúsculas para comparar/buscar sin acentos. */
 function normalizar(texto: string): string {
@@ -93,7 +94,7 @@ export default function BarrioSelect({
       </TouchableOpacity>
 
       <Modal visible={abierto} animationType="slide" transparent onRequestClose={() => setAbierto(false)}>
-        <View style={styles.fondo}>
+        <EspacioTecladoModal style={styles.fondo}>
           <View style={styles.hoja}>
             <View style={styles.encabezado}>
               <Text style={styles.titulo}>{titulo}</Text>
@@ -145,7 +146,7 @@ export default function BarrioSelect({
               />
             )}
           </View>
-        </View>
+        </EspacioTecladoModal>
       </Modal>
     </>
   );

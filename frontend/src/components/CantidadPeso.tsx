@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Modal, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { cantidadValida, redondearCantidad, textoCantidad } from '../cantidades';
 import { font, makeStyles, radius, useTheme } from '../theme';
+import { EspacioTecladoModal } from './EspacioTeclado';
 
 /** La edición se confirma de una vez: un texto incompleto nunca altera el pedido. */
 export default function CantidadPeso({ cantidad, unidad, onChange, disabled = false }: {
@@ -20,7 +21,7 @@ export default function CantidadPeso({ cantidad, unidad, onChange, disabled = fa
       <Text style={styles.enlace}>{textoCantidad({ cantidad, unidad_medida: unidad })} · Editar</Text>
     </TouchableOpacity>
     <Modal visible={abierto} transparent animationType="fade" onRequestClose={() => setAbierto(false)}>
-      <View style={styles.fondo}><View style={styles.caja}>
+      <EspacioTecladoModal style={styles.fondo}><View style={styles.caja}>
         <Text style={styles.titulo}>Cantidad en {unidad}</Text>
         <Text style={styles.texto}>{unidad === 'kg' ? 'Ejemplo: 0,5 kg = 500 g. ' : ''}Puedes usar hasta tres decimales, entre 0,001 y 99.</Text>
         <TextInput autoFocus style={styles.input} value={texto} onChangeText={setTexto} keyboardType="decimal-pad" accessibilityLabel={`Cantidad en ${unidad}`} placeholderTextColor={c.muted} />
@@ -29,7 +30,7 @@ export default function CantidadPeso({ cantidad, unidad, onChange, disabled = fa
           onChange(redondearCantidad(valor)); setAbierto(false);
         }}><Text style={styles.botonTexto}>Guardar cantidad</Text></TouchableOpacity>
         <TouchableOpacity onPress={() => setAbierto(false)}><Text style={styles.enlace}>Cancelar</Text></TouchableOpacity>
-      </View></View>
+      </View></EspacioTecladoModal>
     </Modal>
   </>;
 }

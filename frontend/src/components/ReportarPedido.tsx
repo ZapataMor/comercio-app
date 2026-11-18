@@ -5,6 +5,7 @@ import { useAuth } from '../AuthContext';
 import { messageFromError } from '../formErrors';
 import { font, makeStyles, radius } from '../theme';
 import { useToast } from '../Toast';
+import { EspacioTecladoModal } from './EspacioTeclado';
 
 const etiquetas = { cliente: 'Cliente', negocio: 'Comercio', domiciliario: 'Domiciliario' };
 /** `discreto`: enlace tenue, para el pie de una tarjeta con otras acciones. */
@@ -27,7 +28,7 @@ export default function ReportarPedido({ id, objetivos, discreto }: { id: number
   return <>
     <TouchableOpacity onPress={() => { setVisible(true); setMotivo(''); setError(''); }}><Text style={[styles.enlace, discreto && styles.enlaceDiscreto]}>Reportar un incumplimiento</Text></TouchableOpacity>
     <Modal visible={visible} transparent animationType="fade" onRequestClose={() => { if (!enviando) setVisible(false); }}>
-      <View style={styles.fondo}><View style={styles.caja}>
+      <EspacioTecladoModal style={styles.fondo}><View style={styles.caja}>
         <Text style={styles.titulo}>Reportar un incumplimiento</Text>
         <Text style={styles.texto}>El administrador recibirá tu explicación junto con los datos de este pedido.</Text>
         <View style={styles.fila}>{objetivos.map(o => <TouchableOpacity key={o} disabled={enviando} onPress={() => setObjetivo(o)} style={styles.opcion}><Text style={objetivo === o ? styles.elegido : styles.texto}>{etiquetas[o]}</Text></TouchableOpacity>)}</View>
@@ -35,7 +36,7 @@ export default function ReportarPedido({ id, objetivos, discreto }: { id: number
         {!!error && <Text style={styles.error}>{error}</Text>}
         <TouchableOpacity style={styles.boton} disabled={enviando || motivo.trim().length < 5} onPress={enviar}><Text style={styles.botonTexto}>{enviando ? 'Enviando…' : 'Enviar reporte'}</Text></TouchableOpacity>
         <TouchableOpacity disabled={enviando} onPress={() => setVisible(false)}><Text style={styles.enlace}>Volver</Text></TouchableOpacity>
-      </View></View>
+      </View></EspacioTecladoModal>
     </Modal>
   </>;
 }

@@ -7,7 +7,7 @@ import { DarkTheme, DefaultTheme, NavigationContainer, Theme } from '@react-navi
 import { createNativeStackNavigator, NativeStackHeaderProps } from '@react-navigation/native-stack';
 import React from 'react';
 import { ActivityIndicator, AppState, StatusBar, View } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAlarmaPedidos } from './src/alarmaPedidos';
 import { Colores, font, makeStyles, ThemeProvider, useTheme } from './src/theme';
 import { AuthProvider, useAuth } from './src/AuthContext';
@@ -23,6 +23,7 @@ import { ConfirmacionProvider } from './src/components/Confirmacion';
 import ConfirmarCierre from './src/components/ConfirmarCierre';
 import OfertaPedido from './src/components/OfertaPedido';
 import { AppDesenfocable } from './src/components/Desenfoque';
+import EspacioTeclado from './src/components/EspacioTeclado';
 import { FlyToCartProvider } from './src/components/FlyToCart';
 import HeaderPerfil from './src/components/HeaderPerfil';
 import HeaderVitrina from './src/components/HeaderVitrina';
@@ -106,6 +107,7 @@ function temaNavegacion(c: Colores, noche: boolean): Theme {
 function Navegacion({ listo }: { listo: boolean }) {
   const { c, modo } = useTheme();
   const styles = useStyles();
+  const insets = useSafeAreaInsets();
   const { auth, cargando } = useAuth();
   const roles = auth?.user.roles ?? [];
   // Ruta actual: la barra flotante del cliente decide con ella qué mostrar.
@@ -121,6 +123,10 @@ function Navegacion({ listo }: { listo: boolean }) {
   }
 
   const inicial = !auth ? 'Login' : rutaInicio(auth.user);
+  // Pantallas que llegan hasta el borde de abajo y dejan ellas mismas el
+  // espacio de la barra de navegación del sistema (mapas, login, la barra fija
+  // de la propiedad). Las demás terminan encima de esa barra.
+  const bordeABorde = { contentStyle: { backgroundColor: c.bg } };
 
   return (
     <FlyToCartProvider>
@@ -131,6 +137,9 @@ function Navegacion({ listo }: { listo: boolean }) {
         {/* La key la rearma al entrar o salir de la cuenta: el navegador solo
             lee initialRouteName al montarse, y sin esto, tras iniciar sesión
             abriría la primera pantalla de la lista en vez de rutaInicio. */}
+        {/* El teclado tapa también la barra de navegación, que las pantallas ya
+            dejan libre: aquí solo falta el resto. */}
+        <EspacioTeclado style={styles.raiz} descontar={insets.bottom}>
         <NavigationContainer
           key={auth ? `usuario-${auth.user.id}` : 'sin-sesion'}
           ref={navigationRef}
@@ -149,13 +158,16 @@ function Navegacion({ listo }: { listo: boolean }) {
           headerTintColor: c.onHeader,
           headerTitleStyle: { fontWeight: '700', fontFamily: font.display, color: c.onHeader },
           headerShadowVisible: false,
-          contentStyle: { backgroundColor: c.bg },
+          // Abajo, el espacio de la barra de navegación del sistema: con los
+          // tres botones (no con la rayita de gestos) tapaba botones y el final
+          // de las listas, porque Android 15+ dibuja la app debajo de ella.
+          contentStyle: { backgroundColor: c.bg, paddingBottom: insets.bottom },
           // "Mi perfil" (la persona, no el negocio) visible en todos los roles.
           headerRight: auth ? () => <HeaderPerfil /> : undefined,
         }}>
         {!auth ? (
           <>
-            <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false, ...bordeABorde }} />
             <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
           </>
         ) : (
@@ -187,8 +199,8 @@ function Navegacion({ listo }: { listo: boolean }) {
                 <Stack.Screen name="MisPedidos" component={MisPedidosScreen} options={{ title: 'Mis pedidos' }} />
                 <Stack.Screen name="PedidoDetalle" component={PedidoDetalleScreen} options={{ title: 'Seguimiento' }} />
                 {/* Propiedades: casas en venta o alquiler y patios para eventos. */}
-                <Stack.Screen name="MapaPropiedades" component={MapaPropiedadesScreen} options={{ title: 'Mapa de propiedades' }} />
-                <Stack.Screen name="Propiedad" component={PropiedadScreen} options={({ route }) => ({ title: route.params.titulo })} />
+                <Stack.Screen name="MapaPropiedades" component={MapaPropiedadesScreen} options={{ title: 'Mapa de propiedades', ...bordeABorde }} />
+                <Stack.Screen name="Propiedad" component={PropiedadScreen} options={({ route }) => ({ title: route.params.titulo, ...bordeABorde })} />
                 <Stack.Screen name="MisPropiedades" component={MisPropiedadesScreen} options={{ title: 'Mis propiedades' }} />
                 <Stack.Screen name="EditarPropiedad" component={EditarPropiedadScreen} options={{ title: 'Publicar propiedad' }} />
               </>
@@ -220,10 +232,10 @@ function Navegacion({ listo }: { listo: boolean }) {
 
             {/* Mapa de negocios (cliente) y de domiciliarios en vivo (admin). */}
             {(roles.includes('usuario') || roles.includes('administrador')) && (
-              <Stack.Screen name="Mapa" component={MapaScreen} options={{ title: 'Mapa' }} />
+              <Stack.Screen name="Mapa" component={MapaScreen} options={{ title: 'Mapa', ...bordeABorde }} />
             )}
             {/* «Cómo llegar» dentro de la app (cliente y domiciliario). */}
-            <Stack.Screen name="Ruta" component={RutaScreen} options={{ title: 'Cómo llegar' }} />
+            <Stack.Screen name="Ruta" component={RutaScreen} options={{ title: 'Cómo llegar', ...bordeABorde }} />
 
             {/* Negocios: cualquier usuario puede crear los suyos o trabajar en
                 otros (el acceso lo decide la membresía, no un rol global). */}
@@ -273,6 +285,7 @@ function Navegacion({ listo }: { listo: boolean }) {
         )}
       </Stack.Navigator>
         </NavigationContainer>
+        </EspacioTeclado>
         <BarraCliente ruta={ruta?.name} seccion={ruta?.name === 'Negocio' || ruta?.name === 'Explorar' ? ruta.params?.seccion : undefined} />
         <AvisoCompletarInfo ruta={ruta?.name} listo={listo} />
       </AppDesenfocable>

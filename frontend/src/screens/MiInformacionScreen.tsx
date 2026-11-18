@@ -35,6 +35,7 @@ import { useNegocio } from '../NegocioContext';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
+import { EspacioTecladoModal } from '../components/EspacioTeclado';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MiInformacion'>;
 
@@ -334,9 +335,7 @@ export default function MiInformacionScreen(_props: Props) {
           transparent
           animationType="fade"
           onRequestClose={() => setVerificandoCelular(false)}>
-          <KeyboardAvoidingView
-            style={styles.modalFondo}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <EspacioTecladoModal style={styles.modalFondo}>
             <View style={styles.modalCaja}>
               <Text style={styles.modalTitulo}>Verificar mi celular</Text>
               <VerificarTelefono
@@ -354,13 +353,11 @@ export default function MiInformacionScreen(_props: Props) {
                 <Text style={styles.celularCancelar}>Cancelar</Text>
               </TouchableOpacity>
             </View>
-          </KeyboardAvoidingView>
+          </EspacioTecladoModal>
         </Modal>
 
         <Modal visible={eliminando} transparent animationType="fade" onRequestClose={cerrarEliminar}>
-          <KeyboardAvoidingView
-            style={styles.modalFondo}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <EspacioTecladoModal style={styles.modalFondo}>
             <View style={styles.modalCaja}>
               <Text style={styles.modalTitulo}>Eliminar mi cuenta</Text>
               <Text style={styles.modalTexto}>
@@ -395,7 +392,7 @@ export default function MiInformacionScreen(_props: Props) {
                 <Text style={styles.cancelar}>Cancelar</Text>
               </TouchableOpacity>
             </View>
-          </KeyboardAvoidingView>
+          </EspacioTecladoModal>
         </Modal>
       </ScrollView>
     );

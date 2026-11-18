@@ -2,7 +2,7 @@ import { useLectura } from '../useLectura';
 import { textoCantidad } from '../cantidades';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 import { detenerAlarma } from '../alarmaPedidos';
 import {
   tienePermiso,
@@ -33,6 +33,7 @@ import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 import { usePolling } from '../usePolling';
+import { ScrollTeclado } from '../components/EspacioTeclado';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ComercioPedidoDetalle'>;
 
@@ -230,7 +231,7 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
   const ec = estadoColor(pedido.estado);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
+    <ScrollTeclado style={styles.container} contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
       {pedido.reembolso_solicitado && <View style={styles.card}>
         <Text style={styles.bloqueTitulo}>Reembolso solicitado</Text>
         <Text style={styles.nota}>El cliente solicita la devolución de una transferencia. Verifica el pago y contáctalo para acordar el reembolso.</Text>
@@ -459,7 +460,7 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
         </PressableScale>
       )}
       <ReportarPedido id={pedido.id} objetivos={pedido.domiciliario ? ['cliente', 'domiciliario'] : ['cliente']} />
-    </ScrollView>
+    </ScrollTeclado>
   );
 }
 

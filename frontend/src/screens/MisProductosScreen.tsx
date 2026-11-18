@@ -9,10 +9,8 @@ import {
   Dimensions,
   FlatList,
   Image,
-  KeyboardAvoidingView,
   Modal,
   PanResponder,
-  Platform,
   RefreshControl,
   ScrollView,
   Switch,
@@ -46,6 +44,7 @@ import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErro
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
+import { EspacioTecladoModal } from '../components/EspacioTeclado';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MisProductos'>;
 
@@ -419,9 +418,7 @@ export default function MisProductosScreen({ navigation }: Props) {
 
       {/* Formulario crear/editar */}
       <Modal visible={modal} animationType="slide" transparent onRequestClose={() => setModal(false)}>
-        <KeyboardAvoidingView
-          style={styles.modalFondo}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <EspacioTecladoModal style={styles.modalFondo}>
           <Animated.View style={[styles.modalCard, { transform: [{ translateY: dragY }] }]}>
             {/* Barra de agarre: arrastrar hacia abajo cierra el formulario. */}
             <View style={styles.dragZona} {...panResponder.panHandlers}>
@@ -589,7 +586,7 @@ export default function MisProductosScreen({ navigation }: Props) {
               </TouchableOpacity>
             </ScrollView>
           </Animated.View>
-        </KeyboardAvoidingView>
+        </EspacioTecladoModal>
       </Modal>
     </View>
   );

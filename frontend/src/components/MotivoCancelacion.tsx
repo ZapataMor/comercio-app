@@ -5,15 +5,14 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { font, makeStyles, radius, useTheme } from '../theme';
+import { EspacioTecladoModal } from './EspacioTeclado';
 
 type Props = {
   visible: boolean;
@@ -46,7 +45,7 @@ export default function MotivoCancelacion({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCerrar}>
-      <KeyboardAvoidingView style={styles.fondo} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <EspacioTecladoModal style={styles.fondo}>
         <View style={styles.caja}>
           <Text style={styles.titulo}>{titulo}</Text>
           <Text style={styles.texto}>{explicacion}</Text>
@@ -89,7 +88,7 @@ export default function MotivoCancelacion({
             <Text style={styles.volver}>Volver</Text>
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
+      </EspacioTecladoModal>
     </Modal>
   );
 }

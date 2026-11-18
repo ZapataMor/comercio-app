@@ -10,6 +10,7 @@ import { messageFromError } from '../formErrors';
 import { coloresDe, costoExtras, detalleOpciones, extrasDe, ingredientesDe, ingredientesFijosDe, OpcionesLinea, precioLinea, precioUnitario, sePersonaliza, tallasDe } from '../opcionesProducto';
 import { font, makeStyles, radius } from '../theme';
 import PersonalizarLinea from './PersonalizarLinea';
+import { EspacioTecladoModal } from './EspacioTeclado';
 
 const cop = (n: number) => '$' + n.toLocaleString('es-CO');
 export default function AjustarPedido({ pedido, visible, onCerrar, onGuardado }: {
@@ -78,7 +79,7 @@ export default function AjustarPedido({ pedido, visible, onCerrar, onGuardado }:
     finally { setEnviando(false); }
   }
   return <Modal visible={visible} animationType="slide" onRequestClose={() => { if (!enviando) onCerrar(); }}>
-    <ScrollView style={styles.fondo} contentContainerStyle={styles.contenido}>
+    <EspacioTecladoModal style={styles.fondo}><ScrollView style={styles.fondo} contentContainerStyle={styles.contenido}>
       <Text style={styles.titulo}>Elige de nuevo</Text>
       <Text style={styles.aviso}>{pedido.faltante_motivo}</Text>
       <Text style={styles.texto}>Quita los productos agotados, elige alternativas o ajusta los ingredientes. Revisa el total antes de confirmar.</Text>
@@ -103,7 +104,7 @@ export default function AjustarPedido({ pedido, visible, onCerrar, onGuardado }:
       {!!error && <Text style={styles.error}>{error}</Text>}
       <TouchableOpacity style={styles.boton} disabled={enviando || cargando || !lineas.length || noDisponibles} onPress={guardar}><Text style={styles.botonTexto}>{enviando ? 'Confirmando…' : 'Confirmar nueva elección'}</Text></TouchableOpacity>
       <TouchableOpacity disabled={enviando} onPress={onCerrar}><Text style={styles.enlace}>Volver al pedido</Text></TouchableOpacity>
-    </ScrollView>
+    </ScrollView></EspacioTecladoModal>
     <PersonalizarLinea item={lineas.find(i => i.linea === personalizar) ?? null} modo="ajustar" onCerrar={() => setPersonalizar(null)} onGuardar={(linea, opciones) => { setLineas(prev => prev.map(i => i.linea === linea ? { ...i, opciones } : i)); setPersonalizar(null); }} />
   </Modal>;
 }

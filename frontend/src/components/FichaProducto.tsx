@@ -27,7 +27,6 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { imagenUrl, Producto } from '../api';
 import { esPorPeso } from '../cantidades';
 import {
@@ -94,7 +93,6 @@ type Props = {
 export default function FichaProducto({ producto, retirado, abierto, negocioId, negocioNombre, onCerrar, onVerResenas }: Props) {
   const { c } = useTheme();
   const styles = useStyles();
-  const insets = useSafeAreaInsets();
   const { volar } = useFlyToCart();
   const confirmar = useConfirmar();
   const agregar = useAgregarAlCarrito(negocioId, negocioNombre);
@@ -269,7 +267,10 @@ export default function FichaProducto({ producto, retirado, abierto, negocioId, 
     Animated.event([{ nativeEvent: { contentOffset: { y: desplazamiento } } }], { useNativeDriver: true }),
   ).current;
 
-  const bottom = insets.bottom + MARGEN_BARRA_CLIENTE + ALTO_BARRA_CLIENTE + HUECO_BARRA;
+  // Sin insets.bottom: la pantalla ya termina encima de la barra de
+  // navegación del sistema (contentStyle en App.tsx), justo donde la barra del
+  // cliente empieza a contar su margen.
+  const bottom = MARGEN_BARRA_CLIENTE + ALTO_BARRA_CLIENTE + HUECO_BARRA;
   const izquierda = conPestanas ? MARGEN + ANCHO_PESTANA : MARGEN;
   const translateY = entrada.interpolate({ inputRange: [0, 1], outputRange: [36, 0] });
   // Al pasar la foto aparece una franja con el nombre bajo la X: así la X

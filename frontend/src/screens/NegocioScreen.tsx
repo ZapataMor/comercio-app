@@ -37,6 +37,7 @@ import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 import { useAgregarAlCarrito } from '../useAgregarAlCarrito';
 import { REFRESCO_NEGOCIOS, temasDelNegocio, useEnVivo, usePolling } from '../usePolling';
+import { EspacioTecladoModal } from '../components/EspacioTeclado';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Negocio'>;
 
@@ -348,7 +349,7 @@ export default function NegocioScreen({ navigation, route }: Props) {
       />
     )}
     <Modal visible={!!servicioSeleccionado} transparent animationType="slide" onRequestClose={() => setServicioSeleccionado(null)}>
-      <View style={styles.fondoDetalle}>
+      <EspacioTecladoModal style={styles.fondoDetalle}>
         <ScrollView style={styles.detalleServicio} contentContainerStyle={styles.detalleContenido}>
           {servicioSeleccionado && <>
             <View style={styles.cabeceraDetalle}>
@@ -372,7 +373,7 @@ export default function NegocioScreen({ navigation, route }: Props) {
             <BotonesContacto telefono={negocio?.telefono} mensaje={`Hola, quisiera información sobre ${servicioSeleccionado.nombre}.`} />
           </>}
         </ScrollView>
-      </View>
+      </EspacioTecladoModal>
     </Modal>
     </>
   );

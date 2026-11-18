@@ -20,10 +20,13 @@ import { useToast } from '../Toast';
 import { animarDespliegue, Desplegable, FadeInView, PressableScale } from './anim';
 import Carita, { colorCarita } from './Carita';
 import Icon from './Icon';
+import { useBloqueConTeclado } from './EspacioTeclado';
 
 const NOTAS: NotaCarita[] = [1, 2, 3, 4, 5];
 
 export default function CalificarPedido({ pedido, onEnviado }: { pedido: SeguimientoPedido; onEnviado: () => void }) {
+  // El comentario es el único campo: al escribir, también se ve «Enviar y seguir».
+  const bloque = useBloqueConTeclado();
   const { c } = useTheme();
   const styles = useStyles();
   const { auth } = useAuth();
@@ -119,24 +122,28 @@ export default function CalificarPedido({ pedido, onEnviado }: { pedido: Seguimi
           </Desplegable>
         </View>
 
-      {hayQueja && (
-        <TextInput
-          style={styles.comentario}
-          value={comentario}
-          onChangeText={setComentario}
-          placeholder="Cuéntanos qué pasó (opcional)"
-          placeholderTextColor={c.mutedSoft}
-          multiline
-          maxLength={500}
-        />
-      )}
+      <View ref={bloque.ref}>
+        {hayQueja && (
+          <TextInput
+            style={styles.comentario}
+            value={comentario}
+            onChangeText={setComentario}
+            onFocus={bloque.onFocus}
+            onBlur={bloque.onBlur}
+            placeholder="Cuéntanos qué pasó (opcional)"
+            placeholderTextColor={c.mutedSoft}
+            multiline
+            maxLength={500}
+          />
+        )}
 
-      <PressableScale
-        style={[styles.enviar, !lista && styles.enviarOff]}
-        onPress={enviar}
-        disabled={!lista || enviando}>
-        {enviando ? <ActivityIndicator color={c.onBrand} /> : <Text style={styles.enviarTxt}>Enviar y seguir</Text>}
-      </PressableScale>
+        <PressableScale
+          style={[styles.enviar, !lista && styles.enviarOff]}
+          onPress={enviar}
+          disabled={!lista || enviando}>
+          {enviando ? <ActivityIndicator color={c.onBrand} /> : <Text style={styles.enviarTxt}>Enviar y seguir</Text>}
+        </PressableScale>
+      </View>
     </FadeInView>
   );
 }

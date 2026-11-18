@@ -10,7 +10,7 @@
  * Mientras se ve, los Toast quedan detrás del Modal: los errores van en la tarjeta.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, KeyboardAvoidingView, Modal, Platform, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, AppState, Modal, Text, TextInput, View } from 'react-native';
 import { CierrePorConfirmar, confirmarCierre, getCierresPorConfirmar } from '../api';
 import { useAuth } from '../AuthContext';
 import { font, makeStyles, radius, useTheme } from '../theme';
@@ -21,6 +21,7 @@ import { alCambiarDesdePush } from '../usePolling';
 import { PressableScale } from './anim';
 import { completarHora, formatearHora, hora12 } from './EditorHorario';
 import Icon from './Icon';
+import { EspacioTecladoModal } from './EspacioTeclado';
 
 /** Cada cuánto se pregunta al servidor con la app abierta. */
 const CADA_MS = 30000;
@@ -107,7 +108,7 @@ export default function ConfirmarCierre() {
   return (
     <Modal visible={!!cierre} transparent animationType="fade" statusBarTranslucent onRequestClose={() => {}}>
       {cierre && (
-        <KeyboardAvoidingView style={styles.fondo} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <EspacioTecladoModal style={styles.fondo}>
           <View style={styles.tarjeta} accessibilityViewIsModal>
             <View style={styles.icono}>
               <Icon name="reloj" size={28} color={c.goldText} />
@@ -176,7 +177,7 @@ export default function ConfirmarCierre() {
               </>
             )}
           </View>
-        </KeyboardAvoidingView>
+        </EspacioTecladoModal>
       )}
     </Modal>
   );
