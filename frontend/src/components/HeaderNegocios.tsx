@@ -12,6 +12,7 @@ import { useNegocio } from '../NegocioContext';
 import { navigationRef } from '../RootNavigation';
 import { font, makeStyles } from '../theme';
 import MenuDesplegable, { OpcionMenu } from './MenuDesplegable';
+import { Objetivo } from '../tutorial/Objetivo';
 
 export default function HeaderNegocios() {
   const styles = useStyles();
@@ -29,6 +30,7 @@ export default function HeaderNegocios() {
   }
 
   return (
+    <Objetivo id="negocios.selector" enBarra>
     <MenuDesplegable
       icono="negocios"
       etiqueta="Mis negocios"
@@ -46,6 +48,7 @@ export default function HeaderNegocios() {
         )),
       ]}
     />
+    </Objetivo>
   );
 }
 

@@ -1,7 +1,9 @@
 /**
  * Notificaciones tipo "toast" con estilo de la app.
  * Aparecen a la derecha, justo debajo de la topbar (para no tapar sus botones),
- * de forma temporal, y se cierran solas.
+ * de forma temporal: su borde se llena de izquierda a derecha como una barra de
+ * carga y, al llenarse, se cierran solas. También se quitan deslizándolas
+ * hacia la derecha (ver AvisoTemporal).
  * Reemplazan a los `Alert.alert` genéricos para avisos; las confirmaciones van
  * con `useConfirmar` (components/Confirmacion).
  *
@@ -22,7 +24,9 @@ import React, {
 import { Animated, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colores, font, makeStyles, radius, useTheme } from './theme';
+import AvisoTemporal from './components/AvisoTemporal';
 import { ALTO_CONTENIDO_HEADER, altoBarraEstado } from './components/HeaderVitrina';
+import { avisarTropiezo } from './tutorial/tropiezos';
 
 type Tipo = 'exito' | 'error' | 'info';
 
@@ -43,7 +47,8 @@ const ToastContext = createContext<ToastApi>({
   info: noop,
 });
 
-const DURACION = 2800; // ms visible antes de cerrarse solo
+/** ms visible antes de cerrarse solo (lo que tarda en llenarse el borde). */
+export const DURACION_TOAST = 4000;
 
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
@@ -57,6 +62,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const mostrar = useCallback((tipo: Tipo, titulo: string, mensaje?: string) => {
     const id = ++idRef.current;
     setItems(prev => [...prev, { id, tipo, titulo, mensaje }]);
+    // Errores seguidos: quizá no sabe cómo seguir (se le ofrece la ayuda).
+    if (tipo === 'error') avisarTropiezo({ tipo: 'error' });
   }, []);
 
   const api = useMemo<ToastApi>(
@@ -88,7 +95,8 @@ function Overlay({ items, quitar }: { items: ToastItem[]; quitar: (id: number) =
     return null;
   }
   return (
-    <View style={[styles.overlay, { top: altoBarraEstado(insets.top) + ALTO_CONTENIDO_HEADER + 8 }]} pointerEvents="none">
+    // box-none: los toques entre avisos pasan a la pantalla; sobre un aviso, lo deslizan.
+    <View style={[styles.overlay, { top: altoBarraEstado(insets.top) + ALTO_CONTENIDO_HEADER + 8 }]} pointerEvents="box-none">
       {items.map(item => (
         <Tarjeta key={item.id} item={item} onClose={quitar} />
       ))}
@@ -111,19 +119,29 @@ function Tarjeta({ item, onClose }: { item: ToastItem; onClose: (id: number) => 
 
   useEffect(() => {
     Animated.timing(anim, { toValue: 1, duration: 220, useNativeDriver: true }).start();
-    const t = setTimeout(() => {
-      Animated.timing(anim, { toValue: 0, duration: 220, useNativeDriver: true }).start(() =>
-        onClose(item.id),
-      );
-    }, DURACION);
-    return () => clearTimeout(t);
-  }, [anim, item.id, onClose]);
+  }, [anim]);
+
+  // Se llenó el borde: se desvanece. Deslizado: ya salió de la pantalla.
+  const cerrar = (motivo: 'tiempo' | 'deslizado') => {
+    if (motivo === 'deslizado') {
+      onClose(item.id);
+      return;
+    }
+    Animated.timing(anim, { toValue: 0, duration: 220, useNativeDriver: true }).start(() => onClose(item.id));
+  };
 
   const estilo = estilosToast(c)[item.tipo];
-  const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [-14, 0] });
+  const translateY = useRef(anim.interpolate({ inputRange: [0, 1], outputRange: [-14, 0] })).current;
 
   return (
-    <Animated.View style={[styles.toast, { opacity: anim, transform: [{ translateY }] }]}>
+    <Animated.View style={[styles.envoltura, { opacity: anim, transform: [{ translateY }] }]}>
+     <AvisoTemporal
+      duracion={DURACION_TOAST}
+      onCerrar={cerrar}
+      color={estilo.color}
+      radio={radius.md}
+      style={styles.toast}
+      contenidoStyle={styles.contenido}>
       <View style={[styles.barra, { backgroundColor: estilo.color }]} />
       <View style={[styles.iconoBox, { backgroundColor: estilo.color }]}>
         <Text style={styles.icono}>{estilo.icono}</Text>
@@ -138,6 +156,7 @@ function Tarjeta({ item, onClose }: { item: ToastItem; onClose: (id: number) => 
           </Text>
         )}
       </View>
+     </AvisoTemporal>
     </Animated.View>
   );
 }
@@ -150,20 +169,17 @@ const useStyles = makeStyles((c, shadow) => ({
     zIndex: 1000,
     alignItems: 'flex-end',
   },
+  envoltura: { marginBottom: 10, maxWidth: 360, minWidth: 220 },
   toast: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: c.surface,
-    borderRadius: radius.md,
-    paddingVertical: 12,
-    paddingRight: 16,
-    marginBottom: 10,
-    maxWidth: 360,
-    minWidth: 220,
-    overflow: 'hidden',
     ...shadow.card,
     shadowRadius: 14,
     elevation: 6,
+  },
+  contenido: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingRight: 16,
   },
   barra: { width: 5, alignSelf: 'stretch' },
   iconoBox: {

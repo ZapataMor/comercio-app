@@ -43,6 +43,7 @@ import SelectorImagen from '../components/SelectorImagen';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
+import { Objetivo } from '../tutorial/Objetivo';
 import { useToast } from '../Toast';
 import { EspacioTecladoModal } from '../components/EspacioTeclado';
 
@@ -379,9 +380,11 @@ export default function MisProductosScreen({ navigation }: Props) {
           <RefreshControl refreshing={refrescando} onRefresh={() => cargar('refresco')} colors={[c.accent]} tintColor={c.accent} />
         }
         ListHeaderComponent={
+          <Objetivo id="productos.agregar">
           <PressableScale style={styles.nuevoBtn} onPress={abrirNuevo}>
             <Text style={styles.nuevoTxt}>+ Añadir producto</Text>
           </PressableScale>
+          </Objetivo>
         }
         ListEmptyComponent={
           <Text style={styles.vacio}>
@@ -390,6 +393,7 @@ export default function MisProductosScreen({ navigation }: Props) {
         }
         renderItem={({ item, index }) => (
           <FadeInView delay={Math.min(index, 8) * 40}>
+            <Objetivo id="productos.lista" activo={index === 0}>
             <TouchableOpacity style={styles.item} onPress={() => abrirEditar(item)}>
               <View style={styles.thumb}>
                 {item.imagen ? (
@@ -412,6 +416,7 @@ export default function MisProductosScreen({ navigation }: Props) {
                 </TouchableOpacity>
               </View>
             </TouchableOpacity>
+            </Objetivo>
           </FadeInView>
         )}
       />

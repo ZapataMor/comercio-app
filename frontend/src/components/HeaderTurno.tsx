@@ -16,6 +16,7 @@ import { cambiarTurno } from '../api';
 import { useAuth } from '../AuthContext';
 import { useToast } from '../Toast';
 import BotonMantener from './BotonMantener';
+import { Objetivo } from '../tutorial/Objetivo';
 
 type Turno = { enTurno: boolean; vetado: boolean; cambiando: boolean };
 
@@ -89,6 +90,7 @@ function BotonTurno() {
   }
 
   return (
+    <Objetivo id="turno.boton" enBarra>
     <BotonMantener
       icon="moto"
       encendido={enTurno}
@@ -97,5 +99,6 @@ function BotonTurno() {
       onCambiar={() => cambiar(!enTurno)}
       onToque={() => toast.info('Mantenla presionada', enTurno ? 'Así sales de turno.' : 'Así entras en turno.')}
     />
+    </Objetivo>
   );
 }

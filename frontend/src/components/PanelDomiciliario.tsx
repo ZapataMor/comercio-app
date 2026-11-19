@@ -40,6 +40,7 @@ import type { DestinoRuta } from '../navTypes';
 import { comoLlegar } from '../comoLlegar';
 import MinutosRecogida from './MinutosRecogida';
 import ReportarPedido from './ReportarPedido';
+import { Objetivo } from '../tutorial/Objetivo';
 
 /** Lo que "Mis entregas" le pide al panel: recargar al deslizar hacia abajo. */
 export type PanelDomiciliarioRef = { recargar: () => Promise<void> };
@@ -433,9 +434,11 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
         </>
       )}
 
+      <Objetivo id="entregas.panel">
       <Text style={styles.seccion}>
         Pedidos disponibles{!vetado && disponibles.length > 0 ? ` (${disponibles.length})` : ''}
       </Text>
+      </Objetivo>
       {vetado ? (
         <View style={styles.vetado}>
           <Icon name="alerta" size={18} color={c.danger} />

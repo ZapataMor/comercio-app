@@ -35,6 +35,7 @@ import { RootStackParamList } from '../navTypes';
 import { precioDe } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
+import { Objetivo } from '../tutorial/Objetivo';
 import { useAgregarAlCarrito } from '../useAgregarAlCarrito';
 import { REFRESCO_NEGOCIOS, temasDelNegocio, useEnVivo, usePolling } from '../usePolling';
 import { EspacioTecladoModal } from '../components/EspacioTeclado';
@@ -128,6 +129,8 @@ export default function NegocioScreen({ navigation, route }: Props) {
         servicios: servicios.slice(i * COLUMNAS, (i + 1) * COLUMNAS),
       }))
     : construirCatalogo(productos), [productos, servicios, seccion]);
+  // El tutorial señala la primera fila del catálogo.
+  const primeraFila = catalogo.findIndex(f => f.tipo !== 'categoria');
   const listaRef = useRef<FlatList<CatalogoFila>>(null);
   const negocioAbierto = negocio?.activo !== false;
 
@@ -261,7 +264,7 @@ export default function NegocioScreen({ navigation, route }: Props) {
             <View style={styles.cabecera}>
               {!!etiquetas && <Text style={styles.etiquetas} numberOfLines={1}>{etiquetas}</Text>}
               <Text style={styles.titulo} numberOfLines={2}>{negocio.nombre}</Text>
-              <View style={styles.estadoFila}>
+              <Objetivo id="negocio.estado" style={styles.estadoFila}>
                 <View style={[styles.punto, negocio.activo ? styles.puntoAbierto : styles.puntoCerrado]} />
                 <Text style={[styles.estado, !negocio.activo && styles.estadoCerrado]}>
                   {negocio.estado_texto ?? (negocio.activo ? 'Abierto' : 'Cerrado')}
@@ -269,7 +272,8 @@ export default function NegocioScreen({ navigation, route }: Props) {
                 {seccion === 'productos' && !!negocio.tiempo_preparacion && (
                   <Text style={styles.dato}>· ~{negocio.tiempo_preparacion} min</Text>
                 )}
-              </View>
+              </Objetivo>
+              <Objetivo id="negocio.resenas" style={styles.resenasMarca}>
               <PressableScale
                 style={styles.resenas}
                 accessibilityRole="button"
@@ -278,6 +282,7 @@ export default function NegocioScreen({ navigation, route }: Props) {
                 <PuntajeResenas resenas={negocio.resenas} size={14} conVacio />
                 <Icon name="chevron" size={13} color={c.muted} />
               </PressableScale>
+              </Objetivo>
               {!!negocio.horario_hoy && (
                 <Text style={styles.dato}>{negocio.horario_hoy}</Text>
               )}
@@ -297,6 +302,7 @@ export default function NegocioScreen({ navigation, route }: Props) {
       ListEmptyComponent={<Text style={styles.vacio}>{seccion === 'servicios' ? 'Este negocio no tiene servicios disponibles.' : 'Este negocio no tiene productos disponibles.'}</Text>}
       renderItem={({ item, index }) =>
         item.tipo === 'servicios' ? (
+          <Objetivo id="negocio.producto" activo={index === primeraFila}>
           <FadeInView delay={Math.min(index, 6) * 45} style={styles.fila}>
             {item.servicios.map(servicio => (
               <PressableScale key={servicio.id} style={styles.tarjeta} scaleTo={0.98}
@@ -315,12 +321,14 @@ export default function NegocioScreen({ navigation, route }: Props) {
             ))}
             {item.servicios.length < COLUMNAS && <View style={styles.tarjeta} />}
           </FadeInView>
+          </Objetivo>
         ) : item.tipo === 'categoria' ? (
           <View style={styles.seccion}>
             <Text style={styles.seccionTitulo}>{item.nombre}</Text>
             <Text style={styles.seccionConteo}>{item.cantidad}</Text>
           </View>
         ) : (
+          <Objetivo id="negocio.producto" activo={index === primeraFila}>
           <FadeInView delay={Math.min(index, 6) * 45} style={styles.fila}>
             {item.productos.map(p => (
               <TarjetaProducto
@@ -333,6 +341,7 @@ export default function NegocioScreen({ navigation, route }: Props) {
             {/* Fila incompleta: el hueco conserva el ancho de la columna. */}
             {item.productos.length < COLUMNAS && <View style={styles.tarjeta} />}
           </FadeInView>
+          </Objetivo>
         )
       }
     />
@@ -409,6 +418,7 @@ const useStyles = makeStyles(c => ({
   estado: { color: c.success, fontSize: 13, fontFamily: font.semibold },
   estadoCerrado: { color: c.danger },
   dato: { color: c.muted, fontSize: 13, lineHeight: 18, fontFamily: font.regular },
+  resenasMarca: { alignSelf: 'flex-start' },
   resenas: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 2, paddingVertical: 3 },
   descripcion: { color: c.text, fontSize: 14, lineHeight: 20, fontFamily: font.regular, marginTop: 8 },
   seccion: {

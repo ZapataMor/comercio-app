@@ -36,6 +36,7 @@ import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 import { EspacioTecladoModal } from '../components/EspacioTeclado';
+import { DesplazableTutorial, Objetivo, useDesplazableTutorial } from '../tutorial/Objetivo';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MiInformacion'>;
 
@@ -43,6 +44,8 @@ export default function MiInformacionScreen(_props: Props) {
   const { c } = useTheme();
   const styles = useStyles();
   const { auth, actualizarUsuario, salir } = useAuth();
+  // El tutorial baja hasta «Editar información».
+  const tutorialScroll = useDesplazableTutorial();
   const toast = useToast();
   const confirmar = useConfirmar();
   const user = auth!.user;
@@ -245,13 +248,17 @@ export default function MiInformacionScreen(_props: Props) {
   // ---------------- Vista de solo lectura ----------------
   if (modo === 'ver') {
     return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <DesplazableTutorial value={tutorialScroll.valor}>
+      <ScrollView ref={tutorialScroll.scrollRef} onScroll={tutorialScroll.onScroll} scrollEventThrottle={32} style={styles.container} contentContainerStyle={styles.content}>
         <FadeInView>
           <Text style={styles.seccion}>Datos personales</Text>
           <View style={styles.tarjeta}>
+            <Objetivo id="info.datos">
             <Dato icono="usuario" etiqueta="Nombre(s)" valor={user.name} />
             <Dato icono="usuarios" etiqueta="Apellidos" valor={user.apellidos} />
             <Dato icono="lista" etiqueta="Correo" valor={user.email} />
+            </Objetivo>
+            <Objetivo id="info.telefono">
             <Dato icono="telefono" etiqueta="Teléfono" valor={user.telefono} ultimo />
             <View style={styles.celularEstado}>
               {user.telefono_verificado ? (
@@ -272,6 +279,7 @@ export default function MiInformacionScreen(_props: Props) {
                 </>
               )}
             </View>
+            </Objetivo>
           </View>
         </FadeInView>
 
@@ -317,9 +325,11 @@ export default function MiInformacionScreen(_props: Props) {
         )}
 
         <FadeInView delay={120}>
+          <Objetivo id="info.editar">
           <PressableScale style={styles.btn} onPress={empezarEdicion}>
             <Text style={styles.btnTxt}>Editar información</Text>
           </PressableScale>
+          </Objetivo>
           {esDomiciliario && (
             <TouchableOpacity onPress={confirmarDejarDomiciliario} hitSlop={8}>
               <Text style={styles.dejarTxt}>Dejar de ser domiciliario</Text>
@@ -395,6 +405,7 @@ export default function MiInformacionScreen(_props: Props) {
           </EspacioTecladoModal>
         </Modal>
       </ScrollView>
+      </DesplazableTutorial>
     );
   }
 

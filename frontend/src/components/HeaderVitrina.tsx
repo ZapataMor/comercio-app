@@ -12,6 +12,7 @@ import type { NativeStackHeaderProps } from '@react-navigation/native-stack';
 import React from 'react';
 import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BarraVisibleContext } from '../tutorial/contexto';
 
 /** Alto del contenido de la barra (sin la barra de estado). */
 export const ALTO_CONTENIDO_HEADER = Platform.select({ android: 48, default: 44 });
@@ -31,7 +32,7 @@ export function altoBarraEstado(alto: number): number {
 export default function HeaderVitrina({ navigation, route, options, back }: NativeStackHeaderProps) {
   const insets = useSafeAreaInsets();
   const barraEstado = altoBarraEstado(insets.top);
-  const { headerLeft, headerStyle, ...resto } = options;
+  const { headerLeft, headerRight, headerStyle, ...resto } = options;
   // headerStyle del native-stack solo trae el color de fondo.
   const fondo = headerStyle && 'backgroundColor' in headerStyle ? headerStyle.backgroundColor : undefined;
 
@@ -44,6 +45,13 @@ export default function HeaderVitrina({ navigation, route, options, back }: Nati
       headerStyle={{ backgroundColor: fondo, height: barraEstado + ALTO_CONTENIDO_HEADER }}
       // Mismo margen derecho que la barra nativa (los botones no traen el suyo).
       headerRightContainerStyle={{ paddingEnd: 16 }}
+      // Los botones de esta barra (la que se ve) pueden ser señalados por el
+      // tutorial; la copia invisible de la barra nativa, no (ver contexto.ts).
+      headerRight={
+        headerRight
+          ? p => <BarraVisibleContext.Provider value>{headerRight(p)}</BarraVisibleContext.Provider>
+          : undefined
+      }
       headerLeft={
         typeof headerLeft === 'function'
           ? p => headerLeft({ ...p, canGoBack: !!back })

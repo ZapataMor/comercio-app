@@ -3,6 +3,8 @@
  * (hoy, la dirección: ya no se pide al registrarse). Sale una vez por cada
  * vez que se abre la app, al llegar a Explorar, y lleva a completarla.
  *
+ * Si hay un tutorial en pantalla, espera a que termine.
+ *
  * Qué información se exige está en REQUISITOS_CLIENTE: agregar o quitar uno
  * ahí basta para cambiar lo que se pide.
  */
@@ -10,6 +12,7 @@ import { useEffect, useRef } from 'react';
 import { Usuario } from '../api';
 import { useAuth } from '../AuthContext';
 import { navigationRef } from '../RootNavigation';
+import { useTutorial } from '../tutorial/contexto';
 import { useConfirmar } from './Confirmacion';
 import { IconName } from './Icon';
 
@@ -39,12 +42,13 @@ export function faltantesCliente(u: Usuario): Requisito[] {
 export default function AvisoCompletarInfo({ ruta, listo }: { ruta?: string; listo: boolean }) {
   const { auth } = useAuth();
   const confirmar = useConfirmar();
+  const { ocupado } = useTutorial();
   // Una vez por cuenta mientras la app siga abierta.
   const avisado = useRef<number | null>(null);
   const user = auth?.user;
 
   useEffect(() => {
-    if (!listo || !user || ruta !== 'Explorar' || avisado.current === user.id) return;
+    if (!listo || ocupado || !user || ruta !== 'Explorar' || avisado.current === user.id) return;
     if (!user.roles.includes('usuario')) return;
     const faltan = faltantesCliente(user);
     if (faltan.length === 0) return;
@@ -66,7 +70,7 @@ export default function AvisoCompletarInfo({ ruta, listo }: { ruta?: string; lis
       });
     }, 600);
     return () => clearTimeout(t);
-  }, [listo, user, ruta, confirmar]);
+  }, [listo, ocupado, user, ruta, confirmar]);
 
   return null;
 }

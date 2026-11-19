@@ -12,6 +12,7 @@ import PersonalizarLinea, { ModoHoja } from '../components/PersonalizarLinea';
 import { RootStackParamList } from '../navTypes';
 import { detalleOpciones, precioLinea } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
+import { Objetivo } from '../tutorial/Objetivo';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Carrito'>;
 
@@ -171,11 +172,13 @@ export default function CarritoScreen({ navigation }: Props) {
         )}
         {lineas.map((i, idx) => (
           <FadeInView key={i.linea} delay={idx * 45}>
+            <Objetivo id="carrito.linea" activo={idx === 0}>
             <LineaCarrito
               item={i}
               onAjustar={() => setHoja({ linea: i.linea, modo: 'ajustar' })}
               onAgregarOtra={() => setHoja({ linea: i.linea, modo: 'agregar' })}
             />
+            </Objetivo>
           </FadeInView>
         ))}
         <TouchableOpacity onPress={() => confirmar({ icono: 'basura', titulo: '¿Vaciar carrito?', texto: 'Se quitarán todos los productos de tu carrito.', textoBoton: 'Vaciar carrito', peligro: true, accion: vaciar })} style={{ marginTop: 8 }}>
@@ -184,17 +187,21 @@ export default function CarritoScreen({ navigation }: Props) {
       </ScrollView>
 
       <View style={styles.footer}>
+        <Objetivo id="carrito.total">
         <View style={styles.totalRow}>
           <Text style={styles.totalLabel}>Productos</Text>
           <Text style={styles.totalValor}>{cop(total)}</Text>
         </View>
         <Text style={styles.notaDomicilio}>El domicilio se suma en el siguiente paso.</Text>
+        </Objetivo>
+        <Objetivo id="carrito.continuar">
         <PressableScale
           style={[styles.btn, items.length === 0 && styles.btnOff]}
           disabled={items.length === 0}
           onPress={() => navigation.navigate('Checkout')}>
           <Text style={styles.btnTxt}>Continuar al pago →</Text>
         </PressableScale>
+        </Objetivo>
       </View>
 
       <PersonalizarLinea

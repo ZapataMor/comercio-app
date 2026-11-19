@@ -1,6 +1,7 @@
 /**
  * Cuando al carrito le quedan 10 minutos: con la app abierta, un modal que se
- * cierra solo a los pocos segundos; con la app en segundo plano o cerrada,
+ * cierra solo a los pocos segundos (su borde se llena como barra de carga, y
+ * se quita antes deslizándolo a la derecha); con la app en segundo plano o cerrada,
  * una notificación del teléfono (ver avisoCarrito.ts). Un solo aviso por
  * carrito: si ya llegó la notificación, al volver no se repite en el modal.
  */
@@ -11,6 +12,7 @@ import { AVISO_ANTES_DE_VENCER, programarNotificacionCarrito, retirarNotificacio
 import { useCart } from '../CartContext';
 import { navigationRef } from '../RootNavigation';
 import { font, makeStyles, radius, useTheme } from '../theme';
+import AvisoTemporal from './AvisoTemporal';
 import Icon from './Icon';
 
 /** El modal se va solo pasado este tiempo. */
@@ -79,19 +81,20 @@ export default function AvisoCarritoPorVencer({ listo }: { listo: boolean }) {
     return () => clearInterval(timer);
   }, [vence, listo]);
 
-  useEffect(() => {
-    if (!visible) return;
-    const t = setTimeout(() => setVisible(false), DURACION_MODAL);
-    return () => clearTimeout(t);
-  }, [visible]);
-
   const ruta = navigationRef.isReady() ? navigationRef.getCurrentRoute()?.name : undefined;
   const yaEnCompra = ruta === 'Carrito' || ruta === 'Checkout';
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={() => setVisible(false)}>
       <View style={styles.fondo}>
-        <View style={styles.caja}>
+        {visible && <AvisoTemporal
+          duracion={DURACION_MODAL}
+          onCerrar={() => setVisible(false)}
+          radio={radius.lg}
+          grosor={3}
+          style={styles.marco}
+          colorFondo={c.surface}
+          contenidoStyle={styles.caja}>
           <View style={styles.icono}>
             <Icon name="reloj" size={26} color={c.accent} />
           </View>
@@ -112,7 +115,7 @@ export default function AvisoCarritoPorVencer({ listo }: { listo: boolean }) {
           <TouchableOpacity onPress={() => setVisible(false)}>
             <Text style={styles.cerrar}>{yaEnCompra ? 'Entendido' : 'Seguir mirando'}</Text>
           </TouchableOpacity>
-        </View>
+        </AvisoTemporal>}
       </View>
     </Modal>
   );
@@ -120,7 +123,8 @@ export default function AvisoCarritoPorVencer({ listo }: { listo: boolean }) {
 
 const useStyles = makeStyles((c, shadow) => ({
   fondo: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: 'rgba(0,0,0,0.5)' },
-  caja: { backgroundColor: c.surface, padding: 22, borderRadius: radius.lg, alignItems: 'center', ...shadow.card },
+  marco: { ...shadow.card },
+  caja: { padding: 22, alignItems: 'center' },
   icono: {
     width: 56, height: 56, borderRadius: radius.pill, backgroundColor: c.accentSoft,
     alignItems: 'center', justifyContent: 'center', marginBottom: 12,

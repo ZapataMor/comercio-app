@@ -35,6 +35,10 @@ import { NegocioProvider, useNegocio } from './src/NegocioContext';
 import { configurarMensajesForeground } from './src/pushNotifications';
 import { navigationRef, procesarNotificacionPendiente, rutaInicio } from './src/RootNavigation';
 import { ToastProvider } from './src/Toast';
+import BotonAyuda from './src/tutorial/BotonAyuda';
+import { RaizTutorial } from './src/tutorial/Objetivo';
+import { TutorialProvider } from './src/tutorial/TutorialContext';
+import { avisarTropiezo } from './src/tutorial/tropiezos';
 import { avisarCambioDesdePush, useAvisosEnVivo } from './src/usePolling';
 import { actualizarCanalesEnVivo, conectarEnVivo, desconectarEnVivo } from './src/enVivo';
 import { Usuario } from './src/api';
@@ -398,6 +402,12 @@ function OfertaBridge() {
   return auth?.user.roles.includes('domiciliario') ? <OfertaPedido key={auth.user.id} /> : null;
 }
 
+/** Cuenta el toque para la ayuda y deja que siga a su destino. */
+function contarToque() {
+  avisarTropiezo({ tipo: 'toque' });
+  return false;
+}
+
 function App() {
   // Toda la app toma los colores del modo vigente (día/noche según la hora).
   return (
@@ -425,19 +435,24 @@ function AppContenido() {
               {/* Diálogos de confirmación con el estilo de la app (useConfirmar). */}
               <ConfirmacionProvider>
                 <PedidoPendienteProvider>
+                {/* Tutoriales de principiante y la ayuda «¿No sabes cómo hacer algo?». */}
+                <TutorialProvider listo={!splashVisible}>
                 <StatusBar barStyle="light-content" backgroundColor={c.header} />
                 <PushBridge />
                 <EnVivoBridge />
                 <AlarmaBridge mostrarAviso={!splashVisible} />
                 {!splashVisible && <OfertaBridge />}
                 {!splashVisible && <CierreBridge />}
-                <View style={styles.raiz}>
+                {/* Cada toque cuenta para notar si alguien toca sin rumbo (no lo captura). */}
+                <RaizTutorial style={styles.raiz} onStartShouldSetResponderCapture={contarToque}>
                   <Navegacion listo={!splashVisible} />
                   {!splashVisible && <EnvioPedidoAviso />}
                   {!splashVisible && <VigilarCarrito />}
                   <AvisoCarritoPorVencer listo={!splashVisible} />
+                  <BotonAyuda />
                   {splashVisible && <SplashVitrina onFin={ocultarSplash} />}
-                </View>
+                </RaizTutorial>
+                </TutorialProvider>
                 </PedidoPendienteProvider>
               </ConfirmacionProvider>
             </ToastProvider>

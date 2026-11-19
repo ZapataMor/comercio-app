@@ -59,7 +59,8 @@ export type IconName =
   | 'vuelta-u'
   | 'glorieta'
   | 'bandera'
-  | 'whatsapp';
+  | 'whatsapp'
+  | 'ayuda';
 
 const GLYPHS: Record<IconName, React.ReactNode> = {
   'sin-internet': <><Path d="M2 2l20 20M3 8a16 16 0 0 1 18 0M6 12a10 10 0 0 1 12 0M9 16a5 5 0 0 1 6 0" /><Circle cx="12" cy="20" r="1" /></>,
@@ -378,6 +379,14 @@ const GLYPHS: Record<IconName, React.ReactNode> = {
       <Path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
       <Path d="M16 17l5-5-5-5" />
       <Path d="M21 12H9" />
+    </>
+  ),
+  // Signo de pregunta en un círculo: ayuda y tutoriales.
+  ayuda: (
+    <>
+      <Circle cx="12" cy="12" r="9" />
+      <Path d="M9.6 9.4a2.5 2.5 0 1 1 3.6 2.3c-.7.4-1.2 1-1.2 1.8v.5" />
+      <Path d="M12 17.2v.1" />
     </>
   ),
 };

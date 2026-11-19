@@ -34,6 +34,7 @@ import MenuDesplegable, {
 } from '../components/MenuDesplegable';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
+import { Objetivo, useObjetivo } from '../tutorial/Objetivo';
 import { Estado, ESTADOS, filtrarNegocios, tiposDe } from '../filtrosMapa';
 import { useToast } from '../Toast';
 import { miUbicacion, pedirPermisoUbicacion } from '../ubicacion';
@@ -164,6 +165,7 @@ export default function MapaScreen({ navigation, route }: Props) {
 
   // En el mapa no va la barra del cliente (Carrito / Mis pedidos): solo el borde.
   const abajo = insets.bottom + 20;
+  const refMiUbicacion = useObjetivo<View>('mapa.miUbicacion');
 
   return (
     <View style={styles.container}>
@@ -205,6 +207,7 @@ export default function MapaScreen({ navigation, route }: Props) {
       {/* Arriba: dos botones que despliegan los filtros (como el menú del perfil). */}
       <View style={styles.arriba} pointerEvents="box-none">
         <View style={styles.filaArriba} pointerEvents="box-none">
+          <Objetivo id="mapa.tipos">
           <MenuDesplegable
             icono="lista"
             texto={tiposElegidos.length ? `Tipos (${tiposElegidos.length})` : 'Tipos'}
@@ -215,6 +218,8 @@ export default function MapaScreen({ navigation, route }: Props) {
               ...tipos.map(t => <FilaTipo key={t} tipo={t} almacen={almacenTipos} />),
             ]}
           />
+          </Objetivo>
+          <Objetivo id="mapa.estado">
           <MenuDesplegable
             icono="reloj"
             texto={ESTADOS.find(e => e.valor === estado)!.texto}
@@ -233,6 +238,7 @@ export default function MapaScreen({ navigation, route }: Props) {
               ))
             }
           />
+          </Objetivo>
           {cargando && <ActivityIndicator size="small" color={c.accent} />}
         </View>
         {!cargando && negocios.length === 0 && (
@@ -265,6 +271,7 @@ export default function MapaScreen({ navigation, route }: Props) {
         </TouchableOpacity>
       )}
       <TouchableOpacity
+        ref={refMiUbicacion}
         style={[styles.miUbicacion, { bottom: abajo + (seleccion ? 170 : 0) }]}
         onPress={centrarEnMi}
         disabled={ubicando}

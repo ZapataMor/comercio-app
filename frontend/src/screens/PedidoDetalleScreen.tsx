@@ -23,6 +23,7 @@ import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 import { usePolling } from '../usePolling';
 import { ScrollTeclado } from '../components/EspacioTeclado';
+import { DesplazableTutorial, Objetivo, useDesplazableTutorial } from '../tutorial/Objetivo';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PedidoDetalle'>;
 
@@ -92,6 +93,8 @@ function Paso({ texto, hecho, actual }: { texto: string; hecho: boolean; actual:
 }
 
 export default function PedidoDetalleScreen({ route }: Props) {
+  // El tutorial baja hasta el contacto con el negocio.
+  const tutorialScroll = useDesplazableTutorial();
   const { c } = useTheme();
   const styles = useStyles();
   const { auth } = useAuth();
@@ -174,7 +177,10 @@ export default function PedidoDetalleScreen({ route }: Props) {
   }
 
   return (
+    <DesplazableTutorial value={tutorialScroll.valor}>
     <ScrollTeclado
+      ref={tutorialScroll.scrollRef}
+      onScroll={tutorialScroll.onScroll}
       style={styles.container}
       // Con el teclado abierto, tocar una estrella cuenta al primer toque.
       keyboardShouldPersistTaps="handled"
@@ -253,6 +259,7 @@ export default function PedidoDetalleScreen({ route }: Props) {
         </FadeInView>
       ) : (
       <FadeInView style={styles.card}>
+        <Objetivo id="pedido.estado">
         <Text style={styles.cardTitulo}>Seguimiento</Text>
         {pedido.estados.map((e, i) => (
           <Paso
@@ -262,6 +269,7 @@ export default function PedidoDetalleScreen({ route }: Props) {
             actual={i === pedido.estado_index}
           />
         ))}
+        </Objetivo>
         {pedido.estado === 'tomado' && pedido.minutos_recogida != null && (
           <View style={[styles.nota, styles.fila]}>
             <Icon name="moto" size={14} color={c.accent} />
@@ -358,6 +366,7 @@ export default function PedidoDetalleScreen({ route }: Props) {
 
       {/* Contacto con el negocio (dudas sobre el pedido). */}
       {!!pedido.negocio_telefono && pedido.estado !== 'cancelado' && pedido.estado !== 'entregado' && (
+        <Objetivo id="pedido.contacto">
         <FadeInView delay={40} style={styles.card}>
           <Text style={styles.cardTitulo}>¿Dudas con tu pedido?</Text>
           <Text style={styles.lineaTxt}>Comunícate con {pedido.negocio ?? 'el negocio'}.</Text>
@@ -366,6 +375,7 @@ export default function PedidoDetalleScreen({ route }: Props) {
             mensaje={`Hola, tengo una pregunta sobre mi pedido #${pedido.codigo} en Vitrina.`}
           />
         </FadeInView>
+        </Objetivo>
       )}
 
       <MotivoCancelacion
@@ -418,6 +428,7 @@ export default function PedidoDetalleScreen({ route }: Props) {
         <ReportarPedido id={pedido.id} objetivos={pedido.domiciliario ? ['negocio', 'domiciliario'] : ['negocio']} />
       </View>
     </ScrollTeclado>
+    </DesplazableTutorial>
   );
 }
 

@@ -10,6 +10,7 @@ import { makeStyles } from '../theme';
 import HeaderPerfil from './HeaderPerfil';
 import { IconName } from './Icon';
 import MenuDesplegable, { OpcionMenu } from './MenuDesplegable';
+import { Objetivo } from '../tutorial/Objetivo';
 
 export const SECCIONES: { valor: SeccionCatalogo; titulo: string; detalle: string; icono: IconName }[] = [
   { valor: 'productos', titulo: 'Productos', detalle: 'Comida, mercado, ropa y más', icono: 'bolsa' },
@@ -28,6 +29,7 @@ export default function HeaderCatalogo({
   const actual = SECCIONES.find(s => s.valor === seccion) ?? SECCIONES[0];
   return (
     <View style={styles.fila}>
+      <Objetivo id="catalogo.selector" enBarra>
       <MenuDesplegable
         icono={actual.icono}
         texto={actual.titulo}
@@ -47,6 +49,7 @@ export default function HeaderCatalogo({
           ))
         }
       />
+      </Objetivo>
       <HeaderPerfil />
     </View>
   );

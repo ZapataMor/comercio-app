@@ -38,6 +38,7 @@ import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErro
 import { useNegocio } from '../NegocioContext';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
+import { DesplazableTutorial, Objetivo, useDesplazableTutorial } from '../tutorial/Objetivo';
 import { useToast } from '../Toast';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MiTienda'>;
@@ -119,6 +120,8 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
   const [errores, setErrores] = useState<FieldErrors>({});
   const [pasoGuia, setPasoGuia] = useState(0);
   const scrollFormulario = useRef<ScrollView>(null);
+  // El tutorial de la guía de creación baja hasta el botón «Siguiente».
+  const tutorialScroll = useDesplazableTutorial(scrollFormulario);
   const guia = creando;
 
   function irAlPaso(paso: number) {
@@ -397,15 +400,16 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView ref={scrollFormulario} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        {guia && <View style={styles.aviso} accessibilityLiveRegion="polite">
+      <DesplazableTutorial value={tutorialScroll.valor}>
+      <ScrollView ref={scrollFormulario} onScroll={tutorialScroll.onScroll} scrollEventThrottle={32} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        {guia && <Objetivo id="tienda.paso" style={styles.aviso} accessibilityLiveRegion="polite">
           <Text style={styles.seccionTitulo}>{`Paso ${pasoGuia + 1} de 3`}</Text>
           <Text style={styles.avisoTxt}>{[
             'Empieza aquí: escribe el nombre y elige qué vende tu negocio. Una foto y una descripción ayudan a reconocerlo.',
             'Señala dónde queda tu negocio y cómo contactarlo. Fija el punto exacto en el mapa para facilitar la recogida.',
             'Define un tiempo de preparación realista y tu horario, o elige abrir y cerrar a mano. Después de crear el negocio, añade tus productos desde Mis productos.',
           ][pasoGuia]}</Text>
-        </View>}
+        </Objetivo>}
         {!negocio && (
           <View style={styles.aviso}>
             <Text style={styles.avisoTxt}>
@@ -416,7 +420,7 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
           </View>
         )}
 
-        {(!guia || pasoGuia === 0) && <View style={[styles.seccion, guia && { borderWidth: 2, borderColor: c.accent }]}>
+        {(!guia || pasoGuia === 0) && <Objetivo id="tienda.seccion" style={[styles.seccion, guia && { borderWidth: 2, borderColor: c.accent }]}>
           <Text style={styles.seccionTitulo}>Tu negocio</Text>
           <SelectorImagen
             label="Foto del negocio"
@@ -481,7 +485,7 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
             editable={!guardando}
           />
           <FieldError mensaje={errores.descripcion} />
-        </View>}
+        </Objetivo>}
 
         {(!guia || pasoGuia === 1) && <View style={[styles.seccion, guia && { borderWidth: 2, borderColor: c.accent }]}>
           <Text style={styles.seccionTitulo}>Ubicación y contacto</Text>
@@ -577,9 +581,9 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
           </View>
         </View>}
 
-        {guia && pasoGuia < 2 ? <PressableScale style={styles.boton} onPress={siguientePaso} accessibilityRole="button">
+        {guia && pasoGuia < 2 ? <Objetivo id="tienda.siguiente"><PressableScale style={styles.boton} onPress={siguientePaso} accessibilityRole="button">
           <Text style={styles.botonTexto}>Siguiente</Text>
-        </PressableScale> :
+        </PressableScale></Objetivo> :
         <PressableScale
           style={[styles.boton, guardando && styles.botonDisabled]}
           onPress={onGuardar}
@@ -601,6 +605,7 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
           </TouchableOpacity>
         )}
       </ScrollView>
+      </DesplazableTutorial>
     </KeyboardAvoidingView>
   );
 }

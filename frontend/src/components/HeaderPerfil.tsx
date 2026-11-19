@@ -36,6 +36,8 @@ import HeaderNegocios from './HeaderNegocios';
 import HeaderTurno from './HeaderTurno';
 import Icon, { IconName } from './Icon';
 import MenuDesplegable, { OpcionMenu } from './MenuDesplegable';
+import { Objetivo } from '../tutorial/Objetivo';
+import { useTutorial } from '../tutorial/contexto';
 
 type Modulo = {
   titulo: string;
@@ -109,6 +111,7 @@ export default function HeaderPerfil() {
   const { negocios } = useNegocio();
   const toast = useToast();
   const confirmar = useConfirmar();
+  const { abrirAyuda } = useTutorial();
   const user = auth?.user;
   // Las demás cuentas con la sesión abierta en este teléfono (la más reciente primero).
   const otras = cuentas.filter(cuenta => cuenta.user.id !== user?.id);
@@ -178,6 +181,7 @@ export default function HeaderPerfil() {
       <HeaderConfiabilidad />
       <HeaderTurno />
       <HeaderNegocios />
+      <Objetivo id="perfil.menu" enBarra>
       <MenuDesplegable
         icono="usuario"
         etiqueta="Mi perfil"
@@ -229,6 +233,8 @@ export default function HeaderPerfil() {
             />
           )),
           negocios.length > 0 && <ReembolsosPerfil />,
+          // Guías paso a paso (la misma lista de «¿No sabes cómo hacer algo?»).
+          <OpcionMenu icono="ayuda" titulo="¿Cómo se usa?" detalle="Guías paso a paso" onPress={() => elegir(abrirAyuda)} />,
           <OpcionMenu
             icono="salir"
             titulo="Cerrar sesión"
@@ -246,6 +252,7 @@ export default function HeaderPerfil() {
           ),
         ]}
       />
+      </Objetivo>
     </View>
   );
 }

@@ -9,6 +9,7 @@ import { FadeInView, PressableScale } from '../components/anim';
 import Icon from '../components/Icon';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
+import { Objetivo } from '../tutorial/Objetivo';
 import { usePolling } from '../usePolling';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MisPedidos'>;
@@ -102,6 +103,8 @@ export default function MisPedidosScreen({ navigation }: Props) {
         const ec = estadoColor(item.estado);
         return (
           <FadeInView delay={Math.min(index, 8) * 45}>
+            {/* El tutorial señala el primer pedido. */}
+            <Objetivo id="mispedidos.pedido" activo={index === 0}>
             <PressableScale style={styles.card} onPress={() => navigation.navigate('PedidoDetalle', { id: item.id })}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.nombre}>Pedido #{item.codigo} · {item.negocio}</Text>
@@ -125,6 +128,7 @@ export default function MisPedidosScreen({ navigation }: Props) {
                 ) : null}
               </View>
             </PressableScale>
+            </Objetivo>
           </FadeInView>
         );
       }}

@@ -41,6 +41,7 @@ import Icon from '../components/Icon';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
+import { DesplazableTutorial, Objetivo, useDesplazableTutorial } from '../tutorial/Objetivo';
 import { useToast } from '../Toast';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Checkout'>;
@@ -57,6 +58,8 @@ function textoUbicacion(ubicacion: Pick<ClienteDireccion, 'direccion' | 'barrio'
 export default function CheckoutScreen({ navigation }: Props) {
   const { c } = useTheme();
   const styles = useStyles();
+  // El tutorial baja hasta el teléfono, el pago y el botón de confirmar.
+  const tutorialScroll = useDesplazableTutorial();
   const { auth, actualizarUsuario } = useAuth();
   const cart = useCart();
   const envio = usePedidoPendiente();
@@ -309,10 +312,14 @@ export default function CheckoutScreen({ navigation }: Props) {
   }
 
   return (
-    <>
+    <DesplazableTutorial value={tutorialScroll.valor}>
     <ScrollView
+      ref={tutorialScroll.scrollRef}
+      onScroll={tutorialScroll.onScroll}
+      scrollEventThrottle={32}
       style={styles.container}
       contentContainerStyle={{ padding: 16, paddingBottom: 24 }}>
+      <Objetivo id="checkout.resumen">
       <FadeInView style={styles.resumen}>
         <View style={[styles.resumenTitulo, styles.fila]}>
           <Icon name="tienda" size={15} color={c.text} />
@@ -348,6 +355,7 @@ export default function CheckoutScreen({ navigation }: Props) {
           <Text style={styles.totalValor}>{domicilio == null ? 'Pendiente de tarifa' : cop(totalConDomicilio)}</Text>
         </View>
       </FadeInView>
+      </Objetivo>
 
       <Text style={styles.label}>Ubicación de entrega</Text>
       {cargandoDirecciones ? (
@@ -357,7 +365,7 @@ export default function CheckoutScreen({ navigation }: Props) {
       ) : (
         // Todas en un mismo contenedor, separadas; se editan manteniendo
         // presionada la dirección (se abre la edición encima de la pantalla).
-        <View style={styles.direcciones}>
+        <Objetivo id="checkout.direccion" style={styles.direcciones}>
           {direcciones.map(d => {
             const activa = seleccion === d.id;
             return (
@@ -408,7 +416,7 @@ export default function CheckoutScreen({ navigation }: Props) {
           {direcciones.length > 0 && (
             <Text style={styles.pistaEditar}>Mantén presionado para editar</Text>
           )}
-        </View>
+        </Objetivo>
       )}
       <FieldError mensaje={errores.ubicacion} />
 
@@ -436,7 +444,7 @@ export default function CheckoutScreen({ navigation }: Props) {
       ) : null}
 
       <Text style={styles.label}>Teléfono de contacto</Text>
-      <View style={styles.ubicaciones}>
+      <Objetivo id="checkout.telefono" style={styles.ubicaciones}>
         {telefonoGuardado ? (
           <TouchableOpacity
             style={[styles.ubicacion, !usarOtroTelefono && styles.ubicacionOn]}
@@ -478,7 +486,7 @@ export default function CheckoutScreen({ navigation }: Props) {
             </View>
           </TouchableOpacity>
         ) : null}
-      </View>
+      </Objetivo>
 
       {usarOtroTelefono ? (
         <TextInput style={styles.input} value={telefono} onChangeText={valor => {
@@ -489,7 +497,7 @@ export default function CheckoutScreen({ navigation }: Props) {
       <FieldError mensaje={errores.telefono} />
 
       <Text style={styles.label}>Forma de pago</Text>
-      <View style={styles.pagos}>
+      <Objetivo id="checkout.pago" style={styles.pagos}>
         {[
           { v: 'efectivo', t: 'Efectivo', icon: 'efectivo' as const },
           { v: 'transferencia', t: 'Transferencia', icon: 'banco' as const },
@@ -505,9 +513,10 @@ export default function CheckoutScreen({ navigation }: Props) {
             <Text style={[styles.pagoTxt, pago === op.v && styles.pagoTxtOn]}>{op.t}</Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </Objetivo>
       <FieldError mensaje={errores.pago} />
 
+      <Objetivo id="checkout.confirmar">
       <PressableScale style={styles.btn} onPress={confirmar} disabled={enviando || cargandoDirecciones || domicilio == null || cart.items.length === 0 || !!cart.cambiosPrecio?.length}>
         {enviando ? (
           <ActivityIndicator color={c.onAccent} />
@@ -517,12 +526,13 @@ export default function CheckoutScreen({ navigation }: Props) {
           </Text>
         )}
       </PressableScale>
+      </Objetivo>
     </ScrollView>
     {editandoDireccion && <EditarDireccion key={editandoDireccion.id} direccion={editandoDireccion} onCerrar={() => setEditandoDireccion(null)} onGuardada={d => {
       setDirecciones(prev => prev.map(v => v.id === d.id ? d : v));
       setEditandoDireccion(null);
     }} />}
-    </>
+    </DesplazableTutorial>
   );
 }
 

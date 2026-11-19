@@ -32,6 +32,7 @@ import { RootStackParamList } from '../navTypes';
 import { precioDe } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { REFRESCO_NEGOCIOS, usePolling } from '../usePolling';
+import { Objetivo } from '../tutorial/Objetivo';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Explorar'>;
 
@@ -275,6 +276,8 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
 
   const texto = busqueda.trim();
   const nombre = auth?.user.name.trim().split(/\s+/)[0];
+  // El tutorial señala el primer negocio de la lista.
+  const primerNegocio = filas.findIndex(f => f.tipo === 'negocio');
 
   return (
     <FlatList<Fila>
@@ -301,7 +304,7 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
             <Text style={styles.titular}>¿Qué necesitas hoy?</Text>
 
             <View style={styles.buscadorFila}>
-              <View style={styles.buscador}>
+              <Objetivo id="explorar.buscador" style={styles.buscador}>
                 <Icon name="lupa" size={18} color={c.muted} />
                 <TextInput
                   style={styles.buscadorTexto}
@@ -320,8 +323,9 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
                     <Icon name="cerrar" size={16} color={c.muted} />
                   </TouchableOpacity>
                 )}
-              </View>
+              </Objetivo>
               {/* Los negocios en el mapa de Maicao. */}
+              <Objetivo id="explorar.mapa">
               <PressableScale
                 style={styles.botonMapa}
                 scaleTo={0.92}
@@ -329,10 +333,12 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
                 accessibilityLabel="Ver negocios en el mapa">
                 <Icon name="mapa" size={20} color={c.textStrong} />
               </PressableScale>
+              </Objetivo>
             </View>
           </View>
 
           {tiposNegocio.length > 0 && (
+            <Objetivo id="explorar.tipos">
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -349,6 +355,7 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
                 />
               ))}
             </ScrollView>
+            </Objetivo>
           )}
 
           {cargando && filas.length === 0 && <NegociosFantasma />}
@@ -383,7 +390,13 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
           case 'titulo':
             return <Text style={styles.seccion}>{item.texto}</Text>;
           case 'negocio':
-            return <CardNegocio item={item.negocio} index={index} onAbrir={abrirNegocio} />;
+            return index === primerNegocio ? (
+              <Objetivo id="explorar.negocio">
+                <CardNegocio item={item.negocio} index={index} onAbrir={abrirNegocio} />
+              </Objetivo>
+            ) : (
+              <CardNegocio item={item.negocio} index={index} onAbrir={abrirNegocio} />
+            );
           case 'negocioHallado':
             return (
               <FilaResultado

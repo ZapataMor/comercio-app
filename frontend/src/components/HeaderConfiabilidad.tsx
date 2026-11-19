@@ -18,6 +18,7 @@ import { Colores, font, makeStyles, radius, useTheme } from '../theme';
 import { PressableScale } from './anim';
 import Icon from './Icon';
 import { colorNivel, TarjetaReputacion } from './Reputacion';
+import { Objetivo } from '../tutorial/Objetivo';
 
 const EXPLICACION =
   'Los clientes te califican con caritas de 1 a 5 en amabilidad, rapidez y estado del producto: ' +
@@ -92,6 +93,7 @@ function BotonConfiabilidad({ token }: { token: string }) {
 
   return (
     <>
+      <Objetivo id="confiabilidad" enBarra>
       <PressableScale
         style={styles.boton}
         hitSlop={8}
@@ -101,6 +103,7 @@ function BotonConfiabilidad({ token }: { token: string }) {
         <Icon name="escudo" size={18} color={c.onHeader} strokeWidth={2} />
         {!!r && <View style={[styles.punto, { backgroundColor: colorPunto(c, r) }]} />}
       </PressableScale>
+      </Objetivo>
 
       <Modal visible={abierto} transparent animationType="fade" onRequestClose={() => setAbierto(false)}>
         <View style={styles.fondo}>

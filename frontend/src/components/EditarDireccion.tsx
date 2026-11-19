@@ -5,7 +5,7 @@ import CamposDireccion from '../components/CamposDireccion';
 import { normalizarDireccion } from '../direccion';
 import { direccionValida, errorDireccion } from '../direccion';
 import React, { useState } from 'react';
-import { ActivityIndicator, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, ScrollView, Text, TextInput, TouchableOpacity } from 'react-native';
 import { ClienteDireccion, Coordenadas, crearClienteDireccion, editarClienteDireccion } from '../api';
 import { useAuth } from '../AuthContext';
 import { fieldErrorsFromError, messageFromError, FieldErrors } from '../formErrors';
@@ -14,12 +14,15 @@ import BarrioSelect from './BarrioSelect';
 import FieldError from './FieldError';
 import SelectorUbicacion from './SelectorUbicacion';
 import { EspacioTecladoModal } from './EspacioTeclado';
+import { DesplazableTutorial, Objetivo, PantallaTutorial, useDesplazableTutorial } from '../tutorial/Objetivo';
 
 export default function EditarDireccion({ direccion, onCerrar, onGuardada }: {
   direccion: ClienteDireccion | null; onCerrar: () => void; onGuardada: (d: ClienteDireccion) => void;
 }) {
   const { auth, actualizarUsuario } = useAuth();
   const { c } = useTheme();
+  // El tutorial baja hasta el mapa, las fotos y el botón de guardar.
+  const tutorialScroll = useDesplazableTutorial();
   const styles = useStyles();
   const [fotos, setFotos] = useState<Fotos>(direccion?.fotos ?? {});
   const [nombre, setNombre] = useState(direccion?.nombre ?? '');
@@ -56,31 +59,41 @@ export default function EditarDireccion({ direccion, onCerrar, onGuardada }: {
     } finally { setGuardando(false); }
   }
   return <Modal visible transparent animationType="fade" onRequestClose={() => { if (!guardando) onCerrar(); }}>
-    <EspacioTecladoModal style={styles.fondo}><ScrollView style={styles.caja} contentContainerStyle={styles.contenido} keyboardShouldPersistTaps="handled">
+    {/* Un modal tapa la capa del tutorial de la app: este trae la suya. */}
+    <PantallaTutorial nombre="EditarDireccion" style={styles.raiz}>
+    <DesplazableTutorial value={tutorialScroll.valor}>
+    <EspacioTecladoModal style={styles.fondo}><ScrollView ref={tutorialScroll.scrollRef} onScroll={tutorialScroll.onScroll} scrollEventThrottle={32} style={styles.caja} contentContainerStyle={styles.contenido} keyboardShouldPersistTaps="handled">
       <Text style={styles.titulo}>{direccion ? 'Editar dirección' : 'Agregar dirección'}</Text>
       <Text style={styles.label}>Nombre (opcional)</Text>
-      <TextInput style={styles.input} value={nombre} onChangeText={v => setNombre(limpiarTextoDireccion(v))} maxLength={80} placeholder="Mi casa, Mi trabajo…" placeholderTextColor={c.muted} editable={!guardando} />
+      <Objetivo id="direccion.nombre">
+        <TextInput style={styles.input} value={nombre} onChangeText={v => setNombre(limpiarTextoDireccion(v))} maxLength={80} placeholder="Mi casa, Mi trabajo…" placeholderTextColor={c.muted} editable={!guardando} />
+      </Objetivo>
       <Text style={styles.ayuda}>Solo tú verás este nombre.</Text>
       <FieldError mensaje={errores.nombre} />
       <Text style={styles.label}>Dirección</Text>
-      <CamposDireccion value={calle} onChangeText={setCalle} editable={!guardando} />
+      <Objetivo id="direccion.campos"><CamposDireccion value={calle} onChangeText={setCalle} editable={!guardando} /></Objetivo>
       <FieldError mensaje={errores.direccion} />
       <Text style={styles.label}>Barrio</Text>
-      <BarrioSelect disabled={guardando} valor={barrio} onSeleccionar={v => setBarrio(limpiarCampoDireccion(v))} />
+      <Objetivo id="direccion.barrio"><BarrioSelect disabled={guardando} valor={barrio} onSeleccionar={v => setBarrio(limpiarCampoDireccion(v))} /></Objetivo>
       <FieldError mensaje={errores.barrio} />
-      <View style={styles.mapa}><SelectorUbicacion tipo="entrega" valor={punto} onCambiar={setPunto} disabled={guardando} /></View>
+      <Objetivo id="direccion.mapa" style={styles.mapa}><SelectorUbicacion tipo="entrega" valor={punto} onCambiar={setPunto} disabled={guardando} /></Objetivo>
       <FieldError mensaje={errores.lat ?? errores.lng} />
-      <FotosDireccion fotos={fotos} onChange={setFotos} token={auth!.token} disabled={guardando} />
+      <Objetivo id="direccion.fotos"><FotosDireccion fotos={fotos} onChange={setFotos} token={auth!.token} disabled={guardando} /></Objetivo>
       <FieldError mensaje={errores.fotos ?? errores.foto_frente ?? errores.foto_izquierda ?? errores.foto_derecha} />
       {!!error && <Text style={styles.error}>{error}</Text>}
-      <TouchableOpacity style={styles.boton} disabled={guardando} onPress={guardar}>
-        {guardando ? <ActivityIndicator color={c.onAccent} /> : <Text style={styles.botonTexto}>Guardar dirección</Text>}
-      </TouchableOpacity>
+      <Objetivo id="direccion.guardar">
+        <TouchableOpacity style={styles.boton} disabled={guardando} onPress={guardar}>
+          {guardando ? <ActivityIndicator color={c.onAccent} /> : <Text style={styles.botonTexto}>Guardar dirección</Text>}
+        </TouchableOpacity>
+      </Objetivo>
       <TouchableOpacity disabled={guardando} onPress={onCerrar}><Text style={styles.enlace}>Cancelar</Text></TouchableOpacity>
     </ScrollView></EspacioTecladoModal>
+    </DesplazableTutorial>
+    </PantallaTutorial>
   </Modal>;
 }
 const useStyles = makeStyles(c => ({
+  raiz: { flex: 1 },
   fondo: { flex: 1, backgroundColor: '#0008', justifyContent: 'center', padding: 24 },
   caja: { flexGrow: 0, maxHeight: '90%', borderRadius: radius.lg, backgroundColor: c.bg },
   contenido: { padding: 20, gap: 8 }, titulo: { color: c.textStrong, fontFamily: font.bold, fontSize: 22 },

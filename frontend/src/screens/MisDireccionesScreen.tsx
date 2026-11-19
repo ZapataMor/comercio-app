@@ -1,13 +1,14 @@
 import { useLectura } from '../useLectura';
 import React, { useCallback, useState } from 'react';
 import { useEnVivo } from '../usePolling';
-import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, TouchableOpacity } from 'react-native';
 import { ClienteDireccion, eliminarClienteDireccion, getClienteDirecciones, marcarDireccionPrincipal } from '../api';
 import { useAuth } from '../AuthContext';
 import { useConfirmar } from '../components/Confirmacion';
 import EditarDireccion from '../components/EditarDireccion';
 import { messageFromError } from '../formErrors';
 import { font, makeStyles, radius } from '../theme';
+import { Objetivo } from '../tutorial/Objetivo';
 
 export default function MisDireccionesScreen() {
   const { auth, actualizarUsuario } = useAuth();
@@ -53,17 +54,19 @@ export default function MisDireccionesScreen() {
         <Text style={styles.error}>{error}</Text>
         <TouchableOpacity onPress={cargar}><Text style={styles.enlace}>Reintentar</Text></TouchableOpacity>
       </> : <>
-        {!direcciones.length && <Text style={styles.texto}>Aún no tienes direcciones guardadas.</Text>}
-        {direcciones.map(d => <View key={d.id} style={styles.card}>
+        {!direcciones.length && <Objetivo id="direcciones.lista"><Text style={styles.texto}>Aún no tienes direcciones guardadas.</Text></Objetivo>}
+        {direcciones.map((d, i) => <Objetivo key={d.id} id="direcciones.lista" activo={i === 0} style={styles.card}>
           <Text style={styles.titulo}>{d.nombre || (d.es_principal ? 'Dirección principal' : 'Otra dirección')}</Text>
           {d.es_principal && <Text style={styles.principal}>Principal</Text>}
           <Text style={styles.texto}>{d.direccion} · Barrio {d.barrio}</Text>
           <TouchableOpacity disabled={guardando} accessibilityLabel={`Editar ${d.nombre || d.direccion}`} onPress={() => setEditando(d)}><Text style={styles.enlace}>Editar dirección</Text></TouchableOpacity>
           {!d.es_principal && <TouchableOpacity disabled={guardando} accessibilityLabel={`Marcar como principal ${d.nombre || d.direccion}`} onPress={() => cambiar(d, false)}><Text style={styles.enlace}>Marcar como principal</Text></TouchableOpacity>}
           <TouchableOpacity disabled={guardando} accessibilityLabel={`Eliminar ${d.nombre || d.direccion}`} onPress={() => borrar(d)}><Text style={styles.eliminar}>Eliminar dirección</Text></TouchableOpacity>
-        </View>)}
+        </Objetivo>)}
       </>}
-      <TouchableOpacity disabled={guardando} onPress={() => setEditando(null)}><Text style={styles.enlace}>+ Agregar dirección</Text></TouchableOpacity>
+      <Objetivo id="direcciones.agregar" style={styles.agregar}>
+        <TouchableOpacity disabled={guardando} onPress={() => setEditando(null)}><Text style={styles.enlace}>+ Agregar dirección</Text></TouchableOpacity>
+      </Objetivo>
     </ScrollView>
     {editando !== undefined && <EditarDireccion direccion={editando} onCerrar={() => setEditando(undefined)} onGuardada={d => {
       setDirecciones(prev => prev.some(v => v.id === d.id) ? prev.map(v => v.id === d.id ? d : v) : [...prev, d]);
@@ -79,5 +82,7 @@ const useStyles = makeStyles(c => ({
   texto: { color: c.text, fontFamily: font.regular }, enlace: { color: c.accent, fontFamily: font.semibold, paddingVertical: 12 },
   principal: { color: c.accent, fontFamily: font.bold, marginBottom: 6 },
   eliminar: { color: c.danger, fontFamily: font.semibold, paddingVertical: 12 },
+  // El recuadro del tutorial abraza el enlace, no todo el ancho.
+  agregar: { alignSelf: 'flex-start' },
   error: { color: c.danger, fontFamily: font.regular },
 }));

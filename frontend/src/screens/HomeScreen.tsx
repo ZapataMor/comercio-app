@@ -18,6 +18,7 @@ import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 import { temasDelNegocio, usePolling } from '../usePolling';
 import { ScrollTeclado } from '../components/EspacioTeclado';
+import { DesplazableTutorial, Objetivo, useDesplazableTutorial } from '../tutorial/Objetivo';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -135,7 +136,7 @@ function HeaderEstadoNegocio() {
   }
 
   return (
-    <View style={styles.headerEstado}>
+    <Objetivo id="home.estado" enBarra style={styles.headerEstado}>
       <EtiquetaEstado abierto={negocio.activo} texto={negocio.estado_texto} />
       <BotonMantener
         icon="tienda"
@@ -147,7 +148,7 @@ function HeaderEstadoNegocio() {
           toast.info('Mantenlo presionado', negocio.activo ? 'Así cierras el negocio.' : 'Así abres el negocio.')
         }
       />
-    </View>
+    </Objetivo>
   );
 }
 
@@ -168,7 +169,7 @@ function CuadrosAcceso({ accesos }: { accesos: Acceso[] }) {
   );
 
   return (
-    <View style={styles.cuadros}>
+    <Objetivo id="home.accesos" style={styles.cuadros}>
       {filas.map((fila, f) => (
         <View key={fila[0].titulo} style={styles.cuadrosFila}>
           {fila.map(({ icono, titulo, abrir }, i) => (
@@ -188,7 +189,7 @@ function CuadrosAcceso({ accesos }: { accesos: Acceso[] }) {
           ))}
         </View>
       ))}
-    </View>
+    </Objetivo>
   );
 }
 
@@ -238,6 +239,8 @@ export default function HomeScreen({ navigation }: Props) {
   const token = auth!.token;
   const esAdmin = user.roles.includes('administrador');
   const esDomiciliario = user.roles.includes('domiciliario');
+  // El tutorial baja hasta los pedidos en espera.
+  const tutorialScroll = useDesplazableTutorial();
 
   const { negocio, negocios, recargar } = useNegocio();
   const negocioId = negocio?.id ?? null;
@@ -367,7 +370,10 @@ export default function HomeScreen({ navigation }: Props) {
   ];
 
   return (
+    <DesplazableTutorial value={tutorialScroll.valor}>
     <ScrollTeclado
+      ref={tutorialScroll.scrollRef}
+      onScroll={tutorialScroll.onScroll}
       style={styles.container}
       contentContainerStyle={styles.content}
       // Con el teclado abierto, el primer toque debe llegar a "Confirmar".
@@ -387,9 +393,11 @@ export default function HomeScreen({ navigation }: Props) {
           {/* Pedidos en espera del negocio activo, directamente en el Inicio. */}
           {negocio && tienePermiso(negocio, 'gestionar_pedidos') && (
             <>
+              <Objetivo id="home.pedidos">
               <Text style={styles.seccion}>
                 Pedidos en espera{enEspera.length > 0 ? ` (${enEspera.length})` : ''}
               </Text>
+              </Objetivo>
               {enEspera.length === 0 ? (
                 <View style={styles.vacioBox}>
                   <Text style={styles.vacioTxt}>No tienes pedidos en espera.</Text>
@@ -512,6 +520,7 @@ export default function HomeScreen({ navigation }: Props) {
       )}
       {/* "Cerrar sesión" vive solo en el menú de Mi perfil (ícono de la topbar). */}
     </ScrollTeclado>
+    </DesplazableTutorial>
   );
 }
 
