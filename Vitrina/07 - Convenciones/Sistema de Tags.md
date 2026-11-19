@@ -2,7 +2,7 @@
 title: Sistema de Tags
 tags: [convención]
 estado: hecho
-actualizado: 2026-06-28
+actualizado: 2026-11-19
 ---
 
 # 🏷️ Sistema de Tags
@@ -21,11 +21,12 @@ Taxonomía cerrada de etiquetas. Mantenerla pequeña y consistente.
 | `#diseño` | Flujos, pantallas, visual |
 | `#convención` | Convenciones |
 | `#idea` | Ideas / backlog |
+| `#estrategia` | Publicidad, alianzas, planes: lo que se hace fuera del código |
 | `#adr` | Architecture Decision Records |
 | `#referencia` | Material de referencia / glosario |
 
 ## Tags temáticos (transversales)
-`#reglas` · `#producto` · `#notificaciones` · `#pitch` · `#glosario` · `#estado`
+`#reglas` · `#producto` · `#notificaciones` · `#pitch` · `#glosario` · `#estado` · `#publicidad` · `#alianzas` · `#planes`
 
 ## Regla
 Si necesitas un tag nuevo, **agrégalo aquí primero**. Evita sinónimos (un solo tag por concepto).

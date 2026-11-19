@@ -21,3 +21,4 @@ El conocimiento de **por qué existe** comercio-api y **cómo gana sentido**.
 - [[_MOC Actores]] — quiénes participan
 - [[_MOC Historias]] — qué quieren lograr
 - [[Estado Actual]] — dónde estamos
+- [[_MOC Estrategia]] — cómo lo damos a conocer y cómo cobramos

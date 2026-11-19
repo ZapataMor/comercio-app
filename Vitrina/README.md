@@ -17,6 +17,7 @@ Vault de **Obsidian** con el conocimiento de **negocio y producto** de comercio-
 - `06 - Diseño/` — flujos, pantallas, sistema visual
 - `07 - Convenciones/` — notas, negocio, tags
 - `08 - Ideas/` — backlog conceptual
+- `09 - Estrategia/` — publicidad, reuniones con aliados, protección de la propiedad, planes y bandeja de ideas
 - `_templates/` — plantillas para notas nuevas
 
 ## Convenciones

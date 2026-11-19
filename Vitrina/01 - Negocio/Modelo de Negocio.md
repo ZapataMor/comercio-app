@@ -2,7 +2,7 @@
 title: Modelo de Negocio
 tags: [negocio]
 estado: en-progreso
-actualizado: 2026-06-28
+actualizado: 2026-11-19
 ---
 
 # 🧩 Modelo de Negocio
@@ -33,6 +33,11 @@ actualizado: 2026-06-28
 > - Suscripción mensual del comercio por vitrina/funciones premium.
 > - Destacados/publicidad de negocios.
 
+> [!info] Avance (2026-11-19)
+> En el piloto se decidió **sin comisión por pedido** y cobrar **planes por suscripción** al
+> negocio (dos meses gratis; mensual, semestral o anual). Paquetes propuestos, con inventario y
+> facturación DIAN en el más caro, en [[Planes de membresía]].
+
 ## Estructura de costos (hipótesis)
 - Infraestructura (servidor, base de datos, Firebase/FCM).
 - Soporte y operación.
@@ -42,4 +47,4 @@ actualizado: 2026-06-28
 - [[Administrador]] · [[Comerciante]] · [[Cliente]] · [[Domiciliario]]
 
 ## 🔗 Relacionado
-- [[_MOC Negocio]] · [[Pitch]]
+- [[_MOC Negocio]] · [[Pitch]] · [[Planes de membresía]] · [[_MOC Estrategia]]
