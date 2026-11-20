@@ -188,7 +188,8 @@ class AuthController extends Controller
             // Puede quedar vacío si la persona entra con su celular verificado.
             'email' => ['present', 'nullable', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'password' => ['sometimes', 'nullable', 'string', 'min:5', 'confirmed'],
-            'password_actual' => ['exclude_without:password', 'present', 'string', 'min:1'],
+            // Quien entró con Google y aún no tiene contraseña la crea sin la actual.
+            'password_actual' => $user->password === null ? ['exclude'] : ['exclude_without:password', 'present', 'string', 'min:1'],
             // La dirección del cliente se maneja en "Mis direcciones"; aquí es
             // opcional (versiones anteriores de la app aún la mandan).
             'direccion' => ['sometimes', 'nullable', 'string', 'max:255', new \App\Rules\Direccion],
@@ -200,7 +201,7 @@ class AuthController extends Controller
         // nuevo). La cuenta debe conservar al menos una forma de entrar.
         $cambiaTelefono = array_key_exists('telefono', $data) && $data['telefono'] !== $user->telefono;
         $conservaCelular = $user->telefono_verificado_at !== null && ! $cambiaTelefono;
-        if (blank($data['email']) && blank($user->username) && ! $conservaCelular) {
+        if (blank($data['email']) && blank($user->username) && ! $conservaCelular && $user->google_id === null) {
             throw ValidationException::withMessages([
                 $cambiaTelefono ? 'telefono' : 'email' => [$cambiaTelefono
                     ? 'Tu celular es tu forma de entrar: para cambiarlo, verifica el número nuevo con el código de WhatsApp.'
@@ -209,7 +210,7 @@ class AuthController extends Controller
         }
 
         if (! empty($data['password'])) {
-            if (! Hash::check($data['password_actual'], $user->password)) {
+            if ($user->password !== null && ! Hash::check($data['password_actual'], $user->password)) {
                 throw ValidationException::withMessages([
                     'password_actual' => ['La contraseña actual no es correcta.'],
                 ]);
@@ -356,6 +357,10 @@ class AuthController extends Controller
             'telefono' => $user->telefono,
             // Confirmado por WhatsApp: sirve para entrar y recuperar la contraseña.
             'telefono_verificado' => $user->telefono_verificado_at !== null,
+            // Entra con Google (cuenta de Google conectada).
+            'google' => $user->google_id !== null,
+            // false: se registró con Google y aún no ha creado contraseña.
+            'tiene_clave' => $user->password !== null,
             // Domiciliario: si está en turno (le llegan los avisos de pedidos).
             'en_turno' => (bool) $user->en_turno,
             // Código único para que un negocio lo invite como trabajador.

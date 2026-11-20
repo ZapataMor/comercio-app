@@ -8,6 +8,11 @@ import { telefonoValido, errorTelefono } from '../direccion';
  * Desde este perfil el dueño también desactiva, reactiva o elimina sus negocios.
  * Al final de la vista de lectura están "Dejar de ser domiciliario" (solo
  * para el domiciliario) y "Eliminar mi cuenta".
+ *
+ * Google: aquí se conecta (para entrar con un toque) o se desconecta. Quien
+ * se registró con Google no tiene contraseña (`tiene_clave: false`): la crea
+ * sin escribir la actual, y elimina su cuenta eligiendo otra vez su cuenta
+ * de Google en vez de escribir la contraseña.
  */
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
@@ -22,15 +27,17 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { actualizarPerfil, dejarDeSerDomiciliario, desactivarNegocio, eliminarCuenta, eliminarNegocio, Negocio, pedirCodigoTelefonoPerfil, Usuario, verificarTelefonoPerfil } from '../api';
+import { actualizarPerfil, conectarGoogle, dejarDeSerDomiciliario, desconectarGoogle, desactivarNegocio, eliminarCuenta, eliminarNegocio, Negocio, pedirCodigoTelefonoPerfil, Usuario, verificarTelefonoPerfil } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
+import BotonGoogle, { LogoGoogle } from '../components/BotonGoogle';
 import CampoClave from '../components/CampoClave';
 import { useConfirmar } from '../components/Confirmacion';
 import FieldError from '../components/FieldError';
 import Icon, { IconName } from '../components/Icon';
 import VerificarTelefono from '../components/VerificarTelefono';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
+import { elegirCuentaGoogle, googleDisponible } from '../google';
 import { useNegocio } from '../NegocioContext';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
@@ -83,6 +90,45 @@ export default function MiInformacionScreen(_props: Props) {
 
   const esCliente = user.roles.includes('usuario');
   const esDomiciliario = user.roles.includes('domiciliario');
+  // Se registró con Google y aún no tiene contraseña (las sesiones de antes no traen el dato).
+  const sinClave = user.tiene_clave === false;
+  const mostrarGoogle = !!user.google || googleDisponible();
+  const [cambiandoGoogle, setCambiandoGoogle] = useState(false);
+
+  async function conectarCuentaGoogle() {
+    setCambiandoGoogle(true);
+    try {
+      const idToken = await elegirCuentaGoogle();
+      if (!idToken) return;
+      const r = await conectarGoogle(auth!.token, idToken);
+      actualizarUsuario(r.user);
+      toast.exito('Google conectado', 'Ya puedes entrar con tu cuenta de Google.');
+    } catch (e) {
+      toast.error('No se pudo conectar Google', messageFromError(e));
+    } finally {
+      setCambiandoGoogle(false);
+    }
+  }
+
+  function confirmarDesconectarGoogle() {
+    confirmar({
+      icono: 'candado',
+      titulo: '¿Desconectar Google?',
+      texto: 'Ya no podrás entrar con tu cuenta de Google. Entrarás con tu correo o celular y tu contraseña.',
+      textoBoton: 'Desconectar',
+      textoCancelar: 'Cancelar',
+      peligro: true,
+      accion: async () => {
+        try {
+          const r = await desconectarGoogle(auth!.token);
+          actualizarUsuario(r.user);
+          toast.exito('Google desconectado');
+        } catch (e) {
+          toast.error('No se pudo desconectar', messageFromError(e));
+        }
+      },
+    });
+  }
 
   // 'ver' = solo lectura · 'editar' = formulario.
   const [modo, setModo] = useState<'ver' | 'editar'>('ver');
@@ -98,11 +144,14 @@ export default function MiInformacionScreen(_props: Props) {
   const [errores, setErrores] = useState<FieldErrors>({});
 
   const cambiaPass = passActual.length > 0 || passNueva.length > 0 || passConfirma.length > 0;
+  // Sin contraseña (registro con Google) se crea una sin escribir la actual.
+  const pideActual = !sinClave;
 
   // Verificar el celular con un código por WhatsApp.
   const [verificandoCelular, setVerificandoCelular] = useState(false);
 
-  // "Eliminar mi cuenta": se confirma escribiendo la contraseña.
+  // "Eliminar mi cuenta": se confirma escribiendo la contraseña (o, sin
+  // contraseña, eligiendo otra vez la cuenta de Google).
   const [eliminando, setEliminando] = useState(false);
   const [clave, setClave] = useState('');
   const [errorClave, setErrorClave] = useState<string | undefined>();
@@ -116,13 +165,19 @@ export default function MiInformacionScreen(_props: Props) {
   }
 
   async function confirmarEliminar() {
-    if (!clave) {
+    if (!sinClave && !clave) {
       setErrorClave('Escribe tu contraseña para confirmar.');
       return;
     }
     setEnviando(true);
     try {
-      await eliminarCuenta(auth!.token, clave);
+      if (sinClave) {
+        const googleIdToken = await elegirCuentaGoogle();
+        if (!googleIdToken) return;
+        await eliminarCuenta(auth!.token, { googleIdToken });
+      } else {
+        await eliminarCuenta(auth!.token, clave);
+      }
       setEliminando(false);
       toast.exito('Cuenta eliminada', 'Gracias por haber usado Vitrina.');
       salir();
@@ -193,7 +248,7 @@ export default function MiInformacionScreen(_props: Props) {
     if (!apellidos.trim()) nuevosErrores.apellidos = 'El campo apellidos es obligatorio.';
     // Sin correo, la cuenta entra con su celular verificado (si no lo cambia).
     const conservaCelular = !!user.telefono_verificado && telefono === (user.telefono ?? '');
-    if (!email.trim() && !conservaCelular) nuevosErrores.email = 'El campo correo es obligatorio.';
+    if (!email.trim() && !conservaCelular && !user.google) nuevosErrores.email = 'El campo correo es obligatorio.';
     if (telefono && !telefonoValido(telefono)) nuevosErrores.telefono = errorTelefono;
     if (esCliente && !telefonoValido(telefono)) nuevosErrores.telefono = errorTelefono;
     if (Object.keys(nuevosErrores).length > 0) {
@@ -202,7 +257,7 @@ export default function MiInformacionScreen(_props: Props) {
     }
     if (cambiaPass) {
       const passErrores: FieldErrors = {};
-      if (!passActual) passErrores.password_actual = 'El campo contraseña actual es obligatorio.';
+      if (pideActual && !passActual) passErrores.password_actual = 'El campo contraseña actual es obligatorio.';
       if (!passNueva) passErrores.password = 'El campo nueva contraseña es obligatorio.';
       if (!passConfirma) passErrores.confirmar = 'Confirma la nueva contraseña.';
       if (Object.keys(passErrores).length > 0) {
@@ -227,7 +282,7 @@ export default function MiInformacionScreen(_props: Props) {
         email: email.trim(),
         // La dirección se maneja en "Mis direcciones".
         ...(esCliente || telefono.trim() ? { telefono: telefono.trim() } : {}),
-        ...(cambiaPass ? { password: passNueva, password_actual: passActual } : {}),
+        ...(cambiaPass ? { password: passNueva, ...(pideActual ? { password_actual: passActual } : {}) } : {}),
       });
       actualizarUsuario(actualizado);
       cargarCampos(actualizado);
@@ -284,17 +339,50 @@ export default function MiInformacionScreen(_props: Props) {
         </FadeInView>
 
 
-        {!!codigoPublico && (
+        {(!!codigoPublico || mostrarGoogle) && (
           <FadeInView delay={90}>
             <Text style={styles.seccion}>Cuenta</Text>
-            <View style={styles.tarjeta}>
-              <Dato
-                icono="etiqueta"
-                etiqueta="Código público (para que un negocio te invite)"
-                valor={`#${codigoPublico}`}
-                ultimo
-              />
-            </View>
+            {!!codigoPublico && (
+              <View style={styles.tarjeta}>
+                <Dato
+                  icono="etiqueta"
+                  etiqueta="Código público (para que un negocio te invite)"
+                  valor={`#${codigoPublico}`}
+                  ultimo
+                />
+              </View>
+            )}
+            {mostrarGoogle && (
+              <View style={[styles.tarjeta, !!codigoPublico && styles.tarjetaSiguiente]}>
+                <View style={styles.googleFila}>
+                  <LogoGoogle size={20} />
+                  <View style={styles.googleTexto}>
+                    <Text style={styles.datoValor}>{user.google ? 'Google conectado' : 'Entrar con Google'}</Text>
+                    <Text style={styles.datoEtiqueta}>
+                      {user.google
+                        ? sinClave
+                          ? 'Entras con tu cuenta de Google. Crea una contraseña en «Editar información» para entrar también con tu correo.'
+                          : 'Puedes entrar con tu cuenta de Google o con tu contraseña.'
+                        : 'Conecta tu cuenta de Google para entrar con un toque.'}
+                    </Text>
+                  </View>
+                </View>
+                {user.google ? (
+                  !sinClave && (
+                    <TouchableOpacity accessibilityRole="button" onPress={confirmarDesconectarGoogle} hitSlop={8}>
+                      <Text style={styles.dejarTxt}>Desconectar Google</Text>
+                    </TouchableOpacity>
+                  )
+                ) : (
+                  <BotonGoogle
+                    texto="Conectar con Google"
+                    onPress={conectarCuentaGoogle}
+                    cargando={cambiandoGoogle}
+                    style={styles.googleBoton}
+                  />
+                )}
+              </View>
+            )}
           </FadeInView>
         )}
 
@@ -375,18 +463,22 @@ export default function MiInformacionScreen(_props: Props) {
                 conservan sin tus datos. Si eres el único dueño de un negocio, se cierra y deja de verse.
                 No se puede deshacer.
               </Text>
-              <CampoClave
-                style={styles.inputModal}
-                value={clave}
-                onChangeText={v => {
-                  setClave(v);
-                  setErrorClave(undefined);
-                }}
-                placeholder="Tu contraseña"
-                placeholderTextColor={c.mutedSoft}
-                editable={!enviando}
-                autoFocus
-              />
+              {sinClave ? (
+                <Text style={styles.modalTexto}>Para confirmar, elige otra vez tu cuenta de Google.</Text>
+              ) : (
+                <CampoClave
+                  style={styles.inputModal}
+                  value={clave}
+                  onChangeText={v => {
+                    setClave(v);
+                    setErrorClave(undefined);
+                  }}
+                  placeholder="Tu contraseña"
+                  placeholderTextColor={c.mutedSoft}
+                  editable={!enviando}
+                  autoFocus
+                />
+              )}
               <FieldError mensaje={errorClave} />
               <TouchableOpacity
                 style={[styles.botonPeligro, enviando && styles.botonDeshabilitado]}
@@ -395,7 +487,9 @@ export default function MiInformacionScreen(_props: Props) {
                 {enviando ? (
                   <ActivityIndicator color={c.surface} />
                 ) : (
-                  <Text style={styles.botonPeligroTxt}>Eliminar definitivamente</Text>
+                  <Text style={styles.botonPeligroTxt}>
+                    {sinClave ? 'Confirmar con Google y eliminar' : 'Eliminar definitivamente'}
+                  </Text>
                 )}
               </TouchableOpacity>
               <TouchableOpacity onPress={cerrarEliminar} disabled={enviando}>
@@ -446,7 +540,7 @@ export default function MiInformacionScreen(_props: Props) {
               editable={!guardando}
             />
             <FieldError mensaje={errores.apellidos} />
-            <Text style={styles.label}>{user.telefono_verificado ? 'Correo (opcional)' : 'Correo'}</Text>
+            <Text style={styles.label}>{user.telefono_verificado || user.google ? 'Correo (opcional)' : 'Correo'}</Text>
             <TextInput
               style={styles.input}
               value={email}
@@ -485,22 +579,30 @@ export default function MiInformacionScreen(_props: Props) {
 
 
         <FadeInView delay={90}>
-          <Text style={styles.seccion}>Cambiar contraseña</Text>
-          <Text style={styles.ayuda}>Opcional: déjalo vacío para no cambiarla.</Text>
+          <Text style={styles.seccion}>{pideActual ? 'Cambiar contraseña' : 'Crear contraseña'}</Text>
+          <Text style={styles.ayuda}>
+            {pideActual
+              ? 'Opcional: déjalo vacío para no cambiarla.'
+              : 'Opcional: con una contraseña también entras con tu correo o celular, sin Google.'}
+          </Text>
           <View style={styles.tarjeta}>
-            <Text style={styles.label}>Contraseña actual</Text>
-            <CampoClave
-              style={styles.input}
-              value={passActual}
-              onChangeText={valor => {
-                setPassActual(valor);
-                limpiarError('password_actual');
-              }}
-              placeholder="••••••••"
-              placeholderTextColor={c.mutedSoft}
-              editable={!guardando}
-            />
-            <FieldError mensaje={errores.password_actual} />
+            {pideActual ? (
+              <>
+                <Text style={styles.label}>Contraseña actual</Text>
+                <CampoClave
+                  style={styles.input}
+                  value={passActual}
+                  onChangeText={valor => {
+                    setPassActual(valor);
+                    limpiarError('password_actual');
+                  }}
+                  placeholder="••••••••"
+                  placeholderTextColor={c.mutedSoft}
+                  editable={!guardando}
+                />
+                <FieldError mensaje={errores.password_actual} />
+              </>
+            ) : null}
             <Text style={styles.label}>Nueva contraseña</Text>
             <CampoClave
               style={styles.input}
@@ -604,6 +706,11 @@ const useStyles = makeStyles((c, shadow) => ({
   cancelar: { textAlign: 'center', color: c.muted, fontFamily: font.semibold, marginTop: 14 },
   // Dejar de ser domiciliario (se puede volver: no va en rojo)
   dejarTxt: { textAlign: 'center', color: c.muted, fontFamily: font.semibold, fontSize: 13, marginTop: 22 },
+  // Google conectado o por conectar
+  tarjetaSiguiente: { marginTop: 10 },
+  googleFila: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  googleTexto: { flex: 1 },
+  googleBoton: { marginTop: 14 },
   // Eliminar mi cuenta
   eliminarTxt: { textAlign: 'center', color: c.danger, fontFamily: font.semibold, fontSize: 13, marginTop: 22 },
   celularEstado: {

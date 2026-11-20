@@ -48,6 +48,7 @@ import HomeScreen from './src/screens/HomeScreen';
 import MiInformacionScreen from './src/screens/MiInformacionScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
+import RegistroGoogleScreen from './src/screens/RegistroGoogleScreen';
 import MiTiendaScreen from './src/screens/MiTiendaScreen';
 import ResenasScreen from './src/screens/ResenasScreen';
 import MisNegociosScreen from './src/screens/MisNegociosScreen';
@@ -173,6 +174,7 @@ function Navegacion({ listo }: { listo: boolean }) {
           <>
             <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false, ...bordeABorde }} />
             <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="RegistroGoogle" component={RegistroGoogleScreen} options={{ headerShown: false }} />
           </>
         ) : (
           <>

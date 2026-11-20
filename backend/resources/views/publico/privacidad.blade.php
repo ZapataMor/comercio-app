@@ -21,6 +21,7 @@
     <h2 class="font-semibold text-base">1. Qué datos recogemos</h2>
     <ul class="list-disc pl-5 space-y-1">
         <li><strong>De tu cuenta:</strong> nombre, apellidos, correo electrónico, teléfono, dirección y barrio.</li>
+        <li><strong>Si entras con Google:</strong> Google nos entrega tu nombre, tu correo y un identificador de tu cuenta de Google, solo cuando tú lo eliges. Nunca recibimos tu contraseña de Google.</li>
         <li><strong>De tus pedidos:</strong> lo que pides, el negocio, la dirección de entrega, el teléfono de contacto, la forma de pago y los estados del pedido.</li>
         <li><strong>Si tienes un negocio:</strong> los datos del negocio y de su catálogo, su ubicación en el mapa y quiénes forman su equipo.</li>
         <li><strong>Si eres domiciliario:</strong> las entregas que tomas y sus tiempos, y tu ubicación GPS mientras tienes la app abierta y estás en turno, llevas una entrega o le debes dinero a un negocio. Con la app en segundo plano no la enviamos.</li>
@@ -47,7 +48,7 @@
     <ul class="list-disc pl-5 space-y-1">
         <li><strong>El negocio</strong> al que le pides y <strong>el domiciliario</strong> que toma tu pedido ven tu nombre, dirección de entrega y teléfono, solo para atender ese pedido.</li>
         <li><strong>La ubicación del domiciliario</strong> la ve el cliente mientras le lleva su pedido, y el negocio mientras lo lleva o mientras le deba dinero de ese pedido.</li>
-        <li><strong>Proveedores técnicos</strong> que nos prestan el servidor, el envío de notificaciones (Google Firebase), los mapas (Google Maps) y el reporte de errores (Sentry, que puede tratar esos informes fuera de Colombia), bajo sus propias obligaciones de seguridad.</li>
+        <li><strong>Proveedores técnicos</strong> que nos prestan el servidor, el envío de notificaciones (Google Firebase), el acceso con tu cuenta de Google, los mapas (Google Maps) y el reporte de errores (Sentry, que puede tratar esos informes fuera de Colombia), bajo sus propias obligaciones de seguridad.</li>
         <li><strong>Autoridades</strong>, solo cuando la ley lo exija.</li>
     </ul>
     <p>No vendemos ni alquilamos tus datos.</p>

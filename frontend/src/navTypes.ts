@@ -1,5 +1,5 @@
 // Rutas de navegación de la app (React Navigation - native stack).
-import { ComercioPedido, Coordenadas, ModoRuta, Servicio } from './api';
+import { ComercioPedido, Coordenadas, ModoRuta, PerfilGoogle, Servicio } from './api';
 
 /** A dónde lleva «Cómo llegar» (pantalla Ruta). */
 export type DestinoRuta = {
@@ -19,6 +19,8 @@ export type SeccionCatalogo = 'productos' | 'servicios' | 'propiedades';
 export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
+  // Último paso del registro con Google (cuenta nueva): nombre y política.
+  RegistroGoogle: { idToken: string; perfil: PerfilGoogle };
   Home: undefined;
   // Datos personales de la cuenta: ver y modificar, y eliminar la cuenta (se
   // abre desde el menú del ícono de usuario de la topbar).

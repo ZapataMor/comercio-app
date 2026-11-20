@@ -52,6 +52,15 @@ return [
         'timeout' => (int) env('RUTAS_TIMEOUT', 8),
     ],
 
+    // Entrar con Google. Los «ID de cliente» de OAuth (Google Cloud →
+    // Credenciales) que la app usa para pedir el token, separados por coma:
+    // el del tipo «Aplicación web» es el que va en la app (GOOGLE_WEB_CLIENT_ID
+    // de frontend/src/config.ts). Vacío = entrar con Google desactivado.
+    // Guía: Vitrina/00 - Inicio/Configurar acceso con Google.md
+    'google' => [
+        'client_ids' => array_values(array_filter(array_map('trim', explode(',', (string) env('GOOGLE_CLIENT_IDS', ''))))),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

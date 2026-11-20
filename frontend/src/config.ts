@@ -31,6 +31,13 @@ export const EN_VIVO_PUERTO_DESARROLLO = 8080;
 // Páginas públicas del servidor (política de privacidad, eliminar cuenta).
 export const WEB_URL = API_URL;
 
+// Entrar con Google: el «ID de cliente» OAuth de tipo «Aplicación web» de
+// Google Cloud (termina en .apps.googleusercontent.com). No es secreto. Debe
+// estar también en GOOGLE_CLIENT_IDS del backend. Vacío = el botón
+// «Continuar con Google» no aparece.
+// Guía: Vitrina/00 - Inicio/Configurar acceso con Google.md
+export const GOOGLE_WEB_CLIENT_ID = '';
+
 // Reporte de errores de la versión final (ver src/errores.ts y DESPLIEGUE.md §6).
 // Vacío = no se envía nada. Esta dirección no es secreta: solo permite enviar errores.
 export const SENTRY_DSN = '';

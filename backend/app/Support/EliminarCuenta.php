@@ -121,6 +121,7 @@ class EliminarCuenta
                 'apellidos' => 'eliminado',
                 'email' => "eliminado-{$user->id}@vitrina.invalid",
                 'password' => Str::random(64),
+                'google_id' => null,
                 'direccion' => null,
                 'barrio' => null,
                 'telefono' => null,

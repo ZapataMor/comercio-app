@@ -15,12 +15,14 @@ import {
 import { pedirCodigoRegistro, register, verificarTelefonoRegistro } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
+import BotonGoogle, { useEntrarConGoogle } from '../components/BotonGoogle';
 import CampoClave from '../components/CampoClave';
 import FieldError from '../components/FieldError';
 import Icon from '../components/Icon';
 import { VitrinaMark } from '../components/Logo';
 import VerificarTelefono, { formatoCelular } from '../components/VerificarTelefono';
 import { WEB_URL } from '../config';
+import { googleDisponible } from '../google';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
@@ -34,6 +36,9 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 // Primero se confirma el celular con un código por WhatsApp (con él se
 // entra y se recupera la contraseña); después se llenan los datos. El
 // correo es opcional.
+//
+// O, en vez del celular, «Continuar con Google»: si la cuenta de Google es
+// nueva sigue en RegistroGoogle (nombre y política); si ya existe, entra.
 
 export default function RegisterScreen({ navigation }: Props) {
   const { c } = useTheme();
@@ -51,6 +56,7 @@ export default function RegisterScreen({ navigation }: Props) {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errores, setErrores] = useState<FieldErrors>({});
+  const google = useEntrarConGoogle((idToken, perfil) => navigation.navigate('RegistroGoogle', { idToken, perfil }));
 
   function limpiarError(campo: string) {
     setErrores(prev => {
@@ -124,12 +130,28 @@ export default function RegisterScreen({ navigation }: Props) {
             <VitrinaMark size={30} />
             <Text style={styles.logo}>Crear cuenta</Text>
           </View>
-          <Text style={styles.subtitle}>{celular ? 'Únete a Vitrina' : 'Empieza con tu número de celular'}</Text>
+          <Text style={styles.subtitle}>{celular ? 'Únete a Vitrina' : googleDisponible() ? 'Empieza con Google o con tu celular' : 'Empieza con tu número de celular'}</Text>
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error || (!celular && google.error) ? <Text style={styles.error}>{error ?? google.error}</Text> : null}
 
           {!celular ? (
             <>
+              {googleDisponible() ? (
+                <>
+                  <BotonGoogle
+                    onPress={() => {
+                      setError(null);
+                      google.iniciar();
+                    }}
+                    cargando={google.cargando}
+                  />
+                  <View style={styles.separador}>
+                    <View style={styles.separadorLinea} />
+                    <Text style={styles.separadorTxt}>o con tu celular</Text>
+                    <View style={styles.separadorLinea} />
+                  </View>
+                </>
+              ) : null}
               <VerificarTelefono
                 pedir={pedirCodigoRegistro}
                 verificar={async (telefono, codigo) => {
@@ -341,4 +363,7 @@ const useStyles = makeStyles((c, shadow) => ({
     fontSize: 13,
   },
   hint: { textAlign: 'center', color: c.goldText, fontSize: 14, marginTop: 18, fontFamily: font.semibold },
+  separador: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18, marginBottom: 16 },
+  separadorLinea: { flex: 1, height: 1, backgroundColor: c.borderStrong },
+  separadorTxt: { color: c.muted, fontFamily: font.medium, fontSize: 12 },
 }));

@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { login, Usuario } from '../api';
 import { useAuth } from '../AuthContext';
 import { PressableScale } from '../components/anim';
+import BotonGoogle, { useEntrarConGoogle } from '../components/BotonGoogle';
 import FieldError from '../components/FieldError';
 import Icon, { IconName } from '../components/Icon';
 import CarruselFondo from '../components/login/CarruselFondo';
@@ -29,6 +30,7 @@ import { FOTOS_LOGIN } from '../components/login/fotosLogin';
 import TarjetaVidrio from '../components/login/TarjetaVidrio';
 import { marca, VitrinaLogo } from '../components/Logo';
 import RecuperarClaveModal from '../components/RecuperarClaveModal';
+import { googleDisponible } from '../google';
 import { useToast } from '../Toast';
 import {
   FieldErrors,
@@ -162,6 +164,11 @@ export default function LoginScreen({ navigation }: Props) {
   // "¿Olvidaste tu contraseña?" abierto.
   const [recuperando, setRecuperando] = useState(false);
   const toast = useToast();
+  // «Continuar con Google»: si la cuenta es nueva, falta el último paso del registro.
+  const google = useEntrarConGoogle((idToken, perfil) =>
+    navigation.navigate('RegistroGoogle', { idToken, perfil }),
+  );
+  const ocupado = cargando || google.cargando;
   // Tamaño de la pantalla. El fondo guarda el alto completo: al abrir el
   // teclado la pantalla se encoge y el fondo queda quieto debajo, en vez de
   // reescalar las fotos.
@@ -232,6 +239,7 @@ export default function LoginScreen({ navigation }: Props) {
 
   async function entrar() {
     setError(null);
+    google.setError(null);
     setErrores({});
     const nuevosErrores: FieldErrors = {};
     if (!usuario.trim())
@@ -306,7 +314,9 @@ export default function LoginScreen({ navigation }: Props) {
             style={styles.logo}
           />
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error || google.error ? (
+            <Text style={styles.error}>{error ?? google.error}</Text>
+          ) : null}
 
           {/* cuentas con la sesión abierta en este teléfono: a un toque */}
           {cuentas.length > 0 ? (
@@ -323,7 +333,7 @@ export default function LoginScreen({ navigation }: Props) {
                     key={cuenta.user.id}
                     style={styles.cuenta}
                     onPress={() => cambiarCuenta(cuenta.user.id)}
-                    disabled={cargando}
+                    disabled={ocupado}
                     accessibilityRole="button"
                     accessibilityLabel={`Continuar como ${[
                       cuenta.user.name,
@@ -365,7 +375,7 @@ export default function LoginScreen({ navigation }: Props) {
               autoCorrect={false}
               keyboardType="email-address"
               accessibilityLabel="Correo, celular o usuario"
-              editable={!cargando}
+              editable={!ocupado}
             />
           </View>
           <FieldError mensaje={errores.usuario} />
@@ -383,7 +393,7 @@ export default function LoginScreen({ navigation }: Props) {
               autoCapitalize="none"
               autoCorrect={false}
               accessibilityLabel="Contraseña"
-              editable={!cargando}
+              editable={!ocupado}
               ojo={{ visible: verClave, alternar: () => setVerClave(v => !v) }}
             />
           </View>
@@ -392,7 +402,7 @@ export default function LoginScreen({ navigation }: Props) {
           <TouchableOpacity
             style={styles.olvide}
             onPress={() => setRecuperando(true)}
-            disabled={cargando}
+            disabled={ocupado}
           >
             <Text style={styles.olvideTexto}>¿Olvidaste tu contraseña?</Text>
           </TouchableOpacity>
@@ -401,7 +411,7 @@ export default function LoginScreen({ navigation }: Props) {
             style={styles.boton}
             scaleTo={0.97}
             onPress={entrar}
-            disabled={cargando}
+            disabled={ocupado}
           >
             {cargando ? (
               <ActivityIndicator size="small" color={l.botonTexto} />
@@ -410,10 +420,29 @@ export default function LoginScreen({ navigation }: Props) {
             )}
           </PressableScale>
 
+          {googleDisponible() ? (
+            <>
+              <View style={styles.separador}>
+                <View style={styles.separadorLinea} />
+                <Text style={styles.separadorTxt}>o</Text>
+                <View style={styles.separadorLinea} />
+              </View>
+              <BotonGoogle
+                onPress={() => {
+                  setError(null);
+                  setErrores({});
+                  google.iniciar();
+                }}
+                cargando={google.cargando}
+                disabled={cargando}
+              />
+            </>
+          ) : null}
+
           <TouchableOpacity
             style={styles.registro}
             onPress={() => navigation.navigate('Register')}
-            disabled={cargando}
+            disabled={ocupado}
           >
             <Text style={styles.registroTexto}>
               ¿No tienes cuenta?{' '}

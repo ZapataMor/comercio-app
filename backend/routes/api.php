@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\CuentaController;
 use App\Http\Controllers\Api\DeviceTokenController;
 use App\Http\Controllers\Api\DomiciliarioController as ApiDomiciliarioController;
 use App\Http\Controllers\Api\EnVivoController;
+use App\Http\Controllers\Api\GoogleController;
 use App\Http\Controllers\Api\InvitacionController;
 use App\Http\Controllers\Api\PedidoController as ApiPedidoController;
 use App\Http\Controllers\Api\PedidoIncidenciaController;
@@ -44,6 +45,8 @@ Route::pattern('userId', '[0-9]{1,18}');
 // Límites de intentos con nombre: ver AppServiceProvider::limitesDeIntentos().
 Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:acceso');
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:acceso');
+// Entrar o registrarse con Google (ver GoogleController).
+Route::post('/google', [GoogleController::class, 'entrar'])->middleware('throttle:google');
 
 // "Olvidé mi contraseña": se envía un código de 6 dígitos al correo y con él
 // se pone una contraseña nueva.
@@ -72,6 +75,9 @@ Route::middleware(['auth:sanctum', 'throttle:api-usuario'])->group(function () {
     // Verificar el celular desde Mi información (código por WhatsApp).
     Route::post('/perfil/telefono/codigo', [TelefonoController::class, 'codigoPerfil'])->middleware('throttle:codigo-telefono');
     Route::post('/perfil/telefono/verificar', [TelefonoController::class, 'verificarPerfil'])->middleware('throttle:verificar-telefono');
+    // Conectar o desconectar Google para entrar con él.
+    Route::post('/perfil/google', [GoogleController::class, 'conectar'])->middleware('throttle:google');
+    Route::delete('/perfil/google', [GoogleController::class, 'desconectar']);
     Route::post('/perfil/domiciliario', [AuthController::class, 'hacerseDomiciliario']);
     Route::delete('/perfil/domiciliario', [AuthController::class, 'dejarDeSerDomiciliario']);
     // Eliminar mi cuenta (anonimiza; exige la contraseña).

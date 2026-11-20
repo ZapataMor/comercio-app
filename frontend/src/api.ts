@@ -36,6 +36,10 @@ export type Usuario = {
   negocios?: { id: number; nombre: string; rol: RolNegocio }[];
   /** Domiciliario: si está en turno (le llegan los avisos de pedidos). */
   en_turno?: boolean;
+  /** Tiene una cuenta de Google conectada para entrar con ella. */
+  google?: boolean;
+  /** false: se registró con Google y aún no ha creado contraseña. */
+  tiene_clave?: boolean;
 };
 
 /**
@@ -354,6 +358,42 @@ export async function register(body: {
   return data as LoginResponse;
 }
 
+// ---------- Entrar con Google ----------
+
+/** Datos de Google para completar el registro (cuenta nueva). */
+export type PerfilGoogle = { name: string; apellidos: string; email: string };
+
+/**
+ * Respuesta de POST /api/google: la sesión, o `nuevo` si esa cuenta de Google
+ * aún no tiene cuenta en Vitrina (falta aceptar la política y revisar el nombre).
+ */
+export type RespuestaGoogle = (LoginResponse & { nuevo?: undefined }) | { nuevo: true; perfil: PerfilGoogle };
+
+/**
+ * Entra con el «ID token» que Google le dio a la app (src/google.ts). Con
+ * `registro` (política aceptada, nombre y apellidos) crea la cuenta nueva.
+ * Si el correo ya tiene cuenta sin Google conectado falla con 409 y
+ * `data.codigo === 'correo_existente'`.
+ */
+export async function entrarConGoogle(
+  idToken: string,
+  registro?: { name: string; apellidos: string; acepta_terminos: true },
+): Promise<RespuestaGoogle> {
+  return publicPostDatos('/api/google', { id_token: idToken, ...registro }, 'No se pudo entrar con Google.');
+}
+
+/** Conecta una cuenta de Google a la cuenta con que se entró. */
+export async function conectarGoogle(token: string, idToken: string): Promise<{ message: string; user: Usuario }> {
+  const d = await authSend('POST', '/api/perfil/google', token, { id_token: idToken });
+  return { message: d.message as string, user: d.user as Usuario };
+}
+
+/** Deja de entrar con Google (exige tener contraseña). */
+export async function desconectarGoogle(token: string): Promise<{ message: string; user: Usuario }> {
+  const d = await authSend('DELETE', '/api/perfil/google', token);
+  return { message: d.message as string, user: d.user as Usuario };
+}
+
 // ---------- Recuperar contraseña (sin sesión) ----------
 
 /** POST público (sin token) con cuerpo JSON. Devuelve el `message` del backend. */
@@ -378,7 +418,7 @@ async function publicPostDatos(path: string, body: any, porDefecto: string): Pro
   if (!res.ok) {
     const errors = validationErrors(data);
     const mensaje = res.status === 429 ? 'Demasiados intentos. Espera un minuto.' : data?.message;
-    throw new ApiError(firstValidationMessage(errors) ?? mensaje ?? porDefecto, res.status, errors);
+    throw new ApiError(firstValidationMessage(errors) ?? mensaje ?? porDefecto, res.status, errors, data);
   }
   return data;
 }
@@ -647,11 +687,17 @@ export async function dejarDeSerDomiciliario(token: string): Promise<{ message: 
 }
 
 /**
- * Elimina la cuenta (anonimiza los datos; exige la contraseña). Puede fallar
- * con 409 si hay pedidos o entregas en curso.
+ * Elimina la cuenta (anonimiza los datos). Se confirma con la contraseña o,
+ * sin contraseña (registro con Google), con un ID token de la cuenta de
+ * Google conectada. Puede fallar con 409 si hay pedidos o entregas en curso.
  */
-export async function eliminarCuenta(token: string, password: string): Promise<void> {
-  await authSend('DELETE', '/api/cuenta', token, { password });
+export async function eliminarCuenta(token: string, confirmacion: string | { googleIdToken: string }): Promise<void> {
+  await authSend(
+    'DELETE',
+    '/api/cuenta',
+    token,
+    typeof confirmacion === 'string' ? { password: confirmacion } : { google_id_token: confirmacion.googleIdToken },
+  );
 }
 
 // ---------- Cliente: ubicaciones ----------

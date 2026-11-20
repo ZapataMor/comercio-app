@@ -8,3 +8,10 @@
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
 # Add any project specific keep options here:
+
+# Entrar con Google (Credential Manager): el proveedor de Play Services se
+# carga por reflexión.
+-if class androidx.credentials.CredentialManager
+-keep class androidx.credentials.playservices.** {
+  *;
+}

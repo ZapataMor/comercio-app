@@ -65,6 +65,9 @@ class AppServiceProvider extends ServiceProvider
         // Login y registro (API y web): 6 por minuto por correo (o celular, o usuario) e IP.
         RateLimiter::for('acceso', fn (Request $r) => Limit::perMinute(6)->by('acceso|'.mb_strtolower(trim((string) $r->input('usuario', $r->input('username', $r->input('email', $r->input('telefono')))))).'|'.$r->ip()));
 
+        // Entrar con Google: 10 por minuto por IP (cada intento verifica un token).
+        RateLimiter::for('google', fn (Request $r) => Limit::perMinute(10)->by('google|'.$r->ip()));
+
         // Pedir código de recuperación: 3 por minuto y 10 por hora por correo
         // o celular. Por WhatsApp cada código cuesta, así que también hay tope por IP.
         RateLimiter::for('codigo-clave', fn (Request $r) => [

@@ -273,6 +273,14 @@ class EnVivo
 
             // --- Cuenta y perfil ---
             AuthController::class.'@register' => ['despues' => fn () => self::avisar(self::ADMIN, 'usuarios')],
+            // Entrar con Google: solo la cuenta nueva (201) cambia la lista del admin.
+            Api\GoogleController::class.'@entrar' => ['despues' => function (Request $r, Response $res) {
+                if ($res->getStatusCode() === 201) {
+                    self::avisar(self::ADMIN, 'usuarios');
+                }
+            }],
+            Api\GoogleController::class.'@conectar' => ['despues' => fn (Request $r) => self::perfil($yo($r))],
+            Api\GoogleController::class.'@desconectar' => ['despues' => fn (Request $r) => self::perfil($yo($r))],
             AuthController::class.'@actualizarPerfil' => ['despues' => fn (Request $r) => self::perfil($yo($r))],
             AuthController::class.'@hacerseDomiciliario' => ['despues' => fn (Request $r) => self::perfil($yo($r))],
             // Verificar el celular cambia el número que ven negocios y domiciliarios.
