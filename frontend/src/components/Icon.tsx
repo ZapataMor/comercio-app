@@ -34,6 +34,7 @@ export type IconName =
   | 'cerrar'
   | 'imagen'
   | 'chevron'
+  | 'atras'
   | 'lista'
   | 'lupa'
   | 'reloj'
@@ -200,6 +201,13 @@ const GLYPHS: Record<IconName, React.ReactNode> = {
     </>
   ),
   chevron: <Path d="M9 6l6 6-6 6" />,
+  // Flecha hacia la izquierda: volver a la pantalla anterior.
+  atras: (
+    <>
+      <Path d="M19 12H5" />
+      <Path d="M11 18l-6-6 6-6" />
+    </>
+  ),
   estrella: <Path d="M12 2.8l2.84 5.76 6.36.92-4.6 4.49 1.09 6.33L12 17.31l-5.69 2.99 1.09-6.33-4.6-4.49 6.36-.92z" />,
   lista: (
     <>

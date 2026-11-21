@@ -13,6 +13,7 @@ import { ApiError, entrarConGoogle, Usuario } from '../src/api';
 import { AuthProvider, useAuth } from '../src/AuthContext';
 import { elegirCuentaGoogle, googleDisponible } from '../src/google';
 import LoginScreen from '../src/screens/LoginScreen';
+import RegisterScreen from '../src/screens/RegisterScreen';
 import RegistroGoogleScreen from '../src/screens/RegistroGoogleScreen';
 
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
@@ -187,6 +188,20 @@ describe('último paso del registro', () => {
 
     expect(textos()).toContain('elige otra vez tu cuenta de Google');
     expect(sesion.auth).toBeNull();
+  });
+
+  test('el botón de volver regresa a la pantalla anterior', async () => {
+    await montar(<RegistroGoogleScreen {...({ navigation, route } as any)} />);
+    await tocarEtiqueta('Volver');
+    expect(navigation.goBack).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('registro', () => {
+  test('el botón de volver regresa al inicio de sesión', async () => {
+    await montar(<RegisterScreen {...({ navigation } as any)} />);
+    await tocarEtiqueta('Volver al inicio de sesión');
+    expect(navigation.goBack).toHaveBeenCalledTimes(1);
   });
 });
 

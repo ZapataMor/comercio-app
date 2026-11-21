@@ -1,18 +1,34 @@
 /**
  * Estilos y piezas compartidas por lo que va dentro de la tarjeta de vidrio
- * (login, registro y registro con Google): logo, títulos, botón principal,
- * enlaces, separador, avisos y la casilla de la política de privacidad.
+ * (login, registro y registro con Google): logo, botón de volver, títulos,
+ * botón principal, enlaces, separador, avisos y la casilla de la política de
+ * privacidad.
  * Los colores salen de `paletasLogin` (theme.tsx), igual que el login.
  */
 import React from 'react';
 import { Linking, StyleProp, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { WEB_URL } from '../../config';
 import { font, makeStyles, radius, useTheme } from '../../theme';
+import { PressableScale } from '../anim';
 import Icon from '../Icon';
 import { marca, VitrinaLogo } from '../Logo';
 
 export const useEstilosAcceso = makeStyles((c, _sombras, l) => ({
   logo: { alignSelf: 'center', marginBottom: 20 },
+  // «Volver»: círculo arriba a la izquierda, a la altura del logo (40 de
+  // alto) y sin moverlo. Mismo fondo que las píldoras de «Continuar como».
+  volver: {
+    position: 'absolute',
+    top: 0,
+    left: -6,
+    zIndex: 1,
+    width: 40,
+    height: 40,
+    borderRadius: radius.pill,
+    backgroundColor: l.campo,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   titulo: {
     color: l.rotulo,
     fontFamily: font.display,
@@ -104,6 +120,35 @@ export function LogoAcceso() {
       textColor={modo === 'noche' ? marca.arena : marca.tinta}
       style={e.logo}
     />
+  );
+}
+
+/**
+ * Botón para volver a la pantalla anterior (registro → login). Va primero
+ * dentro de la tarjeta, antes del logo: queda en la esquina sin empujarlo.
+ */
+export function BotonVolverAcceso({
+  onPress,
+  disabled,
+  accessibilityLabel = 'Volver',
+}: {
+  onPress: () => void;
+  disabled?: boolean;
+  accessibilityLabel?: string;
+}) {
+  const { login: l } = useTheme();
+  const e = useEstilosAcceso();
+  return (
+    <PressableScale
+      style={[e.volver, disabled && e.botonInactivo]}
+      scaleTo={0.9}
+      onPress={onPress}
+      disabled={disabled}
+      hitSlop={8}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}>
+      <Icon name="atras" size={20} color={l.campoTexto} strokeWidth={2} />
+    </PressableScale>
   );
 }
 

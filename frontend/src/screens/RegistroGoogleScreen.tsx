@@ -8,7 +8,7 @@ import { LogoGoogle } from '../components/BotonGoogle';
 import FieldError from '../components/FieldError';
 import CampoAcceso from '../components/login/CampoAcceso';
 import EscenaAcceso from '../components/login/EscenaAcceso';
-import { CasillaPolitica, LogoAcceso, useEstilosAcceso } from '../components/login/estilosAcceso';
+import { BotonVolverAcceso, CasillaPolitica, LogoAcceso, useEstilosAcceso } from '../components/login/estilosAcceso';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
 import { useTheme } from '../theme';
@@ -86,6 +86,7 @@ export default function RegistroGoogleScreen({ navigation, route }: Props) {
 
   return (
     <EscenaAcceso>
+      <BotonVolverAcceso onPress={() => navigation.goBack()} disabled={cargando} />
       <LogoAcceso />
       <Text style={e.titulo}>Crear cuenta</Text>
       <Text style={e.subtitulo}>Ya casi: revisa tus datos</Text>

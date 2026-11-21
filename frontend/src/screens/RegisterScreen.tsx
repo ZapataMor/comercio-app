@@ -9,7 +9,13 @@ import FieldError from '../components/FieldError';
 import Icon from '../components/Icon';
 import CampoAcceso from '../components/login/CampoAcceso';
 import EscenaAcceso from '../components/login/EscenaAcceso';
-import { CasillaPolitica, LogoAcceso, SeparadorAcceso, useEstilosAcceso } from '../components/login/estilosAcceso';
+import {
+  BotonVolverAcceso,
+  CasillaPolitica,
+  LogoAcceso,
+  SeparadorAcceso,
+  useEstilosAcceso,
+} from '../components/login/estilosAcceso';
 import VerificarTelefono, { formatoCelular } from '../components/VerificarTelefono';
 import { googleDisponible } from '../google';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
@@ -29,7 +35,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 // O, en vez del celular, «Continuar con Google»: si la cuenta de Google es
 // nueva sigue en RegistroGoogle (nombre y política); si ya existe, entra.
 //
-// Se ve igual que el login (EscenaAcceso): mismo fondo y misma tarjeta.
+// Se ve igual que el login (EscenaAcceso): mismo fondo y misma tarjeta, con
+// un botón de volver al login en la esquina de arriba.
 
 export default function RegisterScreen({ navigation }: Props) {
   const { login: l } = useTheme();
@@ -122,6 +129,11 @@ export default function RegisterScreen({ navigation }: Props) {
 
   return (
     <EscenaAcceso>
+      <BotonVolverAcceso
+        onPress={() => navigation.goBack()}
+        disabled={cargando || google.cargando}
+        accessibilityLabel="Volver al inicio de sesión"
+      />
       <LogoAcceso />
       <Text style={e.titulo}>Crear cuenta</Text>
       <Text style={e.subtitulo}>
