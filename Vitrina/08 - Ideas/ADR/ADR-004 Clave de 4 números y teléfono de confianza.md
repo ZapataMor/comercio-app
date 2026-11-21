@@ -34,8 +34,7 @@ cualquiera podría probar 1234, 0000 o el año de nacimiento.
 1. **Dos pasos distintos**: probar *quién eres* una vez por teléfono (código de WhatsApp o
    Google) y probar *que eres tú quien lo usa* cada vez (la clave).
 2. **Clave de 4 números** obligatoria para toda cuenta: se crea al registrarse (con el celular o
-   con Google); las cuentas de antes la crean al entrar («Crea tu clave»). No se aceptan claves
-   fáciles (repetidas, seguidas, pares como 1212, las más usadas).
+   con Google). No se aceptan claves fáciles (repetidas, seguidas, pares como 1212, las más usadas).
 3. **Teléfono de confianza**: en un teléfono donde ya se demostró quién es, basta celular y
    clave (o «Continuar como» y clave, también para cuentas de Google sin celular). En uno nuevo,
    tras acertar la clave llega un código por WhatsApp. Vence a los 180 días sin usarse.
@@ -48,8 +47,12 @@ cualquiera podría probar 1234, 0000 o el año de nacimiento.
 7. **Piden la clave**: cambiar el celular verificado, desconectar Google (además exige el celular
    verificado), eliminar la cuenta (app y web) y crear, editar o borrar cuentas de pago del negocio.
 8. **Ya no se recupera por correo** (el escrito a mano no se confirma).
-9. **Cuentas de antes**: entran con su contraseña mientras no tengan clave, o si no tienen celular
-   verificado ni Google. El **panel web de administración** sigue con contraseña.
+9. **Solo celular o Google**: no hay otra forma de entrar a la app. El **panel web de
+   administración** sigue con usuario y contraseña de administrador. Las cuentas que crea un admin
+   (cliente o domiciliario) llevan celular verificado y una clave de 4 números.
+10. **Cuentas de prueba** (2026-11-21): se borraron los clientes y quedaron comerciantes y
+    domiciliarios con celulares desde 3000000000 y clave 1920 (`php artisan
+    vitrina:cuentas-de-prueba`; lista en `comercios-demo.txt`).
 
 ## Consecuencias
 - ✅ Entrar es tan simple como en Nequi, sin regalar la cuenta a quien conoce el número.
@@ -62,8 +65,8 @@ cualquiera podría probar 1234, 0000 o el año de nacimiento.
 ## Dónde está
 - Backend: `App\Support\ClavePin`, `App\Rules\ClaveCuatro`, `AuthController::login` y
   `confirmarCodigo`, `ClaveController`, tabla `dispositivos_confianza`.
-- App: `CampoPin`, `PedirClave`, `CrearClaveScreen`, `CompletarCuentaScreen`, la `fase` de `App.tsx`
-  y los `dispositivos` de `AuthContext`.
+- App: `CampoPin`, `PedirClave`, `CompletarCuentaScreen`, la `fase` de `App.tsx` y los
+  `dispositivos` de `AuthContext`.
 
 ## Conecta con
 - [[_MOC ADR]] · [[ADR-001 Inicio de sesión con Google]] · [[Estado Actual]]

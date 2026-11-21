@@ -141,7 +141,7 @@ test('un celular sin cuenta verificada o una cuenta sin clave reciben un aviso c
 
     $user = User::factory()->create(['telefono' => '3001234567', 'telefono_verificado_at' => now()]);
     $this->postJson('/api/login', ['telefono' => '3001234567', 'pin' => '2468'])
-        ->assertStatus(422)->assertJsonPath('errors.pin.0', 'Aún no tienes clave de 4 números. Créala con «¿Olvidaste tu clave?» o entra con tu contraseña.');
+        ->assertStatus(422)->assertJsonPath('errors.pin.0', 'Aún no tienes clave de 4 números. Créala para continuar.');
 });
 
 test('una cuenta suspendida no entra aunque acierte la clave', function () {
@@ -235,53 +235,28 @@ test('cada cuenta conserva solo sus 10 teléfonos de confianza más recientes', 
 });
 
 // ---------------------------------------------------------------------------
-// Cuentas de antes (con contraseña)
-// ---------------------------------------------------------------------------
-
-test('una cuenta de antes entra con su contraseña y crea su clave sin escribir otra', function () {
-    $user = User::factory()->create(['email' => 'ana@correo.com', 'password' => 'clave-actual']);
-    $user->assignRole('usuario');
-
-    $sesion = $this->postJson('/api/login', ['usuario' => 'ana@correo.com', 'password' => 'clave-actual'])
-        ->assertOk()->assertJsonPath('user.tiene_pin', false)->assertJsonStructure(['token', 'dispositivo']);
-
-    $this->withToken($sesion->json('token'))->postJson('/api/perfil/clave', ['pin' => '1111', 'pin_confirmation' => '1111'])
-        ->assertStatus(422)->assertJsonValidationErrors('pin');
-    $this->withToken($sesion->json('token'))->postJson('/api/perfil/clave', ['pin' => '2468', 'pin_confirmation' => '2468'])
-        ->assertOk()->assertJsonPath('user.tiene_pin', true)->assertJsonStructure(['dispositivo']);
-});
-
-test('con clave y celular verificado la contraseña ya no sirve en la app', function () {
-    conClave(extra: ['email' => 'ana@correo.com', 'password' => 'clave-actual']);
-
-    $this->postJson('/api/login', ['usuario' => 'ana@correo.com', 'password' => 'clave-actual'])
-        ->assertStatus(422)->assertJsonPath('errors.usuario.0', 'Tu cuenta ya tiene clave de 4 números: entra con tu celular y tu clave.');
-});
-
-test('con clave pero sin celular ni Google la contraseña sigue sirviendo (no tendría otra forma de entrar)', function () {
-    User::factory()->conClave()->create(['email' => 'ana@correo.com', 'password' => 'clave-actual']);
-
-    $this->postJson('/api/login', ['usuario' => 'ana@correo.com', 'password' => 'clave-actual'])->assertOk();
-});
-
-// ---------------------------------------------------------------------------
 // Cambiar la clave y acciones que la piden
 // ---------------------------------------------------------------------------
 
-test('cambiar la clave pide la actual y no acepta la misma', function () {
+test('cambiar la clave pide la actual, no acepta la misma y cierra las demás sesiones', function () {
     $user = conClave();
-    Sanctum::actingAs($user);
+    $otra = $user->createToken('otro-telefono')->plainTextToken;
+    $actual = $user->createToken('este-telefono')->plainTextToken;
 
-    $this->postJson('/api/perfil/clave', ['pin' => '1357', 'pin_confirmation' => '1357'])
+    $this->withToken($actual)->postJson('/api/perfil/clave', ['pin' => '1357', 'pin_confirmation' => '1357'])
         ->assertStatus(422)->assertJsonValidationErrors('pin_actual');
-    $this->postJson('/api/perfil/clave', ['pin_actual' => '9753', 'pin' => '1357', 'pin_confirmation' => '1357'])
+    $this->withToken($actual)->postJson('/api/perfil/clave', ['pin_actual' => '9753', 'pin' => '1357', 'pin_confirmation' => '1357'])
         ->assertStatus(422)->assertJsonValidationErrors('pin_actual');
-    $this->postJson('/api/perfil/clave', ['pin_actual' => '2468', 'pin' => '2468', 'pin_confirmation' => '2468'])
+    $this->withToken($actual)->postJson('/api/perfil/clave', ['pin_actual' => '2468', 'pin' => '2468', 'pin_confirmation' => '2468'])
         ->assertStatus(422)->assertJsonPath('errors.pin.0', 'La clave nueva es igual a la actual.');
-    $this->postJson('/api/perfil/clave', ['pin_actual' => '2468', 'pin' => '1357', 'pin_confirmation' => '1357'])
-        ->assertOk()->assertJsonMissingPath('dispositivo');
+    $this->withToken($actual)->postJson('/api/perfil/clave', ['pin_actual' => '2468', 'pin' => '1357', 'pin_confirmation' => '1357'])
+        ->assertOk();
 
-    expect(Hash::check('1357', $user->fresh()->pin))->toBeTrue()->and($user->fresh()->pin_fallidos)->toBe(0);
+    expect(Hash::check('1357', $user->fresh()->pin))->toBeTrue()
+        ->and($user->fresh()->pin_fallidos)->toBe(0)
+        ->and($user->tokens()->count())->toBe(1);
+    $this->app['auth']->forgetGuards();
+    $this->withToken($otra)->getJson('/api/user')->assertUnauthorized();
 });
 
 test('la app puede revisar la clave antes de una acción en dos pasos', function () {

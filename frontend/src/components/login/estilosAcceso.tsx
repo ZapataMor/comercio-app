@@ -5,8 +5,8 @@
  * privacidad.
  * Los colores salen de `paletasLogin` (theme.tsx), igual que el login.
  */
-import React from 'react';
-import { Linking, StyleProp, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { BackHandler, Linking, StyleProp, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { WEB_URL } from '../../config';
 import { font, makeStyles, radius, useTheme } from '../../theme';
 import { PressableScale } from '../anim';
@@ -124,8 +124,29 @@ export function LogoAcceso() {
 }
 
 /**
- * Botón para volver a la pantalla anterior (registro → login). Va primero
- * dentro de la tarjeta, antes del logo: queda en la esquina sin empujarlo.
+ * El botón «atrás» de Android hace lo mismo que la flecha de la tarjeta
+ * (ir al paso o la pantalla anterior). Con `alVolver` null no hace nada y
+ * Android sigue con lo suyo.
+ */
+export function useAtrasAndroid(alVolver: (() => void) | null) {
+  const ref = useRef(alVolver);
+  ref.current = alVolver;
+  const hay = !!alVolver;
+  useEffect(() => {
+    if (!hay) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (!ref.current) return false;
+      ref.current();
+      return true;
+    });
+    return () => sub.remove();
+  }, [hay]);
+}
+
+/**
+ * Flecha para volver a la vista anterior (un paso atrás o la pantalla de
+ * antes). Va primero dentro de la tarjeta, antes del logo: queda en la
+ * esquina sin empujarlo. Úsese junto con useAtrasAndroid.
  */
 export function BotonVolverAcceso({
   onPress,

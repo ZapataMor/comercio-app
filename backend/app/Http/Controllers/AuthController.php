@@ -11,11 +11,8 @@ use App\Support\UbicacionDomiciliario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends Controller
 {
@@ -104,27 +101,19 @@ class AuthController extends Controller
     }
 
     /**
-     * Entrar. Tres formas:
+     * Entrar. Dos formas (la tercera es Google, ver GoogleController):
      *
      *  - `telefono` + `pin`: celular verificado y clave de 4 números. En un
      *    teléfono de confianza (`dispositivo`) entra; en uno nuevo responde
      *    `requiere_codigo` y envía un código por WhatsApp (ver confirmarCodigo).
      *  - `dispositivo` + `pin`: «Continuar como» en un teléfono de confianza
      *    (sirve también para las cuentas de Google sin celular).
-     *  - `usuario` + `password`: las cuentas de antes, con su contraseña. Solo
-     *    mientras no tengan clave, o si no tienen celular verificado ni Google
-     *    (no tendrían otra forma de entrar). Se sigue aceptando `email` en vez
-     *    de `usuario` (versiones anteriores de la app).
      */
     public function login(Request $request, CodigosTelefono $codigos): JsonResponse
     {
-        if ($request->has('pin')) {
-            return $request->filled('dispositivo') && ! $request->filled('telefono')
-                ? $this->entrarEnDispositivo($request)
-                : $this->entrarConCelular($request, $codigos);
-        }
-
-        return $this->entrarConContrasena($request);
+        return $request->filled('dispositivo') && ! $request->filled('telefono')
+            ? $this->entrarEnDispositivo($request)
+            : $this->entrarConCelular($request, $codigos);
     }
 
     private function entrarConCelular(Request $request, CodigosTelefono $codigos): JsonResponse
@@ -145,12 +134,6 @@ class AuthController extends Controller
                 'telefono' => ['Este celular no tiene una cuenta verificada en Vitrina. Revisa el número o regístrate.'],
             ]);
         }
-        if ($user->pin === null) {
-            throw ValidationException::withMessages([
-                'pin' => ['Aún no tienes clave de 4 números. Créala con «¿Olvidaste tu clave?» o entra con tu contraseña.'],
-            ]);
-        }
-
         ClavePin::comprobar($user, $data['pin']);
         self::asegurarActiva($user, 'telefono');
 
@@ -234,41 +217,6 @@ class AuthController extends Controller
         return self::sesion($user, $data['dispositivo']);
     }
 
-    /** Las cuentas de antes: correo, celular o usuario y contraseña. */
-    private function entrarConContrasena(Request $request): JsonResponse
-    {
-        $campo = $request->has('usuario') ? 'usuario' : 'email';
-        $data = $request->validate([
-            $campo => $campo === 'usuario' ? ['required', 'string', 'max:255'] : ['required', 'string', 'email'],
-            'password' => ['present', 'string', 'min:1'],
-        ], [
-            'usuario.required' => 'Escribe tu correo, celular o usuario.',
-        ]);
-
-        $user = self::buscarParaAcceso($data[$campo]);
-
-        if (! $user || ! Hash::check($data['password'], $user->password)) {
-            // Mensaje genérico: no revelamos si la cuenta existe o no.
-            throw ValidationException::withMessages([
-                $campo => ['Las credenciales no son correctas.'],
-            ]);
-        }
-
-        self::asegurarActiva($user, $campo);
-
-        // Con clave y otra forma de entrar, la contraseña ya no sirve en la app
-        // (el panel web de administración la sigue usando).
-        if ($user->pin !== null && ($user->telefono_verificado_at !== null || $user->google_id !== null)) {
-            throw ValidationException::withMessages([
-                $campo => [$user->telefono_verificado_at !== null
-                    ? 'Tu cuenta ya tiene clave de 4 números: entra con tu celular y tu clave.'
-                    : 'Tu cuenta ya tiene clave de 4 números: entra con «Continuar con Google» y tu clave.'],
-            ]);
-        }
-
-        return self::sesion($user, ClavePin::confiar($user, $request->input('nombre_dispositivo')));
-    }
-
     /**
      * La sesión que reciben la app al entrar: datos, token y, si lo hay, el
      * token del teléfono de confianza (la app lo guarda para «Continuar como»).
@@ -298,30 +246,11 @@ class AuthController extends Controller
     }
 
     /**
-     * La cuenta a la que se refiere lo que la persona escribió al entrar:
-     * correo si tiene "@", celular si son 10 dígitos que empiezan por 3 (o
-     * con +57) y solo si está verificado, o si no, nombre de usuario.
-     */
-    public static function buscarParaAcceso(string $identificador): ?User
-    {
-        $identificador = trim($identificador);
-        if (str_contains($identificador, '@')) {
-            return User::where('email', $identificador)->first();
-        }
-        $telefono = CodigosTelefono::normalizar($identificador);
-        if ($telefono !== null) {
-            return CodigosTelefono::cuentaConTelefono($telefono);
-        }
-
-        return User::where('username', mb_strtolower($identificador))->first();
-    }
-
-    /**
      * Actualiza el perfil PERSONAL del usuario autenticado (cualquier rol).
      *
-     * Es el perfil de la persona (nombre, email, contraseña), NO el del
-     * negocio: eso vive en /negocios/{negocio}. Para cambiar la contraseña
-     * se exige la contraseña actual.
+     * Es el perfil de la persona (nombre, apellidos, correo y teléfono de
+     * contacto), NO el del negocio: eso vive en /negocios/{negocio}. La clave
+     * se cambia en /perfil/clave y el celular verificado en /perfil/telefono.
      */
     public function actualizarPerfil(Request $request): JsonResponse
     {
@@ -344,13 +273,10 @@ class AuthController extends Controller
         }
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            // Opcional aquí: las cuentas creadas antes (o por un admin) pueden no tenerlos.
+            // Opcional aquí: las cuentas creadas por un admin pueden no tenerlos.
             'apellidos' => ['sometimes', 'nullable', 'string', 'max:255'],
-            // Puede quedar vacío si la persona entra con su celular verificado.
+            // Opcional: se entra con el celular verificado o con Google.
             'email' => ['present', 'nullable', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
-            'password' => ['sometimes', 'nullable', 'string', 'min:5', 'confirmed'],
-            // Quien entró con Google y aún no tiene contraseña la crea sin la actual.
-            'password_actual' => $user->password === null ? ['exclude'] : ['exclude_without:password', 'present', 'string', 'min:1'],
             // La dirección del cliente se maneja en "Mis direcciones"; aquí es
             // opcional (versiones anteriores de la app aún la mandan).
             'direccion' => ['sometimes', 'nullable', 'string', 'max:255', new \App\Rules\Direccion],
@@ -360,32 +286,12 @@ class AuthController extends Controller
 
         // El celular verificado es la forma de entrar: se cambia solo con la
         // clave y un código de WhatsApp (/perfil/telefono/codigo). Uno sin
-        // verificar es solo de contacto y se cambia aquí. La cuenta debe
-        // conservar al menos una forma de entrar.
+        // verificar es solo de contacto y se cambia aquí.
         $cambiaTelefono = array_key_exists('telefono', $data) && $data['telefono'] !== $user->telefono;
         if ($cambiaTelefono && $user->telefono_verificado_at !== null) {
             throw ValidationException::withMessages([
-                'telefono' => ['Tu celular verificado se cambia con «Cambiar celular» en Mi información: te pediremos tu clave y un código de WhatsApp.'],
+                'telefono' => ['Tu celular verificado se cambia con «Cambiar» en Mi información: te pediremos tu clave y un código de WhatsApp.'],
             ]);
-        }
-        $conservaCelular = $user->telefono_verificado_at !== null && ! $cambiaTelefono;
-        if (blank($data['email']) && blank($user->username) && ! $conservaCelular && $user->google_id === null) {
-            throw ValidationException::withMessages([
-                $cambiaTelefono ? 'telefono' : 'email' => [$cambiaTelefono
-                    ? 'Tu celular es tu forma de entrar: para cambiarlo, verifica el número nuevo con el código de WhatsApp.'
-                    : 'El campo correo es obligatorio.'],
-            ]);
-        }
-
-        if (! empty($data['password'])) {
-            if ($user->password !== null && ! Hash::check($data['password_actual'], $user->password)) {
-                throw ValidationException::withMessages([
-                    'password_actual' => ['La contraseña actual no es correcta.'],
-                ]);
-            }
-            $user->password = $data['password']; // se hashea solo (cast 'hashed')
-
-            $user->remember_token = Str::random(60);
         }
 
         $user->name = $data['name'];
@@ -404,16 +310,6 @@ class AuthController extends Controller
             $user->telefono_verificado_at = null;
         }
         $user->save();
-
-        if (! empty($data['password'])) {
-            $actual = $user->currentAccessToken();
-            $user->tokens()->when($actual instanceof PersonalAccessToken, fn ($q) => $q->whereKeyNot($actual->getKey()))->delete();
-            if (config('session.driver') === 'database') {
-                DB::connection(config('session.connection'))->table(config('session.table', 'sessions'))
-                    ->where('user_id', $user->id)
-                    ->when($request->hasSession(), fn ($q) => $q->where('id', '!=', $request->session()->getId()))->delete();
-            }
-        }
 
         // Mantener sincronizada la ubicación principal del cliente con su perfil.
         if ($esCliente && ! empty($data['direccion']) && ! empty($data['barrio'])) {
@@ -527,10 +423,8 @@ class AuthController extends Controller
             'telefono_verificado' => $user->telefono_verificado_at !== null,
             // Entra con Google (cuenta de Google conectada).
             'google' => $user->google_id !== null,
-            // Clave de 4 números. false: la app le pide crearla antes de seguir.
+            // Clave de 4 números.
             'tiene_pin' => $user->pin !== null,
-            // Contraseña de antes (cuentas viejas y el panel web de administración).
-            'tiene_clave' => $user->password !== null,
             // Domiciliario: si está en turno (le llegan los avisos de pedidos).
             'en_turno' => (bool) $user->en_turno,
             // Código único para que un negocio lo invite como trabajador.

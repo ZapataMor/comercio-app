@@ -232,12 +232,13 @@ test('un trabajador puede salir del negocio, el propietario no', function () {
 });
 
 test('el login devuelve mis negocios con mi rol en cada uno', function () {
-    $user = User::factory()->create(['password' => 'password123']);
+    $user = User::factory()->conClave()->create(['telefono' => '3001234567', 'telefono_verificado_at' => now()]);
     $user->assignRole('usuario');
     negocioDe($user, 'Mío');
     hacerTrabajador(negocioDe(persona(), 'Ajeno'), $user);
+    $dispositivo = \App\Support\ClavePin::confiar($user);
 
-    $this->postJson('/api/login', ['email' => $user->email, 'password' => 'password123'])
+    $this->postJson('/api/login', ['telefono' => '3001234567', 'pin' => '2468', 'dispositivo' => $dispositivo])
         ->assertOk()
         ->assertJsonPath('user.codigo_publico', $user->codigo_publico)
         ->assertJsonCount(2, 'user.negocios');

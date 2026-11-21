@@ -332,7 +332,7 @@ export default function MiInformacionScreen(_props: Props) {
             <Dato
               icono="candado"
               etiqueta="Clave de 4 números"
-              valor={user.tiene_pin === false ? 'Sin crear' : '••••'}
+              valor="••••"
               ultimo
             />
             <TouchableOpacity accessibilityRole="button" onPress={() => setCambiandoClave(true)} hitSlop={8}>

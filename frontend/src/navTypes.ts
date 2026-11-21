@@ -21,10 +21,7 @@ export type RootStackParamList = {
   Register: undefined;
   // Últimos pasos del registro con Google (cuenta nueva): nombre, política y clave.
   RegistroGoogle: { idToken: string; perfil: PerfilGoogle };
-  // Con la sesión abierta, antes de la app: crear la clave de 4 números
-  // (obligatorio para las cuentas que no la tienen) y, una vez tras
-  // registrarse, «Completa tu cuenta» (correo o celular, opcionales).
-  CrearClave: undefined;
+  // Una vez, tras registrarse: «Completa tu cuenta» (correo o celular, opcionales).
   CompletarCuenta: undefined;
   Home: undefined;
   // Datos personales de la cuenta: ver y modificar, y eliminar la cuenta (se

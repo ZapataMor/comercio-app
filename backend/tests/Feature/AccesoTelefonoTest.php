@@ -79,7 +79,6 @@ test('el registro completo con el celular: código, verificación y cuenta sin c
         ->assertJsonPath('user.telefono', '3001234567')
         ->assertJsonPath('user.telefono_verificado', true)
         ->assertJsonPath('user.tiene_pin', true)
-        ->assertJsonPath('user.tiene_clave', false)
         ->assertJsonPath('user.email', null);
     // Con el código de WhatsApp ya demostró quién es: este teléfono queda de confianza.
     $dispositivo = $respuesta->json('dispositivo');
@@ -189,34 +188,23 @@ test('un mismo número no puede pedir más de cinco códigos por hora', function
 });
 
 // ---------------------------------------------------------------------------
-// Login con contraseña (cuentas de antes, sin clave de 4 números)
+// Entrar (ver también ClaveTest)
 // ---------------------------------------------------------------------------
 
-test('una cuenta de antes entra con el celular verificado y su contraseña, con o sin +57', function ($escrito) {
-    $user = cuentaConCelular('3001234567');
-
-    $this->postJson('/api/login', ['usuario' => $escrito, 'password' => 'clave-actual'])
-        ->assertOk()->assertJsonPath('user.id', $user->id);
-})->with(['3001234567', '+57 300 123 4567', '300 123 4567']);
-
 test('un celular sin verificar no sirve para entrar', function () {
-    cuentaConCelular('3001234567', verificado: false);
+    $user = cuentaConCelular('3001234567', verificado: false);
+    $user->forceFill(['pin' => '2468'])->save();
 
-    $this->postJson('/api/login', ['usuario' => '3001234567', 'password' => 'clave-actual'])
-        ->assertStatus(422)->assertJsonPath('errors.usuario.0', 'Las credenciales no son correctas.');
+    $this->postJson('/api/login', ['telefono' => '3001234567', 'pin' => '2468'])
+        ->assertStatus(422)->assertJsonValidationErrors('telefono');
 });
 
-test('el campo usuario también acepta correo y nombre de usuario', function () {
-    $user = User::factory()->create(['password' => 'clave-actual', 'email' => 'ana@correo.com', 'username' => 'ana.p']);
+test('ya no se entra con correo o usuario y contraseña', function () {
+    User::factory()->create(['password' => 'clave-actual', 'email' => 'ana@correo.com', 'username' => 'ana.p']);
 
-    $this->postJson('/api/login', ['usuario' => 'ana@correo.com', 'password' => 'clave-actual'])->assertOk();
-    $this->postJson('/api/login', ['usuario' => 'ANA.P', 'password' => 'clave-actual'])->assertOk()->assertJsonPath('user.id', $user->id);
-});
-
-test('la versión anterior de la app sigue entrando con el campo email', function () {
-    $user = User::factory()->create(['password' => 'clave-actual']);
-
-    $this->postJson('/api/login', ['email' => $user->email, 'password' => 'clave-actual'])->assertOk();
+    $this->postJson('/api/login', ['usuario' => 'ana@correo.com', 'password' => 'clave-actual'])
+        ->assertStatus(422)->assertJsonValidationErrors(['telefono', 'pin']);
+    $this->postJson('/api/login', ['email' => 'ana@correo.com', 'password' => 'clave-actual'])->assertStatus(422);
 });
 
 // ---------------------------------------------------------------------------

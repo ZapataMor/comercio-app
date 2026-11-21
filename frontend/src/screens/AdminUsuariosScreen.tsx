@@ -24,6 +24,8 @@ import { FadeInView, PressableScale } from '../components/anim';
 import FieldError from '../components/FieldError';
 import Icon from '../components/Icon';
 import MotivoCancelacion from '../components/MotivoCancelacion';
+import { problemaClave } from '../clave';
+import { errorTelefono, telefonoValido } from '../direccion';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
@@ -44,9 +46,11 @@ export default function AdminUsuariosScreen() {
 
   // Formulario de creación.
   const [mostrarForm, setMostrarForm] = useState(false);
+  // Clientes y domiciliarios: entran a la app con su celular y una clave de 4
+  // números. Los administradores se crean en el panel web.
   const [nombre, setNombre] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [telefono, setTelefono] = useState('');
+  const [pin, setPin] = useState('');
   const [formRol, setFormRol] = useState('usuario');
   const [enviando, setEnviando] = useState(false);
   const [errores, setErrores] = useState<FieldErrors>({});
@@ -170,8 +174,9 @@ export default function AdminUsuariosScreen() {
     setErrores({});
     const nuevosErrores: FieldErrors = {};
     if (!nombre.trim()) nuevosErrores.name = 'El campo nombre es obligatorio.';
-    if (!email.trim()) nuevosErrores.email = 'El campo correo es obligatorio.';
-    if (password.length < 5) nuevosErrores.password = 'La contraseña debe tener al menos 5 caracteres.';
+    if (!telefonoValido(telefono)) nuevosErrores.telefono = errorTelefono;
+    const problema = problemaClave(pin);
+    if (problema) nuevosErrores.pin = problema;
     if (!formRol) nuevosErrores.rol = 'Selecciona un rol.';
     if (Object.keys(nuevosErrores).length > 0) {
       setErrores(nuevosErrores);
@@ -180,10 +185,10 @@ export default function AdminUsuariosScreen() {
 
     setEnviando(true);
     try {
-      await crearUsuario(token, { name: nombre, email, password, rol: formRol });
+      await crearUsuario(token, { name: nombre.trim(), telefono, pin, rol: formRol });
       setNombre('');
-      setEmail('');
-      setPassword('');
+      setTelefono('');
+      setPin('');
       setErrores({});
       setMostrarForm(false);
       cargar(formRol, 'silencioso');
@@ -214,19 +219,21 @@ export default function AdminUsuariosScreen() {
               limpiarError('name');
             }} />
             <FieldError mensaje={errores.name} />
-            <TextInput style={styles.input} placeholder="Correo" placeholderTextColor={c.mutedSoft} value={email} onChangeText={valor => {
-              setEmail(valor);
-              limpiarError('email');
+            <TextInput style={styles.input} placeholder="Celular (3001234567)" placeholderTextColor={c.mutedSoft} value={telefono} onChangeText={valor => {
+              setTelefono(valor.replace(/\D/g, '').slice(0, 10));
+              limpiarError('telefono');
             }}
-              autoCapitalize="none" keyboardType="email-address" />
-            <FieldError mensaje={errores.email} />
-            <TextInput style={styles.input} placeholder="Contraseña (mín. 8)" placeholderTextColor={c.mutedSoft} value={password} onChangeText={valor => {
-              setPassword(valor);
-              limpiarError('password');
-            }} />
-            <FieldError mensaje={errores.password} />
+              keyboardType="number-pad" maxLength={10} accessibilityLabel="Celular" />
+            <FieldError mensaje={errores.telefono} />
+            <TextInput style={styles.input} placeholder="Clave de 4 números" placeholderTextColor={c.mutedSoft} value={pin} onChangeText={valor => {
+              setPin(valor.replace(/\D/g, '').slice(0, 4));
+              limpiarError('pin');
+            }}
+              keyboardType="number-pad" maxLength={4} accessibilityLabel="Clave de 4 números" />
+            <FieldError mensaje={errores.pin} />
+            <Text style={styles.ayudaForm}>Entra a la app con este celular y esta clave (puede cambiarla). Los administradores se crean en el panel web.</Text>
             <View style={styles.chips}>
-              {roles.map(r => (
+              {roles.filter(r => r !== 'administrador').map(r => (
                 <TouchableOpacity key={r} onPress={() => {
                   setFormRol(r);
                   limpiarError('rol');
@@ -343,6 +350,7 @@ export default function AdminUsuariosScreen() {
 }
 
 const useStyles = makeStyles((c, shadow) => ({
+  ayudaForm: { fontSize: 12, fontFamily: font.regular, color: c.muted, marginTop: 2, marginBottom: 8 },
   container: { flex: 1, backgroundColor: c.bg },
   formBox: { backgroundColor: c.surface, padding: 16, margin: 16, marginBottom: 8, borderRadius: radius.lg, ...shadow.low },
   formToggle: { color: c.goldText, fontFamily: font.bold },

@@ -8,6 +8,7 @@ use App\Models\Pedido;
 use App\Models\PedidoReporte;
 use App\Models\User;
 use App\Support\UbicacionDomiciliario;
+use App\Support\CuentaPorAdmin;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -77,34 +78,45 @@ class AdminController extends Controller
         return view('admin.usuarios', compact('usuarios', 'roles', 'rolActual', 'conteos', 'tipos'));
     }
 
-    /** Crear un nuevo usuario con un rol asignado. */
+    /**
+     * Crear un nuevo usuario con un rol asignado. Clientes y domiciliarios
+     * entran a la app con su celular y una clave de 4 números (ver
+     * CuentaPorAdmin); los administradores, a este panel con usuario y
+     * contraseña.
+     */
     public function storeUsuario(Request $request): RedirectResponse|JsonResponse
     {
-        if (is_string($request->input('username'))) {
-            $request->merge(['username' => strtolower(trim($request->input('username')))]);
+        $rol = $request->validate(['rol' => ['required', Rule::in(self::ROLES)]])['rol'];
+
+        if ($rol === 'administrador') {
+            if (is_string($request->input('username'))) {
+                $request->merge(['username' => strtolower(trim($request->input('username')))]);
+            }
+            $datos = $request->validate([
+                'username' => ['required', 'string', 'min:3', 'max:50', 'regex:/\A[a-z0-9][a-z0-9_.-]*\z/', 'unique:users,username'],
+                'password' => ['required', 'string', 'min:5'],
+            ], [
+                'username.required' => 'Escribe el usuario con que entrará al panel.',
+                'password.required' => 'Escribe la contraseña con que entrará al panel.',
+            ]);
+            $user = User::create([
+                'name' => $datos['username'],
+                'username' => $datos['username'],
+                'password' => $datos['password'], // se hashea solo (cast 'hashed')
+            ]);
+            $user->syncRoles(User::rolesDelTipo($rol));
+        } else {
+            $user = CuentaPorAdmin::deLaApp($request, $rol);
         }
-        $datos = $request->validate([
-            'username' => ['required', 'string', 'min:3', 'max:50', 'regex:/\A[a-z0-9][a-z0-9_.-]*\z/', 'unique:users,username'],
-            'password' => ['present', 'string', 'min:5'],
-            'rol' => ['required', Rule::in(self::ROLES)],
-        ]);
-
-        $user = User::create([
-            'name' => $datos['username'],
-            'username' => $datos['username'],
-            'password' => $datos['password'], // se hashea solo (cast 'hashed')
-        ]);
-
-        $user->syncRoles(User::rolesDelTipo($datos['rol']));
 
         if ($request->expectsJson()) {
-            return response()->json(['message' => 'Usuario creado.', 'user' => $user->only(['id', 'username', 'name'])], 201);
+            return response()->json(['message' => 'Usuario creado.', 'user' => $user->only(['id', 'username', 'name', 'telefono'])], 201);
         }
 
         // Vuelve a la pestaña del tipo recién creado.
         return redirect()
-            ->route('admin.usuarios', ['rol' => $datos['rol']])
-            ->with('ok', "Usuario {$user->name} creado como ".User::TIPOS[$datos['rol']].'.');
+            ->route('admin.usuarios', ['rol' => $rol])
+            ->with('ok', "Usuario {$user->name} creado como ".User::TIPOS[$rol].'.');
     }
 
     /** Cambiar el rol de un usuario. */

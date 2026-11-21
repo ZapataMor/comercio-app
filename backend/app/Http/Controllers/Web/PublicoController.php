@@ -11,7 +11,6 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -31,22 +30,20 @@ class PublicoController extends Controller
     }
 
     /**
-     * Se identifica con su celular verificado o su correo, y confirma con su
-     * clave de 4 números (o la contraseña, si su cuenta es de antes).
+     * Se identifica con su celular verificado (o el correo de su cuenta de
+     * Google) y confirma con su clave de 4 números.
      */
     public function eliminarCuenta(Request $request): RedirectResponse
     {
         $datos = $request->validate([
-            'usuario' => ['required_without:email', 'nullable', 'string', 'max:255'],
-            'email' => ['nullable', 'string', 'max:255'],
-            'clave' => ['required_without:password', 'nullable', 'string', 'max:255'],
-            'password' => ['nullable', 'string', 'max:255'],
+            'usuario' => ['required', 'string', 'max:255'],
+            'clave' => ['required', 'string', 'max:255'],
         ], [
-            'usuario.required_without' => 'Escribe tu celular o tu correo.',
-            'clave.required_without' => 'Escribe tu clave.',
+            'usuario.required' => 'Escribe tu celular o tu correo.',
+            'clave.required' => 'Escribe tu clave de 4 números.',
         ]);
-        $identificador = trim((string) ($datos['usuario'] ?? $datos['email'] ?? ''));
-        $clave = (string) ($datos['clave'] ?? $datos['password'] ?? '');
+        $identificador = trim($datos['usuario']);
+        $clave = $datos['clave'];
         $volver = fn (string $mensaje) => back()->withInput($request->only('usuario'))->withErrors(['usuario' => $mensaje]);
 
         $telefono = CodigosTelefono::normalizar($identificador);
@@ -57,16 +54,12 @@ class PublicoController extends Controller
             return $volver('Los datos no son correctos.');
         }
 
-        if ($user->pin !== null && preg_match('/\A\d{4}\z/', $clave)) {
-            try {
-                ClavePin::comprobar($user, $clave);
-            } catch (ValidationException $e) {
-                return $volver(collect($e->errors())->flatten()->first());
-            } catch (HttpResponseException) {
-                return $volver('Tu clave está bloqueada por intentos fallidos. Desbloquéala en la app con «¿Olvidaste tu clave?».');
-            }
-        } elseif (! Hash::check($clave, $user->password)) {
-            return $volver('Los datos no son correctos.');
+        try {
+            ClavePin::comprobar($user, $clave);
+        } catch (ValidationException $e) {
+            return $volver(collect($e->errors())->flatten()->first());
+        } catch (HttpResponseException) {
+            return $volver('Tu clave está bloqueada por intentos fallidos. Desbloquéala en la app con «¿Olvidaste tu clave?».');
         }
 
         if ($motivo = EliminarCuenta::bloqueo($user)) {

@@ -22,8 +22,7 @@ use Illuminate\Validation\ValidationException;
  *   · Si esa cuenta de Google ya está conectada a una de Vitrina, falta la
  *     clave de 4 números: la primera respuesta trae `requiere_pin` y la app
  *     vuelve a mandar el mismo token con `pin`. Google demuestra quién es,
- *     así que el teléfono queda de confianza. (Las cuentas que aún no tienen
- *     clave entran y la app les pide crearla.)
+ *     así que el teléfono queda de confianza.
  *   · Si el correo ya es de una cuenta de Vitrina que no la tiene conectada,
  *     NO se une sola: en Vitrina el correo no se confirma al registrarse, así
  *     que alguien pudo crear una cuenta con un correo ajeno. La persona entra
@@ -33,9 +32,9 @@ use Illuminate\Validation\ValidationException;
  *     privacidad, revisar el nombre y crear la clave; la segunda, con
  *     `acepta_terminos` y `pin`, la crea.
  *
- * Las cuentas creadas con Google no tienen contraseña ni celular verificado:
- * la app les ofrece agregar el celular, y se pide en el primer pedido o al
- * hacerse domiciliario, como a cualquier cliente.
+ * Las cuentas creadas con Google no tienen celular verificado: la app les
+ * ofrece agregarlo, y se pide en el primer pedido o al hacerse domiciliario,
+ * como a cualquier cliente.
  */
 class GoogleController extends Controller
 {
@@ -52,22 +51,20 @@ class GoogleController extends Controller
         $user = User::where('google_id', $cuenta['sub'])->first();
         if ($user) {
             AuthController::asegurarActiva($user, 'id_token');
-            if ($user->pin !== null) {
-                if (! $request->filled('pin')) {
-                    return response()->json([
-                        'requiere_pin' => true,
-                        'user' => ['id' => $user->id, 'name' => $user->name, 'apellidos' => $user->apellidos],
-                    ]);
-                }
-                ClavePin::comprobar($user, $request->input('pin'));
+            if (! $request->filled('pin')) {
+                return response()->json([
+                    'requiere_pin' => true,
+                    'user' => ['id' => $user->id, 'name' => $user->name, 'apellidos' => $user->apellidos],
+                ]);
             }
+            ClavePin::comprobar($user, $request->input('pin'));
 
             return $this->sesion($user, $request);
         }
 
         if (User::where('email', $cuenta['email'])->exists()) {
             return response()->json([
-                'message' => "Ya tienes una cuenta de Vitrina con {$cuenta['email']}. Entra con tu celular y tu clave (o tu contraseña, si tu cuenta es de antes) y conecta Google desde Mi información.",
+                'message' => "Ya tienes una cuenta de Vitrina con {$cuenta['email']}. Entra con tu celular y tu clave, y conecta Google desde Mi información.",
                 'codigo' => 'correo_existente',
             ], 409);
         }
@@ -101,7 +98,6 @@ class GoogleController extends Controller
                     'name' => trim($data['name']),
                     'apellidos' => trim($data['apellidos']),
                     'email' => $cuenta['email'],
-                    'password' => null,
                 ]);
                 // Google ya confirmó el correo.
                 $user->forceFill([

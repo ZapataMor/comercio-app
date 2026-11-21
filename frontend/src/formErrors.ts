@@ -6,8 +6,6 @@ const FIELD_LABELS: Record<string, string> = {
   name: 'nombre',
   nombre: 'nombre',
   email: 'correo',
-  password: 'contraseña',
-  password_actual: 'contraseña actual',
   pin: 'clave',
   pin_actual: 'clave actual',
   confirmar: 'confirmación',
@@ -49,15 +47,6 @@ export function friendlyFieldMessage(field: string, message: string) {
   }
   if (key === 'email' && (text.includes('valid') || text.includes('correo'))) {
     return 'Escribe un correo válido, por ejemplo nombre@correo.com.';
-  }
-  if (key === 'password' && (text.includes('min') || text.includes('8'))) {
-    return 'La contraseña debe tener al menos 5 caracteres.';
-  }
-  if (key === 'password' && text.includes('confirm')) {
-    return 'La contraseña y su confirmación deben ser iguales.';
-  }
-  if (key === 'password_actual') {
-    return 'La contraseña actual no es correcta.';
   }
   if (text.includes('max')) {
     return `El campo ${label} es demasiado largo.`;

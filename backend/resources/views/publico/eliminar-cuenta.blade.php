@@ -32,9 +32,8 @@
             </div>
             <div>
                 <label class="block font-medium mb-1">Clave de 4 números</label>
-                <input type="password" name="clave" required autocomplete="current-password"
+                <input type="password" name="clave" required inputmode="numeric" maxlength="4" autocomplete="current-password"
                        class="w-full rounded-lg border-slate-300 border px-3 py-2">
-                <p class="text-slate-500 text-xs mt-1">Si tu cuenta es de antes y no tiene clave, escribe tu contraseña.</p>
             </div>
             <button class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg py-2.5">
                 Eliminar mi cuenta

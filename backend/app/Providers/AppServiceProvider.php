@@ -63,7 +63,7 @@ class AppServiceProvider extends ServiceProvider
         ], 429);
 
         // Login y registro (API y web): 6 por minuto por correo (o celular, o usuario) e IP.
-        RateLimiter::for('acceso', fn (Request $r) => Limit::perMinute(6)->by('acceso|'.mb_strtolower(trim((string) $r->input('usuario', $r->input('username', $r->input('email', $r->input('telefono')))))).'|'.$r->ip()));
+        RateLimiter::for('acceso', fn (Request $r) => Limit::perMinute(6)->by('acceso|'.($celular($r) ?: substr(hash('sha256', (string) $r->input('dispositivo')), 0, 16)).'|'.$r->ip()));
 
         // Entrar con Google: 10 por minuto por IP (cada intento verifica un token).
         RateLimiter::for('google', fn (Request $r) => Limit::perMinute(10)->by('google|'.$r->ip()));

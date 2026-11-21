@@ -37,7 +37,7 @@ const entrarMock = entrarConGoogle as jest.Mock;
 const elegirMock = elegirCuentaGoogle as jest.Mock;
 const disponibleMock = googleDisponible as jest.Mock;
 
-const ana: Usuario = { id: 7, name: 'Ana', apellidos: 'Pérez', email: 'ana.perez@gmail.com', roles: ['usuario'], google: true, tiene_clave: false };
+const ana: Usuario = { id: 7, name: 'Ana', apellidos: 'Pérez', email: 'ana.perez@gmail.com', roles: ['usuario'], google: true, tiene_pin: true };
 const perfil = { name: 'Ana', apellidos: 'Pérez', email: 'ana.perez@gmail.com' };
 
 let sesion: ReturnType<typeof useAuth>;

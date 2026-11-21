@@ -271,22 +271,6 @@ test('las citas se reasignan antes de quitar a un trabajador y se avisa al clien
     expect($delDueno->fresh()->estado)->toBe('confirmada');
 });
 
-test('cambiar la contraseña cierra las demás sesiones y conserva la actual', function () {
-    $user = limPersona();
-    $otra = $user->createToken('api')->plainTextToken;
-    $actual = $user->createToken('api')->plainTextToken;
-
-    $this->withToken($actual)->putJson('/api/perfil', [
-        'name' => 'Ana', 'email' => $user->email, 'direccion' => 'Calle 1 #10-20', 'barrio' => 'Centro', 'telefono' => '3001234567',
-        'password' => 'OtraClave22', 'password_confirmation' => 'OtraClave22', 'password_actual' => 'ClaveSegura1',
-    ])->assertOk();
-
-    expect($user->tokens()->count())->toBe(1);
-    $this->withToken($actual)->getJson('/api/user')->assertOk();
-    app('auth')->forgetGuards();
-    $this->withToken($otra)->getJson('/api/user')->assertUnauthorized();
-});
-
 test('cliente ausente requiere cinco minutos desde la llegada y confirmación de devolución del comercio', function () {
     [$dueno, $negocio] = limNegocio();
     $cliente = limPersona();
@@ -527,24 +511,6 @@ test('la no aceptación de un pedido aparece en los reportes del administrador',
     $this->artisan('pedidos:vencer')->assertSuccessful();
     Sanctum::actingAs(limPersona('administrador'));
     $this->getJson('/api/admin/reportes')->assertJsonPath('reportes.0.tipo', 'sin_aceptar')->assertJsonPath('reportes.0.pedido_id', $pedido->id);
-});
-
-test('cambiar la clave también cierra las sesiones web guardadas de ese usuario', function () {
-    $usuario = limPersona();
-    $otraPersona = limPersona();
-    $token = $usuario->createToken('actual')->plainTextToken;
-    DB::table('sessions')->insert([
-        ['id' => 'equipo-anterior', 'user_id' => $usuario->id, 'payload' => base64_encode(serialize([])), 'last_activity' => time()],
-        ['id' => 'sesion-ajena', 'user_id' => $otraPersona->id, 'payload' => base64_encode(serialize([])), 'last_activity' => time()],
-    ]);
-    config(['session.driver' => 'database']);
-    $this->withToken($token)->putJson('/api/perfil', [
-        'name' => 'Ana', 'email' => $usuario->email, 'direccion' => 'Calle 1 #10-20', 'barrio' => 'Centro', 'telefono' => '3001234567',
-        'password' => 'OtraClave22', 'password_confirmation' => 'OtraClave22', 'password_actual' => 'ClaveSegura1',
-    ])->assertOk();
-    $this->assertDatabaseMissing('sessions', ['id' => 'equipo-anterior']);
-    $this->assertDatabaseHas('sessions', ['id' => 'sesion-ajena']);
-    expect($usuario->tokens()->count())->toBe(1);
 });
 
 test('el panel web del administrador muestra reportes y guarda su resolución', function () {

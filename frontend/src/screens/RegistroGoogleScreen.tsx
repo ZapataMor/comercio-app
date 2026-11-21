@@ -9,7 +9,7 @@ import FieldError from '../components/FieldError';
 import CampoAcceso from '../components/login/CampoAcceso';
 import CrearClaveVidrio from '../components/login/CrearClaveVidrio';
 import EscenaAcceso from '../components/login/EscenaAcceso';
-import { BotonVolverAcceso, CasillaPolitica, LogoAcceso, useEstilosAcceso } from '../components/login/estilosAcceso';
+import { BotonVolverAcceso, CasillaPolitica, LogoAcceso, useAtrasAndroid, useEstilosAcceso } from '../components/login/estilosAcceso';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
 
@@ -94,6 +94,10 @@ export default function RegistroGoogleScreen({ navigation, route }: Props) {
     }
   }
 
+  // La flecha (y el «atrás» de Android): de la clave a los datos; de los datos, a la pantalla anterior.
+  const volver = () => (creandoClave ? setCreandoClave(false) : navigation.goBack());
+  useAtrasAndroid(cargando ? () => {} : volver);
+
   const cuentaGoogle = (
     <View style={e.recuadro}>
       <View style={estiloLogo}>
@@ -105,7 +109,7 @@ export default function RegistroGoogleScreen({ navigation, route }: Props) {
           {perfil.email}
         </Text>
       </View>
-      <TouchableOpacity onPress={() => (creandoClave ? setCreandoClave(false) : navigation.goBack())} disabled={cargando} hitSlop={8}>
+      <TouchableOpacity onPress={volver} disabled={cargando} hitSlop={8}>
         <Text style={e.recuadroAccion}>{creandoClave ? 'Atrás' : 'Cambiar'}</Text>
       </TouchableOpacity>
     </View>
@@ -113,7 +117,7 @@ export default function RegistroGoogleScreen({ navigation, route }: Props) {
 
   return (
     <EscenaAcceso>
-      <BotonVolverAcceso onPress={() => (creandoClave ? setCreandoClave(false) : navigation.goBack())} disabled={cargando} />
+      <BotonVolverAcceso onPress={volver} disabled={cargando} />
       <LogoAcceso />
       <Text style={e.titulo}>Crear cuenta</Text>
       <Text style={e.subtitulo}>{creandoClave ? 'Último paso: crea tu clave' : 'Ya casi: revisa tus datos'}</Text>

@@ -29,7 +29,7 @@ export type Usuario = {
   direccion?: string | null;
   barrio?: string | null;
   telefono?: string | null;
-  /** Celular confirmado por WhatsApp: sirve para entrar y recuperar la contraseña. */
+  /** Celular confirmado por WhatsApp: sirve para entrar y recuperar la clave. */
   telefono_verificado?: boolean;
   /** Código que la persona comparte para que un negocio la invite (ej. "U34F4D"). */
   codigo_publico?: string | null;
@@ -39,10 +39,8 @@ export type Usuario = {
   en_turno?: boolean;
   /** Tiene una cuenta de Google conectada para entrar con ella. */
   google?: boolean;
-  /** Clave de 4 números. false: la app le pide crearla antes de seguir (undefined: sesión de antes, aún sin el dato). */
+  /** Tiene clave de 4 números. */
   tiene_pin?: boolean;
-  /** Contraseña de antes (cuentas viejas y el panel web de administración). */
-  tiene_clave?: boolean;
 };
 
 /**
@@ -325,38 +323,6 @@ export function entrarEnDispositivo(dispositivo: string, pin: string): Promise<L
 }
 
 /**
- * Las cuentas de antes: correo, celular o usuario y contraseña (POST /api/login).
- * Si aún no tienen clave de 4 números, la app se la pide al entrar.
- * Devuelve el usuario + token, o lanza un Error con el mensaje del backend.
- */
-export async function login(usuario: string, password: string): Promise<LoginResponse> {
-  let res: Response;
-  try {
-    res = await solicitar(`${API_URL}/api/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify({ usuario, password, nombre_dispositivo: nombreDispositivo() }),
-    });
-  } catch (error) {
-    if (error instanceof ErrorRed) throw error;
-    // Falla de red: el server no responde / URL mal / sin conexión.
-    throw new Error('No se pudo conectar con el servidor. ¿Está corriendo la API?');
-  }
-
-  const data = await res.json().catch(() => ({} as any));
-
-  if (!res.ok) {
-    const errors = validationErrors(data);
-    throw new ApiError(firstValidationMessage(errors) ?? data?.message ?? 'No se pudo iniciar sesión.', res.status, errors);
-  }
-
-  return data as LoginResponse;
-}
-
-/**
  * Registro de una cuenta nueva contra POST /api/register.
  * Modelo unificado: no se elige rol. Toda cuenta nace como cliente y luego
  * puede crear sus negocios (o unirse a otros) desde "Mis negocios".
@@ -469,18 +435,10 @@ export async function desconectarGoogle(token: string, pin: string): Promise<{ m
 
 // ---------- Clave de 4 números (con sesión) ----------
 
-/**
- * Crea la clave (las cuentas de antes no tienen) o la cambia (con la actual).
- * Al crearla, este teléfono queda de confianza (`dispositivo`).
- */
-export async function guardarClave(token: string, pin: string, pinActual?: string): Promise<{ message: string; user: Usuario; dispositivo?: string }> {
-  const d = await authSend('POST', '/api/perfil/clave', token, {
-    pin,
-    pin_confirmation: pin,
-    ...(pinActual ? { pin_actual: pinActual } : {}),
-    nombre_dispositivo: nombreDispositivo(),
-  });
-  return { message: d.message as string, user: d.user as Usuario, dispositivo: d.dispositivo as string | undefined };
+/** Cambia la clave (pide la actual). Cierra las sesiones abiertas en otros teléfonos. */
+export async function guardarClave(token: string, pin: string, pinActual: string): Promise<{ message: string; user: Usuario }> {
+  const d = await authSend('POST', '/api/perfil/clave', token, { pin, pin_confirmation: pin, pin_actual: pinActual });
+  return { message: d.message as string, user: d.user as Usuario };
 }
 
 /** Revisa la clave antes de una acción en dos pasos (cuenta como un intento). */
@@ -744,9 +702,6 @@ export type PerfilInput = {
   apellidos?: string | null;
   /** Vacío solo si la cuenta entra con su celular verificado. */
   email: string;
-  /** Si viene, se exige también `password_actual`. */
-  password?: string;
-  password_actual?: string;
   /** Datos de contacto: obligatorios para clientes, opcionales para el resto. */
   direccion?: string;
   barrio?: string;
@@ -755,11 +710,7 @@ export type PerfilInput = {
 
 /** Actualiza mi perfil personal. Devuelve el usuario ya actualizado. */
 export async function actualizarPerfil(token: string, body: PerfilInput): Promise<Usuario> {
-  const d = await authSend('PUT', '/api/perfil', token, {
-    ...body,
-    // El backend exige confirmación (regla 'confirmed').
-    ...(body.password ? { password_confirmation: body.password } : {}),
-  });
+  const d = await authSend('PUT', '/api/perfil', token, body);
   return d.user as Usuario;
 }
 
@@ -1605,9 +1556,10 @@ export async function reactivarUsuario(token: string, id: number): Promise<strin
   return d.message as string;
 }
 
+/** Crea un cliente o domiciliario: entra a la app con su celular y la clave de 4 números que se le da. */
 export async function crearUsuario(
   token: string,
-  body: { name: string; email: string; password: string; rol: string },
+  body: { name: string; telefono: string; pin: string; rol: string },
 ): Promise<void> {
   await authSend('POST', '/api/admin/usuarios', token, body);
 }

@@ -20,7 +20,7 @@
 
     <h2 class="font-semibold text-base">1. Qué datos recogemos</h2>
     <ul class="list-disc pl-5 space-y-1">
-        <li><strong>De tu cuenta:</strong> nombre, apellidos, correo electrónico, teléfono, dirección y barrio.</li>
+        <li><strong>De tu cuenta:</strong> nombre, apellidos, celular, correo electrónico (si lo agregas), dirección y barrio.</li>
         <li><strong>Si entras con Google:</strong> Google nos entrega tu nombre, tu correo y un identificador de tu cuenta de Google, solo cuando tú lo eliges. Nunca recibimos tu contraseña de Google.</li>
         <li><strong>De tus pedidos:</strong> lo que pides, el negocio, la dirección de entrega, el teléfono de contacto, la forma de pago y los estados del pedido.</li>
         <li><strong>Si tienes un negocio:</strong> los datos del negocio y de su catálogo, su ubicación en el mapa y quiénes forman su equipo.</li>
@@ -77,7 +77,7 @@
 
     <h2 class="font-semibold text-base">6. Seguridad y menores de edad</h2>
     <p>
-        Tus contraseñas se guardan cifradas y la app se comunica con el servidor por conexión segura (HTTPS).
+        Tu clave de 4 números se guarda cifrada y la app se comunica con el servidor por conexión segura (HTTPS).
         Vitrina no está dirigida a menores de 14 años.
     </p>
 

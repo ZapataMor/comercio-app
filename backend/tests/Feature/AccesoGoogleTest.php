@@ -69,13 +69,12 @@ test('registrarse con Google exige aceptar la política de privacidad', function
     expect(User::count())->toBe(0);
 });
 
-test('con la política aceptada y la clave crea la cuenta de cliente sin contraseña y entra', function () {
+test('con la política aceptada y la clave crea la cuenta de cliente y entra', function () {
     $r = $this->postJson('/api/google', [
         'id_token' => tokenGoogle(), 'acepta_terminos' => true, 'name' => ' Ana María ', 'apellidos' => 'Pérez',
         'pin' => '2468', 'pin_confirmation' => '2468',
     ])->assertCreated()
         ->assertJsonPath('user.google', true)
-        ->assertJsonPath('user.tiene_clave', false)
         ->assertJsonPath('user.tiene_pin', true)
         ->assertJsonPath('user.name', 'Ana María')
         ->assertJsonPath('user.roles', ['usuario']);
@@ -101,16 +100,6 @@ test('registrarse con Google exige crear una clave difícil de adivinar', functi
 test('registrarse con Google exige nombre y apellidos', function () {
     $this->postJson('/api/google', ['id_token' => tokenGoogle(), 'acepta_terminos' => true, 'name' => '', 'apellidos' => ''])
         ->assertStatus(422)->assertJsonValidationErrors(['name', 'apellidos']);
-});
-
-test('una cuenta conectada que aún no tiene clave entra y la app le pide crearla', function () {
-    $user = User::factory()->create(['email' => 'otro@correo.com']);
-    $user->forceFill(['google_id' => '109876543210'])->save();
-    $user->assignRole('usuario');
-
-    $this->postJson('/api/google', ['id_token' => tokenGoogle()])
-        ->assertOk()->assertJsonPath('user.id', $user->id)->assertJsonPath('user.tiene_pin', false)
-        ->assertJsonStructure(['token', 'dispositivo']);
 });
 
 test('con clave, Google pide la clave y luego entra, aunque cambie su correo en Google', function () {
@@ -198,7 +187,7 @@ test('conectar Google a una cuenta existente le permite entrar con él', functio
     Sanctum::actingAs($user);
 
     $this->postJson('/api/perfil/google', ['id_token' => tokenGoogle()])
-        ->assertOk()->assertJsonPath('user.google', true)->assertJsonPath('user.tiene_clave', true);
+        ->assertOk()->assertJsonPath('user.google', true);
 
     $this->app['auth']->forgetGuards();
     $this->postJson('/api/google', ['id_token' => tokenGoogle()])->assertOk()->assertJsonPath('user.id', $user->id);
@@ -237,28 +226,6 @@ test('desconectar Google exige el celular verificado y la clave', function () {
     $this->deleteJson('/api/perfil/google', ['pin' => '1357'])->assertStatus(422)->assertJsonValidationErrors(['pin']);
     $this->deleteJson('/api/perfil/google', ['pin' => '2468'])->assertOk()->assertJsonPath('user.google', false);
     expect($user->fresh()->google_id)->toBeNull();
-});
-
-test('quien entró con Google crea su contraseña sin escribir la actual', function () {
-    $user = User::factory()->create(['email' => 'ana.perez@gmail.com', 'password' => null, 'telefono' => '3001234567']);
-    $user->forceFill(['google_id' => '109876543210'])->save();
-    $user->assignRole('usuario');
-    Sanctum::actingAs($user);
-
-    $this->putJson('/api/perfil', [
-        'name' => 'Ana', 'email' => 'ana.perez@gmail.com', 'telefono' => '3001234567',
-        'password' => 'nueva-clave', 'password_confirmation' => 'nueva-clave',
-    ])->assertOk()->assertJsonPath('user.tiene_clave', true);
-
-    $this->app['auth']->forgetGuards();
-    $this->postJson('/api/login', ['usuario' => 'ana.perez@gmail.com', 'password' => 'nueva-clave'])->assertOk();
-});
-
-test('una cuenta sin contraseña no entra con contraseña vacía', function () {
-    User::factory()->create(['email' => 'ana.perez@gmail.com', 'password' => null]);
-
-    $this->postJson('/api/login', ['usuario' => 'ana.perez@gmail.com', 'password' => ''])
-        ->assertStatus(422);
 });
 
 // ---------------------------------------------------------------------------

@@ -15,11 +15,9 @@ use Illuminate\Validation\ValidationException;
 /**
  * «¿Olvidaste tu clave?» con el celular: un código de 6 números llega por
  * WhatsApp al celular verificado y con él se crea una clave nueva de 4
- * números (también desbloquea la clave y sirve a las cuentas de antes para
- * crear su primera clave). Con Google, ver GoogleController::restablecerClave.
- *
- * Ya no se recupera por correo: en Vitrina el correo escrito a mano no se
- * confirma, y el de Google ya tiene su propio camino.
+ * números (también desbloquea la clave). Con Google, ver
+ * GoogleController::restablecerClave. No se recupera por correo: el escrito a
+ * mano no se confirma.
  *
  * El código lo maneja CodigosTelefono (10 minutos, 5 intentos). Pedirlo no
  * revela si el número tiene cuenta. Al acertar se entra directamente: el

@@ -1,8 +1,7 @@
 /**
  * «Crea tu clave» en la tarjeta de vidrio: la clave de 4 números escrita dos
  * veces, revisada antes de enviar con las mismas reglas del backend (ver
- * src/clave.ts). La usan el registro con el celular, el registro con Google
- * y CrearClaveScreen (cuentas de antes que aún no tienen clave).
+ * src/clave.ts). La usan el registro con el celular y el registro con Google.
  *
  * `errorServidor` muestra el error del backend sobre la clave (y la borra
  * para escribirla otra vez).

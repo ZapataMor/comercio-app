@@ -1,7 +1,6 @@
 /**
  * «¿Olvidaste tu clave?» (desde el login, sin sesión). También desbloquea la
- * clave tras 5 intentos fallidos y sirve a las cuentas de antes para crear
- * su primera clave.
+ * clave tras 5 intentos fallidos.
  *
  * Dos caminos:
  *  - Celular: escribe su número → llega un código de 6 números por WhatsApp
@@ -24,6 +23,7 @@ import BotonGoogle from './BotonGoogle';
 import CampoPin from './CampoPin';
 import FieldError from './FieldError';
 import { EspacioTecladoModal } from './EspacioTeclado';
+import Icon from './Icon';
 
 type Props = {
   visible: boolean;
@@ -66,6 +66,18 @@ export default function RecuperarClaveModal({ visible, telefonoInicial, googleId
       setErrores({});
     }
   }, [visible, telefonoInicial, googleIdToken]);
+
+  // La flecha (y el «atrás» de Android): al paso anterior; desde el primero, se cierra.
+  function atras() {
+    if (cargando) return;
+    setErrores({});
+    if (paso === 'codigo') setPaso('telefono');
+    else if (paso === 'clave' && idToken && !googleIdToken) {
+      setIdToken(null);
+      setPaso('telefono');
+    } else if (paso === 'clave' && !idToken) setPaso('codigo');
+    else onCerrar();
+  }
 
   async function enviarCodigo() {
     if (!telefonoValido(telefono)) {
@@ -138,11 +150,22 @@ export default function RecuperarClaveModal({ visible, telefonoInicial, googleId
   }
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCerrar}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={atras}>
       <EspacioTecladoModal style={styles.fondo}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <View style={styles.caja}>
-            <Text style={styles.titulo}>{paso === 'clave' ? 'Crea tu clave nueva' : '¿Olvidaste tu clave?'}</Text>
+            <View style={styles.cabecera}>
+              <TouchableOpacity
+                style={styles.atras}
+                onPress={atras}
+                disabled={cargando}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={paso === 'telefono' || (paso === 'clave' && !!googleIdToken) ? 'Cerrar' : 'Volver al paso anterior'}>
+                <Icon name="atras" size={20} color={c.textStrong} strokeWidth={2} />
+              </TouchableOpacity>
+              <Text style={styles.titulo}>{paso === 'clave' ? 'Crea tu clave nueva' : '¿Olvidaste tu clave?'}</Text>
+            </View>
 
             {paso === 'telefono' ? (
               <>
@@ -260,7 +283,9 @@ const useStyles = makeStyles((c, shadow) => ({
   fondo: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
   scroll: { flexGrow: 1, justifyContent: 'center', padding: 24 },
   caja: { backgroundColor: c.surface, borderRadius: radius.xl, padding: 22, ...shadow.card },
-  titulo: { fontSize: 19, fontFamily: font.display, color: c.textStrong, marginBottom: 8 },
+  cabecera: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
+  atras: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center' },
+  titulo: { flex: 1, fontSize: 19, fontFamily: font.display, color: c.textStrong },
   texto: { fontSize: 13, fontFamily: font.regular, color: c.text, lineHeight: 19, marginBottom: 14 },
   label: { fontSize: 13, fontFamily: font.semibold, color: c.text, marginTop: 6, marginBottom: 8 },
   fila: { flexDirection: 'row', alignItems: 'center', gap: 8 },

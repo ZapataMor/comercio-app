@@ -136,14 +136,6 @@ test('la cuenta también se puede eliminar desde la web pública con el celular 
     expect($user->fresh()->eliminado_at)->not->toBeNull();
 });
 
-test('una cuenta de antes sin clave se elimina en la web con su correo y contraseña', function () {
-    $user = User::factory()->create(['password' => 'clave-actual']);
-
-    $this->post('/eliminar-cuenta', ['usuario' => $user->email, 'clave' => 'clave-actual'])
-        ->assertRedirect(route('eliminar-cuenta'));
-    expect($user->fresh()->eliminado_at)->not->toBeNull();
-});
-
 test('la política de privacidad es pública', function () {
     $this->get('/privacidad')->assertOk()->assertSee('Ley 1581 de 2012');
 });
@@ -154,12 +146,12 @@ test('la política de privacidad es pública', function () {
 
 test('una cuenta suspendida no puede iniciar sesión', function () {
     $user = clienteCuenta();
-    $user->forceFill(['suspendido_at' => now(), 'motivo_suspension' => 'Pedidos falsos'])->save();
+    $user->forceFill(['suspendido_at' => now(), 'motivo_suspension' => 'Pedidos falsos', 'telefono_verificado_at' => now()])->save();
 
-    $respuesta = $this->postJson('/api/login', ['email' => $user->email, 'password' => 'clave-actual'])
+    $respuesta = $this->postJson('/api/login', ['telefono' => $user->telefono, 'pin' => '2468'])
         ->assertStatus(422);
 
-    expect($respuesta->json('errors.email.0'))->toContain('suspendida')->toContain('Pedidos falsos');
+    expect($respuesta->json('errors.telefono.0'))->toContain('suspendida')->toContain('Pedidos falsos');
 });
 
 test('al suspender la cuenta su token deja de servir', function () {
@@ -203,15 +195,16 @@ function restablecer(User $user, string $codigo, string $clave = '1357')
 test('fallar el login no bloquea pedir el código de recuperación', function () {
     $user = clienteConCelular();
     foreach (range(1, 6) as $i) {
-        $this->postJson('/api/login', ['email' => $user->email, 'password' => 'mala'])->assertStatus(422);
+        expect($this->postJson('/api/login', ['telefono' => $user->telefono, 'pin' => '1357'])->status())->toBeIn([422, 423]);
     }
-    $this->postJson('/api/login', ['email' => $user->email, 'password' => 'mala'])->assertStatus(429);
+    $this->postJson('/api/login', ['telefono' => $user->telefono, 'pin' => '1357'])->assertStatus(429);
 
     expect(pedirCodigo($user))->toMatch('/^\d{6}$/');
 
-    // Y el límite del login es por cuenta: otra persona en la misma IP entra.
-    $otro = User::factory()->create(['password' => 'clave-actual']);
-    $this->postJson('/api/login', ['email' => $otro->email, 'password' => 'clave-actual'])->assertOk();
+    // Y el límite del login es por celular: otra persona en la misma IP entra.
+    $otro = User::factory()->conClave()->create(['telefono' => '3205556677', 'telefono_verificado_at' => now()]);
+    $dispositivo = \App\Support\ClavePin::confiar($otro);
+    $this->postJson('/api/login', ['telefono' => '3205556677', 'pin' => '2468', 'dispositivo' => $dispositivo])->assertOk();
 });
 
 test('pedir código no revela si el número tiene cuenta', function () {

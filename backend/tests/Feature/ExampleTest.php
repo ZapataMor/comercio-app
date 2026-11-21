@@ -74,7 +74,17 @@ test('el administrador entra por usuario y conserva su panel y gestion de cuenta
     $this->get('/admin')->assertOk()->assertDontSee('Probar app web')->assertDontSee('Abrir administración completa');
     $this->get('/admin/usuarios')->assertOk();
     $this->get('/admin/negocios')->assertOk();
-    $this->post('/admin/usuarios', ['username' => 'cuenta.nueva', 'password' => 'password123', 'rol' => 'usuario'])
+    // Cliente o domiciliario: con celular y clave de 4 números, para entrar a la app.
+    $this->post('/admin/usuarios', ['name' => 'Cuenta Nueva', 'telefono' => '3109998877', 'pin' => '1234', 'rol' => 'domiciliario'])
+        ->assertSessionHasErrors('pin');
+    $this->post('/admin/usuarios', ['name' => 'Cuenta Nueva', 'telefono' => '3109998877', 'pin' => '2468', 'rol' => 'domiciliario'])
         ->assertRedirect();
-    expect(User::where('username', 'cuenta.nueva')->sole()->hasRole('usuario'))->toBeTrue();
+    $nueva = User::where('telefono', '3109998877')->sole();
+    expect($nueva->hasRole('domiciliario'))->toBeTrue()
+        ->and($nueva->telefono_verificado_at)->not->toBeNull()
+        ->and(\Illuminate\Support\Facades\Hash::check('2468', $nueva->pin))->toBeTrue();
+    // Administrador: con usuario y contraseña, para este panel.
+    $this->post('/admin/usuarios', ['username' => 'otro.admin', 'password' => 'password123', 'rol' => 'administrador'])
+        ->assertRedirect();
+    expect(User::where('username', 'otro.admin')->sole()->hasRole('administrador'))->toBeTrue();
 });

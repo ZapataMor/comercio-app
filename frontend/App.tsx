@@ -49,7 +49,6 @@ import MiInformacionScreen from './src/screens/MiInformacionScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import RegistroGoogleScreen from './src/screens/RegistroGoogleScreen';
-import CrearClaveScreen from './src/screens/CrearClaveScreen';
 import CompletarCuentaScreen from './src/screens/CompletarCuentaScreen';
 import MiTiendaScreen from './src/screens/MiTiendaScreen';
 import ResenasScreen from './src/screens/ResenasScreen';
@@ -130,18 +129,10 @@ function Navegacion({ listo }: { listo: boolean }) {
     );
   }
 
-  // Con la sesión abierta, antes de la app: la cuenta sin clave de 4 números
-  // debe crearla, y la recién registrada ve una vez «Completa tu cuenta».
-  // (`tiene_pin` undefined: sesión de antes; el dato llega en vivo y entonces
-  // sale «Crea tu clave».)
-  const fase = !auth
-    ? 'acceso'
-    : auth.user.tiene_pin === false
-      ? 'clave'
-      : porCompletar === auth.user.id
-        ? 'completar'
-        : 'app';
-  const inicial = fase === 'acceso' ? 'Login' : fase === 'clave' ? 'CrearClave' : fase === 'completar' ? 'CompletarCuenta' : rutaInicio(auth!.user);
+  // Con la sesión abierta, antes de la app: la cuenta recién registrada ve
+  // una vez «Completa tu cuenta» (correo o celular, opcionales).
+  const fase = !auth ? 'acceso' : porCompletar === auth.user.id ? 'completar' : 'app';
+  const inicial = fase === 'acceso' ? 'Login' : fase === 'completar' ? 'CompletarCuenta' : rutaInicio(auth!.user);
   // Pantallas que llegan hasta el borde de abajo y dejan ellas mismas el
   // espacio de la barra de navegación del sistema (mapas, login, la barra fija
   // de la propiedad). Las demás terminan encima de esa barra.
@@ -185,9 +176,7 @@ function Navegacion({ listo }: { listo: boolean }) {
           // "Mi perfil" (la persona, no el negocio) visible en todos los roles.
           headerRight: fase === 'app' ? () => <HeaderPerfil /> : undefined,
         }}>
-        {fase === 'clave' ? (
-          <Stack.Screen name="CrearClave" component={CrearClaveScreen} options={accesoOpciones} />
-        ) : fase === 'completar' ? (
+        {fase === 'completar' ? (
           <Stack.Screen name="CompletarCuenta" component={CompletarCuentaScreen} options={accesoOpciones} />
         ) : !auth ? (
           <>
@@ -357,8 +346,8 @@ function huellaUsuario(u: Usuario): string {
   return JSON.stringify([
     u.name, u.apellidos ?? null, u.email, [...u.roles].sort(), u.direccion ?? null, u.barrio ?? null,
     u.telefono ?? null, u.codigo_publico ?? null, !!u.en_turno,
-    // Clave y formas de entrar: sin clave, la app pide crearla.
-    u.tiene_pin ?? null, !!u.telefono_verificado, !!u.google,
+    // Formas de entrar (Mi información las muestra).
+    !!u.telefono_verificado, !!u.google,
     (u.negocios ?? []).map(n => [n.id, n.nombre, n.rol]).sort((a, b) => Number(a[0]) - Number(b[0])),
   ]);
 }

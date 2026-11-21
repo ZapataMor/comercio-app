@@ -1,34 +1,43 @@
-CREDENCIALES DE COMERCIOS DE PRUEBA
-Contrasena para todos: password123
-comerciante@demo.co tambien administra El Rincon Paisa.
+CUENTAS DE PRUEBA (local y VPS)
+Se entra con el celular y la clave. Clave para todos: 1920
+En un teléfono nuevo se pide además un código de WhatsApp (en pruebas sale en la pantalla).
+Para volver a dejarlas así: php artisan vitrina:cuentas-de-prueba (borra a los clientes).
 
-Aroma Café                      aroma-cafe@demo.co
-Asadero El Carbón               asadero-el-carbon@demo.co
-Barbería El Patrón             barberia-el-patron@demo.co
-Boutique Elegancia               boutique-elegancia@demo.co
-Café de la Esquina              cafe-de-la-esquina@demo.co
-Carnes Finas El Novillo          carnes-finas-el-novillo@demo.co
-Celulares Punto Móvil           celulares-punto-movil@demo.co
-Construrey                       construrey@demo.co
-Doña Rosa Restaurante           dona-rosa-restaurante@demo.co
-Droguería La Salud              drogueria-la-salud@demo.co
-El Buen Sabor                    el-buen-sabor@demo.co
-El Rincón Paisa                 el-rincon-paisa@demo.co
-Farma Express                    farma-express@demo.co
-Ferretería El Tornillo          ferreteria-el-tornillo@demo.co
-Frutas y Verduras El Campo       frutas-y-verduras-el-campo@demo.co
-Glamour Cosméticos              glamour-cosmeticos@demo.co
-Helados La Nieve                 helados-la-nieve@demo.co
-La Fonda Antioqueña             la-fonda-antioquena@demo.co
-Licorería El Brindis            licoreria-el-brindis@demo.co
-Luna Bar                         luna-bar@demo.co
-Mascotas Felices                 mascotas-felices@demo.co
-Moda Urbana                      moda-urbana@demo.co
-Moto Repuestos Caribe            moto-repuestos-caribe@demo.co
-Óptica Visión Clara            optica-vision-clara@demo.co
-Panaderia La Espiga              comerciante@demo.co
-Papelería El Lápiz Feliz       papeleria-el-lapiz-feliz@demo.co
-Pollos La Brasa Dorada           pollos-la-brasa-dorada@demo.co
-Punto Fashion                    punto-fashion@demo.co
-Sazón de la Abuela              sazon-de-la-abuela@demo.co
-Supermercado El Ahorro           supermercado-el-ahorro@demo.co
+COMERCIANTES (local)
+3000000000  Comerciante Demo (Panaderia La Espiga y El Rincón Paisa)
+3000000001  El Rincón Paisa
+3000000002  Sazón de la Abuela
+3000000003  La Fonda Antioqueña
+3000000004  Doña Rosa Restaurante
+3000000005  El Buen Sabor
+3000000006  Asadero El Carbón
+3000000007  Pollos La Brasa Dorada
+3000000008  Café de la Esquina
+3000000009  Aroma Café
+3000000010  Luna Bar
+3000000011  Helados La Nieve
+3000000012  Papelería El Lápiz Feliz
+3000000013  Ferretería El Tornillo
+3000000014  Construrey
+3000000015  Moda Urbana
+3000000016  Boutique Elegancia
+3000000017  Punto Fashion
+3000000018  Frutas y Verduras El Campo
+3000000019  Carnes Finas El Novillo
+3000000020  Droguería La Salud
+3000000021  Farma Express
+3000000022  Licorería El Brindis
+3000000023  Supermercado El Ahorro
+3000000024  Celulares Punto Móvil
+3000000025  Glamour Cosméticos
+3000000026  Mascotas Felices
+3000000027  Moto Repuestos Caribe
+3000000028  Óptica Visión Clara
+3000000029  Barbería El Patrón
+
+DOMICILIARIOS (local)
+3000000030  Cliente Ana
+3000000031  Domiciliario Demo
+
+El VPS tiene su propia lista (ver artifacts/hostinger/DESPLIEGUE-REALIZADO.md).
+El panel web de administración sigue con usuario y contraseña de administrador.

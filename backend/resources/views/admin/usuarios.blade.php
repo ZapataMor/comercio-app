@@ -19,19 +19,34 @@
             <div class="mt-3 rounded-lg bg-red-100 text-red-800 px-4 py-2 text-sm">{{ $errors->first() }}</div>
         @endif
 
-        <form method="POST" action="{{ route('admin.usuarios.store') }}" class="space-y-3 mt-3">
+        <form method="POST" action="{{ route('admin.usuarios.store') }}" class="space-y-3 mt-3"
+              onchange="var adm=this.rol.value==='administrador';this.querySelectorAll('[data-app]').forEach(function(e){e.style.display=adm?'none':'contents';e.querySelectorAll('input').forEach(function(i){i.disabled=adm})});this.querySelectorAll('[data-panel]').forEach(function(e){e.style.display=adm?'contents':'none';e.querySelectorAll('input').forEach(function(i){i.disabled=!adm})});">
             @csrf
+            @php($esAdmin = old('rol', 'usuario') === 'administrador')
             <div class="grid sm:grid-cols-2 gap-3">
-                <input name="username" value="{{ old('username') }}" required placeholder="Usuario" aria-label="Usuario" autocomplete="off" minlength="3" maxlength="50" pattern="[A-Za-z0-9][A-Za-z0-9_.-]*"
-                       class="rounded-lg border border-slate-300 px-3 py-2">
-                <input name="password" type="password" required placeholder="Contraseña (mín. 5)" aria-label="Contraseña" autocomplete="new-password" minlength="5"
-                       class="rounded-lg border border-slate-300 px-3 py-2">
-                <select name="rol" class="rounded-lg border border-slate-300 px-3 py-2">
+                <select name="rol" class="rounded-lg border border-slate-300 px-3 py-2" aria-label="Tipo de cuenta">
                     @foreach ($roles as $rol)
                         <option value="{{ $rol }}" @selected(old('rol', 'usuario') === $rol)>{{ $tipos[$rol] }}</option>
                     @endforeach
                 </select>
+                {{-- Cliente o domiciliario: entra a la app con su celular y una clave de 4 números. --}}
+                <div data-app style="display: {{ $esAdmin ? 'none' : 'contents' }}">
+                    <input name="name" value="{{ old('name') }}" required placeholder="Nombre" aria-label="Nombre" maxlength="255" @disabled($esAdmin)
+                           class="rounded-lg border border-slate-300 px-3 py-2">
+                    <input name="telefono" value="{{ old('telefono') }}" required placeholder="Celular (3001234567)" aria-label="Celular" inputmode="numeric" maxlength="13" @disabled($esAdmin)
+                           class="rounded-lg border border-slate-300 px-3 py-2">
+                    <input name="pin" required placeholder="Clave de 4 números" aria-label="Clave de 4 números" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" @disabled($esAdmin)
+                           class="rounded-lg border border-slate-300 px-3 py-2">
+                </div>
+                {{-- Administrador: entra a este panel con usuario y contraseña. --}}
+                <div data-panel style="display: {{ $esAdmin ? 'contents' : 'none' }}">
+                    <input name="username" value="{{ old('username') }}" required placeholder="Usuario" aria-label="Usuario" autocomplete="off" minlength="3" maxlength="50" pattern="[A-Za-z0-9][A-Za-z0-9_.-]*" @disabled(! $esAdmin)
+                           class="rounded-lg border border-slate-300 px-3 py-2">
+                    <input name="password" type="password" required placeholder="Contraseña (mín. 5)" aria-label="Contraseña" autocomplete="new-password" minlength="5" @disabled(! $esAdmin)
+                           class="rounded-lg border border-slate-300 px-3 py-2">
+                </div>
             </div>
+            <p class="text-xs text-slate-500">Clientes y domiciliarios entran a la app con su celular y la clave de 4 números (pueden cambiarla). Los administradores entran a este panel.</p>
             <button class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg px-4 py-2">
                 Crear usuario
             </button>

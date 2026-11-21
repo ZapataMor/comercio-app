@@ -28,6 +28,11 @@ type Props = {
   textoEnviar?: string;
   /** Dentro de la tarjeta de vidrio de las pantallas de acceso. */
   vidrio?: boolean;
+  /**
+   * Avisa el paso (número o código) y entrega cómo volver del código al
+   * número, para la flecha de la pantalla (null en el paso del número).
+   */
+  onPaso?: (volverAlNumero: (() => void) | null) => void;
 };
 
 /** 3001234567 → 300 123 4567 */
@@ -41,6 +46,7 @@ export default function VerificarTelefono({
   verificar,
   textoEnviar = 'Enviar código por WhatsApp',
   vidrio,
+  onPaso,
 }: Props) {
   const { c, login: l } = useTheme();
   const normales = useStyles();
@@ -57,6 +63,20 @@ export default function VerificarTelefono({
   const [errores, setErrores] = useState<FieldErrors>({});
   const [cargando, setCargando] = useState(false);
   const reloj = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // La pantalla sabe si hay un paso al que volver (del código al número).
+  const onPasoRef = useRef(onPaso);
+  onPasoRef.current = onPaso;
+  useEffect(() => {
+    onPasoRef.current?.(
+      paso === 'codigo'
+        ? () => {
+            setPaso('numero');
+            setErrores({});
+          }
+        : null,
+    );
+  }, [paso]);
 
   // Cuenta regresiva para poder pedir otro código.
   useEffect(() => {

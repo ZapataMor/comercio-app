@@ -8,7 +8,7 @@ import FieldError from '../components/FieldError';
 import Icon from '../components/Icon';
 import CampoAcceso from '../components/login/CampoAcceso';
 import EscenaAcceso from '../components/login/EscenaAcceso';
-import { LogoAcceso, SeparadorAcceso, useEstilosAcceso } from '../components/login/estilosAcceso';
+import { BotonVolverAcceso, LogoAcceso, SeparadorAcceso, useAtrasAndroid, useEstilosAcceso } from '../components/login/estilosAcceso';
 import VerificarTelefono, { formatoCelular } from '../components/VerificarTelefono';
 import { fieldErrorsFromError, messageFromError } from '../formErrors';
 import { elegirCuentaGoogle, googleDisponible } from '../google';
@@ -42,6 +42,12 @@ export default function CompletarCuentaScreen() {
   const [errorCorreo, setErrorCorreo] = useState<string | undefined>();
   const [guardandoCorreo, setGuardandoCorreo] = useState(false);
   const [conectando, setConectando] = useState(false);
+  // En el paso del código de WhatsApp, cómo volver al del número.
+  const [volverAlNumero, setVolverAlNumero] = useState<(() => void) | null>(null);
+  // La flecha (y el «atrás» de Android): del código al número; si no, sigue a
+  // la app como «Ahora no» (la cuenta ya está creada).
+  const volver = () => (volverAlNumero ? volverAlNumero() : terminarCompletar());
+  useAtrasAndroid(volver);
   if (!auth) return null;
   const { token, user } = auth;
   const correoListo = !!user.email;
@@ -87,6 +93,7 @@ export default function CompletarCuentaScreen() {
 
   return (
     <EscenaAcceso>
+      <BotonVolverAcceso onPress={volver} accessibilityLabel={volverAlNumero ? 'Volver al número' : 'Volver, entrar a Vitrina'} />
       <LogoAcceso />
       <Text style={e.titulo}>Completa tu cuenta</Text>
       <Text style={e.subtitulo}>Es opcional: también puedes hacerlo después en Mi información.</Text>
@@ -142,6 +149,7 @@ export default function CompletarCuentaScreen() {
               <Text style={[e.texto, styles.explica]}>Para que el domiciliario pueda llamarte y para entrar también con tu número.</Text>
               <VerificarTelefono
                 vidrio
+                onPaso={v => setVolverAlNumero(() => v)}
                 telefonoInicial={user.telefono ?? ''}
                 pedir={tel => pedirCodigoTelefonoPerfil(token, tel)}
                 verificar={async (tel, codigo) => actualizarUsuario(await verificarTelefonoPerfil(token, tel, codigo))}

@@ -104,8 +104,7 @@ el código público (6.2); un barrio nuevo queda como sugerencia (5.4). Ver
 - Token Sanctum; sesión persistente en la app (`AuthContext` + AsyncStorage).
 - Logout revoca solo ese token y da de baja el token FCM.
 - **¿Olvidaste tu clave?**: código de 6 números por WhatsApp (o Google) y clave nueva; la
-  desbloquea y cierra las demás sesiones. Ya no se recupera por correo.
-- Cuentas de antes: entran con su contraseña y la app les pide crear la clave.
+  desbloquea y cierra las demás sesiones.
 - **Cuenta suspendida** por un admin: no entra y sus sesiones se cierran solas (`CuentaActiva`).
 - Límites de intentos con nombre (`AppServiceProvider::limitesDeIntentos`): `acceso`, `codigo-clave`,
   `restablecer-clave`, `eliminar-cuenta`, `publico`, `ubicacion`, `codigo-pedido`.
@@ -435,9 +434,10 @@ negocios) y las páginas públicas `/privacidad` y `/eliminar-cuenta` que exige 
 opciones, menús de restaurantes, reseñas y recetas. Imágenes aparte con
 `php artisan db:seed --class=ImagenesDemoSeeder`.
 
-- Contraseña de todos: `password123`. Usuarios: `admin@demo.co`, `comerciante@demo.co` (dueño de "El
-  Rincón Paisa"), `domiciliario@demo.co`, `cliente@demo.co`. En la app entran con «¿Tu cuenta es de
-  antes? Entra con tu contraseña» y luego crean su clave de 4 números.
+- **Cuentas de prueba** (desde el 2026-11-21): comerciantes y domiciliarios entran con celulares
+  desde `3000000000` y la clave `1920` (lista en `comercios-demo.txt`). Tras sembrar de nuevo, correr
+  `php artisan vitrina:cuentas-de-prueba` (borra a los clientes). El panel web sigue con el
+  administrador y su contraseña.
 - Cada negocio demo tiene su dueño `{slug}@demo.co`; la lista está en `comercios-demo.txt`.
 - Catálogo: unos 59 negocios, 364 categorías y 980 productos, más las cartas de restaurantes.
 

@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Support\Busqueda;
 use App\Support\HorarioNegocio;
 use App\Support\UbicacionDomiciliario;
+use App\Support\CuentaPorAdmin;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -147,25 +148,29 @@ class AdminController extends Controller
         return response()->json(['message' => "Cuenta de {$usuario->nombre_completo} reactivada."]);
     }
 
-    /** Crear un usuario con rol. */
+    /**
+     * Crear un usuario con rol. Clientes y domiciliarios: nombre, celular y
+     * clave de 4 números (ver CuentaPorAdmin). Administradores: nombre, correo
+     * y contraseña, para el panel web.
+     */
     public function storeUsuario(Request $request): JsonResponse
     {
-        $datos = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['present', 'string', 'min:5'],
-            'rol' => ['required', Rule::in(self::ROLES)],
-        ]);
+        $rol = $request->validate(['rol' => ['required', Rule::in(self::ROLES)]])['rol'];
 
-        $user = User::create([
-            'name' => $datos['name'],
-            'email' => $datos['email'],
-            'password' => $datos['password'],
-        ]);
-        $user->syncRoles(User::rolesDelTipo($datos['rol']));
+        if ($rol === 'administrador') {
+            $datos = $request->validate([
+                'name' => ['required', 'string', 'max:255'],
+                'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+                'password' => ['present', 'string', 'min:5'],
+            ]);
+            $user = User::create(['name' => $datos['name'], 'email' => $datos['email'], 'password' => $datos['password']]);
+            $user->syncRoles(User::rolesDelTipo($rol));
+        } else {
+            $user = CuentaPorAdmin::deLaApp($request, $rol);
+        }
 
         return response()->json([
-            'usuario' => ['id' => $user->id, 'name' => $user->nombre_completo, 'email' => $user->email, 'rol' => $datos['rol']],
+            'usuario' => ['id' => $user->id, 'name' => $user->nombre_completo, 'email' => $user->email, 'telefono' => $user->telefono, 'rol' => $rol],
         ], 201);
     }
 

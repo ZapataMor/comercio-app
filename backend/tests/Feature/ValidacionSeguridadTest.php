@@ -54,9 +54,9 @@ test('el limite por usuario comparte contador entre rutas y respeta el minuto', 
     $this->getJson('/api/user')->assertOk();
 });
 
-test('rotar correos no evade el limite general por IP', function () {
-    for ($i = 0; $i < 300; $i++) $this->postJson('/api/login', ['email' => "u$i@example.com", 'password' => 'x'])->assertStatus(422);
-    $this->postJson('/api/login', ['email' => 'otro@example.com', 'password' => 'x'])->assertStatus(429)->assertHeader('Retry-After');
+test('rotar celulares no evade el limite general por IP', function () {
+    for ($i = 0; $i < 300; $i++) $this->postJson('/api/login', ['telefono' => '30000'.str_pad((string) $i, 5, '0', STR_PAD_LEFT), 'pin' => '2468'])->assertStatus(422);
+    $this->postJson('/api/login', ['telefono' => '3109998877', 'pin' => '2468'])->assertStatus(429)->assertHeader('Retry-After');
 });
 
 test('las escrituras se limitan a cuarenta por minuto sin bloquear lecturas', function () {

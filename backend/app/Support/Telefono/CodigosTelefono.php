@@ -74,8 +74,9 @@ class CodigosTelefono
     /**
      * Crea un código nuevo (anula el anterior) y lo envía.
      *
-     * @return string|null el código, solo con el canal de prueba en local,
-     *                     para que la app lo muestre sin abrir el log.
+     * @return string|null el código, solo con el canal de prueba en local
+     *                     (o con `services.whatsapp.codigo_en_pantalla` en un
+     *                     servidor de pruebas), para que la app lo muestre.
      *
      * @throws ValidationException si hay que esperar o el envío falló.
      */
@@ -113,7 +114,9 @@ class CodigosTelefono
             ]);
         }
 
-        return $this->enviador->esDePrueba() && app()->environment('local', 'testing') ? $codigo : null;
+        $mostrar = app()->environment('local', 'testing') || config('services.whatsapp.codigo_en_pantalla');
+
+        return $this->enviador->esDePrueba() && $mostrar ? $codigo : null;
     }
 
     /**

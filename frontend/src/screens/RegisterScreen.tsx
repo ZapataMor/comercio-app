@@ -15,6 +15,7 @@ import {
   CasillaPolitica,
   LogoAcceso,
   SeparadorAcceso,
+  useAtrasAndroid,
   useEstilosAcceso,
 } from '../components/login/estilosAcceso';
 import VerificarTelefono, { formatoCelular } from '../components/VerificarTelefono';
@@ -52,6 +53,8 @@ export default function RegisterScreen({ navigation }: Props) {
   // Después de los datos, el paso de crear la clave.
   const [creandoClave, setCreandoClave] = useState(false);
   const [errorClave, setErrorClave] = useState<string | null>(null);
+  // En el paso del código de WhatsApp, cómo volver al del número.
+  const [volverAlNumero, setVolverAlNumero] = useState<(() => void) | null>(null);
   // Autorización del tratamiento de datos (Ley 1581): casilla sin marcar por defecto.
   const [aceptaTerminos, setAceptaTerminos] = useState(false);
   const [cargando, setCargando] = useState(false);
@@ -122,6 +125,15 @@ export default function RegisterScreen({ navigation }: Props) {
     }
   }
 
+  // La flecha (y el «atrás» de Android) va al paso anterior; desde el primero, al login.
+  function volver() {
+    if (creandoClave) setCreandoClave(false);
+    else if (celular) setCelular(null);
+    else if (volverAlNumero) volverAlNumero();
+    else navigation.goBack();
+  }
+  useAtrasAndroid(cargando || google.cargando ? () => {} : volver);
+
   const avisoGeneral = error ?? (!celular ? google.error : null);
   const irAlLogin = (
     <TouchableOpacity style={e.pie} onPress={() => navigation.goBack()} disabled={cargando || google.cargando}>
@@ -135,9 +147,9 @@ export default function RegisterScreen({ navigation }: Props) {
     <EscenaAcceso>
       {google.modal}
       <BotonVolverAcceso
-        onPress={() => (creandoClave ? setCreandoClave(false) : navigation.goBack())}
+        onPress={volver}
         disabled={cargando || google.cargando}
-        accessibilityLabel="Volver al inicio de sesión"
+        accessibilityLabel={creandoClave || celular || volverAlNumero ? 'Volver al paso anterior' : 'Volver al inicio de sesión'}
       />
       <LogoAcceso />
       <Text style={e.titulo}>Crear cuenta</Text>
@@ -169,6 +181,7 @@ export default function RegisterScreen({ navigation }: Props) {
           ) : null}
           <VerificarTelefono
             vidrio
+            onPaso={v => setVolverAlNumero(() => v)}
             pedir={pedirCodigoRegistro}
             verificar={async (telefono, codigo) => {
               const token = await verificarTelefonoRegistro(telefono, codigo);

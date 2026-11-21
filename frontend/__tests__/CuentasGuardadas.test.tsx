@@ -1,7 +1,7 @@
 /**
  * Varias cuentas en el mismo teléfono, como en Instagram: se agregan sin
  * cerrar las demás, se cambia entre ellas sin contraseña y al cerrar la
- * sesión de una se sigue con otra. Y el ojo del login para ver la contraseña.
+ * sesión de una se sigue con otra. Y entrar con el celular y la clave.
  * @format
  */
 
@@ -229,27 +229,10 @@ test('al pasar directo a otra cuenta, los negocios de la anterior no se le pegan
 });
 
 describe('login', () => {
-  const campoClave = () => app!.root.findAll(n => n.type === TextInput && n.props.accessibilityLabel === 'Contraseña')[0];
   const boton = (etiqueta: string) =>
     app!.root.findAll(n => n.props.accessibilityLabel === etiqueta && typeof n.props.onPress === 'function')[0];
-  const conTexto = (texto: string) =>
-    app!.root
-      .findAll(n => typeof n.props.onPress === 'function' && n.findAll(t => t.props.children === texto || (Array.isArray(t.props.children) && t.props.children.join('') === texto)).length > 0)
-      .pop()!;
   const escribir = (etiqueta: string, valor: string) =>
     hacer(() => app!.root.findAll(n => n.type === TextInput && n.props.accessibilityLabel === etiqueta)[0].props.onChangeText(valor));
-
-  test('el ojo muestra y oculta la contraseña de las cuentas de antes', async () => {
-    await montar(true);
-    await hacer(() => conTexto('¿Tu cuenta es de antes? Entra con tu contraseña').props.onPress());
-    expect(campoClave().props.secureTextEntry).toBe(true);
-
-    await hacer(() => boton('Mostrar contraseña').props.onPress());
-    expect(campoClave().props.secureTextEntry).toBe(false);
-
-    await hacer(() => boton('Ocultar contraseña').props.onPress());
-    expect(campoClave().props.secureTextEntry).toBe(true);
-  });
 
   test('sin cuentas guardadas no ofrece «Continuar como»', async () => {
     await montar(true);
@@ -278,6 +261,21 @@ describe('login', () => {
     expect(entrarMock).toHaveBeenLastCalledWith('3001234567', '2468', undefined);
     expect(sesion.auth).toBeNull();
     expect(JSON.stringify(app!.toJSON())).toContain('482913');
+
+    // La flecha vuelve del código al celular y la clave.
+    await hacer(() => boton('Volver al celular y la clave').props.onPress());
+    expect(JSON.stringify(app!.toJSON())).not.toContain('482913');
+    expect(app!.root.findAll(n => n.type === TextInput && n.props.accessibilityLabel === 'Número de celular')).toHaveLength(1);
+  });
+
+  test('en el login a secas no hay flecha; desde «Agregar cuenta» vuelve a la cuenta anterior', async () => {
+    await montar(true);
+    expect(app!.root.findAll(n => n.props.accessibilityLabel === 'Volver a la cuenta anterior' && typeof n.props.onPress === 'function')).toHaveLength(0);
+
+    await hacer(() => sesion.entrar('t-ana', ana));
+    await hacer(() => sesion.agregarCuenta());
+    await hacer(() => boton('Volver a la cuenta anterior').props.onPress());
+    expect(sesion.auth?.user.id).toBe(1);
   });
 
   test('una cuenta con teléfono de confianza vuelve desde «Continuar como» con su clave', async () => {

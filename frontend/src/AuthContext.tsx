@@ -2,7 +2,7 @@
  * Sesión de la app, con varias cuentas a la vez como en Instagram: quien
  * maneja más de un perfil en el mismo teléfono (su cuenta personal y la de
  * su negocio, p. ej.) pasa de una a otra desde «Mi perfil» sin volver a
- * escribir la contraseña.
+ * escribir la clave.
  *
  * En el teléfono se guardan:
  *   · `sesion`:  la cuenta activa (la app arranca en ella).
@@ -20,14 +20,14 @@
  * solo con su clave de 4 números.
  *
  * Las cuentas con la sesión cerrada se recuerdan si tienen ese token o
- * entran con Google (`recordadas`, en `cuentasGoogle`, el nombre de antes):
+ * entran con Google (`recordadas`, guardadas en `cuentasGoogle`):
  * siguen en «Continuar como» y vuelven a entrar con la clave (o eligiendo la
  * cuenta de Google). De esas no se guarda el token de sesión, solo los datos
  * para mostrarlas. «Cerrar todas las sesiones» y «Quitar de este teléfono»
  * las olvidan, junto con su token de confianza.
  *
- * `porCompletar`: la cuenta que acaba de registrarse (o de crear su clave)
- * ve una vez «Completa tu cuenta» (correo o celular, opcionales).
+ * `porCompletar`: la cuenta que acaba de registrarse ve una vez «Completa tu
+ * cuenta» (correo o celular, opcionales).
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
@@ -57,18 +57,16 @@ type AuthContextType = {
   olvidarRecordada: (userId: number) => void;
   /** Token del teléfono de confianza de cada cuenta (por id). */
   dispositivos: Record<number, string>;
-  /** Guarda el token de confianza de una cuenta (p. ej., al crear su clave). */
+  /** Guarda el token de confianza de una cuenta. */
   guardarDispositivo: (userId: number, token: string) => void;
   /** El backend dijo que este teléfono ya no es de confianza para la cuenta. */
   olvidarDispositivo: (userId: number) => void;
   /** Cuenta que debe ver «Completa tu cuenta» (una vez). */
   porCompletar: number | null;
-  /** Muestra «Completa tu cuenta» a esa cuenta. */
-  pedirCompletar: (userId: number) => void;
   /** Termina (o salta) «Completa tu cuenta». */
   terminarCompletar: () => void;
   entrar: (token: string, user: Usuario, opciones?: OpcionesEntrar) => void;
-  /** Pasa a otra de las cuentas guardadas, sin contraseña. */
+  /** Pasa a otra de las cuentas guardadas, sin escribir la clave. */
   cambiarCuenta: (userId: number) => void;
   /** Lleva al login para entrar con otra cuenta, sin cerrar las sesiones abiertas. */
   agregarCuenta: () => void;
@@ -99,7 +97,6 @@ const AuthContext = createContext<AuthContextType>({
   guardarDispositivo: () => {},
   olvidarDispositivo: () => {},
   porCompletar: null,
-  pedirCompletar: () => {},
   terminarCompletar: () => {},
   entrar: () => {},
   cambiarCuenta: () => {},
@@ -334,7 +331,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [fijarRecordadas, olvidarDispositivo],
   );
 
-  const pedirCompletar = useCallback((userId: number) => setPorCompletar(userId), []);
   const terminarCompletar = useCallback(() => setPorCompletar(null), []);
 
   const cambiarCuenta = useCallback(
@@ -415,7 +411,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       guardarDispositivo,
       olvidarDispositivo,
       porCompletar,
-      pedirCompletar,
       terminarCompletar,
       entrar,
       cambiarCuenta,
@@ -426,7 +421,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       auth, cargando, cuentas, agregando, recordadas, olvidarRecordada, dispositivos, guardarDispositivo, olvidarDispositivo,
-      porCompletar, pedirCompletar, terminarCompletar, entrar, cambiarCuenta, agregarCuenta, actualizarUsuario, salir, salirDeTodas,
+      porCompletar, terminarCompletar, entrar, cambiarCuenta, agregarCuenta, actualizarUsuario, salir, salirDeTodas,
     ],
   );
 

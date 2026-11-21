@@ -34,6 +34,9 @@ return [
     // Guía: Vitrina/00 - Inicio/Configurar WhatsApp Cloud API.md
     'whatsapp' => [
         'driver' => env('WHATSAPP_DRIVER', 'log'),
+        // Servidor de pruebas sin WhatsApp: con el canal `log`, la app muestra
+        // el código en pantalla (en local siempre). Nunca en uno de verdad.
+        'codigo_en_pantalla' => (bool) env('WHATSAPP_CODIGO_EN_PANTALLA', false),
         'token' => env('WHATSAPP_TOKEN'),
         'phone_number_id' => env('WHATSAPP_PHONE_NUMBER_ID'),
         'plantilla' => env('WHATSAPP_PLANTILLA_CODIGO', 'codigo_vitrina'),

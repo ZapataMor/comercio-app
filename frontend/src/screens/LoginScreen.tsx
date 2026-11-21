@@ -1,6 +1,6 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, BackHandler, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
   ApiError,
   CodigoAcceso,
@@ -9,7 +9,6 @@ import {
   entrarConClave,
   entrarEnDispositivo,
   limpiarCelular,
-  login,
   LoginResponse,
   Usuario,
 } from '../api';
@@ -22,7 +21,7 @@ import FieldError from '../components/FieldError';
 import Icon from '../components/Icon';
 import CampoAcceso from '../components/login/CampoAcceso';
 import EscenaAcceso from '../components/login/EscenaAcceso';
-import { LogoAcceso, SeparadorAcceso, useEstilosAcceso } from '../components/login/estilosAcceso';
+import { BotonVolverAcceso, LogoAcceso, SeparadorAcceso, useAtrasAndroid, useEstilosAcceso } from '../components/login/estilosAcceso';
 import { usePedirClave } from '../components/PedirClave';
 import RecuperarClaveModal from '../components/RecuperarClaveModal';
 import { formatoCelular } from '../components/VerificarTelefono';
@@ -48,9 +47,6 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 // campos sale «Continuar como»: las de sesión abierta entran con un toque;
 // las de sesión cerrada piden la clave (o, sin teléfono de confianza, eligen
 // otra vez la cuenta de Google). Con un toque largo se quitan del teléfono.
-//
-// Las cuentas de antes, sin clave, entran con su contraseña («¿Tu cuenta es
-// de antes?») y la app les pide crear la clave.
 // Si se llegó desde «Agregar cuenta», «atrás» vuelve a la cuenta anterior.
 // ─────────────────────────────────────────────────────────────
 
@@ -80,17 +76,12 @@ export default function LoginScreen({ navigation }: Props) {
   const confirmar = useConfirmar();
   const toast = useToast();
   const clave = usePedirClave();
-  // 'clave': celular + clave de 4 números. 'contrasena': cuentas de antes.
-  const [modo, setModo] = useState<'clave' | 'contrasena'>('clave');
   const [telefono, setTelefono] = useState('');
   const [pin, setPin] = useState('');
   // Teléfono nuevo: el backend envió un código por WhatsApp.
   const [codigoAcceso, setCodigoAcceso] = useState<CodigoAcceso | null>(null);
   const [codigo, setCodigo] = useState('');
   const [espera, setEspera] = useState(0);
-  // Cuentas de antes: correo, celular o usuario, y contraseña.
-  const [usuario, setUsuario] = useState('');
-  const [password, setPassword] = useState('');
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errores, setErrores] = useState<FieldErrors>({});
@@ -117,18 +108,20 @@ export default function LoginScreen({ navigation }: Props) {
     });
   }
 
-  // Desde «Agregar cuenta», «atrás» vuelve a la cuenta de la que venía (la
-  // más reciente). Solo en esta pantalla: en el registro, «atrás» regresa aquí.
-  useEffect(() => {
-    const anterior = agregando ? cuentas[0] : undefined;
-    if (!anterior) return;
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (!navigation.isFocused()) return false;
-      cambiarCuenta(anterior.user.id);
-      return true;
-    });
-    return () => sub.remove();
-  }, [agregando, cuentas, cambiarCuenta, navigation]);
+  // La flecha (y el «atrás» de Android): del código de WhatsApp vuelve al
+  // celular y la clave; desde «Agregar cuenta», a la cuenta de la que venía
+  // (la más reciente). En el login a secas no hay vista anterior.
+  const anterior = agregando ? cuentas[0] : undefined;
+  const volver = codigoAcceso
+    ? () => {
+        setCodigoAcceso(null);
+        setPin('');
+        setErrores({});
+      }
+    : anterior
+      ? () => cambiarCuenta(anterior.user.id)
+      : null;
+  useAtrasAndroid(volver);
 
   // Cuenta regresiva para pedir otro código.
   useEffect(() => {
@@ -245,27 +238,6 @@ export default function LoginScreen({ navigation }: Props) {
     }
   }
 
-  async function entrarConContrasena() {
-    setError(null);
-    google.setError(null);
-    setErrores({});
-    const nuevos: FieldErrors = {};
-    if (!usuario.trim()) nuevos.usuario = 'Escribe tu correo, celular o usuario.';
-    if (!password) nuevos.password = 'El campo contraseña es obligatorio.';
-    if (Object.keys(nuevos).length > 0) {
-      setErrores(nuevos);
-      return;
-    }
-    setCargando(true);
-    try {
-      abrirSesion(await login(usuario.trim(), password));
-    } catch (err) {
-      mostrarError(err);
-    } finally {
-      setCargando(false);
-    }
-  }
-
   function entrarConGoogle(rapido: boolean) {
     setError(null);
     setErrores({});
@@ -291,7 +263,6 @@ export default function LoginScreen({ navigation }: Props) {
           if (err instanceof ApiError && err.data?.codigo === 'dispositivo_desconocido') {
             // El teléfono ya no es de confianza: entra con el celular (y el código) o con Google.
             olvidarDispositivo(user.id);
-            setModo('clave');
             setTelefono(user.telefono_verificado && user.telefono ? user.telefono : '');
           }
           throw err;
@@ -334,6 +305,7 @@ export default function LoginScreen({ navigation }: Props) {
   if (codigoAcceso) {
     return (
       <EscenaAcceso fuera={fuera}>
+        <BotonVolverAcceso onPress={volver!} disabled={cargando} accessibilityLabel="Volver al celular y la clave" />
         <LogoAcceso />
         <Text style={e.titulo}>Confirma que eres tú</Text>
         <Text style={e.texto}>
@@ -379,14 +351,7 @@ export default function LoginScreen({ navigation }: Props) {
               {espera > 0 ? `Reenviar en ${espera} s` : 'Reenviar código'}
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => {
-              setCodigoAcceso(null);
-              setPin('');
-              setErrores({});
-            }}
-            disabled={cargando}
-            hitSlop={8}>
+          <TouchableOpacity onPress={volver!} disabled={cargando} hitSlop={8}>
             <Text style={styles.enlace}>Volver</Text>
           </TouchableOpacity>
         </View>
@@ -396,6 +361,7 @@ export default function LoginScreen({ navigation }: Props) {
 
   return (
     <EscenaAcceso fuera={fuera}>
+      {volver ? <BotonVolverAcceso onPress={volver} disabled={ocupado} accessibilityLabel="Volver a la cuenta anterior" /> : null}
       <LogoAcceso />
 
       {error || google.error ? <Text style={e.error}>{error ?? google.error}</Text> : null}
@@ -451,99 +417,52 @@ export default function LoginScreen({ navigation }: Props) {
         </>
       ) : null}
 
-      {modo === 'clave' ? (
-        <>
-          <View style={e.bloqueCampo}>
-            <CampoAcceso
-              rotulo="CELULAR"
-              icono="telefono"
-              placeholder="300 123 4567"
-              value={telefono}
-              onChangeText={valor => {
-                setTelefono(valor.replace(/[^\d+ ]/g, '').slice(0, 16));
-                limpiarError('telefono');
-              }}
-              keyboardType="phone-pad"
-              textContentType="telephoneNumber"
-              autoComplete="tel"
-              returnKeyType="next"
-              onSubmitEditing={() => campoPin.current?.focus()}
-              accessibilityLabel="Número de celular"
-              editable={!ocupado}
-            />
-          </View>
-          <FieldError mensaje={errores.telefono} />
+      <View style={e.bloqueCampo}>
+        <CampoAcceso
+          rotulo="CELULAR"
+          icono="telefono"
+          placeholder="300 123 4567"
+          value={telefono}
+          onChangeText={valor => {
+            setTelefono(valor.replace(/[^\d+ ]/g, '').slice(0, 16));
+            limpiarError('telefono');
+          }}
+          keyboardType="phone-pad"
+          textContentType="telephoneNumber"
+          autoComplete="tel"
+          returnKeyType="next"
+          onSubmitEditing={() => campoPin.current?.focus()}
+          accessibilityLabel="Número de celular"
+          editable={!ocupado}
+        />
+      </View>
+      <FieldError mensaje={errores.telefono} />
 
-          <Text style={styles.rotulo}>CLAVE</Text>
-          <CampoPin
-            ref={campoPin}
-            vidrio
-            value={pin}
-            onChangeText={v => {
-              setPin(v);
-              limpiarError('pin');
-            }}
-            onCompleto={v => {
-              if (telefonoValido(limpiarCelular(telefono))) entrarConCelular(v);
-            }}
-            editable={!ocupado}
-            conError={!!errores.pin}
-            accessibilityLabel="Clave de 4 números"
-          />
-          <FieldError mensaje={errores.pin} />
+      <Text style={styles.rotulo}>CLAVE</Text>
+      <CampoPin
+        ref={campoPin}
+        vidrio
+        value={pin}
+        onChangeText={v => {
+          setPin(v);
+          limpiarError('pin');
+        }}
+        onCompleto={v => {
+          if (telefonoValido(limpiarCelular(telefono))) entrarConCelular(v);
+        }}
+        editable={!ocupado}
+        conError={!!errores.pin}
+        accessibilityLabel="Clave de 4 números"
+      />
+      <FieldError mensaje={errores.pin} />
 
-          <TouchableOpacity style={styles.olvide} onPress={() => setRecuperando({ telefono })} disabled={ocupado}>
-            <Text style={styles.olvideTexto}>¿Olvidaste tu clave?</Text>
-          </TouchableOpacity>
+      <TouchableOpacity style={styles.olvide} onPress={() => setRecuperando({ telefono })} disabled={ocupado}>
+        <Text style={styles.olvideTexto}>¿Olvidaste tu clave?</Text>
+      </TouchableOpacity>
 
-          <PressableScale style={e.boton} scaleTo={0.97} onPress={() => entrarConCelular()} disabled={ocupado}>
-            {cargando ? <ActivityIndicator size="small" color={l.botonTexto} /> : <Text style={e.botonTexto}>Entrar</Text>}
-          </PressableScale>
-        </>
-      ) : (
-        <>
-          <View style={e.bloqueCampo}>
-            <CampoAcceso
-              rotulo="CORREO, CELULAR O USUARIO"
-              icono="sobre"
-              placeholder="nombre@correo.com"
-              value={usuario}
-              onChangeText={valor => {
-                setUsuario(valor);
-                limpiarError('usuario');
-              }}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              accessibilityLabel="Correo, celular o usuario"
-              editable={!ocupado}
-            />
-          </View>
-          <FieldError mensaje={errores.usuario} />
-
-          <View style={e.bloqueCampo}>
-            <CampoAcceso
-              rotulo="CONTRASEÑA"
-              icono="candado"
-              placeholder="Tu contraseña"
-              value={password}
-              onChangeText={valor => {
-                setPassword(valor);
-                limpiarError('password');
-              }}
-              accessibilityLabel="Contraseña"
-              editable={!ocupado}
-              clave
-            />
-          </View>
-          <FieldError mensaje={errores.password} />
-          <Text style={e.ayuda}>Al entrar te pediremos crear tu clave de 4 números.</Text>
-
-          <PressableScale style={e.boton} scaleTo={0.97} onPress={entrarConContrasena} disabled={ocupado}>
-            {cargando ? <ActivityIndicator size="small" color={l.botonTexto} /> : <Text style={e.botonTexto}>Entrar</Text>}
-          </PressableScale>
-        </>
-      )}
+      <PressableScale style={e.boton} scaleTo={0.97} onPress={() => entrarConCelular()} disabled={ocupado}>
+        {cargando ? <ActivityIndicator size="small" color={l.botonTexto} /> : <Text style={e.botonTexto}>Entrar</Text>}
+      </PressableScale>
 
       {conGoogle ? (
         <>
@@ -551,19 +470,6 @@ export default function LoginScreen({ navigation }: Props) {
           <BotonGoogle onPress={() => entrarConGoogle(false)} cargando={google.cargando} disabled={cargando} />
         </>
       ) : null}
-
-      <TouchableOpacity
-        style={styles.otroModo}
-        onPress={() => {
-          setModo(m => (m === 'clave' ? 'contrasena' : 'clave'));
-          setErrores({});
-          setError(null);
-        }}
-        disabled={ocupado}>
-        <Text style={styles.olvideTexto}>
-          {modo === 'clave' ? '¿Tu cuenta es de antes? Entra con tu contraseña' : 'Entrar con mi celular y mi clave'}
-        </Text>
-      </TouchableOpacity>
 
       <TouchableOpacity style={e.pie} onPress={() => navigation.navigate('Register')} disabled={ocupado}>
         <Text style={e.pieTexto}>
@@ -579,7 +485,6 @@ const useStyles = makeStyles((_c, _sombras, l) => ({
   rotulo: { color: l.rotulo, fontFamily: font.bold, fontSize: 11, letterSpacing: 1.3, marginBottom: 6 },
   olvide: { alignSelf: 'flex-end', minHeight: 44, justifyContent: 'center', marginTop: 2 },
   olvideTexto: { color: l.rotulo, fontFamily: font.semibold, fontSize: 13, textAlign: 'center' },
-  otroModo: { minHeight: 44, justifyContent: 'center', alignItems: 'center', marginTop: 10 },
   fuerte: { fontFamily: font.bold, color: l.campoTexto },
   separado: { marginTop: 14 },
   prueba: { marginTop: 12, marginBottom: 0 },

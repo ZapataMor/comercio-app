@@ -48,8 +48,8 @@ function rutaActual(): Pantalla | null {
 export function TutorialProvider({ children, listo }: { children: React.ReactNode; listo: boolean }) {
   const { auth, porCompletar } = useAuth();
   const user = auth?.user ?? null;
-  // Antes de la app («Crea tu clave», «Completa tu cuenta») no se ofrece ayuda.
-  const antesDeLaApp = !!user && (user.tiene_pin === false || porCompletar === user.id);
+  // Antes de la app («Completa tu cuenta») no se ofrece ayuda.
+  const antesDeLaApp = !!user && porCompletar === user.id;
   const antesDeLaAppRef = useRef(antesDeLaApp);
   antesDeLaAppRef.current = antesDeLaApp;
 
