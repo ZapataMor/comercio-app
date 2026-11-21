@@ -27,6 +27,7 @@ import Icon from '../components/Icon';
 import { haceCuanto, MapaSeguimiento, NotaEnVivo } from '../components/Mapa';
 import MotivoCancelacion from '../components/MotivoCancelacion';
 import { RevisarPago } from '../components/PagoTransferencia';
+import { DevolucionNegocio } from '../components/Devolucion';
 import ReportarPedido from '../components/ReportarPedido';
 import { NivelBadge } from '../components/Reputacion';
 import { useNegocio } from '../NegocioContext';
@@ -82,7 +83,8 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
   // atenderlo, el cliente cancelarlo, y se ve dónde viene el domiciliario.
   // Entregado se sigue su rastro mientras falte confirmar el dinero.
   usePolling(() => {
-    if (pedido?.estado === 'cancelado') return;
+    // Cancelado ya no cambia, salvo una devolución que aún espera respuesta.
+    if (pedido?.estado === 'cancelado' && !['solicitado', 'devuelto', 'no_recibido'].includes(pedido.reembolso?.estado ?? '')) return;
     if (pedido?.estado === 'entregado' && !pedido.domiciliario_ubicacion) return;
     recargar().catch(() => {});
   }, 10000, a => (a.tema === 'pedidos' || a.tema === 'ubicacion') && a.id === pedidoId);
@@ -236,10 +238,16 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
 
   return (
     <ScrollTeclado style={styles.container} contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
-      {pedido.reembolso_solicitado && <View style={styles.card}>
-        <Text style={styles.bloqueTitulo}>Reembolso solicitado</Text>
-        <Text style={styles.nota}>El cliente solicita la devolución de una transferencia. Verifica el pago y contáctalo para acordar el reembolso.</Text>
-      </View>}
+      {/* Cancelado por transferencia: devolverle el dinero al cliente. */}
+      {!!pedido.reembolso?.estado && !!negocioId && (
+        <DevolucionNegocio
+          token={token}
+          negocioId={negocioId}
+          pedidoId={pedido.id}
+          reembolso={pedido.reembolso}
+          onCambio={() => { recargar().catch(() => {}); }}
+        />
+      )}
       <FadeInView style={styles.card}>
         <View style={styles.head}>
           <Text style={styles.pid}>Pedido #{pedido.codigo}</Text>
@@ -381,7 +389,7 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
           pedido.cancelar_penaliza
             ? 'Ya pasaron más de 5 minutos desde que lo aceptaste: cancelarlo baja tu confiabilidad. El cliente verá el motivo.'
             : clienteYaPago
-              ? 'El cliente verá el motivo y recibirá un aviso. Si ya te transfirió, debes devolverle el dinero.'
+              ? 'El cliente verá el motivo y recibirá un aviso. Como ya te transfirió, deberás devolverle el dinero: la devolución aparecerá en este pedido.'
               : 'El cliente verá el motivo y recibirá un aviso. No se le cobra nada.'
         }
         motivos={pedido.motivos_cancelacion ?? []}

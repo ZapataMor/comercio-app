@@ -63,6 +63,13 @@ El detalle paso a paso está en [[CU-001 Realizar un pedido]] y [[CU-004 Entrega
      cancelación libre corren desde que confirma el pago, y también su tiempo de preparación.
    - Con el pago avisado ya no se informan productos agotados (el total cambiaría): se llama al
      cliente o se cancela y se devuelve el dinero.
+   - **Devolución** si se cancela (`reembolso_estado`): *solicitada* (el cliente la pide e indica a
+     dónde; se abre sola si el negocio había confirmado el pago) → *devuelta* (el negocio pone cuánto
+     y foto del comprobante opcional) → *recibida* cuando el cliente confirma. Si el cliente dice que
+     no le llegó (*no recibida*) vuelve al negocio. *Rechazada* si el negocio nunca recibió el pago,
+     con motivo, y solo si no lo había confirmado. Se sugiere devolver el total, o la mitad de los
+     productos si el cliente no apareció. El negocio las ve en el Inicio («Devoluciones por hacer»),
+     en el pedido y en Mi perfil.
 8. **Productos con tipo de venta**: el precio se entiende "por unidad de medida" — ver
    [[Tipos de Venta]].
 9. **Domicilio aparte.** Total = subtotal de productos + **tarifa de domicilio** vigente (la fija el

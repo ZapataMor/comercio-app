@@ -609,15 +609,17 @@ test('el reembolso es idempotente, privado y solo para transferencias canceladas
     $pedido = limPedido($cliente, $negocio, 'cancelado');
     Sanctum::actingAs($cliente);
     $ruta = "/api/pedidos/{$pedido->id}/reembolso";
-    $this->postJson($ruta)->assertUnprocessable();
+    $cuenta = ['cuenta' => 'Nequi 3001234567'];
+    $this->postJson($ruta, $cuenta)->assertUnprocessable();
     $pedido->update(['metodo_pago' => 'transferencia', 'estado' => 'aceptado']);
-    $this->postJson($ruta)->assertUnprocessable();
+    $this->postJson($ruta, $cuenta)->assertUnprocessable();
     $pedido->update(['estado' => 'cancelado']);
     Sanctum::actingAs(limPersona());
-    $this->postJson($ruta)->assertNotFound();
+    $this->postJson($ruta, $cuenta)->assertNotFound();
     Sanctum::actingAs($cliente);
-    $this->postJson($ruta)->assertOk();
-    $this->postJson($ruta)->assertOk();
+    $this->postJson($ruta, $cuenta)->assertOk();
+    // Repetirla solo actualiza la cuenta: no avisa dos veces.
+    $this->postJson($ruta, $cuenta)->assertOk();
     expect($pedido->fresh()->reembolso_solicitado_at)->not->toBeNull();
     Notification::assertSentToTimes($dueno, ReembolsoSolicitado::class, 1);
     $this->getJson("/api/pedidos/{$pedido->id}")->assertJsonPath('reembolso_solicitado', true);

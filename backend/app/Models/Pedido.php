@@ -59,6 +59,17 @@ class Pedido extends Model
      */
     public const PAGO_ESTADOS = ['por_pagar', 'informado', 'confirmado', 'no_llego'];
 
+    /**
+     * Devolución de una transferencia (ver Support\Reembolso): el cliente la
+     * pide (solicitado), el negocio devuelve (devuelto) y el cliente confirma
+     * (recibido) o dice que no le llegó (no_recibido, vuelve al negocio); o el
+     * negocio dice que nunca recibió ese pago (rechazado).
+     */
+    public const REEMBOLSO_ESTADOS = ['solicitado', 'devuelto', 'recibido', 'no_recibido', 'rechazado'];
+
+    /** Estados en los que el negocio todavía debe hacer algo. */
+    public const REEMBOLSO_PENDIENTES = ['solicitado', 'no_recibido'];
+
     protected $fillable = [
         'negocio_id',
         'user_id',
@@ -106,6 +117,16 @@ class Pedido extends Model
         'pago_confirmado_at',
         'pago_confirmado_por',
         'pago_no_llego_at',
+        'reembolso_solicitado_at',
+        'reembolso_estado',
+        'reembolso_cuenta',
+        'reembolso_monto',
+        'reembolso_comprobante',
+        'reembolso_devuelto_at',
+        'reembolso_devuelto_por',
+        'reembolso_motivo',
+        'reembolso_rechazado_at',
+        'reembolso_respondido_at',
     ];
 
     /**
@@ -153,6 +174,11 @@ class Pedido extends Model
             'pago_informado_at' => 'datetime',
             'pago_confirmado_at' => 'datetime',
             'pago_no_llego_at' => 'datetime',
+            'reembolso_solicitado_at' => 'datetime',
+            'reembolso_monto' => 'decimal:2',
+            'reembolso_devuelto_at' => 'datetime',
+            'reembolso_rechazado_at' => 'datetime',
+            'reembolso_respondido_at' => 'datetime',
         ];
     }
 

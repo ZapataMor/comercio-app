@@ -122,6 +122,8 @@ class CancelarPedido
         $pedido->refresh();
         // También cuando lo cancela el sistema (pedidos:vencer), sin petición de por medio.
         EnVivo::pedido($pedido);
+        // Si el negocio ya había confirmado la transferencia, debe devolverla.
+        Reembolso::abrirSiCorresponde($pedido);
 
         if ($resultado['penalizar'] && $pedido->negocio) {
             Reputacion::registrar(Reputacion::NEGOCIO, $pedido->negocio, 'cancelo_tras_aceptar', $pedido);

@@ -386,6 +386,8 @@ class EnVivo
             Api\PedidoController::class.'@store' => ['despues' => fn (Request $r, Response $res) => self::pedido($json($res, 'id'))],
             Api\PedidoController::class.'@cancelar' => $pedido,
             Api\PedidoController::class.'@solicitarReembolso' => $pedido,
+            Api\PedidoController::class.'@responderReembolso' => $pedido,
+            Api\PedidoController::class.'@comprobanteReembolso' => null,
             Api\PedidoController::class.'@informarPago' => $pedido,
             // Solo lee la foto.
             Api\PedidoController::class.'@comprobante' => null,
@@ -416,6 +418,7 @@ class EnVivo
             Api\ComercioPedidoController::class.'@recogido' => $pedido,
             Api\ComercioPedidoController::class.'@cancelar' => $pedido,
             Api\ComercioPedidoController::class.'@pago' => $pedido,
+            Api\ComercioPedidoController::class.'@reembolso' => $pedido,
             // Cuentas de pago: el cliente las ve al abrir su pedido; no hay nada que avisar.
             Api\CuentaPagoController::class.'@store' => null,
             Api\CuentaPagoController::class.'@update' => null,

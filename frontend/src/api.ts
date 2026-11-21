@@ -1020,6 +1020,8 @@ export type ComercioPedido = {
   metodo_pago: string;
   /** Solo transferencia: en qué va el pago y si el negocio puede confirmarlo. */
   pago?: PagoNegocio | null;
+  /** Cancelado por transferencia: la devolución al cliente. */
+  reembolso?: ReembolsoPedido | null;
   /** Por transferencia el negocio le entrega el domicilio al domiciliario al recoger. */
   domicilio_lo_entrega_negocio?: boolean;
   direccion_entrega: string;
@@ -1971,6 +1973,8 @@ export type SeguimientoPedido = {
   metodo_pago: string;
   /** Solo transferencia: cuentas del negocio y en qué va mi pago. */
   pago?: PagoCliente | null;
+  /** Cancelado por transferencia: la devolución de mi dinero. */
+  reembolso?: ReembolsoPedido | null;
   direccion_entrega: string;
   minutos_recogida: number | null;
   fecha?: string;
@@ -2349,10 +2353,76 @@ export async function eliminarPropiedad(token: string, id: number): Promise<void
   await authSend('DELETE', `/api/propiedades/${id}`, token);
 }
 
-export async function solicitarReembolso(token: string, id: number): Promise<void> {
-  await authSend('POST', `/api/pedidos/${id}/reembolso`, token);
+// ---------- Devolución de una transferencia ----------
+
+/**
+ * solicitado: el cliente la pidió (o se abrió sola porque el negocio había
+ * confirmado el pago); devuelto: el negocio la marcó devuelta; recibido: el
+ * cliente confirmó; no_recibido: el cliente dice que no le llegó (vuelve al
+ * negocio); rechazado: el negocio dice que nunca recibió ese pago.
+ */
+export type ReembolsoEstado = 'solicitado' | 'devuelto' | 'recibido' | 'no_recibido' | 'rechazado';
+
+export type ReembolsoPedido = {
+  estado: ReembolsoEstado | null;
+  /** A dónde quiere el cliente que le devuelvan (texto libre). */
+  cuenta: string | null;
+  /** Lo que debería devolver: el total, o la mitad de los productos si el cliente no apareció. */
+  monto_sugerido: number;
+  regla_mitad: boolean;
+  /** Lo que el negocio dice que devolvió. */
+  monto: number | null;
+  /** Ruta protegida de la foto del comprobante de la devolución. */
+  comprobante: string | null;
+  /** Por qué el negocio la rechazó. */
+  motivo: string | null;
+  solicitado_at: string | null;
+  devuelto_at: string | null;
+  rechazado_at: string | null;
+  respondido_at: string | null;
+  puede_rechazar: boolean;
+  puede_solicitar: boolean;
+  puede_cambiar_cuenta: boolean;
+};
+
+/** Pedir la devolución (o cambiar a dónde, si ya estaba pedida). */
+export async function solicitarReembolso(token: string, id: number, cuenta: string): Promise<string> {
+  const d = await authSend('POST', `/api/pedidos/${id}/reembolso`, token, { cuenta });
+  return d.message as string;
 }
-export type SolicitudReembolso = { id: number; codigo: string; negocio_id: number; negocio: string; cliente: string; telefono: string | null; fecha: string };
+
+/** El cliente dice si le llegó la devolución. */
+export async function responderReembolso(token: string, id: number, recibido: boolean): Promise<string> {
+  const d = await authSend('PUT', `/api/pedidos/${id}/reembolso/respuesta`, token, { recibido });
+  return d.message as string;
+}
+
+/** El negocio la marca devuelta (monto y comprobante opcional) o la rechaza con motivo. */
+export async function responderReembolsoNegocio(
+  token: string,
+  negocioId: number,
+  id: number,
+  datos: { estado: 'devuelto'; monto: number; comprobanteUri?: string | null } | { estado: 'rechazado'; motivo: string },
+): Promise<string> {
+  const campos = datos.estado === 'devuelto' ? { estado: 'devuelto', monto: datos.monto } : { estado: 'rechazado', motivo: datos.motivo };
+  const foto = datos.estado === 'devuelto' && datos.comprobanteUri ? { comprobante: datos.comprobanteUri } : undefined;
+  const d = await authUpload('POST', `/api/negocios/${negocioId}/pedidos/${id}/reembolso`, token, campos, undefined, undefined, foto);
+  return d.message as string;
+}
+
+export type SolicitudReembolso = {
+  id: number;
+  codigo: string;
+  negocio_id: number;
+  negocio: string;
+  cliente: string;
+  telefono: string | null;
+  fecha: string;
+  estado: ReembolsoEstado | null;
+  cuenta: string | null;
+  /** Lo devuelto o, si aún no, lo que debería devolver. */
+  monto: number;
+};
 export async function getReembolsos(token: string, pagina = 1): Promise<{ solicitudes: SolicitudReembolso[]; total: number; pagina: number; ultima_pagina: number }> {
   return authGet(`/api/negocios/mios/reembolsos?page=${pagina}`, token);
 }

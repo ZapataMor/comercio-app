@@ -26,7 +26,7 @@ class ReembolsoSolicitado extends Notification implements ShouldQueue
     {
         return (new FcmMessage(notification: new FcmNotification(
             title: 'Solicitud de reembolso · Pedido #'.$this->pedido->codigo,
-            body: 'El cliente solicita devolver una transferencia. Revisa las solicitudes en Mi perfil y acuerda el reembolso con él.',
+            body: 'Debes devolverle la transferencia al cliente. Abre el pedido: ahí ves a dónde devolverla y la marcas como devuelta.',
         )))->android($this->androidAlertaAlta())->data(['tipo' => 'reembolso_solicitado', 'pedido_id' => (string) $this->pedido->id, 'negocio_id' => (string) $this->pedido->negocio_id]);
     }
 }

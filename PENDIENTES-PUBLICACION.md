@@ -63,8 +63,9 @@ solo en local.
 - [x] **Transferencia sin verificar** (resuelto el 20 de noviembre de 2026): el
       cliente ve las cuentas del negocio al ser aceptado, avisa «Ya pagué» y el
       negocio confirma que le llegó; sin eso no se marca listo y el domiciliario
-      solo ve «No cobrar» con el pago confirmado. Falta: devolución con estados
-      (solicitada/devuelta) cuando se cancela un pedido ya pagado.
+      solo ve «No cobrar» con el pago confirmado. La devolución de un pedido
+      cancelado ya tiene estados (solicitada → devuelta → recibida, no
+      recibida o rechazada), desde el 21 de noviembre.
 - [ ] **Botón de ayuda** en el pedido hacia un soporte de Vitrina (puede ser un
       WhatsApp atendido por una persona).
 - [ ] **Aprobación de domiciliarios**: hoy cualquier cliente se activa solo

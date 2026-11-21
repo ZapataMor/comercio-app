@@ -194,6 +194,8 @@ Route::middleware(['auth:sanctum', 'throttle:api-usuario'])->group(function () {
         Route::put('/pedidos/{id}/dinero', [ComercioPedidoController::class, 'confirmarDinero']);
         // Transferencia: el negocio revisó su cuenta (confirmado | no_llego).
         Route::put('/pedidos/{id}/pago', [ComercioPedidoController::class, 'pago']);
+        // Devolución de la transferencia de un pedido cancelado (multipart por el comprobante).
+        Route::post('/pedidos/{id}/reembolso', [ComercioPedidoController::class, 'reembolso'])->whereNumber('id');
 
         // Cuentas donde el negocio recibe transferencias.
         Route::get('/cuentas-pago', [CuentaPagoController::class, 'index']);
@@ -237,6 +239,8 @@ Route::middleware(['auth:sanctum', 'throttle:api-usuario'])->group(function () {
     Route::get('/pedidos/{id}', [ApiPedidoController::class, 'show']);
     // Cancelar mientras el negocio no lo tenga listo.
     Route::post('/pedidos/{id}/reembolso', [ApiPedidoController::class, 'solicitarReembolso']);
+    Route::put('/pedidos/{id}/reembolso/respuesta', [ApiPedidoController::class, 'responderReembolso'])->whereNumber('id');
+    Route::get('/pedidos/{id}/reembolso/comprobante', [ApiPedidoController::class, 'comprobanteReembolso'])->whereNumber('id');
     Route::post('/pedidos/{id}/cancelar', [ApiPedidoController::class, 'cancelar']);
     // Transferencia: «Ya pagué» (cuenta elegida y comprobante opcional) y ver el comprobante.
     Route::post('/pedidos/{id}/pago', [ApiPedidoController::class, 'informarPago'])->whereNumber('id');

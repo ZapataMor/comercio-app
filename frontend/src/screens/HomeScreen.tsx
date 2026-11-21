@@ -3,7 +3,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, Text, View } from 'react-native';
 import { detenerAlarma } from '../alarmaPedidos';
-import { tienePermiso, aceptarPedido, ComercioPedido, confirmarRecogida, getCitas, getPedidosComercio, getServicios } from '../api';
+import { tienePermiso, aceptarPedido, ComercioPedido, confirmarRecogida, getCitas, getPedidosComercio, getReembolsos, getServicios, SolicitudReembolso } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import BotonMantener from '../components/BotonMantener';
@@ -252,6 +252,8 @@ export default function HomeScreen({ navigation }: Props) {
   const cargandoPanel = !tienePanel && (user.negocios?.length ?? 0) > 0;
   const [pedidos, setPedidos] = useState<ComercioPedido[]>([]);
   const [citasPendientes, setCitasPendientes] = useState(0);
+  // Transferencias de pedidos cancelados que el negocio debe devolver.
+  const [devoluciones, setDevoluciones] = useState<SolicitudReembolso[]>([]);
   const [catalogoServicios, setCatalogoServicios] = useState<{ negocioId: number; tieneServicios: boolean } | null>(null);
   const negocioIdActual = useRef(negocioId);
   negocioIdActual.current = negocioId;
@@ -286,7 +288,13 @@ export default function HomeScreen({ navigation }: Props) {
 
     if (tienePermiso(negocio, 'gestionar_pedidos')) {
       getPedidosComercio(token, negocioId).then(setPedidos).catch(() => {});
-    } else { setPedidos([]); }
+      getReembolsos(token)
+        .then(d => {
+          if (negocioIdActual.current !== negocioId) return;
+          setDevoluciones(d.solicitudes.filter(s => s.negocio_id === negocioId && (s.estado === 'solicitado' || s.estado === 'no_recibido')));
+        })
+        .catch(() => {});
+    } else { setPedidos([]); setDevoluciones([]); }
     getServicios(token, negocioId)
       .then(servicios => {
         if (negocioIdActual.current !== negocioId) return;
@@ -300,7 +308,7 @@ export default function HomeScreen({ navigation }: Props) {
   }, [negocioId, token, negocio]);
 
   // Al cambiar de negocio no se muestran los pedidos del anterior.
-  useEffect(() => { setPedidos([]); setCitasPendientes(0); }, [negocioId]);
+  useEffect(() => { setPedidos([]); setCitasPendientes(0); setDevoluciones([]); }, [negocioId]);
 
   // Pedidos en espera del negocio activo: se recargan al entrar, al instante
   // cuando cambia un pedido o una cita del negocio (en vivo o push) y, de
@@ -489,6 +497,23 @@ export default function HomeScreen({ navigation }: Props) {
                         )}
                       </TarjetaPedido>
                     </FadeInView>
+                  ))}
+                </>
+              )}
+
+              {devoluciones.length > 0 && (
+                <>
+                  <Text style={styles.seccion}>Devoluciones por hacer ({devoluciones.length})</Text>
+                  {devoluciones.map(s => (
+                    <PressableScale
+                      key={s.id}
+                      style={styles.pedidoCard}
+                      onPress={() => navigation.navigate('ComercioPedidoDetalle', { pedidoId: s.id, negocioId: s.negocio_id })}>
+                      <Text style={styles.pedidoId}>Pedido #{s.codigo} · {cop(s.monto)}</Text>
+                      <Text style={styles.pedidoVer}>
+                        {s.estado === 'no_recibido' ? 'El cliente dice que no le ha llegado ›' : 'Devuélvele la transferencia al cliente ›'}
+                      </Text>
+                    </PressableScale>
                   ))}
                 </>
               )}

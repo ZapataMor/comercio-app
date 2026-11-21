@@ -107,6 +107,7 @@ class PedidoIncidenciaController extends Controller
         ]);
         abort_unless($cambio, 409, 'Este pedido no tiene una devolución pendiente.');
         $pedido->refresh();
+        \App\Support\Reembolso::abrirSiCorresponde($pedido);
         $aviso = new EstadoPedidoActualizado($pedido, ['Devolución confirmada', 'El comercio recibió el pedido de vuelta. El pedido quedó cerrado.']);
         if ($pedido->cliente) {
             Push::enviar($pedido->cliente, $aviso);

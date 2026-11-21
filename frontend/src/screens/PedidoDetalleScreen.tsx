@@ -1,11 +1,11 @@
-import { useConfirmar } from '../components/Confirmacion';
 import { useLecturaEnFoco } from '../useLectura';
 import ErrorCarga from '../components/ErrorCarga';
 import { textoCantidad } from '../cantidades';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Text, TouchableOpacity, View } from 'react-native';
-import { cancelarMiPedido, getPedido, solicitarReembolso, SeguimientoPedido } from '../api';
+import { cancelarMiPedido, getPedido, SeguimientoPedido } from '../api';
+import { DevolucionCliente } from '../components/Devolucion';
 import { useAuth } from '../AuthContext';
 import { FadeInView } from '../components/anim';
 import BotonesContacto from '../components/BotonesContacto';
@@ -102,8 +102,6 @@ export default function PedidoDetalleScreen({ route }: Props) {
   const styles = useStyles();
   const { auth } = useAuth();
   const toast = useToast();
-  const confirmar = useConfirmar();
-  const [solicitando, setSolicitando] = useState(false);
   const { id } = route.params;
   const [error, setError] = useState<string | null>(null);
   const [pedido, setPedido] = useState<SeguimientoPedido | null>(null);
@@ -252,32 +250,20 @@ export default function PedidoDetalleScreen({ route }: Props) {
                     : 'Lo cancelaste tú'}
             {pedido.motivo_cancelacion ? `: ${pedido.motivo_cancelacion}` : '.'}
           </Text>
-          {pedido.metodo_pago === 'transferencia' && pedido.pago?.estado === 'por_pagar' ? (
-            <Text style={styles.canceladoNota}>No alcanzaste a pagar: no se te cobra nada.</Text>
-          ) : pedido.metodo_pago === 'transferencia' ? <>
-            <Text style={styles.canceladoNota}>
-              {pedido.pago?.estado === 'confirmado'
-                ? `${pedido.negocio ?? 'El negocio'} confirmó que recibió tu transferencia: debe devolverte el dinero. Solicita el reembolso y acuérdalo con el negocio.`
-                : 'Si ya pagaste por transferencia, solicita al negocio la devolución del dinero. El reembolso no es automático.'}
-            </Text>
-            <TouchableOpacity disabled={solicitando || pedido.reembolso_solicitado} onPress={() => confirmar({
-              icono: 'banco', titulo: '¿Ya hiciste la transferencia?',
-              texto: 'Solicita el reembolso solo si ya pagaste. Avisaremos al negocio para que acuerden la devolución.',
-              textoBoton: 'Solicitar reembolso', accion: async () => {
-                setSolicitando(true);
-                try {
-                  await solicitarReembolso(auth!.token, pedido.id);
-                  setPedido(p => p && { ...p, reembolso_solicitado: true });
-                  toast.exito('Solicitud registrada', 'Puedes contactar directamente al negocio para acordar la devolución.');
-                } catch (e) { toast.error('No se pudo solicitar', messageFromError(e)); }
-                finally { setSolicitando(false); }
-              },
-            })}>
-              <Text style={styles.cancelarTxt}>{pedido.reembolso_solicitado ? 'Reembolso solicitado' : solicitando ? 'Solicitando…' : 'Solicitar reembolso'}</Text>
-              <Text style={styles.canceladoNota}>{pedido.negocio} · {pedido.negocio_telefono || 'Teléfono no disponible'}</Text>
-            </TouchableOpacity>
-            <BotonesContacto telefono={pedido.negocio_telefono} etiquetaLlamar="Llamar al negocio"
-              mensaje={`Hola, ya pagué por transferencia el pedido #${pedido.codigo}, que fue cancelado. Quisiera acordar el reembolso.`} />
+          {pedido.metodo_pago === 'transferencia' && pedido.reembolso ? <>
+            {/* Devolución de la transferencia: pedirla, en qué va y si llegó. */}
+            <DevolucionCliente
+              token={auth!.token}
+              pedidoId={pedido.id}
+              negocio={pedido.negocio}
+              pagoEstado={pedido.pago?.estado}
+              reembolso={pedido.reembolso}
+              onCambio={() => cargarPedido()}
+            />
+            {!!pedido.reembolso.estado && pedido.reembolso.estado !== 'recibido' && (
+              <BotonesContacto telefono={pedido.negocio_telefono} etiquetaLlamar="Llamar al negocio"
+                mensaje={`Hola, te escribo por la devolución de la transferencia del pedido #${pedido.codigo}.`} />
+            )}
           </> : <Text style={styles.canceladoNota}>No se te cobra nada.</Text>}
         </FadeInView>
       ) : (

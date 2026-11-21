@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { getReembolsos, SolicitudReembolso } from '../api';
+import { getReembolsos, ReembolsoEstado, SolicitudReembolso } from '../api';
+import { navigationRef } from '../RootNavigation';
 import { useAuth } from '../AuthContext';
 import { useLectura } from '../useLectura';
 import { useAvisosEnVivo } from '../usePolling';
@@ -8,7 +9,22 @@ import { font, makeStyles, radius } from '../theme';
 import BotonesContacto from './BotonesContacto';
 import ErrorCarga from './ErrorCarga';
 
-/** Bandeja del equipo en Mi perfil: permanece aunque no llegue el push. */
+const ESTADO: Record<ReembolsoEstado, string> = {
+  solicitado: 'Por devolver',
+  no_recibido: 'El cliente dice que no le llegó',
+  devuelto: 'Devuelta: falta que el cliente confirme',
+  recibido: 'Recibida por el cliente',
+  rechazado: 'Rechazada',
+};
+
+function cop(n: number) {
+  return '$' + Math.round(n).toLocaleString('es-CO');
+}
+
+/**
+ * Bandeja del equipo en Mi perfil: devoluciones de transferencias de sus
+ * negocios, las pendientes primero. Permanece aunque no llegue el push.
+ */
 export default function ReembolsosPerfil() {
   const { auth } = useAuth();
   const styles = useStyles();
@@ -33,20 +49,28 @@ export default function ReembolsosPerfil() {
   useAvisosEnVivo(['pedidos'], () => { if (!abierto) cargar(); });
   return <>
     <TouchableOpacity accessibilityRole="button" onPress={() => { setAbierto(true); cargar(); }}>
-      <Text style={styles.enlace}>Reembolsos solicitados{total > 0 ? ` (${total})` : ''}</Text>
+      <Text style={styles.enlace}>Devoluciones{total > 0 ? ` por hacer (${total})` : ''}</Text>
     </TouchableOpacity>
     <Modal visible={abierto} transparent animationType="fade" onRequestClose={() => setAbierto(false)}>
       <View style={styles.fondo}><View style={styles.panel}>
-        <Text style={styles.titulo}>Solicitudes de reembolso</Text>
+        <Text style={styles.titulo}>Devoluciones de transferencias</Text>
         <ScrollView>
           {error ? <ErrorCarga mensaje={error} /> : cargando ? <ActivityIndicator /> : <>
-            {!solicitudes.length && <Text style={styles.texto}>No hay solicitudes de reembolso.</Text>}
+            {!solicitudes.length && <Text style={styles.texto}>No hay devoluciones.</Text>}
             {solicitudes.map(s => <View key={s.id} style={styles.solicitud}>
               <Text style={styles.titulo}>Pedido #{s.codigo} · {s.negocio}</Text>
-              <Text style={styles.texto}>{s.cliente} solicita la devolución de una transferencia. Verifica el pago y acuerda el reembolso directamente.</Text>
-              <Text style={styles.texto}>{s.telefono || 'Teléfono no disponible'}</Text>
+              <Text style={[styles.estado, (s.estado === 'solicitado' || s.estado === 'no_recibido') && styles.estadoPendiente]}>
+                {s.estado ? ESTADO[s.estado] : 'Por devolver'} · {cop(s.monto)}
+              </Text>
+              <Text style={styles.texto}>{s.cliente}{s.cuenta ? ` · a ${s.cuenta}` : ''}</Text>
+              <TouchableOpacity accessibilityRole="button" onPress={() => {
+                setAbierto(false);
+                if (navigationRef.isReady()) navigationRef.navigate('ComercioPedidoDetalle', { pedidoId: s.id, negocioId: s.negocio_id });
+              }}>
+                <Text style={styles.enlace}>Abrir pedido ›</Text>
+              </TouchableOpacity>
               <BotonesContacto telefono={s.telefono} etiquetaLlamar="Llamar al cliente"
-                mensaje={`Hola, te contactamos sobre la solicitud de reembolso del pedido #${s.codigo}.`} />
+                mensaje={`Hola, te escribimos por la devolución de la transferencia del pedido #${s.codigo}.`} />
             </View>)}
             {pagina > 1 && <TouchableOpacity onPress={() => cargar(pagina - 1)}><Text style={styles.enlace}>Anterior</Text></TouchableOpacity>}
             {pagina < ultima && <TouchableOpacity onPress={() => cargar(pagina + 1)}><Text style={styles.enlace}>Siguiente</Text></TouchableOpacity>}
@@ -64,4 +88,6 @@ const useStyles = makeStyles(c => ({
   texto: { color: c.text, fontFamily: font.regular, marginBottom: 8 },
   enlace: { color: c.goldText, fontFamily: font.bold, padding: 12 },
   solicitud: { paddingVertical: 12, borderBottomWidth: 1, borderColor: c.border },
+  estado: { color: c.muted, fontFamily: font.semibold, marginBottom: 6 },
+  estadoPendiente: { color: c.danger },
 }));

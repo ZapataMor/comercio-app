@@ -24,7 +24,7 @@ Este documento distingue decisiones de producto de funciones implementadas. No e
 - Registrar por separado pago del cliente, devolución al cliente y liquidación entre negocio y repartidor. No confundir «pedido entregado» con «dinero liquidado».
 - Cancelación del cliente: en cualquier momento antes de comenzar la preparación, sin límite de minutos desde la creación. Pendiente representar inequívocamente el inicio de preparación y validar la transición en el servidor para evitar que cancelar e iniciar preparación puedan completarse simultáneamente.
 - Si cancela dentro de esas condiciones y ya transfirió, el negocio debe devolver el dinero. Una vez iniciada la preparación no habrá cancelación ordinaria del cliente; las incidencias deben tener resolución independiente.
-- Reembolsos: solicitado, en revisión, devuelto o rechazado; registrar importe, responsable, fecha, motivo y evidencia. La solicitud por sí sola no significa que se haya devuelto dinero.
+- Reembolsos: solicitado, en revisión, devuelto o rechazado; registrar importe, responsable, fecha, motivo y evidencia. La solicitud por sí sola no significa que se haya devuelto dinero. Implementado el 21 de noviembre de 2026: solicitado (con la cuenta del cliente; se abre solo si el negocio confirmó el pago) → devuelto (monto, quién, cuándo y comprobante opcional) → recibido o no recibido (lo confirma el cliente); rechazado con motivo solo si el negocio no había confirmado el pago. «En revisión» se cubre con «no recibido», que vuelve al negocio.
 - Datos de transferencia: cada negocio registra sus cuentas (Nequi, Daviplata, Bancolombia, otro banco, llave o QR) en «Cuentas de pago».
 
 ## Reparto e incidencias

@@ -12,6 +12,7 @@ use App\Support\CancelarPedido;
 use App\Support\OfrecerPedido;
 use App\Support\PagoTransferencia;
 use App\Support\Push;
+use App\Support\Reembolso;
 use App\Support\Reputacion;
 use App\Support\UbicacionDomiciliario;
 use Illuminate\Http\JsonResponse;
@@ -187,6 +188,8 @@ class ComercioPedidoController extends Controller
             // Por transferencia, el negocio le entrega el domicilio al domiciliario al recoger.
             'domicilio_lo_entrega_negocio' => $p->domicilioLoEntregaNegocio(),
             'reembolso_solicitado' => $p->reembolso_solicitado_at !== null,
+            // Devolución de la transferencia si se canceló.
+            'reembolso' => Reembolso::datos($p),
             'direccion_entrega' => $p->direccion_entrega,
             'telefono_contacto' => $p->telefono_contacto,
             'cliente' => $p->cliente?->nombre_completo,
@@ -436,6 +439,49 @@ class ComercioPedidoController extends Controller
                 ? 'Pago confirmado. Ya puedes preparar el pedido.'
                 : 'Le avisamos al cliente que no te ha llegado.',
         ]);
+    }
+
+    /**
+     * Devolución de la transferencia de un pedido cancelado: `devuelto` con
+     * el monto (y foto del comprobante si quiere), o `rechazado` con motivo
+     * si nunca recibió ese pago (solo si no lo había confirmado). Llega como
+     * POST multipart por la foto.
+     */
+    public function reembolso(Request $request, Negocio $negocio, int $id): JsonResponse
+    {
+        if (! $negocio->puede($request->user(), 'gestionar_pedidos')) {
+            return $this->sinAcceso();
+        }
+
+        $pedido = $negocio->pedidos()->find($id);
+        if (! $pedido) {
+            return response()->json(['message' => 'Pedido no encontrado.'], 404);
+        }
+
+        $datos = $request->validate([
+            'estado' => ['required', Rule::in(['devuelto', 'rechazado'])],
+            'monto' => ['required_if:estado,devuelto', 'nullable', 'numeric', 'min:1', 'max:'.(float) $pedido->total],
+            'comprobante' => ['nullable', 'image', 'max:8192'],
+            'motivo' => ['required_if:estado,rechazado', 'nullable', 'string', 'min:5', 'max:255'],
+        ], [
+            'monto.required_if' => 'Escribe cuánto le devolviste.',
+            'monto.max' => 'No puedes devolver más de lo que pagó el cliente.',
+            'motivo.required_if' => 'Explica por qué no le devuelves el dinero.',
+            'comprobante.image' => 'El comprobante debe ser una foto.',
+        ]);
+
+        $ok = $datos['estado'] === 'devuelto'
+            ? Reembolso::devolver($pedido, $request->user(), (float) $datos['monto'], $request->file('comprobante'))
+            : Reembolso::rechazar($pedido, $datos['motivo']);
+        if (! $ok) {
+            return response()->json(['message' => $datos['estado'] === 'rechazado' && $pedido->pago_estado === 'confirmado'
+                ? 'Confirmaste que recibiste este pago: debes devolverlo.'
+                : 'Esta devolución ya no está pendiente. Actualiza el pedido.'], 409);
+        }
+
+        return response()->json(['message' => $datos['estado'] === 'devuelto'
+            ? 'Listo. Le pedimos al cliente que confirme que le llegó.'
+            : 'Le avisamos al cliente.']);
     }
 
     private function sinAcceso(): JsonResponse

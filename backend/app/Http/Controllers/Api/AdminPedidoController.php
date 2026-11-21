@@ -101,6 +101,7 @@ class AdminPedidoController extends Controller
         }
 
         $pedido->refresh();
+        \App\Support\Reembolso::abrirSiCorresponde($pedido);
 
         if ($pedido->cliente) {
             Push::enviar($pedido->cliente, $entregado ? new EstadoPedidoActualizado($pedido) : new PedidoCancelado($pedido));
@@ -143,6 +144,7 @@ class AdminPedidoController extends Controller
 
         $pedido->refresh();
         EnVivo::pedido($pedido);
+        \App\Support\Reembolso::abrirSiCorresponde($pedido);
 
         $aviso = new EstadoPedidoActualizado($pedido, ['Devolución cerrada', 'Vitrina cerró la devolución del pedido. El pedido quedó cerrado.']);
         $destinatarios = collect([$pedido->cliente, $pedido->domiciliario])

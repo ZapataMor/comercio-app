@@ -9,7 +9,6 @@ use App\Models\Pedido;
 use App\Models\ReputacionEvento;
 use App\Models\User;
 use App\Notifications\NuevoPedidoParaComercio;
-use App\Notifications\ReembolsoSolicitado;
 use App\Rules\Direccion;
 use App\Rules\Telefono;
 use App\Support\CancelarPedido;
@@ -18,6 +17,7 @@ use App\Support\OpcionesPedido;
 use App\Support\PagoTransferencia;
 use App\Support\PrecioCarrito;
 use App\Support\Push;
+use App\Support\Reembolso;
 use App\Support\Reputacion;
 use App\Support\Resenas;
 use App\Support\TiempoEntrega;
@@ -284,29 +284,70 @@ class PedidoController extends Controller
         ]);
     }
 
-    /** El cliente declara que ya transfirió; esto solicita, no ejecuta, la devolución. */
+    /**
+     * El cliente pide que le devuelvan la transferencia de un pedido
+     * cancelado y dice a dónde (si ya estaba abierta, cambia a dónde). Pedirla
+     * no es que ya se la hayan devuelto: el negocio la marca devuelta.
+     */
     public function solicitarReembolso(Request $request, int $id): JsonResponse
     {
+        $datos = $request->validate([
+            'cuenta' => ['required', 'string', 'min:5', 'max:150'],
+        ], [
+            'cuenta.required' => 'Escribe a dónde te devuelven el dinero (por ejemplo: Nequi 3001234567).',
+            'cuenta.min' => 'Escribe a dónde te devuelven el dinero (por ejemplo: Nequi 3001234567).',
+        ]);
+
         $pedido = $request->user()->pedidos()->findOrFail($id);
         abort_unless($pedido->estado === 'cancelado' && $pedido->metodo_pago === 'transferencia', 422,
             'Solo puedes solicitar el reembolso de un pedido cancelado pagado por transferencia.');
-        // Actualización condicional: un reintento nunca genera dos solicitudes.
-        $nuevo = Pedido::whereKey($id)->where('estado', 'cancelado')
-            ->whereNull('reembolso_solicitado_at')->update(['reembolso_solicitado_at' => now()]);
-        if ($nuevo) {
-            Push::enviar($pedido->negocio?->miembrosActivos()->get(), new ReembolsoSolicitado($pedido));
+
+        if (! Reembolso::solicitar($pedido, $datos['cuenta'])) {
+            return response()->json(['message' => 'El negocio ya respondió esta devolución. Actualiza el pedido.'], 409);
         }
 
-        return response()->json(['message' => 'Solicitud de reembolso registrada. Contacta al negocio para acordar la devolución.']);
+        return response()->json(['message' => 'Devolución solicitada. Te avisaremos cuando el negocio la marque como devuelta.']);
     }
 
-    /** Bandeja persistente del equipo, accesible desde Mi perfil. */
+    /** El cliente dice si le llegó la devolución que el negocio marcó. */
+    public function responderReembolso(Request $request, int $id): JsonResponse
+    {
+        $datos = $request->validate(['recibido' => ['required', 'boolean']]);
+        $pedido = $request->user()->pedidos()->findOrFail($id);
+
+        if (! Reembolso::responder($pedido, (bool) $datos['recibido'])) {
+            return response()->json(['message' => 'Esta devolución ya no espera tu respuesta.'], 409);
+        }
+
+        return response()->json(['message' => $datos['recibido']
+            ? '¡Listo! La devolución quedó cerrada.'
+            : 'Le avisamos al negocio que no te ha llegado.']);
+    }
+
+    /** Foto del comprobante de la devolución: el cliente y el equipo del negocio. */
+    public function comprobanteReembolso(Request $request, int $id)
+    {
+        $pedido = Pedido::with('negocio')->findOrFail($id);
+        abort_unless(Reembolso::puedeVerComprobante($pedido, $request->user()), 403);
+        abort_unless($pedido->reembolso_comprobante, 404);
+
+        return Storage::disk('local')->response($pedido->reembolso_comprobante, null, ['Cache-Control' => 'private, no-store, max-age=0', 'X-Content-Type-Options' => 'nosniff']);
+    }
+
+    /**
+     * Bandeja del equipo (Mi perfil): las devoluciones de sus negocios, las
+     * que esperan algo del negocio primero. `total` cuenta solo esas.
+     */
     public function reembolsos(Request $request): JsonResponse
     {
         $negocios = $request->user()->negociosActivos()->get()
             ->filter(fn (Negocio $n) => $n->puede($request->user(), 'gestionar_pedidos'))->pluck('id');
-        $pedidos = Pedido::whereIn('negocio_id', $negocios)->whereNotNull('reembolso_solicitado_at')
-            ->with(['negocio', 'cliente'])->orderByDesc('reembolso_solicitado_at')->paginate(20);
+        $base = fn () => Pedido::whereIn('negocio_id', $negocios)->whereNotNull('reembolso_estado');
+        $pedidos = $base()
+            ->with(['negocio', 'cliente'])
+            ->orderByRaw("CASE WHEN reembolso_estado IN ('solicitado', 'no_recibido') THEN 0 ELSE 1 END")
+            ->orderByDesc('reembolso_solicitado_at')
+            ->paginate(20);
 
         return response()->json([
             'solicitudes' => $pedidos->getCollection()->map(fn (Pedido $p) => [
@@ -314,8 +355,12 @@ class PedidoController extends Controller
                 'negocio' => $p->negocio?->nombre, 'cliente' => $p->cliente?->nombre_completo,
                 'telefono' => $p->telefono_contacto,
                 'fecha' => $p->reembolso_solicitado_at,
+                'estado' => $p->reembolso_estado,
+                'cuenta' => $p->reembolso_cuenta,
+                'monto' => $p->reembolso_monto !== null ? (float) $p->reembolso_monto : Reembolso::montoSugerido($p),
             ]),
-            'pagina' => $pedidos->currentPage(), 'ultima_pagina' => $pedidos->lastPage(), 'total' => $pedidos->total(),
+            'pagina' => $pedidos->currentPage(), 'ultima_pagina' => $pedidos->lastPage(),
+            'total' => $base()->whereIn('reembolso_estado', Pedido::REEMBOLSO_PENDIENTES)->count(),
         ]);
     }
 
@@ -347,6 +392,8 @@ class PedidoController extends Controller
             // Transferencia: cuentas del negocio, en qué va el pago y si puede avisar que pagó.
             'pago' => PagoTransferencia::paraCliente($pedido),
             'reembolso_solicitado' => $pedido->reembolso_solicitado_at !== null,
+            // Devolución de la transferencia si se canceló: estado, a dónde, cuánto y comprobante.
+            'reembolso' => Reembolso::datos($pedido),
             'direccion_entrega' => $pedido->direccion_entrega,
             'minutos_recogida' => $pedido->minutos_recogida,
             'fecha' => $pedido->created_at->format('d/m/Y H:i'),
