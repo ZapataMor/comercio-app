@@ -74,7 +74,8 @@ export function DevolucionCliente({ token, pedidoId, negocio, pagoEstado, reembo
   async function enviarCuenta() {
     setEnviando(true);
     try {
-      toast.exito(r.estado ? 'Cuenta actualizada' : 'Devolución solicitada', await solicitarReembolso(token, pedidoId, cuenta));
+      await solicitarReembolso(token, pedidoId, cuenta);
+      toast.exito(r.estado ? 'Cuenta guardada' : 'Devolución solicitada', 'Te avisaremos cuando el negocio la marque como devuelta.');
       setEditando(false);
       onCambio();
     } catch (e) {
