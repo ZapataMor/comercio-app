@@ -918,6 +918,90 @@ export async function eliminarProducto(token: string, negocioId: number, id: num
   await authSend('DELETE', `/api/negocios/${negocioId}/productos/${id}`, token);
 }
 
+// ---------- Pago por transferencia ----------
+
+export type TipoCuentaPago = 'llave' | 'nequi' | 'daviplata' | 'bancolombia' | 'banco' | 'qr';
+
+/** Una cuenta donde el negocio recibe transferencias. */
+export type CuentaPago = {
+  id: number;
+  tipo: TipoCuentaPago;
+  /** «Nequi», «Banco de Bogotá», «Llave», «Código QR»… */
+  nombre: string;
+  banco: string | null;
+  /** Celular, número de cuenta o llave (null si es solo QR). */
+  numero: string | null;
+  tipo_cuenta: 'ahorros' | 'corriente' | null;
+  titular: string;
+  /** Imagen del código QR ("/storage/..."). */
+  qr: string | null;
+};
+
+/**
+ * En qué va un pago por transferencia: el cliente debe pagar, avisó que
+ * pagó, el negocio confirmó que le llegó o no lo encuentra.
+ */
+export type PagoEstado = 'por_pagar' | 'informado' | 'confirmado' | 'no_llego';
+
+export type PagoPedido = {
+  estado: PagoEstado | null;
+  /** La cuenta en la que el cliente dice que pagó. */
+  cuenta: CuentaPago | null;
+  /** Ruta protegida de la foto del comprobante (con el token). */
+  comprobante: string | null;
+  informado_at: string | null;
+  confirmado_at: string | null;
+  no_llego_at: string | null;
+};
+
+export type PagoCliente = PagoPedido & {
+  /** Cuentas del negocio, solo mientras el cliente tiene que pagar. */
+  cuentas: CuentaPago[];
+  puede_informar: boolean;
+};
+
+export type PagoNegocio = PagoPedido & { puede_confirmar: boolean };
+
+/** Las cuentas de pago de un negocio (las edita el propietario o un administrador). */
+export async function getCuentasPago(token: string, negocioId: number): Promise<{ cuentas: CuentaPago[]; puede_editar: boolean; maximo: number }> {
+  const d = await authGet(`/api/negocios/${negocioId}/cuentas-pago`, token);
+  return { cuentas: (d.cuentas ?? []) as CuentaPago[], puede_editar: !!d.puede_editar, maximo: d.maximo ?? 6 };
+}
+
+export type CuentaPagoForm = {
+  tipo: TipoCuentaPago;
+  titular: string;
+  numero?: string | null;
+  banco?: string | null;
+  tipo_cuenta?: 'ahorros' | 'corriente' | null;
+  /** Imagen del QR recién elegida (URI local). */
+  qrUri?: string;
+  quitar_qr?: boolean;
+};
+
+/** Crea (sin id) o edita una cuenta de pago. */
+export async function guardarCuentaPago(token: string, negocioId: number, form: CuentaPagoForm, id?: number): Promise<CuentaPago> {
+  const { qrUri, ...campos } = form;
+  const d = await authUpload('POST', `/api/negocios/${negocioId}/cuentas-pago${id ? `/${id}` : ''}`, token, campos, undefined, undefined, qrUri ? { qr: qrUri } : undefined);
+  return d.cuenta as CuentaPago;
+}
+
+export async function eliminarCuentaPago(token: string, negocioId: number, id: number): Promise<void> {
+  await authSend('DELETE', `/api/negocios/${negocioId}/cuentas-pago/${id}`, token);
+}
+
+/** El cliente avisa que ya pagó: en qué cuenta y, si quiere, la foto del comprobante. */
+export async function informarPago(token: string, pedidoId: number, cuentaId: number, comprobanteUri?: string | null): Promise<string> {
+  const d = await authUpload('POST', `/api/pedidos/${pedidoId}/pago`, token, { cuenta_id: cuentaId }, undefined, undefined, comprobanteUri ? { comprobante: comprobanteUri } : undefined);
+  return d.message as string;
+}
+
+/** El negocio revisó su cuenta: el dinero llegó (confirmado) o no lo encuentra. */
+export async function revisarPago(token: string, negocioId: number, pedidoId: number, estado: 'confirmado' | 'no_llego'): Promise<string> {
+  const d = await authSend('PUT', `/api/negocios/${negocioId}/pedidos/${pedidoId}/pago`, token, { estado });
+  return d.message as string;
+}
+
 /** Pedidos recibidos por un negocio mío. */
 export type ComercioPedido = {
   reembolso_solicitado?: boolean;
@@ -934,6 +1018,10 @@ export type ComercioPedido = {
   costo_domicilio?: number;
   total: number;
   metodo_pago: string;
+  /** Solo transferencia: en qué va el pago y si el negocio puede confirmarlo. */
+  pago?: PagoNegocio | null;
+  /** Por transferencia el negocio le entrega el domicilio al domiciliario al recoger. */
+  domicilio_lo_entrega_negocio?: boolean;
   direccion_entrega: string;
   telefono_contacto: string | null;
   cliente: string | null;
@@ -1269,7 +1357,10 @@ export async function getCatalogo(
   return { negocio: data.negocio as Negocio, productos: (data.productos ?? []) as Producto[], servicios: data.servicios ?? [] };
 }
 
-export type EstadoNegocio = Pick<Negocio, 'activo' | 'horario_hoy' | 'estado_texto'>;
+export type EstadoNegocio = Pick<Negocio, 'activo' | 'horario_hoy' | 'estado_texto'> & {
+  /** Tiene cuentas para recibir transferencias. */
+  acepta_transferencia?: boolean;
+};
 
 /** Si la tienda sigue abierta, sin pedir todo el catálogo: es lo que se refresca seguido. */
 export async function getEstadoNegocio(token: string, id: number): Promise<EstadoNegocio> {
@@ -1597,6 +1688,8 @@ export type Pedido = {
   total: number;
   /** Lo que se le cobra al cliente al entregar (0 si pagó por transferencia). */
   cobrar: number;
+  /** Pagado por transferencia: el negocio me entrega el domicilio al recoger. */
+  domicilio_lo_entrega_negocio?: boolean;
   metodo_pago: string;
   minutos_recogida: number | null;
   /** Lo dicto al negocio para que me entregue el pedido (solo si lo tomé y no lo he recogido). */
@@ -1876,6 +1969,8 @@ export type SeguimientoPedido = {
   costo_domicilio: number;
   total: number;
   metodo_pago: string;
+  /** Solo transferencia: cuentas del negocio y en qué va mi pago. */
+  pago?: PagoCliente | null;
   direccion_entrega: string;
   minutos_recogida: number | null;
   fecha?: string;

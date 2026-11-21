@@ -10,6 +10,7 @@ use App\Notifications\EstadoPedidoActualizado;
 use App\Notifications\PedidoYaAtendido;
 use App\Support\CancelarPedido;
 use App\Support\OfrecerPedido;
+use App\Support\PagoTransferencia;
 use App\Support\Push;
 use App\Support\Reputacion;
 use App\Support\UbicacionDomiciliario;
@@ -181,6 +182,10 @@ class ComercioPedidoController extends Controller
             'costo_domicilio' => (float) $p->costo_domicilio,
             'total' => (float) $p->total,
             'metodo_pago' => $p->metodo_pago,
+            // Transferencia: en qué va el pago y si el negocio puede confirmarlo.
+            'pago' => PagoTransferencia::paraNegocio($p),
+            // Por transferencia, el negocio le entrega el domicilio al domiciliario al recoger.
+            'domicilio_lo_entrega_negocio' => $p->domicilioLoEntregaNegocio(),
             'reembolso_solicitado' => $p->reembolso_solicitado_at !== null,
             'direccion_entrega' => $p->direccion_entrega,
             'telefono_contacto' => $p->telefono_contacto,
@@ -210,7 +215,7 @@ class ComercioPedidoController extends Controller
             'puede_cancelar' => CancelarPedido::puede($p, CancelarPedido::POR_NEGOCIO),
             // Cancelarlo ahora le bajaría la confiabilidad al negocio.
             'cancelar_penaliza' => CancelarPedido::penaliza($p),
-            'motivos_cancelacion' => CancelarPedido::MOTIVOS_NEGOCIO,
+            'motivos_cancelacion' => CancelarPedido::motivosNegocio($p),
             'items' => $p->items->map(fn ($i) => [
                 'nombre' => $i->nombre,
                 'unidad_medida' => $i->unidad_medida, 'cantidad' => $i->cantidad,
@@ -244,10 +249,16 @@ class ComercioPedidoController extends Controller
 
         Push::enviar($negocio->miembrosActivos()->get(), new PedidoYaAtendido($pedido));
         if ($pedido->cliente) {
-            Push::enviar($pedido->cliente, new EstadoPedidoActualizado($pedido));
+            // Por transferencia aún no se prepara: primero tiene que pagar.
+            Push::enviar($pedido->cliente, new EstadoPedidoActualizado($pedido, $pedido->esperaPago() ? [
+                'El negocio aceptó tu pedido ✅',
+                'Ahora págale $'.number_format((float) $pedido->total, 0, ',', '.').' por transferencia: abre tu pedido para ver sus cuentas.',
+            ] : null));
         }
 
-        return response()->json(['message' => 'Pedido aceptado. El cliente ya lo sabe.']);
+        return response()->json(['message' => $pedido->esperaPago()
+            ? 'Pedido aceptado. El cliente ya ve tus cuentas para pagarte.'
+            : 'Pedido aceptado. El cliente ya lo sabe.']);
     }
 
     /** Marcar un pedido aceptado como "listo" (lo verán los domiciliarios). */
@@ -263,16 +274,24 @@ class ComercioPedidoController extends Controller
             return response()->json(['message' => 'No se puede marcar listo ese pedido.'], 409);
         }
 
+        // Por transferencia, no se prepara ni se ofrece hasta confirmar el pago:
+        // así el domiciliario puede no cobrar nada con seguridad.
+        if ($pedido->esperaPago()) {
+            return response()->json(['message' => 'Primero confirma que te llegó la transferencia del cliente.'], 409);
+        }
+
         $afectados = Pedido::whereKey($id)->where('estado', 'aceptado')->whereNull('faltante_motivo')
+            ->where(fn ($q) => $q->where('metodo_pago', '!=', 'transferencia')->orWhere('pago_estado', 'confirmado'))
             ->update(['estado' => 'listo', 'listo_at' => now()]);
         if (! $afectados) {
             return response()->json(['message' => 'El pedido cambió o falta que el cliente resuelva un producto agotado.'], 409);
         }
         $pedido->refresh();
 
-        // ¿Cumplió el tiempo de preparación que promete? Cuenta desde que lo aceptó.
+        // ¿Cumplió el tiempo de preparación que promete? Cuenta desde que lo
+        // aceptó (por transferencia, desde que confirmó el pago).
         if ($pedido->minutos_preparacion) {
-            $tarde = Reputacion::excedeTiempo($pedido->aceptado_at ?? $pedido->created_at, $pedido->listo_at, $pedido->minutos_preparacion);
+            $tarde = Reputacion::excedeTiempo($pedido->inicioPreparacion() ?? $pedido->created_at, $pedido->listo_at, $pedido->minutos_preparacion);
             Reputacion::registrar(Reputacion::NEGOCIO, $negocio, $tarde ? 'preparacion_tarde' : 'preparacion_a_tiempo', $pedido);
         }
 
@@ -383,6 +402,40 @@ class ComercioPedidoController extends Controller
                 'message' => $datos['estado'] === 'recibido' ? 'Listo, quedó confirmado.' : 'Gracias, lo tendremos en cuenta.',
             ]);
         });
+    }
+
+    /**
+     * Transferencia: el negocio revisó su cuenta. `confirmado` si el dinero
+     * llegó completo (desde ahí se prepara); `no_llego` si no lo encuentra
+     * (el cliente revisa y vuelve a avisar).
+     */
+    public function pago(Request $request, Negocio $negocio, int $id): JsonResponse
+    {
+        if (! $negocio->puede($request->user(), 'gestionar_pedidos')) {
+            return $this->sinAcceso();
+        }
+
+        $datos = $request->validate([
+            'estado' => ['required', Rule::in(['confirmado', 'no_llego'])],
+        ]);
+
+        $pedido = $negocio->pedidos()->find($id);
+        if (! $pedido || $pedido->metodo_pago !== 'transferencia') {
+            return response()->json(['message' => 'Este pedido no es por transferencia.'], 409);
+        }
+
+        $ok = $datos['estado'] === 'confirmado'
+            ? PagoTransferencia::confirmar($pedido, $request->user())
+            : PagoTransferencia::noLlego($pedido, $request->user());
+        if (! $ok) {
+            return response()->json(['message' => 'El pago de este pedido cambió. Actualiza para continuar.'], 409);
+        }
+
+        return response()->json([
+            'message' => $datos['estado'] === 'confirmado'
+                ? 'Pago confirmado. Ya puedes preparar el pedido.'
+                : 'Le avisamos al cliente que no te ha llegado.',
+        ]);
     }
 
     private function sinAcceso(): JsonResponse

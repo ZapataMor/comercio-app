@@ -60,9 +60,11 @@ solo en local.
       reportar *y* bloquear; reportar ya existe, bloquear no.
 
 ## 2. No bloquean la tienda, pero van antes de operar con gente real
-- [ ] **Transferencia sin verificar**: elegirla pone 0 a cobrar y el domiciliario
-      ve "no cobres nada" aunque el dinero no haya llegado. Confirmación del
-      negocio (pendiente/confirmada/devolución) o arrancar solo con efectivo.
+- [x] **Transferencia sin verificar** (resuelto el 20 de noviembre de 2026): el
+      cliente ve las cuentas del negocio al ser aceptado, avisa «Ya pagué» y el
+      negocio confirma que le llegó; sin eso no se marca listo y el domiciliario
+      solo ve «No cobrar» con el pago confirmado. Falta: devolución con estados
+      (solicitada/devuelta) cuando se cancela un pedido ya pagado.
 - [ ] **Botón de ayuda** en el pedido hacia un soporte de Vitrina (puede ser un
       WhatsApp atendido por una persona).
 - [ ] **Aprobación de domiciliarios**: hoy cualquier cliente se activa solo

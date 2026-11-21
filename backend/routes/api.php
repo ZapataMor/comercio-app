@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\CitaController;
 use App\Http\Controllers\Api\ClienteDireccionController;
 use App\Http\Controllers\Api\ComercioPedidoController;
 use App\Http\Controllers\Api\CuentaController;
+use App\Http\Controllers\Api\CuentaPagoController;
 use App\Http\Controllers\Api\DeviceTokenController;
 use App\Http\Controllers\Api\DomiciliarioController as ApiDomiciliarioController;
 use App\Http\Controllers\Api\EnVivoController;
@@ -191,6 +192,15 @@ Route::middleware(['auth:sanctum', 'throttle:api-usuario'])->group(function () {
         Route::put('/pedidos/{id}/devolucion', [PedidoIncidenciaController::class, 'devolucion']);
         // Efectivo: ¿el domiciliario entregó el dinero? (afecta su confiabilidad).
         Route::put('/pedidos/{id}/dinero', [ComercioPedidoController::class, 'confirmarDinero']);
+        // Transferencia: el negocio revisó su cuenta (confirmado | no_llego).
+        Route::put('/pedidos/{id}/pago', [ComercioPedidoController::class, 'pago']);
+
+        // Cuentas donde el negocio recibe transferencias.
+        Route::get('/cuentas-pago', [CuentaPagoController::class, 'index']);
+        Route::post('/cuentas-pago', [CuentaPagoController::class, 'store']);
+        // POST: llega como multipart por la imagen del QR.
+        Route::post('/cuentas-pago/{id}', [CuentaPagoController::class, 'update'])->whereNumber('id');
+        Route::delete('/cuentas-pago/{id}', [CuentaPagoController::class, 'destroy'])->whereNumber('id');
 
         // Nivel de confiabilidad del negocio y sus últimos eventos.
         Route::get('/reputacion', [NegocioController::class, 'reputacion']);
@@ -228,6 +238,9 @@ Route::middleware(['auth:sanctum', 'throttle:api-usuario'])->group(function () {
     // Cancelar mientras el negocio no lo tenga listo.
     Route::post('/pedidos/{id}/reembolso', [ApiPedidoController::class, 'solicitarReembolso']);
     Route::post('/pedidos/{id}/cancelar', [ApiPedidoController::class, 'cancelar']);
+    // Transferencia: «Ya pagué» (cuenta elegida y comprobante opcional) y ver el comprobante.
+    Route::post('/pedidos/{id}/pago', [ApiPedidoController::class, 'informarPago'])->whereNumber('id');
+    Route::get('/pedidos/{id}/comprobante', [ApiPedidoController::class, 'comprobante'])->whereNumber('id');
     Route::put('/pedidos/{id}/ajuste', [PedidoIncidenciaController::class, 'ajustar']);
     Route::post('/pedidos/{id}/reporte', [PedidoReporteController::class, 'store']);
     // Tarifa de domicilio vigente (para mostrar el total en el checkout).

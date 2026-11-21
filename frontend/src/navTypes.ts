@@ -35,6 +35,8 @@ export type RootStackParamList = {
   MisServicios: undefined;
   // Miembros e invitaciones del negocio activo.
   Equipo: undefined;
+  // Dónde recibe transferencias el negocio activo (Nequi, llave, banco, QR).
+  CuentasPago: undefined;
   AgendarCita: {
     negocioId: number;
     negocioNombre: string;

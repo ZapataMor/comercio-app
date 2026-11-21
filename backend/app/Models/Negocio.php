@@ -193,6 +193,18 @@ class Negocio extends Model
         return $this->hasMany(Pedido::class);
     }
 
+    /** Dónde recibe transferencias (ver CuentaPago). */
+    public function cuentasPago(): HasMany
+    {
+        return $this->hasMany(CuentaPago::class)->orderBy('orden')->orderBy('id');
+    }
+
+    /** ¿Ofrece pagar por transferencia? Solo si tiene alguna cuenta. */
+    public function aceptaTransferencia(): bool
+    {
+        return $this->cuentasPago()->exists();
+    }
+
     /** Texto para la búsqueda tolerante a errores. */
     public function textoBusqueda(): string
     {

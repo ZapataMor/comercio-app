@@ -15,6 +15,7 @@ use App\Rules\Telefono;
 use App\Support\CancelarPedido;
 use App\Support\CantidadPedido;
 use App\Support\OpcionesPedido;
+use App\Support\PagoTransferencia;
 use App\Support\PrecioCarrito;
 use App\Support\Push;
 use App\Support\Reputacion;
@@ -84,6 +85,11 @@ class PedidoController extends Controller
             ->find($datos['negocio_id']);
         if (! $negocio) {
             return response()->json(['message' => 'Ese negocio no está disponible.'], 422);
+        }
+
+        // Transferencia solo si el negocio dejó dónde recibirla.
+        if ($datos['metodo_pago'] === 'transferencia' && ! $negocio->aceptaTransferencia()) {
+            throw ValidationException::withMessages(['metodo_pago' => 'Este negocio no recibe transferencias. Elige efectivo.']);
         }
 
         // Productos de ESTE negocio, disponibles, que estén en el pedido.
@@ -211,6 +217,8 @@ class PedidoController extends Controller
                 'user_id' => $request->user()->id,
                 'estado' => 'pendiente',
                 'metodo_pago' => $datos['metodo_pago'],
+                // Transferencia: el cliente paga cuando el negocio acepte.
+                'pago_estado' => $datos['metodo_pago'] === 'transferencia' ? 'por_pagar' : null,
                 'total' => 0,
                 'direccion_entrega' => $direccion->direccion.' - Barrio '.$direccion->barrio,
                 'entrega_fotos' => $direccion->fotos,
@@ -330,12 +338,14 @@ class PedidoController extends Controller
             'codigo' => $pedido->codigo,
             'estado' => $pedido->estado,
             'estado_label' => $pedido->estadoLabel(),
-            'estados' => $pedido->estado === 'devolviendo' ? ['devolviendo'] : Pedido::ESTADOS,
-            'estado_index' => $pedido->estadoIndex(),
+            'estados' => $this->pasos($pedido),
+            'estado_index' => $this->pasoActual($pedido),
             'subtotal' => (float) $pedido->subtotal,
             'costo_domicilio' => (float) $pedido->costo_domicilio,
             'total' => (float) $pedido->total,
             'metodo_pago' => $pedido->metodo_pago,
+            // Transferencia: cuentas del negocio, en qué va el pago y si puede avisar que pagó.
+            'pago' => PagoTransferencia::paraCliente($pedido),
             'reembolso_solicitado' => $pedido->reembolso_solicitado_at !== null,
             'direccion_entrega' => $pedido->direccion_entrega,
             'minutos_recogida' => $pedido->minutos_recogida,
@@ -411,6 +421,70 @@ class PedidoController extends Controller
             'puede_resenar' => $pedido->puedeResenarse(),
             'resenas' => Resenas::dePedido($pedido),
         ]);
+    }
+
+    /**
+     * Pasos de la línea de tiempo. Por transferencia hay uno más después de
+     * que el negocio acepta: pagar y que el negocio confirme el pago.
+     */
+    private function pasos(Pedido $pedido): array
+    {
+        if ($pedido->estado === 'devolviendo') {
+            return ['devolviendo'];
+        }
+
+        return $pedido->metodo_pago === 'transferencia'
+            ? ['pendiente', 'pago', ...array_slice(Pedido::ESTADOS, 1)]
+            : Pedido::ESTADOS;
+    }
+
+    private function pasoActual(Pedido $pedido): int
+    {
+        $indice = $pedido->estadoIndex();
+        if ($pedido->metodo_pago !== 'transferencia' || $pedido->estado === 'devolviendo' || $pedido->estado === 'pendiente') {
+            return $indice;
+        }
+
+        // Aceptado sin pago confirmado: va en el paso del pago.
+        return $pedido->estado === 'aceptado' && $pedido->esperaPago() ? 1 : $indice + 1;
+    }
+
+    /**
+     * El cliente avisa que ya pagó por transferencia: en qué cuenta del
+     * negocio y, si quiere, la foto del comprobante. El negocio debe revisar
+     * que el dinero le llegó antes de confirmarlo.
+     */
+    public function informarPago(Request $request, int $id): JsonResponse
+    {
+        $datos = $request->validate([
+            'cuenta_id' => ['required', 'integer'],
+            'comprobante' => ['nullable', 'image', 'max:8192'],
+        ], [
+            'cuenta_id.required' => 'Elige en cuál cuenta pagaste.',
+            'comprobante.image' => 'El comprobante debe ser una foto.',
+            'comprobante.max' => 'La foto del comprobante es muy pesada (máximo 8 MB).',
+        ]);
+
+        $pedido = $request->user()->pedidos()->with('negocio')->find($id);
+        if (! $pedido) {
+            return response()->json(['message' => 'Pedido no encontrado.'], 404);
+        }
+
+        if (! PagoTransferencia::informar($pedido, (int) $datos['cuenta_id'], $request->file('comprobante'))) {
+            return response()->json(['message' => 'Este pedido ya no está esperando tu pago. Actualiza para ver en qué va.'], 409);
+        }
+
+        return response()->json(['message' => 'Le avisamos al negocio. Confirmará cuando vea el dinero en su cuenta.']);
+    }
+
+    /** Foto del comprobante de pago: la ven el cliente y el equipo del negocio. */
+    public function comprobante(Request $request, int $id)
+    {
+        $pedido = Pedido::with('negocio')->findOrFail($id);
+        abort_unless(PagoTransferencia::puedeVerComprobante($pedido, $request->user()), 403);
+        abort_unless($pedido->pago_comprobante, 404);
+
+        return Storage::disk('local')->response($pedido->pago_comprobante, null, ['Cache-Control' => 'private, no-store, max-age=0', 'X-Content-Type-Options' => 'nosniff']);
     }
 
     /**

@@ -178,7 +178,11 @@ export default function OfertaPedido() {
               <View style={styles.fila}>
                 <Icon name="tarjeta" size={15} color={c.text} />
                 <Text style={styles.linea}>
-                  {pedido.cobrar > 0 ? `Cobrar ${cop(pedido.cobrar)} en efectivo` : 'Pagado: no cobres nada'}
+                  {pedido.cobrar > 0
+                    ? `Cobrar ${cop(pedido.cobrar)} en efectivo`
+                    : pedido.domicilio_lo_entrega_negocio && pedido.costo_domicilio > 0
+                      ? `Pagado por transferencia: no cobres nada. El negocio te entrega ${cop(pedido.costo_domicilio)} del domicilio al recoger.`
+                      : 'Pagado: no cobres nada'}
                 </Text>
               </View>
 

@@ -266,6 +266,8 @@ class CatalogoController extends Controller
             'activo' => (bool) $negocio->activo,
             'estado_texto' => HorarioNegocio::estadoTexto($negocio),
             'horario_hoy' => HorarioNegocio::textoHoyDe($negocio, now()),
+            // El checkout ofrece transferencia solo si el negocio tiene dónde recibirla.
+            'acepta_transferencia' => $negocio->aceptaTransferencia(),
         ]);
     }
 

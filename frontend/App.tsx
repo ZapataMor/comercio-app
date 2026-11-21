@@ -55,6 +55,7 @@ import MisNegociosScreen from './src/screens/MisNegociosScreen';
 import MisProductosScreen from './src/screens/MisProductosScreen';
 import MisServiciosScreen from './src/screens/MisServiciosScreen';
 import EquipoScreen from './src/screens/EquipoScreen';
+import CuentasPagoScreen from './src/screens/CuentasPagoScreen';
 import AgendarCitaScreen from './src/screens/AgendarCitaScreen';
 import CitasScreen from './src/screens/CitasScreen';
 import ComercioPedidoDetalleScreen from './src/screens/ComercioPedidoDetalleScreen';
@@ -256,6 +257,7 @@ function Navegacion({ listo }: { listo: boolean }) {
             <Stack.Screen name="MisProductos" component={MisProductosScreen} options={{ title: 'Mis productos' }} />
             <Stack.Screen name="MisServicios" component={MisServiciosScreen} options={{ title: 'Mis servicios' }} />
             <Stack.Screen name="Equipo" component={EquipoScreen} options={{ title: 'Equipo' }} />
+            <Stack.Screen name="CuentasPago" component={CuentasPagoScreen} options={{ title: 'Cuentas para transferencias' }} />
             <Stack.Screen name="AgendarCita" component={AgendarCitaScreen} options={{ title: 'Agendar cita' }} />
             <Stack.Screen name="MisCitas" component={CitasScreen} options={{ title: 'Mis citas' }} />
             <Stack.Screen name="AgendaNegocio" component={CitasScreen} options={{ title: 'Agenda de citas' }} />

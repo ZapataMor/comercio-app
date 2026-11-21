@@ -20,12 +20,12 @@ Este documento distingue decisiones de producto de funciones implementadas. No e
 
 - Efectivo: el cliente paga productos más domicilio al repartidor. El repartidor conserva el domicilio y entrega al negocio el subtotal de productos.
 - Transferencia: el encargado autorizado del negocio verifica la recepción y confirma manualmente. No se puede tratar como pagado por elegir ese método. El flujo del pedido debe esperar la confirmación.
-- Si el cliente transfiere el total, el negocio entrega al repartidor el valor del domicilio.
+- Si el cliente transfiere el total, el negocio entrega al repartidor el valor del domicilio. Decisión del 20 de noviembre de 2026: se lo entrega **al recoger** el pedido (el repartidor ya lleva mercancía que vale más que el domicilio y, si el cliente no aparece, el domicilio igual es suyo). El comprobante del cliente es opcional; revisar que el dinero llegó es responsabilidad del negocio. Implementado: cuentas de pago del negocio, «Ya pagué», confirmación del negocio y «No cobrar» para el repartidor.
 - Registrar por separado pago del cliente, devolución al cliente y liquidación entre negocio y repartidor. No confundir «pedido entregado» con «dinero liquidado».
 - Cancelación del cliente: en cualquier momento antes de comenzar la preparación, sin límite de minutos desde la creación. Pendiente representar inequívocamente el inicio de preparación y validar la transición en el servidor para evitar que cancelar e iniciar preparación puedan completarse simultáneamente.
 - Si cancela dentro de esas condiciones y ya transfirió, el negocio debe devolver el dinero. Una vez iniciada la preparación no habrá cancelación ordinaria del cliente; las incidencias deben tener resolución independiente.
 - Reembolsos: solicitado, en revisión, devuelto o rechazado; registrar importe, responsable, fecha, motivo y evidencia. La solicitud por sí sola no significa que se haya devuelto dinero.
-- Datos e instrucciones de transferencia: el propietario los definirá después.
+- Datos de transferencia: cada negocio registra sus cuentas (Nequi, Daviplata, Bancolombia, otro banco, llave o QR) en «Cuentas de pago».
 
 ## Reparto e incidencias
 

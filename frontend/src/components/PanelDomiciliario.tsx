@@ -567,7 +567,13 @@ function resumenPago(p: Pedido, c: Colores): { titulo: string; texto: string; mo
   if (p.cobrar > 0) {
     return { titulo: 'Cobrar al cliente', texto: 'En efectivo, al entregar.', monto: cop(p.cobrar), icono: 'efectivo', fg: c.goldText, bg: c.accentSoft };
   }
-  return { titulo: 'Ya está pagado', texto: 'Pagado por transferencia: no cobres nada.', icono: 'banco', fg: c.success, bg: c.successSoft };
+  // Solo llega aquí con la transferencia ya confirmada por el negocio.
+  const domicilio = p.domicilio_lo_entrega_negocio && p.costo_domicilio > 0
+    ? ['tomado'].includes(p.estado)
+      ? ` Al recoger, el negocio te entrega ${cop(p.costo_domicilio)} del domicilio.`
+      : ` El negocio te entregó ${cop(p.costo_domicilio)} del domicilio al recoger.`
+    : '';
+  return { titulo: 'No cobrar', texto: `Pagado por transferencia y confirmado por el negocio: no le cobres nada al cliente.${domicilio}`, icono: 'banco', fg: c.success, bg: c.successSoft };
 }
 
 const PASOS = [

@@ -407,7 +407,10 @@ class DomiciliarioController extends Controller
             'efectivo_pendiente' => $p->efectivoPendienteAlNegocio(),
             'efectivo_ocupado_at' => $p->efectivo_ocupado_at?->toIso8601String(),
             'puede_avisar_ocupado' => $p->efectivoPendienteAlNegocio() && ! $p->efectivo_ocupado_at && (request()->user()->reputacion_domiciliario ?? config('reputacion.inicial')) >= 70,
-            'cobrar' => $p->metodo_pago === 'efectivo' ? (float) $p->total : 0.0,
+            // Por transferencia, 0: solo llega a los domiciliarios con el pago ya confirmado.
+            'cobrar' => $p->aCobrar(),
+            // Por transferencia, el negocio le entrega el domicilio al recoger.
+            'domicilio_lo_entrega_negocio' => $p->domicilioLoEntregaNegocio(),
             'minutos_recogida' => $p->minutos_recogida,
             // Se lo dicta al negocio al llegar por el pedido.
             'codigo_recogida' => $p->estado === 'tomado' ? $p->codigo_confirmacion : null,

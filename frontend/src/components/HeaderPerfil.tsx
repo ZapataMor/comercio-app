@@ -54,6 +54,7 @@ const RUTAS_NEGOCIO = new Set([
   'MiTienda',
   'MisProductos',
   'Equipo',
+  'CuentasPago',
   'AgendaNegocio',
   'PedidosNegocio',
   'ComercioPedidoDetalle',

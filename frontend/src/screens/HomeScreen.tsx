@@ -361,6 +361,9 @@ export default function HomeScreen({ navigation }: Props) {
           ] satisfies Acceso[] : []),
           { icono: 'lista', titulo: 'Pedidos y ventas', abrir: () => navigation.navigate('PedidosNegocio') },
           { icono: 'usuarios', titulo: 'Equipo', abrir: () => navigation.navigate('Equipo') },
+          ...(tienePermiso(negocio, 'administrador') ? [
+            { icono: 'banco', titulo: 'Cuentas de pago', abrir: () => navigation.navigate('CuentasPago') },
+          ] satisfies Acceso[] : []),
           ...(tieneServicios ? [{ icono: 'calendario', titulo: 'Agenda de citas', abrir: () => navigation.navigate('AgendaNegocio', { negocioId: negocio.id }) } satisfies Acceso] : []),
         ] satisfies Acceso[])
       : []),
@@ -450,7 +453,11 @@ export default function HomeScreen({ navigation }: Props) {
                         pedido={p}
                         icono="usuario"
                         nombre={p.cliente ?? 'Cliente'}
-                        pie="Ver y marcar listo ›"
+                        pie={p.metodo_pago === 'transferencia' && p.pago?.estado !== 'confirmado'
+                          ? p.pago?.estado === 'informado'
+                            ? 'El cliente dice que ya pagó: revisa y confirma ›'
+                            : 'Esperando el pago por transferencia ›'
+                          : 'Ver y marcar listo ›'}
                         onPress={() => navigation.navigate('ComercioPedidoDetalle', { pedido: p })}
                       />
                     </FadeInView>
@@ -475,6 +482,11 @@ export default function HomeScreen({ navigation }: Props) {
                           textoBoton="Confirmar"
                           onConfirmar={codigo => entregarAlDomiciliario(p, codigo)}
                         />
+                        {p.domicilio_lo_entrega_negocio && (
+                          <Text style={styles.domicilioNota}>
+                            Pagado por transferencia: entrégale {cop(p.costo_domicilio ?? 0)} del domicilio.
+                          </Text>
+                        )}
                       </TarjetaPedido>
                     </FadeInView>
                   ))}
@@ -563,6 +575,7 @@ const useStyles = makeStyles((c, shadow) => ({
   capa: { position: 'absolute', top: 0, right: 0, left: -40, textAlign: 'right', transformOrigin: 'right center' },
   // Pedidos en espera
   seccion: { fontSize: 16, fontFamily: font.displaySemi, color: c.textStrong, marginTop: 14, marginBottom: 10 },
+  domicilioNota: { color: c.goldText, fontFamily: font.semibold, fontSize: 13, lineHeight: 18, marginTop: 8 },
   vacioBox: {
     backgroundColor: c.surface, borderRadius: radius.md, padding: 18, marginBottom: 12,
     alignItems: 'center', ...shadow.low,

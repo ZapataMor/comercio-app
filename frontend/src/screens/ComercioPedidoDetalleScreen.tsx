@@ -26,6 +26,7 @@ import { useConfirmar } from '../components/Confirmacion';
 import Icon from '../components/Icon';
 import { haceCuanto, MapaSeguimiento, NotaEnVivo } from '../components/Mapa';
 import MotivoCancelacion from '../components/MotivoCancelacion';
+import { RevisarPago } from '../components/PagoTransferencia';
 import ReportarPedido from '../components/ReportarPedido';
 import { NivelBadge } from '../components/Reputacion';
 import { useNegocio } from '../NegocioContext';
@@ -229,6 +230,9 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
   }
 
   const ec = estadoColor(pedido.estado);
+  // Por transferencia no se prepara hasta confirmar que llegó el dinero.
+  const esperaPago = pedido.metodo_pago === 'transferencia' && pedido.pago?.estado !== 'confirmado';
+  const clienteYaPago = pedido.pago?.estado === 'informado' || pedido.pago?.estado === 'confirmado';
 
   return (
     <ScrollTeclado style={styles.container} contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
@@ -248,7 +252,9 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
         {pedido.estado === 'tomado' && (
           <PedirCodigo
             titulo="Entregar al domiciliario"
-            ayuda="Pídele su código y escríbelo aquí para confirmar que es quien debe llevarse el pedido."
+            ayuda={pedido.domicilio_lo_entrega_negocio
+              ? `Pídele su código y escríbelo aquí. Entrégale también ${cop(pedido.costo_domicilio ?? 0)} del domicilio: el cliente te lo pagó en la transferencia.`
+              : 'Pídele su código y escríbelo aquí para confirmar que es quien debe llevarse el pedido.'}
             textoBoton="Confirmar recogida"
             onConfirmar={onRecogido}
           />
@@ -279,7 +285,7 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
           )}
           <View style={styles.filaInfo}>
             <Icon name="tarjeta" size={15} color={c.text} />
-            <Text style={styles.linea}>Pago: {pedido.metodo_pago}</Text>
+            <Text style={styles.linea}>Pago: {pedido.metodo_pago === 'transferencia' ? 'transferencia' : 'efectivo contra entrega'}</Text>
           </View>
           {!!pedido.domiciliario && (
             <View style={styles.filaInfo}>
@@ -347,7 +353,25 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
           <Text style={styles.totalLabel}>Total que paga el cliente</Text>
           <Text style={styles.totalValor}>{cop(pedido.total)}</Text>
         </View>
+        {pedido.domicilio_lo_entrega_negocio && pedido.estado !== 'cancelado' && (
+          <Text style={styles.notaIzq}>Por transferencia el cliente te paga todo: al recoger, entrégale al domiciliario {cop(pedido.costo_domicilio ?? 0)} del domicilio.</Text>
+        )}
       </FadeInView>
+
+      {/* Transferencia: confirmar que el dinero llegó antes de preparar. */}
+      {!!pedido.pago && !!negocioId && ['pendiente', 'aceptado'].includes(pedido.estado) && (
+        <View style={{ marginTop: 14 }}>
+          <RevisarPago
+            token={token}
+            negocioId={negocioId}
+            pedidoId={pedido.id}
+            estado={pedido.estado}
+            total={pedido.total}
+            pago={pedido.pago}
+            onRevisado={() => { recargar().catch(() => {}); }}
+          />
+        </View>
+      )}
 
       <MotivoCancelacion
         visible={cancelando}
@@ -356,7 +380,9 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
         explicacion={
           pedido.cancelar_penaliza
             ? 'Ya pasaron más de 5 minutos desde que lo aceptaste: cancelarlo baja tu confiabilidad. El cliente verá el motivo.'
-            : 'El cliente verá el motivo y recibirá un aviso. No se le cobra nada.'
+            : clienteYaPago
+              ? 'El cliente verá el motivo y recibirá un aviso. Si ya te transfirió, debes devolverle el dinero.'
+              : 'El cliente verá el motivo y recibirá un aviso. No se le cobra nada.'
         }
         motivos={pedido.motivos_cancelacion ?? []}
         textoBoton={pedido.estado === 'pendiente' ? 'Rechazar pedido' : 'Cancelar pedido'}
@@ -369,7 +395,7 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
         explicacion="Escribe exactamente qué se agotó y qué alternativas puedes ofrecer. El cliente podrá cambiar su elección o cancelar. No marques listo hasta que responda."
         motivos={[]} textoBoton="Avisar al cliente" enviando={enviando} onCerrar={() => setFaltante(false)} onConfirmar={enviarFaltante} />
       {!!pedido.faltante_motivo && <View style={styles.card}><Text style={styles.novedadTxt}>Esperando la elección del cliente: {pedido.faltante_motivo}</Text></View>}
-      {['pendiente', 'aceptado'].includes(pedido.estado) && <PressableScale style={styles.btnRechazar} onPress={() => setFaltante(true)}><Text style={styles.btnRechazarTxt}>Informar producto o ingrediente agotado</Text></PressableScale>}
+      {['pendiente', 'aceptado'].includes(pedido.estado) && !clienteYaPago && <PressableScale style={styles.btnRechazar} onPress={() => setFaltante(true)}><Text style={styles.btnRechazarTxt}>Informar producto o ingrediente agotado</Text></PressableScale>}
       {pedido.puede_confirmar_devolucion && <PressableScale style={styles.btn} onPress={onDevolucion}><Text style={styles.btnTxt}>Confirmar devolución al comercio</Text></PressableScale>}
 
       {/* Efectivo: el negocio dice si el domiciliario le entregó el dinero
@@ -423,6 +449,11 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
             <Text style={styles.btnTxt}>Aceptar pedido</Text>
           )}
         </PressableScale>
+      ) : pedido.estado === 'aceptado' && esperaPago ? (
+        <View style={styles.filaNota}>
+          <Icon name="candado" size={16} color={c.muted} />
+          <Text style={[styles.nota, styles.notaInline]}>Podrás marcarlo listo cuando confirmes el pago.</Text>
+        </View>
       ) : pedido.estado === 'aceptado' ? (
         <PressableScale style={styles.btn} onPress={onListo} disabled={enviando || !!pedido.faltante_motivo}>
           {enviando ? (
@@ -500,6 +531,7 @@ const useStyles = makeStyles((c, shadow) => ({
   btn: { backgroundColor: c.brand, borderRadius: radius.md, paddingVertical: 16, alignItems: 'center', marginTop: 16, ...shadow.soft },
   btnTxt: { color: c.onBrand, fontFamily: font.bold, fontSize: 16 },
   nota: { textAlign: 'center', color: c.muted, marginTop: 16, fontSize: 14, fontFamily: font.regular },
+  notaIzq: { color: c.goldText, marginTop: 10, fontSize: 13, lineHeight: 18, fontFamily: font.medium },
   novedad: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: c.warningSoft,
     borderRadius: radius.sm, padding: 10, marginTop: 10,

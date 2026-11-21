@@ -1,0 +1,253 @@
+<?php
+
+use App\Models\CuentaPago;
+use App\Models\Negocio;
+use App\Models\Pedido;
+use App\Models\Producto;
+use App\Models\User;
+use App\Notifications\EstadoPedidoActualizado;
+use App\Support\CancelarPedido;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
+use Laravel\Sanctum\Sanctum;
+use Spatie\Permission\Models\Role;
+
+// Pago por transferencia verificado por el negocio: el cliente ve las
+// cuentas al ser aceptado, avisa que pagó, el negocio confirma que le llegó
+// y solo entonces se prepara y el domiciliario no cobra nada.
+
+beforeEach(function () {
+    foreach (['administrador', 'usuario', 'domiciliario'] as $rol) {
+        Role::findOrCreate($rol, 'web');
+    }
+    config(['firebase.projects.app.credentials' => 'fake.json']);
+    Notification::fake();
+    Storage::fake('public');
+    Storage::fake('local');
+});
+
+function ptPersona(string $rol = 'usuario'): User
+{
+    $user = User::factory()->create(['telefono' => '3001234567', 'password' => 'ClaveSegura1']);
+    $user->syncRoles(User::rolesDelTipo($rol));
+
+    return $user;
+}
+
+/** @return array{0: User, 1: Negocio, 2: Producto} */
+function ptNegocio(bool $conCuenta = true): array
+{
+    $dueno = ptPersona();
+    $horario = collect(['lun', 'mar', 'mie', 'jue', 'vie', 'sab', 'dom'])
+        ->mapWithKeys(fn ($d) => [$d => ['abre' => '00:00', 'cierra' => '23:59']])->all();
+    $negocio = $dueno->negocio()->create(['nombre' => 'Tienda', 'activo' => true, 'horario' => $horario]);
+    $producto = $negocio->productos()->create([
+        'nombre' => 'Arepa', 'precio' => 3000, 'tipo_venta' => 'cantidad', 'unidad_medida' => 'unidad', 'disponible' => true,
+    ]);
+    if ($conCuenta) {
+        $negocio->cuentasPago()->create(['tipo' => 'nequi', 'numero' => '3001112233', 'titular' => 'Tienda SAS']);
+    }
+
+    return [$dueno, $negocio, $producto];
+}
+
+/** Pedido por transferencia creado desde la app, como lo haría el cliente. */
+function ptPedir($test, User $cliente, Negocio $negocio, Producto $producto): Pedido
+{
+    Sanctum::actingAs($cliente);
+    $id = $test->postJson('/api/pedidos', [
+        'negocio_id' => $negocio->id,
+        'items' => [['producto_id' => $producto->id, 'cantidad' => 2]],
+        'metodo_pago' => 'transferencia',
+        ...direccionPedidoPrueba($cliente),
+        'telefono_contacto' => '3001234567',
+    ])->assertCreated()->json('id');
+
+    return Pedido::findOrFail($id);
+}
+
+test('solo se puede elegir transferencia si el negocio tiene dónde recibirla', function () {
+    [, $sinCuenta, $producto] = ptNegocio(false);
+    $cliente = ptPersona();
+    Sanctum::actingAs($cliente);
+
+    $this->getJson("/api/negocios/{$sinCuenta->id}/estado")->assertJsonPath('acepta_transferencia', false);
+    $this->postJson('/api/pedidos', [
+        'negocio_id' => $sinCuenta->id,
+        'items' => [['producto_id' => $producto->id, 'cantidad' => 1]],
+        'metodo_pago' => 'transferencia',
+        ...direccionPedidoPrueba($cliente),
+        'telefono_contacto' => '3001234567',
+    ])->assertUnprocessable()->assertJsonValidationErrors('metodo_pago');
+
+    [, $negocio, $otro] = ptNegocio();
+    $this->getJson("/api/negocios/{$negocio->id}/estado")->assertJsonPath('acepta_transferencia', true);
+    expect(ptPedir($this, $cliente, $negocio, $otro)->pago_estado)->toBe('por_pagar');
+});
+
+test('el flujo completo: aceptar, pagar, revisar y confirmar antes de preparar', function () {
+    [$dueno, $negocio, $producto] = ptNegocio();
+    $cliente = ptPersona();
+    $pedido = ptPedir($this, $cliente, $negocio, $producto);
+    $cuenta = $negocio->cuentasPago()->first();
+
+    // Sin aceptar: todavía no ve cuentas ni puede avisar que pagó.
+    $this->getJson("/api/pedidos/{$pedido->id}")
+        ->assertJsonPath('pago.estado', 'por_pagar')
+        ->assertJsonPath('pago.cuentas', [])
+        ->assertJsonPath('pago.puede_informar', false)
+        ->assertJsonPath('estados.1', 'pago')
+        ->assertJsonPath('estado_index', 0);
+    $this->postJson("/api/pedidos/{$pedido->id}/pago", ['cuenta_id' => $cuenta->id])->assertConflict();
+
+    Sanctum::actingAs($dueno);
+    $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}/aceptar")->assertOk();
+    // El aviso no dice «ya lo están preparando»: le pide pagar.
+    Notification::assertSentTo($cliente, EstadoPedidoActualizado::class,
+        fn ($n) => str_contains($n->texto[1] ?? '', 'por transferencia'));
+    // No se prepara ni se ofrece a domiciliarios sin el pago confirmado.
+    $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}/listo")->assertConflict();
+    $this->getJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}")
+        ->assertJsonPath('estado_label', 'Esperando el pago')
+        ->assertJsonPath('pago.puede_confirmar', true);
+
+    Sanctum::actingAs($cliente);
+    $this->getJson("/api/pedidos/{$pedido->id}")
+        ->assertJsonPath('pago.cuentas.0.nombre', 'Nequi')
+        ->assertJsonPath('pago.cuentas.0.numero', '3001112233')
+        ->assertJsonPath('pago.puede_informar', true)
+        ->assertJsonPath('estado_index', 1);
+
+    $this->post("/api/pedidos/{$pedido->id}/pago", [
+        'cuenta_id' => $cuenta->id,
+        'comprobante' => UploadedFile::fake()->image('comprobante.jpg'),
+    ], ['Accept' => 'application/json'])->assertOk();
+    $pedido->refresh();
+    expect($pedido->pago_estado)->toBe('informado')
+        ->and($pedido->pago_cuenta['titular'])->toBe('Tienda SAS');
+    Storage::disk('local')->assertExists($pedido->pago_comprobante);
+    Notification::assertSentTo($dueno, EstadoPedidoActualizado::class);
+    // Ya avisó: no lo repite ni ve las cuentas.
+    $this->postJson("/api/pedidos/{$pedido->id}/pago", ['cuenta_id' => $cuenta->id])->assertConflict();
+    $this->getJson("/api/pedidos/{$pedido->id}")->assertJsonPath('pago.cuentas', []);
+
+    // El comprobante es privado: el cliente y el equipo del negocio.
+    $this->get("/api/pedidos/{$pedido->id}/comprobante")->assertOk();
+    Sanctum::actingAs($dueno);
+    $this->get("/api/pedidos/{$pedido->id}/comprobante")->assertOk();
+    Sanctum::actingAs(ptPersona());
+    $this->get("/api/pedidos/{$pedido->id}/comprobante")->assertForbidden();
+
+    // No lo encuentra: el cliente revisa y vuelve a avisar.
+    Sanctum::actingAs($dueno);
+    $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}/pago", ['estado' => 'no_llego'])->assertOk();
+    Notification::assertSentTo($cliente, EstadoPedidoActualizado::class);
+    Sanctum::actingAs($cliente);
+    $this->postJson("/api/pedidos/{$pedido->id}/pago", ['cuenta_id' => $cuenta->id])->assertOk();
+
+    Sanctum::actingAs($dueno);
+    $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}/pago", ['estado' => 'confirmado'])->assertOk();
+    expect($pedido->fresh())->pago_estado->toBe('confirmado')->pago_confirmado_por->toBe($dueno->id);
+    $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}/pago", ['estado' => 'confirmado'])->assertConflict();
+    $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}/listo")->assertOk();
+
+    Sanctum::actingAs($cliente);
+    $this->getJson("/api/pedidos/{$pedido->id}")->assertJsonPath('estado_index', 3)->assertJsonPath('estado_label', 'Listo para recoger');
+});
+
+test('el domiciliario no cobra nada y sabe que el negocio le entrega el domicilio', function () {
+    [, $negocio, $producto] = ptNegocio();
+    $pedido = ptPedir($this, ptPersona(), $negocio, $producto);
+    $domiciliario = ptPersona('domiciliario');
+    $pedido->update([
+        'estado' => 'tomado', 'domiciliario_id' => $domiciliario->id, 'tomado_at' => now(),
+        'pago_estado' => 'confirmado', 'codigo_confirmacion' => '1234',
+    ]);
+
+    Sanctum::actingAs($domiciliario);
+    $this->getJson('/api/domiciliario/entregas')
+        ->assertJsonPath('pedidos.0.cobrar', 0)
+        ->assertJsonPath('pedidos.0.domicilio_lo_entrega_negocio', true);
+});
+
+test('el negocio cancela sin perder confiabilidad si el cliente no paga', function () {
+    [$dueno, $negocio, $producto] = ptNegocio();
+    $pedido = ptPedir($this, ptPersona(), $negocio, $producto);
+    $pedido->update(['estado' => 'aceptado', 'aceptado_at' => now()->subHour()]);
+
+    expect(CancelarPedido::penaliza($pedido->fresh()))->toBeFalse();
+    Sanctum::actingAs($dueno);
+    $this->getJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}")
+        ->assertJsonPath('cancelar_penaliza', false)
+        ->assertJsonPath('motivos_cancelacion.0', CancelarPedido::MOTIVO_SIN_PAGO);
+
+    // Con el pago confirmado, el reloj de la cancelación libre corre desde ahí.
+    $pedido->update(['pago_estado' => 'confirmado', 'pago_confirmado_at' => now()]);
+    expect(CancelarPedido::penaliza($pedido->fresh()))->toBeFalse();
+    $pedido->update(['pago_confirmado_at' => now()->subMinutes(10)]);
+    expect(CancelarPedido::penaliza($pedido->fresh()))->toBeTrue();
+});
+
+test('con el pago avisado no se puede informar un faltante que cambie el total', function () {
+    [$dueno, $negocio, $producto] = ptNegocio();
+    $pedido = ptPedir($this, ptPersona(), $negocio, $producto);
+    $pedido->update(['estado' => 'aceptado', 'aceptado_at' => now(), 'pago_estado' => 'informado']);
+
+    Sanctum::actingAs($dueno);
+    $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}/faltante", ['motivo' => 'Se acabó la arepa'])->assertConflict();
+    $pedido->update(['pago_estado' => 'por_pagar']);
+    $this->putJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}/faltante", ['motivo' => 'Se acabó la arepa'])->assertOk();
+    // Con un faltante por resolver, el cliente no paga todavía.
+    expect($pedido->fresh()->puedeInformarPago())->toBeFalse();
+});
+
+test('no se puede avisar el pago en una cuenta de otro negocio', function () {
+    [$dueno, $negocio, $producto] = ptNegocio();
+    [, $otro] = ptNegocio();
+    $cliente = ptPersona();
+    $pedido = ptPedir($this, $cliente, $negocio, $producto);
+    $pedido->update(['estado' => 'aceptado', 'aceptado_at' => now()]);
+
+    $this->postJson("/api/pedidos/{$pedido->id}/pago", ['cuenta_id' => $otro->cuentasPago()->first()->id])->assertUnprocessable();
+    expect($pedido->fresh()->pago_estado)->toBe('por_pagar');
+});
+
+test('el propietario maneja las cuentas; quien gestiona pedidos solo las ve', function () {
+    [$dueno, $negocio] = ptNegocio(false);
+    $trabajador = ptPersona();
+    $negocio->miembros()->attach($trabajador->id, ['rol' => Negocio::ROL_TRABAJADOR, 'activo' => true, 'gestionar_pedidos' => true]);
+    $base = "/api/negocios/{$negocio->id}/cuentas-pago";
+
+    Sanctum::actingAs($dueno);
+    // Cada tipo pide lo suyo.
+    $this->postJson($base, ['tipo' => 'nequi', 'titular' => 'Ana Pérez'])->assertJsonValidationErrors('numero');
+    $this->postJson($base, ['tipo' => 'banco', 'numero' => '123456789', 'titular' => 'Ana Pérez'])
+        ->assertJsonValidationErrors(['banco', 'tipo_cuenta']);
+    $this->postJson($base, ['tipo' => 'qr', 'titular' => 'Ana Pérez'])->assertJsonValidationErrors('qr');
+
+    $this->postJson($base, ['tipo' => 'bancolombia', 'numero' => '123 4567  8901', 'tipo_cuenta' => 'ahorros', 'titular' => 'Ana Pérez'])
+        ->assertCreated()->assertJsonPath('cuenta.numero', '123 4567 8901');
+    $qr = $this->post($base, ['tipo' => 'qr', 'titular' => 'Ana Pérez', 'qr' => UploadedFile::fake()->image('qr.png')], ['Accept' => 'application/json'])
+        ->assertCreated()->json('cuenta');
+    expect($qr['qr'])->toStartWith('/storage/cuentas-pago/');
+
+    $id = CuentaPago::where('tipo', 'bancolombia')->value('id');
+    $this->postJson("{$base}/{$id}", ['tipo' => 'llave', 'numero' => '@tienda', 'titular' => 'Ana Pérez'])
+        ->assertOk()->assertJsonPath('cuenta.tipo_cuenta', null)->assertJsonPath('cuenta.nombre', 'Llave');
+
+    Sanctum::actingAs($trabajador);
+    $this->getJson($base)->assertOk()->assertJsonCount(2, 'cuentas')->assertJsonPath('puede_editar', false);
+    $this->postJson($base, ['tipo' => 'nequi', 'numero' => '3001112233', 'titular' => 'Yo'])->assertForbidden();
+    $this->deleteJson("{$base}/{$id}")->assertForbidden();
+
+    Sanctum::actingAs(ptPersona());
+    $this->getJson($base)->assertForbidden();
+
+    Sanctum::actingAs($dueno);
+    $this->deleteJson("{$base}/{$id}")->assertOk();
+    foreach (range(1, CuentaPago::MAXIMO - 1) as $i) {
+        $this->postJson($base, ['tipo' => 'nequi', 'numero' => "300000000{$i}", 'titular' => 'Ana Pérez'])->assertCreated();
+    }
+    $this->postJson($base, ['tipo' => 'nequi', 'numero' => '3009999999', 'titular' => 'Ana Pérez'])->assertUnprocessable();
+});

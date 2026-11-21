@@ -52,6 +52,13 @@ class Pedido extends Model
     /** Formas de pago admitidas. */
     public const METODOS_PAGO = ['efectivo', 'transferencia'];
 
+    /**
+     * En qué va un pago por transferencia: el cliente debe pagar (por_pagar),
+     * avisó que pagó (informado), el negocio revisó que le llegó (confirmado)
+     * o no lo encuentra (no_llego, el cliente puede volver a avisar).
+     */
+    public const PAGO_ESTADOS = ['por_pagar', 'informado', 'confirmado', 'no_llego'];
+
     protected $fillable = [
         'negocio_id',
         'user_id',
@@ -92,6 +99,13 @@ class Pedido extends Model
         'faltante_at',
         'faltante_version',
         'ajustado_at',
+        'pago_estado',
+        'pago_cuenta',
+        'pago_comprobante',
+        'pago_informado_at',
+        'pago_confirmado_at',
+        'pago_confirmado_por',
+        'pago_no_llego_at',
     ];
 
     /**
@@ -135,6 +149,10 @@ class Pedido extends Model
             'devuelto_at' => 'datetime',
             'faltante_at' => 'datetime',
             'ajustado_at' => 'datetime',
+            'pago_cuenta' => 'array',
+            'pago_informado_at' => 'datetime',
+            'pago_confirmado_at' => 'datetime',
+            'pago_no_llego_at' => 'datetime',
         ];
     }
 
@@ -208,7 +226,70 @@ class Pedido extends Model
     /** Etiqueta legible del estado actual. */
     public function estadoLabel(): string
     {
+        // Aceptado por transferencia: no se prepara hasta confirmar el pago.
+        if ($this->estado === 'aceptado' && $this->esperaPago()) {
+            return $this->pago_estado === 'informado' ? 'Pago por confirmar' : 'Esperando el pago';
+        }
+
         return self::ESTADO_LABEL[$this->estado] ?? $this->estado;
+    }
+
+    // ---------- Pago por transferencia ----------
+
+    /** ¿Es por transferencia y el negocio aún no confirma que le llegó? */
+    public function esperaPago(): bool
+    {
+        return $this->metodo_pago === 'transferencia' && $this->pago_estado !== 'confirmado';
+    }
+
+    /**
+     * ¿El cliente puede avisar que ya pagó? Cuando el negocio aceptó (antes
+     * no ve las cuentas), sin un producto agotado por resolver (el total
+     * podría cambiar) y si no lo había avisado o el negocio no lo encontró.
+     */
+    public function puedeInformarPago(): bool
+    {
+        return $this->metodo_pago === 'transferencia'
+            && $this->estado === 'aceptado'
+            && ! $this->faltante_motivo
+            && in_array($this->pago_estado, ['por_pagar', 'no_llego'], true);
+    }
+
+    /**
+     * ¿El negocio puede confirmar que le llegó la transferencia? Desde que
+     * acepta: también si el cliente pagó sin avisar en la app.
+     */
+    public function puedeConfirmarPago(): bool
+    {
+        return $this->metodo_pago === 'transferencia'
+            && $this->estado === 'aceptado'
+            && $this->pago_estado !== 'confirmado';
+    }
+
+    /** Desde cuándo corre la preparación: por transferencia, desde que se confirmó el pago. */
+    public function inicioPreparacion(): ?\Illuminate\Support\Carbon
+    {
+        return $this->metodo_pago === 'transferencia'
+            ? ($this->pago_confirmado_at ?? $this->aceptado_at)
+            : $this->aceptado_at;
+    }
+
+    /**
+     * Lo que el domiciliario le cobra al cliente al entregar. Por
+     * transferencia nada: solo llega a él con el pago ya confirmado.
+     */
+    public function aCobrar(): float
+    {
+        return $this->metodo_pago === 'efectivo' ? (float) $this->total : 0.0;
+    }
+
+    /**
+     * Por transferencia el cliente le pagó el domicilio al negocio: el
+     * negocio se lo entrega al domiciliario al recoger el pedido.
+     */
+    public function domicilioLoEntregaNegocio(): bool
+    {
+        return $this->metodo_pago === 'transferencia';
     }
 
     public function segundosParaReportarAusencia(): ?int

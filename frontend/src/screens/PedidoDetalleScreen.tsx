@@ -16,6 +16,7 @@ import { haceCuanto, MapaSeguimiento, NotaEnVivo } from '../components/Mapa';
 import MotivoCancelacion from '../components/MotivoCancelacion';
 import ResenarPedido from '../components/ResenarPedido';
 import AjustarPedido from '../components/AjustarPedido';
+import { PagarTransferencia } from '../components/PagoTransferencia';
 import ReportarPedido from '../components/ReportarPedido';
 import { messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
@@ -35,6 +36,8 @@ const UBICACION_VIEJA_S = 60;
 
 const LABEL: Record<string, string> = {
   pendiente: 'Pendiente',
+  // Solo por transferencia: pagar y que el negocio confirme que le llegó.
+  pago: 'Pago por transferencia',
   aceptado: 'En preparación',
   listo: 'Listo para recoger',
   tomado: 'Domiciliario asignado',
@@ -203,6 +206,20 @@ export default function PedidoDetalleScreen({ route }: Props) {
         <Text style={styles.sub}>{pedido.negocio}</Text>
       </View>
 
+      {/* Transferencia: cuentas del negocio, «Ya pagué» y en qué va la revisión. */}
+      {!!pedido.pago && ['pendiente', 'aceptado'].includes(pedido.estado) && (
+        <PagarTransferencia
+          token={auth!.token}
+          pedidoId={pedido.id}
+          estado={pedido.estado}
+          total={pedido.total}
+          negocio={pedido.negocio}
+          pago={pedido.pago}
+          faltante={!!pedido.faltante_motivo}
+          onEnviado={() => cargarPedido()}
+        />
+      )}
+
       {/* Al terminar, en dos pasos: primero las caritas del domiciliario y,
           ya enviadas, las estrellas de la tienda y de lo que compró. */}
       {calificaDomiciliario ? (
@@ -235,8 +252,14 @@ export default function PedidoDetalleScreen({ route }: Props) {
                     : 'Lo cancelaste tú'}
             {pedido.motivo_cancelacion ? `: ${pedido.motivo_cancelacion}` : '.'}
           </Text>
-          {pedido.metodo_pago === 'transferencia' ? <>
-            <Text style={styles.canceladoNota}>Si ya pagaste por transferencia, solicita al negocio la devolución del dinero. El reembolso no es automático.</Text>
+          {pedido.metodo_pago === 'transferencia' && pedido.pago?.estado === 'por_pagar' ? (
+            <Text style={styles.canceladoNota}>No alcanzaste a pagar: no se te cobra nada.</Text>
+          ) : pedido.metodo_pago === 'transferencia' ? <>
+            <Text style={styles.canceladoNota}>
+              {pedido.pago?.estado === 'confirmado'
+                ? `${pedido.negocio ?? 'El negocio'} confirmó que recibió tu transferencia: debe devolverte el dinero. Solicita el reembolso y acuérdalo con el negocio.`
+                : 'Si ya pagaste por transferencia, solicita al negocio la devolución del dinero. El reembolso no es automático.'}
+            </Text>
             <TouchableOpacity disabled={solicitando || pedido.reembolso_solicitado} onPress={() => confirmar({
               icono: 'banco', titulo: '¿Ya hiciste la transferencia?',
               texto: 'Solicita el reembolso solo si ya pagaste. Avisaremos al negocio para que acuerden la devolución.',
@@ -415,7 +438,9 @@ export default function PedidoDetalleScreen({ route }: Props) {
         </View>
         <View style={[styles.info, styles.fila]}>
           <Icon name="tarjeta" size={13} color={c.muted} />
-          <Text style={styles.info}>{pedido.metodo_pago} ·</Text>
+          <Text style={styles.info}>
+            {pedido.metodo_pago === 'transferencia' ? `Transferencia${pedido.pago?.estado === 'confirmado' ? ' (pago confirmado)' : ''}` : 'Efectivo'} ·
+          </Text>
           <Icon name="ubicacion" size={13} color={c.muted} />
           <Text style={[styles.info, { flex: 1 }]}>{pedido.direccion_entrega}</Text>
         </View>

@@ -289,7 +289,12 @@ pendiente → aceptado → listo → tomado → recogido → en_camino → entre
 - Los códigos son de 4 dígitos, comparten `codigo_confirmacion` con índice único y se liberan al
   entregar o soltar: dos vigentes nunca coinciden. Límite: 6 intentos por minuto, por persona y pedido.
 - Cada pedido tiene además `codigo`: 8 letras y números que reemplazan al `#id` en la app y los avisos.
-- Pago: `efectivo` o `transferencia`. En efectivo, el negocio confirma el dinero recibido.
+- Pago: `efectivo` o `transferencia`. En efectivo, el negocio confirma el dinero recibido. Por
+  transferencia (`pago_estado`: `por_pagar` → `informado` → `confirmado`, o `no_llego`), el cliente
+  ve las cuentas del negocio al ser aceptado (`negocio_cuentas_pago`, pantalla «Cuentas de pago»),
+  avisa «Ya pagué» con comprobante opcional y el negocio confirma; sin eso no se marca listo. El
+  domiciliario ve «No cobrar» y el negocio le entrega el domicilio al recoger. Ver
+  [[Lógica de Negocio]] regla 7.
 
 ### 5.4 Moderación de barrios ✅
 `GET /admin/barrios/pendientes`, aprobar o rechazar (`AdminBarriosScreen`). Al rechazar, el cliente

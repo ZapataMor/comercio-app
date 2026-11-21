@@ -41,6 +41,17 @@ class CancelarPedido
         'Dirección fuera de cobertura',
     ];
 
+    /** Motivo para un pedido por transferencia cuyo pago no llegó. */
+    public const MOTIVO_SIN_PAGO = 'No llegó el pago por transferencia';
+
+    /** Motivos sugeridos al negocio para este pedido. */
+    public static function motivosNegocio(Pedido $pedido): array
+    {
+        return $pedido->estado === 'aceptado' && $pedido->esperaPago()
+            ? [self::MOTIVO_SIN_PAGO, ...self::MOTIVOS_NEGOCIO]
+            : self::MOTIVOS_NEGOCIO;
+    }
+
     public const MOTIVOS_CLIENTE = [
         'Me equivoqué en el pedido',
         'Se demora mucho',
@@ -60,12 +71,17 @@ class CancelarPedido
 
     /**
      * ¿Si el negocio cancela ahora, baja su confiabilidad? Solo si lo aceptó
-     * hace más de `reputacion.minutos_cancelacion_libre`.
+     * hace más de `reputacion.minutos_cancelacion_libre`. Por transferencia
+     * el reloj corre desde que confirmó el pago: mientras el cliente no
+     * pague, el negocio puede cancelar sin consecuencias.
      */
     public static function penaliza(Pedido $pedido): bool
     {
-        return $pedido->estado === 'aceptado'
-            && $pedido->aceptado_at?->lt(now()->subMinutes((int) config('reputacion.minutos_cancelacion_libre')));
+        if ($pedido->estado !== 'aceptado' || ($pedido->metodo_pago === 'transferencia' && $pedido->esperaPago())) {
+            return false;
+        }
+
+        return (bool) $pedido->inicioPreparacion()?->lt(now()->subMinutes((int) config('reputacion.minutos_cancelacion_libre')));
     }
 
     public static function puede(Pedido $pedido, string $quien): bool

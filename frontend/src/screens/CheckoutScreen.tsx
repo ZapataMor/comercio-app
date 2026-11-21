@@ -26,6 +26,7 @@ import {
   crearClienteDireccion,
   getCatalogo,
   getClienteDirecciones,
+  getEstadoNegocio,
   getTarifaDomicilio,
   nuevaClaveIntento,
 } from '../api';
@@ -118,6 +119,19 @@ export default function CheckoutScreen({ navigation }: Props) {
 
   useLectura(cargarTarifa, [cargarTarifa]);
   useEnVivo(['ajustes'], cargarTarifa);
+
+  // Transferencia solo si el negocio dejó cuentas donde recibirla.
+  const [aceptaTransferencia, setAceptaTransferencia] = useState<boolean | null>(null);
+  const negocioCarrito = cart.negocioId;
+  useLectura(() => {
+    if (!auth?.token || !negocioCarrito) return;
+    getEstadoNegocio(auth.token, negocioCarrito)
+      .then(e => {
+        setAceptaTransferencia(!!e.acepta_transferencia);
+        if (!e.acepta_transferencia) setPago(p => (p === 'transferencia' ? 'efectivo' : p));
+      })
+      .catch(() => setAceptaTransferencia(null));
+  }, [auth?.token, negocioCarrito]);
 
   function limpiarError(campo: string) {
     setErrores(prev => {
@@ -504,7 +518,8 @@ export default function CheckoutScreen({ navigation }: Props) {
         ].map(op => (
           <TouchableOpacity
             key={op.v}
-            style={[styles.pago, pago === op.v && styles.pagoOn]}
+            disabled={op.v === 'transferencia' && aceptaTransferencia === false}
+            style={[styles.pago, pago === op.v && styles.pagoOn, op.v === 'transferencia' && aceptaTransferencia === false && styles.pagoNo]}
             onPress={() => {
               setPago(op.v);
               limpiarError('pago');
@@ -514,7 +529,14 @@ export default function CheckoutScreen({ navigation }: Props) {
           </TouchableOpacity>
         ))}
       </Objetivo>
-      <FieldError mensaje={errores.pago} />
+      <FieldError mensaje={errores.pago ?? errores.metodo_pago} />
+      {pago === 'transferencia' ? (
+        <Text style={styles.pagoNota}>
+          Cuando el negocio acepte tu pedido verás sus cuentas para pagar. Avísale en la app cuando transfieras: preparará tu pedido al confirmar que le llegó el dinero.
+        </Text>
+      ) : aceptaTransferencia === false ? (
+        <Text style={styles.pagoNota}>Este negocio aún no recibe transferencias.</Text>
+      ) : null}
 
       <Objetivo id="checkout.confirmar">
       <PressableScale style={styles.btn} onPress={confirmar} disabled={enviando || cargandoDirecciones || domicilio == null || cart.items.length === 0 || !!cart.cambiosPrecio?.length}>
@@ -571,6 +593,8 @@ const useStyles = makeStyles((c, shadow) => ({
   nuevaBox: { marginBottom: 2 },
   nuevoMapa: { marginTop: 10 },
   pagos: { flexDirection: 'row', gap: 10, marginBottom: 20 },
+  pagoNo: { opacity: 0.45 },
+  pagoNota: { color: c.muted, fontFamily: font.regular, fontSize: 13, lineHeight: 18, marginTop: -10, marginBottom: 18 },
   pago: { flex: 1, borderWidth: 1, borderColor: c.borderStrong, borderRadius: radius.md, paddingVertical: 14, alignItems: 'center', gap: 4, backgroundColor: c.surface },
   pagoOn: { borderColor: c.accent, backgroundColor: c.accentSoft },
   pagoTxt: { color: c.muted, fontFamily: font.semibold },

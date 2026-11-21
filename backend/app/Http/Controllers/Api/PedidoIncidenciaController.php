@@ -24,6 +24,9 @@ class PedidoIncidenciaController extends Controller
             Negocio::whereKey($negocio->id)->lockForUpdate()->firstOrFail();
             $pedido = $negocio->pedidos()->lockForUpdate()->findOrFail($id);
             abort_unless(in_array($pedido->estado, ['pendiente', 'aceptado']), 409, 'Solo puedes informar faltantes antes de marcar listo el pedido.');
+            // El total podría cambiar y ya no coincidiría con lo transferido.
+            abort_if($pedido->metodo_pago === 'transferencia' && in_array($pedido->pago_estado, ['informado', 'confirmado'], true), 409,
+                'El cliente ya pagó por transferencia: llámalo para acordar el cambio o cancela el pedido y devuélvele el dinero.');
             $pedido->update([
                 'estado' => 'aceptado', 'aceptado_at' => $pedido->aceptado_at ?? now(),
                 'faltante_motivo' => trim($datos['motivo']), 'faltante_at' => now(),

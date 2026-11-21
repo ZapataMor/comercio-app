@@ -48,7 +48,21 @@ El detalle paso a paso está en [[CU-001 Realizar un pedido]] y [[CU-004 Entrega
 6. **Salvaguarda del admin.** Un administrador no puede quitarse su propio rol ni suspender su
    propia cuenta.
 7. **Formas de pago**: `efectivo` o `transferencia`, elegidas en el checkout. En efectivo, el
-   domiciliario cobra el **total** al entregar.
+   domiciliario cobra el **total** al entregar, se queda el domicilio y le lleva al negocio el valor
+   de los productos. **Transferencia** solo si el negocio tiene cuentas de pago (Nequi, Daviplata,
+   Bancolombia, otro banco, llave o QR; las maneja el propietario o un administrador):
+   1. Cuando el negocio **acepta**, el cliente ve sus cuentas, elige una, copia el número, paga el
+      **total** (productos + domicilio) y avisa **«Ya pagué»**, con foto del comprobante opcional.
+   2. El negocio **revisa en su banco** que el dinero llegó y lo confirma (o avisa que no le llegó y
+      el cliente vuelve a avisar). Revisarlo es **su responsabilidad**: un comprobante se puede
+      falsificar.
+   3. Sin el pago confirmado no se puede marcar **listo**, así que el domiciliario solo ve pedidos
+      ya pagados: le sale **«No cobrar»**. Al recoger, el negocio le entrega el **valor del
+      domicilio**, porque el cliente se lo pagó a él en la transferencia.
+   - Mientras el cliente no pague, el negocio cancela sin perder confiabilidad; los 5 minutos de
+     cancelación libre corren desde que confirma el pago, y también su tiempo de preparación.
+   - Con el pago avisado ya no se informan productos agotados (el total cambiaría): se llama al
+     cliente o se cancela y se devuelve el dinero.
 8. **Productos con tipo de venta**: el precio se entiende "por unidad de medida" — ver
    [[Tipos de Venta]].
 9. **Domicilio aparte.** Total = subtotal de productos + **tarifa de domicilio** vigente (la fija el
