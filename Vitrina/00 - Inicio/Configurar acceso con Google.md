@@ -10,8 +10,9 @@ actualizado: 2026-11-20
 > Las personas pueden **crear su cuenta y entrar con Google** («Continuar con Google» en el login
 > y en el registro). **Configurado el 2026-11-20** en el proyecto `miproyecto-48045`: cliente web
 > «Vitrina servidor», cliente Android «Vitrina Android debug» y pantalla de consentimiento en
-> modo **Prueba** (solo entran los usuarios de prueba). Faltan: la SHA-1 de la llave de
-> producción, publicar la app y poner `GOOGLE_CLIENT_IDS` en el VPS (pasos 4, 2.5 y 5).
+> modo **Prueba** (solo entran los usuarios de prueba). En el VPS desde el 2026-11-20 (backend,
+> `GOOGLE_CLIENT_IDS` y `vitrina-vps.apk`). Faltan: la SHA-1 de la llave de producción y
+> publicar la app (pasos 4 y 2.5).
 
 ## Cómo funciona (lo que ya está hecho)
 
