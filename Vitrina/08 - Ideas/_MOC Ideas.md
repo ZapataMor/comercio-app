@@ -2,7 +2,7 @@
 title: _MOC Ideas
 tags: [moc, idea]
 estado: en-progreso
-actualizado: 2026-11-19
+actualizado: 2026-11-21
 ---
 
 # 🗺️ MOC — Ideas
@@ -18,6 +18,7 @@ Backlog conceptual. No son compromisos: son semillas. Cada una con impacto y esf
 | [[Idea - Calificaciones y reseñas]] | hecho (2026-10-28) | medio | medio |
 | [[Idea - Pagos en linea]] | semilla | alto | alto |
 | [[Idea - Inventario y facturación DIAN]] | semilla | alto | alto |
+| [[Idea - Actividades]] | semilla | medio | medio |
 
 ## Decisiones (ADR)
 Cuando una idea madura a decisión razonada, pasa a un **ADR** → [[_MOC ADR]].
