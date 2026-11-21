@@ -42,11 +42,19 @@ const NOMBRE_SALE = 600;
 // Proporción de las fotos, por si el asset no trae medidas (Jest).
 const PROPORCION_POR_DEFECTO = 1072 / 1218;
 
+// Foto que se está viendo y desde cuándo, compartidas entre pantallas: el
+// login, el registro y el registro con Google montan cada uno su fondo, y así
+// el nuevo sigue en la misma foto y en el mismo punto del paneo, en vez de
+// volver a la primera (el fondo no se mueve al cambiar de pantalla).
+const enCurso = { idx: 0, desde: 0 };
+
 type Diapo = {
   seq: number;
   idx: number;
   entra: boolean;
   sale: boolean;
+  /** ms que la foto ya llevaba en pantalla en otra pantalla (solo la primera). */
+  transcurrido: number;
   /** Posición del marco (entrada desde la izquierda, salida a la derecha). */
   x: Animated.Value;
   /** 0 → 1 durante todo el tiempo visible: paneo + zoom. */
@@ -65,14 +73,22 @@ type Props = {
   filtro?: React.ReactNode;
 };
 
+// Última respuesta de «reducir movimiento»: la pantalla siguiente arranca
+// con ella y no pasa por el estado quieto (sería un salto del fondo).
+let reducidoConocido: boolean | null = null;
+
 /** «Reducir movimiento» del sistema; `null` mientras se consulta. */
 function useReducirMovimiento(): boolean | null {
-  const [reducido, setReducido] = useState<boolean | null>(null);
+  const [reducido, setReducidoEstado] = useState<boolean | null>(reducidoConocido);
   useEffect(() => {
     let vivo = true;
+    const setReducido = (r: boolean) => {
+      reducidoConocido = r;
+      if (vivo) setReducidoEstado(r);
+    };
     AccessibilityInfo.isReduceMotionEnabled()
-      .then(r => vivo && setReducido(r))
-      .catch(() => vivo && setReducido(false));
+      .then(setReducido)
+      .catch(() => setReducido(false));
     const sub = AccessibilityInfo.addEventListener(
       'reduceMotionChanged',
       setReducido,
@@ -105,15 +121,17 @@ function nuevaDiapo(
   entra: boolean,
   ancho: number,
   quieto: boolean,
+  transcurrido = 0,
 ): Diapo {
   return {
     seq,
     idx,
     entra,
     sale: false,
+    transcurrido,
     x: new Animated.Value(entra ? -ancho : 0),
-    recorrido: new Animated.Value(0),
-    nombre: new Animated.Value(quieto ? 1 : 0),
+    recorrido: new Animated.Value(transcurrido / VISIBLE),
+    nombre: new Animated.Value(quieto || transcurrido > 0 ? 1 : 0),
   };
 }
 
@@ -126,30 +144,43 @@ function Carrusel({
   filtro,
   quieto,
 }: Props & { quieto: boolean }) {
+  // Arranca donde iba el fondo de la pantalla anterior (si la hubo).
+  const [inicio] = useState(() => {
+    const idx = fotos.length > 0 ? enCurso.idx % fotos.length : 0;
+    const transcurrido = !enCurso.desde ? 0 : Math.min(Math.max(Date.now() - enCurso.desde, 0), CADA - 1);
+    return { idx, transcurrido };
+  });
   const [diapos, setDiapos] = useState<Diapo[]>(() => [
-    nuevaDiapo(0, 0, false, ancho, quieto),
+    nuevaDiapo(0, inicio.idx, false, ancho, quieto, inicio.transcurrido),
   ]);
   const anchoRef = useRef(ancho);
   anchoRef.current = ancho;
+  const ultimoIdx = useRef(inicio.idx);
 
   useEffect(() => {
-    if (quieto || fotos.length < 2) return;
-    const id = setInterval(() => {
+    if (quieto) return;
+    if (inicio.transcurrido === 0) {
+      enCurso.idx = inicio.idx;
+      enCurso.desde = Date.now();
+    }
+    if (fotos.length < 2) return;
+    let id: ReturnType<typeof setTimeout>;
+    const avanzar = () => {
+      const idx = (ultimoIdx.current + 1) % fotos.length;
+      ultimoIdx.current = idx;
+      enCurso.idx = idx;
+      enCurso.desde = Date.now();
       setDiapos(prev => {
         const actual = prev[prev.length - 1];
-        const nueva = nuevaDiapo(
-          actual.seq + 1,
-          (actual.idx + 1) % fotos.length,
-          true,
-          anchoRef.current,
-          false,
-        );
+        const nueva = nuevaDiapo(actual.seq + 1, idx, true, anchoRef.current, false);
         // Nunca más de dos: la que sale y la que entra.
         return [{ ...actual, sale: true }, nueva];
       });
-    }, CADA);
-    return () => clearInterval(id);
-  }, [quieto, fotos.length]);
+      id = setTimeout(avanzar, CADA);
+    };
+    id = setTimeout(avanzar, CADA - inicio.transcurrido);
+    return () => clearTimeout(id);
+  }, [quieto, fotos.length, inicio]);
 
   // Precarga las fotos del modo. En desarrollo llegan desde Metro y pueden
   // tardar más que lo que cada una está en pantalla: sin esto, la vista se
@@ -255,14 +286,28 @@ function Diapositiva({
     if (quieto) return;
     const retardo = d.entra ? NOMBRE_RETARDO : 0;
     const entra = d.entra ? NOMBRE_ENTRA : NOMBRE_SALE;
+    const recorrido = Animated.timing(d.recorrido, {
+      toValue: 1,
+      duration: VISIBLE - d.transcurrido,
+      easing: Easing.linear,
+      useNativeDriver: true,
+    });
+    // Viene de otra pantalla a media foto: el nombre ya se veía y solo falta que salga.
+    const nombre =
+      d.transcurrido > 0
+        ? Animated.sequence([
+            Animated.delay(Math.max(0, CADA - NOMBRE_SALE - d.transcurrido)),
+            Animated.timing(d.nombre, {
+              toValue: 0,
+              duration: NOMBRE_SALE,
+              easing: Easing.in(Easing.quad),
+              useNativeDriver: true,
+            }),
+          ])
+        : null;
     const animaciones = [
-      Animated.timing(d.recorrido, {
-        toValue: 1,
-        duration: VISIBLE,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
-      Animated.sequence([
+      recorrido,
+      nombre ?? Animated.sequence([
         Animated.delay(retardo),
         Animated.timing(d.nombre, {
           toValue: 1,

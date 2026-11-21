@@ -189,3 +189,72 @@ describe('último paso del registro', () => {
     expect(sesion.auth).toBeNull();
   });
 });
+
+describe('cuentas de Google recordadas', () => {
+  test('al cerrar sesión la cuenta de Google sigue en «Continuar como» y entra con un toque', async () => {
+    elegirMock.mockResolvedValue('id-token-google');
+    entrarMock.mockResolvedValue({ token: 'tok-ana', user: ana });
+    await montar(<LoginScreen {...({ navigation } as any)} />);
+    await tocarEtiqueta('Continuar con Google');
+    expect(sesion.auth?.token).toBe('tok-ana');
+
+    await act(async () => {
+      sesion.salir();
+    });
+    expect(sesion.auth).toBeNull();
+    expect(sesion.cuentas).toHaveLength(0);
+    // No se guarda el token, solo los datos para mostrarla.
+    expect(sesion.recordadas).toEqual([{ user: ana }]);
+    expect(JSON.stringify(sesion.recordadas)).not.toContain('tok-ana');
+
+    entrarMock.mockResolvedValue({ token: 'tok-ana-2', user: ana });
+    await tocarEtiqueta('Continuar como Ana Pérez con Google');
+
+    expect(elegirMock).toHaveBeenLastCalledWith({ rapido: true });
+    expect(sesion.auth?.token).toBe('tok-ana-2');
+    // Con la sesión abierta pasa a las cuentas guardadas.
+    expect(sesion.recordadas).toHaveLength(0);
+  });
+
+  test('las cuentas sin Google no se recuerdan y «Cerrar todas» olvida las de Google', async () => {
+    const bruno: Usuario = { id: 8, name: 'Bruno', email: 'bruno@demo.co', roles: ['usuario'], google: false };
+    await montar(<LoginScreen {...({ navigation } as any)} />);
+
+    await act(async () => {
+      sesion.entrar('tok-bruno', bruno);
+    });
+    await act(async () => {
+      sesion.salir();
+    });
+    expect(sesion.recordadas).toHaveLength(0);
+
+    await act(async () => {
+      sesion.entrar('tok-ana', ana);
+    });
+    await act(async () => {
+      sesion.salirDeTodas();
+    });
+    expect(sesion.recordadas).toHaveLength(0);
+    expect(porEtiqueta('Continuar como Ana Pérez con Google')).toHaveLength(0);
+  });
+
+  test('sin Google disponible no se muestran las cuentas recordadas', async () => {
+    await montar(<LoginScreen {...({ navigation } as any)} />);
+    await act(async () => {
+      sesion.entrar('tok-ana', ana);
+    });
+    await act(async () => {
+      sesion.salir();
+    });
+    disponibleMock.mockReturnValue(false);
+    await act(async () => {
+      app!.update(
+        <AuthProvider>
+          <Sonda />
+          <LoginScreen {...({ navigation } as any)} />
+        </AuthProvider>,
+      );
+    });
+    expect(porEtiqueta('Continuar como Ana Pérez con Google')).toHaveLength(0);
+  });
+});

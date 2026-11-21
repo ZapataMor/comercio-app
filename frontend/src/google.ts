@@ -9,7 +9,7 @@
 import { NativeModules, Platform } from 'react-native';
 import { GOOGLE_WEB_CLIENT_ID } from './config';
 
-type ModuloGoogle = { elegirCuenta: (webClientId: string) => Promise<string> };
+type ModuloGoogle = { elegirCuenta: (webClientId: string, rapido: boolean) => Promise<string> };
 
 function modulo(): ModuloGoogle | undefined {
   return NativeModules.GoogleAcceso as ModuloGoogle | undefined;
@@ -22,14 +22,16 @@ export function googleDisponible(): boolean {
 /**
  * Pide elegir una cuenta de Google. Devuelve su ID token, o null si la persona
  * cerró la ventana. Lanza un Error con un mensaje para mostrar si algo falla.
+ * `rapido`: para una cuenta recordada; ofrece solo las cuentas que ya entraron
+ * a Vitrina y, si es una sola, entra sin preguntar.
  */
-export async function elegirCuentaGoogle(): Promise<string | null> {
+export async function elegirCuentaGoogle({ rapido = false }: { rapido?: boolean } = {}): Promise<string | null> {
   const nativo = modulo();
   if (!nativo || !googleDisponible()) {
     throw new Error('Entrar con Google no está disponible en este teléfono.');
   }
   try {
-    return await nativo.elegirCuenta(GOOGLE_WEB_CLIENT_ID.trim());
+    return await nativo.elegirCuenta(GOOGLE_WEB_CLIENT_ID.trim(), rapido);
   } catch (e: any) {
     if (e?.code === 'cancelado') return null;
     if (e?.code === 'sin_cuentas') {

@@ -110,7 +110,7 @@ function temaNavegacion(c: Colores, noche: boolean): Theme {
 
 /** `listo`: ya terminó el splash (los avisos emergentes esperan a que acabe). */
 function Navegacion({ listo }: { listo: boolean }) {
-  const { c, modo } = useTheme();
+  const { c, modo, login } = useTheme();
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { auth, cargando } = useAuth();
@@ -132,6 +132,7 @@ function Navegacion({ listo }: { listo: boolean }) {
   // espacio de la barra de navegación del sistema (mapas, login, la barra fija
   // de la propiedad). Las demás terminan encima de esa barra.
   const bordeABorde = { contentStyle: { backgroundColor: c.bg } };
+  const accesoOpciones = { headerShown: false, animation: 'none' as const, contentStyle: { backgroundColor: login.sombraEscena } };
 
   return (
     <FlyToCartProvider>
@@ -172,9 +173,12 @@ function Navegacion({ listo }: { listo: boolean }) {
         }}>
         {!auth ? (
           <>
-            <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false, ...bordeABorde }} />
-            <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
-            <Stack.Screen name="RegistroGoogle" component={RegistroGoogleScreen} options={{ headerShown: false }} />
+            {/* Las tres pantallas de acceso comparten fondo y tarjeta
+                (EscenaAcceso): sin animación de pantalla el fondo no se mueve
+                y solo cambia lo de la tarjeta. */}
+            <Stack.Screen name="Login" component={LoginScreen} options={accesoOpciones} />
+            <Stack.Screen name="Register" component={RegisterScreen} options={accesoOpciones} />
+            <Stack.Screen name="RegistroGoogle" component={RegistroGoogleScreen} options={accesoOpciones} />
           </>
         ) : (
           <>

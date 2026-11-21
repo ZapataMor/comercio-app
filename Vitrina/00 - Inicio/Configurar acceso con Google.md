@@ -1,16 +1,17 @@
 ---
 title: Configurar acceso con Google
 tags: [referencia]
-estado: pendiente
-actualizado: 2026-11-19
+estado: hecho
+actualizado: 2026-11-20
 ---
 
 # 🔑 Configurar acceso con Google
 
 > Las personas pueden **crear su cuenta y entrar con Google** («Continuar con Google» en el login
-> y en el registro). El código ya está hecho y probado. Falta lo que solo puedes hacer tú: crear
-> las credenciales en Google Cloud y pegar un ID en dos lugares. Mientras no lo hagas, el botón
-> **no aparece** y todo sigue igual que antes.
+> y en el registro). **Configurado el 2026-11-20** en el proyecto `miproyecto-48045`: cliente web
+> «Vitrina servidor», cliente Android «Vitrina Android debug» y pantalla de consentimiento en
+> modo **Prueba** (solo entran los usuarios de prueba). Faltan: la SHA-1 de la llave de
+> producción, publicar la app y poner `GOOGLE_CLIENT_IDS` en el VPS (pasos 4, 2.5 y 5).
 
 ## Cómo funciona (lo que ya está hecho)
 
@@ -30,6 +31,12 @@ actualizado: 2026-11-19
 - **Eliminar la cuenta**: quien no tiene contraseña la confirma eligiendo otra vez su cuenta de
   Google. La página web de eliminar cuenta pide contraseña: esa persona puede crear una con
   «¿Olvidaste tu contraseña?» (le llega un código a su correo de Google).
+- **«Continuar como»**: al cerrar sesión de una cuenta que entra con Google, el teléfono la
+  recuerda (sin guardar el token) con una «G» en el avatar; un toque abre Google solo con las
+  cuentas que ya entraron a Vitrina (si es una sola, entra sin preguntar). Toque largo: quitarla.
+  «Cerrar todas las sesiones» las olvida.
+- **Un correo que ya tiene cuenta de Vitrina** (por ejemplo las cuentas demo) no entra con Google
+  hasta conectarlo desde **Mi información → Cuenta → Conectar con Google**.
 - **iOS**: todavía no; el botón solo aparece en Android.
 
 ## Lo que necesitas hacer

@@ -68,11 +68,12 @@ export function useEntrarConGoogle(alSerNueva: (idToken: string, perfil: PerfilG
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function iniciar() {
+  /** `rapido`: para una cuenta recordada en «Continuar como» (ver elegirCuentaGoogle). */
+  async function iniciar(rapido = false) {
     setError(null);
     setCargando(true);
     try {
-      const idToken = await elegirCuentaGoogle();
+      const idToken = await elegirCuentaGoogle({ rapido });
       if (!idToken) return; // cerró la ventana de Google
       const r = await entrarConGoogle(idToken);
       if (r.nuevo) {

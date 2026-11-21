@@ -13,6 +13,12 @@
  * entrar con otra cuenta o volver a una de las guardadas con un toque.
  * «Cerrar sesión» cierra solo la cuenta activa y sigue con la más reciente
  * de las demás; «Cerrar todas las sesiones» deja el teléfono sin ninguna.
+ *
+ * Las cuentas que entran con Google se recuerdan aunque se cierre su sesión
+ * (`recordadas`, en `cuentasGoogle`): siguen en «Continuar como» y vuelven a
+ * entrar con un toque eligiendo la cuenta de Google. De esas no se guarda el
+ * token, solo los datos para mostrarlas. «Cerrar todas las sesiones» y
+ * «Quitar de este teléfono» las olvidan.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
@@ -23,6 +29,8 @@ import { detenerRastreo } from './ubicacion';
 
 /** Una sesión abierta en este teléfono. */
 export type Cuenta = { token: string; user: Usuario };
+/** Cuenta de Google con la sesión cerrada que el teléfono recuerda (sin token). */
+export type CuentaRecordada = { user: Usuario };
 type Sesion = Cuenta | null;
 
 type AuthContextType = {
@@ -32,6 +40,10 @@ type AuthContextType = {
   cuentas: Cuenta[];
   /** true mientras se agrega otra cuenta desde «Mi perfil»: el login puede volver a la anterior. */
   agregando: boolean;
+  /** Cuentas de Google con la sesión cerrada: en el login vuelven a entrar con Google en un toque. */
+  recordadas: CuentaRecordada[];
+  /** Deja de recordar una cuenta de Google en este teléfono. */
+  olvidarRecordada: (userId: number) => void;
   entrar: (token: string, user: Usuario) => void;
   /** Pasa a otra de las cuentas guardadas, sin contraseña. */
   cambiarCuenta: (userId: number) => void;
@@ -50,12 +62,15 @@ type AuthContextType = {
 
 const CLAVE = 'sesion';
 const CLAVE_CUENTAS = 'cuentas';
+const CLAVE_RECORDADAS = 'cuentasGoogle';
 
 const AuthContext = createContext<AuthContextType>({
   auth: null,
   cargando: true,
   cuentas: [],
   agregando: false,
+  recordadas: [],
+  olvidarRecordada: () => {},
   entrar: () => {},
   cambiarCuenta: () => {},
   agregarCuenta: () => {},
@@ -67,6 +82,11 @@ const AuthContext = createContext<AuthContextType>({
 function esCuenta(valor: unknown): valor is Cuenta {
   const c = valor as Cuenta | null;
   return !!c && typeof c.token === 'string' && !!c.user && typeof c.user.id === 'number';
+}
+
+function esRecordada(valor: unknown): valor is CuentaRecordada {
+  const c = valor as CuentaRecordada | null;
+  return !!c && !!c.user && typeof c.user.id === 'number' && typeof c.user.name === 'string';
 }
 
 function leer(raw: string | null): unknown {
@@ -82,12 +102,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [auth, setAuth] = useState<Sesion>(null);
   const [cuentas, setCuentas] = useState<Cuenta[]>([]);
   const [agregando, setAgregando] = useState(false);
+  const [recordadas, setRecordadas] = useState<CuentaRecordada[]>([]);
   const [cargando, setCargando] = useState(true);
 
   // Copias al día para las funciones del contexto (que no cambian entre renders)
   // y para el aviso de token rechazado.
   const authRef = useRef<Sesion>(null);
   const cuentasRef = useRef<Cuenta[]>([]);
+  const recordadasRef = useRef<CuentaRecordada[]>([]);
   // Token de la última cuenta activa. Sigue puesto mientras se agrega otra:
   // si se vuelve a la misma, lo que compartía (el GPS del domiciliario) sigue.
   const ultimoToken = useRef<string | null>(null);
@@ -112,10 +134,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const fijarRecordadas = useCallback((lista: CuentaRecordada[]) => {
+    recordadasRef.current = lista;
+    setRecordadas(lista);
+    if (lista.length > 0) {
+      AsyncStorage.setItem(CLAVE_RECORDADAS, JSON.stringify(lista)).catch(() => {});
+    } else {
+      AsyncStorage.removeItem(CLAVE_RECORDADAS).catch(() => {});
+    }
+  }, []);
+
+  /** Si la cuenta entra con Google, la recuerda (sin token) para volver con un toque. */
+  const recordarSiEsGoogle = useCallback(
+    (user: Usuario) => {
+      if (!user.google) return;
+      fijarRecordadas([{ user }, ...recordadasRef.current.filter(r => r.user.id !== user.id)]);
+    },
+    [fijarRecordadas],
+  );
+
   // Al arrancar, recupera la sesión activa y las demás cuentas guardadas.
   useEffect(() => {
-    Promise.all([AsyncStorage.getItem(CLAVE), AsyncStorage.getItem(CLAVE_CUENTAS)])
-      .then(([rawSesion, rawCuentas]) => {
+    Promise.all([AsyncStorage.getItem(CLAVE), AsyncStorage.getItem(CLAVE_CUENTAS), AsyncStorage.getItem(CLAVE_RECORDADAS)])
+      .then(([rawSesion, rawCuentas, rawRecordadas]) => {
+        const recordadasGuardadas = leer(rawRecordadas);
+        const listaRecordadas = Array.isArray(recordadasGuardadas) ? recordadasGuardadas.filter(esRecordada) : [];
+        recordadasRef.current = listaRecordadas;
+        setRecordadas(listaRecordadas);
         const sesion = leer(rawSesion);
         const guardadas = leer(rawCuentas);
         let lista = Array.isArray(guardadas) ? guardadas.filter(esCuenta) : [];
@@ -138,8 +183,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // No se llama a eliminarPush: con un token inválido el backend también lo rechazaría.
   useEffect(() => {
     alRechazarToken(token => {
-      if (cuentasRef.current.some(c => c.token === token)) {
+      const rechazada = cuentasRef.current.find(c => c.token === token);
+      if (rechazada) {
         fijarCuentas(cuentasRef.current.filter(c => c.token !== token));
+        recordarSiEsGoogle(rechazada.user);
       }
       if (token !== authRef.current?.token) {
         return;
@@ -151,7 +198,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       fijarSesion(null);
     });
     return () => alRechazarToken(null);
-  }, [fijarCuentas, fijarSesion]);
+  }, [fijarCuentas, fijarSesion, recordarSiEsGoogle]);
 
   useEffect(() => {
     if (!auth?.token) {
@@ -185,8 +232,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setAgregando(false);
       fijarSesion(sesion);
       fijarCuentas([sesion, ...cuentasRef.current.filter(c => c.user.id !== user.id)]);
+      // Con la sesión abierta ya sale entre las cuentas guardadas.
+      if (recordadasRef.current.some(r => r.user.id === user.id)) {
+        fijarRecordadas(recordadasRef.current.filter(r => r.user.id !== user.id));
+      }
     },
-    [fijarCuentas, fijarSesion],
+    [fijarCuentas, fijarSesion, fijarRecordadas],
+  );
+
+  const olvidarRecordada = useCallback(
+    (userId: number) => fijarRecordadas(recordadasRef.current.filter(r => r.user.id !== userId)),
+    [fijarRecordadas],
   );
 
   const cambiarCuenta = useCallback(
@@ -235,8 +291,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAgregando(false);
     fijarCuentas(resto);
     fijarSesion(siguiente);
+    recordarSiEsGoogle(actual.user);
     return siguiente;
-  }, [fijarCuentas, fijarSesion]);
+  }, [fijarCuentas, fijarSesion, recordarSiEsGoogle]);
 
   const salirDeTodas = useCallback(() => {
     detenerRastreo();
@@ -246,8 +303,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     ultimoToken.current = null;
     setAgregando(false);
     fijarCuentas([]);
+    fijarRecordadas([]);
     fijarSesion(null);
-  }, [fijarCuentas, fijarSesion]);
+  }, [fijarCuentas, fijarSesion, fijarRecordadas]);
 
   const valor = useMemo(
     () => ({
@@ -255,6 +313,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       cargando,
       cuentas,
       agregando,
+      recordadas,
+      olvidarRecordada,
       entrar,
       cambiarCuenta,
       agregarCuenta,
@@ -262,7 +322,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       salir,
       salirDeTodas,
     }),
-    [auth, cargando, cuentas, agregando, entrar, cambiarCuenta, agregarCuenta, actualizarUsuario, salir, salirDeTodas],
+    [auth, cargando, cuentas, agregando, recordadas, olvidarRecordada, entrar, cambiarCuenta, agregarCuenta, actualizarUsuario, salir, salirDeTodas],
   );
 
   return <AuthContext.Provider value={valor}>{children}</AuthContext.Provider>;

@@ -17,6 +17,7 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.uimanager.ViewManager
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 
@@ -29,6 +30,10 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
  * (POST /api/google) para que lo verifique. `webClientId` es el ID de cliente
  * OAuth de tipo «Aplicación web» (GOOGLE_WEB_CLIENT_ID en src/config.ts).
  *
+ * Con `rapido` (una cuenta recordada en «Continuar como») ofrece solo las
+ * cuentas que ya entraron a Vitrina y, si hay una sola, entra sin preguntar.
+ * Si no hay ninguna autorizada, abre la hoja normal.
+ *
  * Errores (código de la promesa): `cancelado` (cerró la hoja), `sin_cuentas`
  * (no hay cuentas o no se pudo usar ninguna) y `error` (configuración de
  * Google Cloud incompleta, sin Play Services…: el mensaje trae el detalle).
@@ -37,16 +42,23 @@ class GoogleAccesoModule(context: ReactApplicationContext) : ReactContextBaseJav
   override fun getName() = "GoogleAcceso"
 
   @ReactMethod
-  fun elegirCuenta(webClientId: String, promise: Promise) {
+  fun elegirCuenta(webClientId: String, rapido: Boolean, promise: Promise) {
     val actividad = reactApplicationContext.currentActivity
     if (actividad == null) {
       promise.reject("error", "La app no está en primer plano.")
       return
     }
 
-    val solicitud = GetCredentialRequest.Builder()
-      .addCredentialOption(GetSignInWithGoogleOption.Builder(webClientId).build())
-      .build()
+    val opcion = if (rapido) {
+      GetGoogleIdOption.Builder()
+        .setServerClientId(webClientId)
+        .setFilterByAuthorizedAccounts(true)
+        .setAutoSelectEnabled(true)
+        .build()
+    } else {
+      GetSignInWithGoogleOption.Builder(webClientId).build()
+    }
+    val solicitud = GetCredentialRequest.Builder().addCredentialOption(opcion).build()
 
     CredentialManager.create(actividad).getCredentialAsync(
       actividad,
@@ -70,9 +82,11 @@ class GoogleAccesoModule(context: ReactApplicationContext) : ReactContextBaseJav
         }
 
         override fun onError(e: GetCredentialException) {
-          when (e) {
-            is GetCredentialCancellationException -> promise.reject("cancelado", "Se cerró la ventana de Google.")
-            is NoCredentialException -> promise.reject("sin_cuentas", e.message ?: "No hay cuentas de Google disponibles.")
+          when {
+            // Ninguna cuenta autorizada todavía: la hoja normal, con todas.
+            rapido && e is NoCredentialException -> elegirCuenta(webClientId, false, promise)
+            e is GetCredentialCancellationException -> promise.reject("cancelado", "Se cerró la ventana de Google.")
+            e is NoCredentialException -> promise.reject("sin_cuentas", e.message ?: "No hay cuentas de Google disponibles.")
             else -> promise.reject("error", "${e.type}: ${e.message}", e)
           }
         }

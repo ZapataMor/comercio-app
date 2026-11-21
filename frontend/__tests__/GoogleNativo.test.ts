@@ -39,7 +39,9 @@ test('solo está disponible en Android con el módulo nativo y el ID de cliente'
 test('devuelve el token de la cuenta elegida, con el ID de cliente web', async () => {
   const nativo = { elegirCuenta: jest.fn().mockResolvedValue('id-token') };
   await expect(cargar({ nativo }).elegirCuentaGoogle()).resolves.toBe('id-token');
-  expect(nativo.elegirCuenta).toHaveBeenCalledWith('web-123.apps.googleusercontent.com');
+  expect(nativo.elegirCuenta).toHaveBeenCalledWith('web-123.apps.googleusercontent.com', false);
+  await cargar({ nativo }).elegirCuentaGoogle({ rapido: true });
+  expect(nativo.elegirCuenta).toHaveBeenLastCalledWith('web-123.apps.googleusercontent.com', true);
 });
 
 test('cerrar la ventana no es un error; los demás fallos dan un mensaje claro', async () => {

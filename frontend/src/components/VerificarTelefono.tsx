@@ -6,6 +6,9 @@
  *
  * Mientras el backend no envía WhatsApp de verdad (WHATSAPP_DRIVER=log), en
  * local la respuesta trae `codigo_prueba` y aquí se muestra.
+ *
+ * Con `vidrio` toma el aspecto de la tarjeta de vidrio del login (registro):
+ * campos hundidos y botón con los colores de `paletasLogin`.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -23,6 +26,8 @@ type Props = {
   verificar: (telefono: string, codigo: string) => Promise<void>;
   /** Texto del botón del paso 1. */
   textoEnviar?: string;
+  /** Dentro de la tarjeta de vidrio de las pantallas de acceso. */
+  vidrio?: boolean;
 };
 
 /** 3001234567 → 300 123 4567 */
@@ -30,9 +35,20 @@ export function formatoCelular(telefono: string): string {
   return telefono.replace(/^(\d{3})(\d{3})(\d{4})$/, '$1 $2 $3');
 }
 
-export default function VerificarTelefono({ telefonoInicial = '', pedir, verificar, textoEnviar = 'Enviar código por WhatsApp' }: Props) {
-  const { c } = useTheme();
-  const styles = useStyles();
+export default function VerificarTelefono({
+  telefonoInicial = '',
+  pedir,
+  verificar,
+  textoEnviar = 'Enviar código por WhatsApp',
+  vidrio,
+}: Props) {
+  const { c, login: l } = useTheme();
+  const normales = useStyles();
+  const deVidrio = useEstilosVidrio();
+  const styles = vidrio ? deVidrio : normales;
+  const colorEjemplo = vidrio ? l.campoEjemplo : c.mutedSoft;
+  const colorCarga = vidrio ? l.botonTexto : c.onBrand;
+  const cursor = vidrio ? { cursorColor: l.cursor, selectionColor: l.cursor, selectionHandleColor: l.cursor } : null;
   const [paso, setPaso] = useState<'numero' | 'codigo'>('numero');
   const [telefono, setTelefono] = useState(telefonoInicial);
   const [codigo, setCodigo] = useState('');
@@ -106,7 +122,8 @@ export default function VerificarTelefono({ telefonoInicial = '', pedir, verific
             keyboardType="number-pad"
             maxLength={10}
             placeholder="3001234567"
-            placeholderTextColor={c.mutedSoft}
+            placeholderTextColor={colorEjemplo}
+            {...cursor}
             textContentType="telephoneNumber"
             autoComplete="tel"
             editable={!cargando}
@@ -116,7 +133,7 @@ export default function VerificarTelefono({ telefonoInicial = '', pedir, verific
         <FieldError mensaje={errores.telefono} />
         <Text style={styles.ayuda}>Te enviaremos un código de 6 números por WhatsApp.</Text>
         <TouchableOpacity style={[styles.boton, cargando && styles.botonDisabled]} onPress={enviar} disabled={cargando}>
-          {cargando ? <ActivityIndicator color={c.onBrand} /> : <Text style={styles.botonTxt}>{textoEnviar}</Text>}
+          {cargando ? <ActivityIndicator color={colorCarga} /> : <Text style={styles.botonTxt}>{textoEnviar}</Text>}
         </TouchableOpacity>
       </View>
     );
@@ -129,7 +146,7 @@ export default function VerificarTelefono({ telefonoInicial = '', pedir, verific
       </Text>
       {codigoPrueba ? (
         <View style={styles.prueba}>
-          <Icon name="alerta" size={16} color={c.goldText} />
+          <Icon name="alerta" size={16} color={vidrio ? l.campoIcono : c.goldText} />
           <Text style={styles.pruebaTxt}>
             Modo prueba (WhatsApp sin configurar): tu código es <Text style={styles.fuerte}>{codigoPrueba}</Text>
           </Text>
@@ -145,7 +162,8 @@ export default function VerificarTelefono({ telefonoInicial = '', pedir, verific
         keyboardType="number-pad"
         maxLength={6}
         placeholder="000000"
-        placeholderTextColor={c.mutedSoft}
+        placeholderTextColor={colorEjemplo}
+        {...cursor}
         textContentType="oneTimeCode"
         autoComplete="sms-otp"
         editable={!cargando}
@@ -154,7 +172,7 @@ export default function VerificarTelefono({ telefonoInicial = '', pedir, verific
       />
       <FieldError mensaje={errores.codigo} />
       <TouchableOpacity style={[styles.boton, cargando && styles.botonDisabled]} onPress={confirmar} disabled={cargando}>
-        {cargando ? <ActivityIndicator color={c.onBrand} /> : <Text style={styles.botonTxt}>Confirmar</Text>}
+        {cargando ? <ActivityIndicator color={colorCarga} /> : <Text style={styles.botonTxt}>Confirmar</Text>}
       </TouchableOpacity>
       <View style={styles.enlaces}>
         <TouchableOpacity onPress={enviar} disabled={cargando || espera > 0}>
@@ -206,3 +224,61 @@ const useStyles = makeStyles((c, shadow) => ({
   enlace: { color: c.goldText, fontFamily: font.semibold, fontSize: 13 },
   enlaceApagado: { color: c.mutedSoft },
 }));
+
+// Mismas piezas con el aspecto de la tarjeta de vidrio (ver CampoAcceso).
+const useEstilosVidrio = makeStyles((_c, _sombras, l) => {
+  const hundido = {
+    borderRadius: radius.md,
+    backgroundColor: l.campo,
+    boxShadow: `inset 0px 2px 5px 0px ${l.campoHundido}, inset 0px -1px 0px 0px ${l.campoFilo}`,
+  };
+  return {
+    label: {
+      color: l.rotulo,
+      fontFamily: font.bold,
+      fontSize: 11,
+      letterSpacing: 1.3,
+      textTransform: 'uppercase',
+      marginBottom: 6,
+    },
+    fila: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    prefijo: {
+      ...hundido,
+      height: 48,
+      lineHeight: 48,
+      paddingHorizontal: 12,
+      color: l.campoTexto,
+      fontFamily: font.semibold,
+      fontSize: 16,
+    },
+    input: {
+      ...hundido,
+      height: 48,
+      paddingHorizontal: 14,
+      paddingVertical: 0,
+      color: l.campoTexto,
+      fontFamily: font.medium,
+      fontSize: 16,
+    },
+    inputTelefono: { flex: 1 },
+    inputCodigo: { fontSize: 24, letterSpacing: 8, textAlign: 'center', fontFamily: font.bold, marginTop: 4 },
+    ayuda: { color: l.rotulo, opacity: 0.8, fontSize: 12, fontFamily: font.regular, marginTop: 8 },
+    texto: { color: l.rotulo, fontSize: 14, fontFamily: font.regular, lineHeight: 20, marginBottom: 12 },
+    fuerte: { color: l.rotulo, fontFamily: font.bold },
+    prueba: { ...hundido, flexDirection: 'row', gap: 8, alignItems: 'center', padding: 10, marginBottom: 12 },
+    pruebaTxt: { flex: 1, color: l.campoTexto, fontSize: 12.5, fontFamily: font.regular },
+    boton: {
+      height: 51,
+      backgroundColor: l.boton,
+      borderRadius: radius.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 14,
+    },
+    botonDisabled: { opacity: 0.7 },
+    botonTxt: { color: l.botonTexto, fontFamily: font.bold, fontSize: 16, includeFontPadding: false },
+    enlaces: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 14 },
+    enlace: { color: l.rotulo, fontFamily: font.bold, fontSize: 13, textDecorationLine: 'underline' },
+    enlaceApagado: { opacity: 0.6, textDecorationLine: 'none' },
+  } as const;
+});

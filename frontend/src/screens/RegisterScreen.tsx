@@ -1,31 +1,20 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Linking,
-  Platform,
-  ScrollView,
-  StatusBar,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
 import { pedirCodigoRegistro, register, verificarTelefonoRegistro } from '../api';
 import { useAuth } from '../AuthContext';
-import { FadeInView, PressableScale } from '../components/anim';
+import { PressableScale } from '../components/anim';
 import BotonGoogle, { useEntrarConGoogle } from '../components/BotonGoogle';
-import CampoClave from '../components/CampoClave';
 import FieldError from '../components/FieldError';
 import Icon from '../components/Icon';
-import { VitrinaMark } from '../components/Logo';
+import CampoAcceso from '../components/login/CampoAcceso';
+import EscenaAcceso from '../components/login/EscenaAcceso';
+import { CasillaPolitica, LogoAcceso, SeparadorAcceso, useEstilosAcceso } from '../components/login/estilosAcceso';
 import VerificarTelefono, { formatoCelular } from '../components/VerificarTelefono';
-import { WEB_URL } from '../config';
 import { googleDisponible } from '../google';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
-import { font, makeStyles, radius, useTheme } from '../theme';
+import { useTheme } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 
@@ -39,10 +28,12 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 //
 // O, en vez del celular, «Continuar con Google»: si la cuenta de Google es
 // nueva sigue en RegistroGoogle (nombre y política); si ya existe, entra.
+//
+// Se ve igual que el login (EscenaAcceso): mismo fondo y misma tarjeta.
 
 export default function RegisterScreen({ navigation }: Props) {
-  const { c } = useTheme();
-  const styles = useStyles();
+  const { login: l } = useTheme();
+  const e = useEstilosAcceso();
   const { entrar: guardarSesion } = useAuth();
   const [nombre, setNombre] = useState('');
   const [apellidos, setApellidos] = useState('');
@@ -57,6 +48,7 @@ export default function RegisterScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [errores, setErrores] = useState<FieldErrors>({});
   const google = useEntrarConGoogle((idToken, perfil) => navigation.navigate('RegistroGoogle', { idToken, perfil }));
+  const conGoogle = googleDisponible();
 
   function limpiarError(campo: string) {
     setErrores(prev => {
@@ -103,8 +95,8 @@ export default function RegisterScreen({ navigation }: Props) {
         acepta_terminos: aceptaTerminos,
       });
       guardarSesion(token, user);
-    } catch (e) {
-      const campos = fieldErrorsFromError(e, { password_confirmation: 'confirmar' });
+    } catch (err) {
+      const campos = fieldErrorsFromError(err, { password_confirmation: 'confirmar' });
       if (campos.telefono || campos.verificacion) {
         // La verificación venció o el número ya tiene cuenta: volver a confirmarlo.
         setCelular(null);
@@ -112,258 +104,186 @@ export default function RegisterScreen({ navigation }: Props) {
       } else if (Object.keys(campos).length > 0) {
         setErrores(campos);
       } else {
-        setError(messageFromError(e));
+        setError(messageFromError(err));
       }
     } finally {
       setCargando(false);
     }
   }
 
+  const avisoGeneral = error ?? (!celular ? google.error : null);
+  const irAlLogin = (
+    <TouchableOpacity style={e.pie} onPress={() => navigation.goBack()} disabled={cargando || google.cargando}>
+      <Text style={e.pieTexto}>
+        ¿Ya tienes cuenta? <Text style={e.enlace}>Inicia sesión</Text>
+      </Text>
+    </TouchableOpacity>
+  );
+
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <StatusBar barStyle="dark-content" backgroundColor={c.bg} />
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <FadeInView style={styles.card}>
-          <View style={styles.logoRow}>
-            <VitrinaMark size={30} />
-            <Text style={styles.logo}>Crear cuenta</Text>
-          </View>
-          <Text style={styles.subtitle}>{celular ? 'Únete a Vitrina' : googleDisponible() ? 'Empieza con Google o con tu celular' : 'Empieza con tu número de celular'}</Text>
+    <EscenaAcceso>
+      <LogoAcceso />
+      <Text style={e.titulo}>Crear cuenta</Text>
+      <Text style={e.subtitulo}>
+        {celular ? 'Únete a Vitrina' : conGoogle ? 'Empieza con Google o con tu celular' : 'Empieza con tu número de celular'}
+      </Text>
 
-          {error || (!celular && google.error) ? <Text style={styles.error}>{error ?? google.error}</Text> : null}
+      {avisoGeneral ? <Text style={e.error}>{avisoGeneral}</Text> : null}
 
-          {!celular ? (
+      {!celular ? (
+        <>
+          {conGoogle ? (
             <>
-              {googleDisponible() ? (
-                <>
-                  <BotonGoogle
-                    onPress={() => {
-                      setError(null);
-                      google.iniciar();
-                    }}
-                    cargando={google.cargando}
-                  />
-                  <View style={styles.separador}>
-                    <View style={styles.separadorLinea} />
-                    <Text style={styles.separadorTxt}>o con tu celular</Text>
-                    <View style={styles.separadorLinea} />
-                  </View>
-                </>
-              ) : null}
-              <VerificarTelefono
-                pedir={pedirCodigoRegistro}
-                verificar={async (telefono, codigo) => {
-                  const token = await verificarTelefonoRegistro(telefono, codigo);
+              <BotonGoogle
+                onPress={() => {
                   setError(null);
-                  setCelular({ telefono, token });
+                  google.iniciar();
                 }}
+                cargando={google.cargando}
               />
-              <TouchableOpacity onPress={() => navigation.goBack()}>
-                <Text style={styles.hint}>¿Ya tienes cuenta? Inicia sesión</Text>
-              </TouchableOpacity>
+              <SeparadorAcceso texto="o con tu celular" />
             </>
-          ) : (
-          <>
-          <View style={styles.celularListo}>
-            <Icon name="check" size={18} color={c.success} />
-            <View style={styles.celularTexto}>
-              <Text style={styles.celularEtiqueta}>Celular confirmado</Text>
-              <Text style={styles.celularNumero}>+57 {formatoCelular(celular.telefono)}</Text>
+          ) : null}
+          <VerificarTelefono
+            vidrio
+            pedir={pedirCodigoRegistro}
+            verificar={async (telefono, codigo) => {
+              const token = await verificarTelefonoRegistro(telefono, codigo);
+              setError(null);
+              setCelular({ telefono, token });
+            }}
+          />
+          {irAlLogin}
+        </>
+      ) : (
+        <>
+          <View style={e.recuadro}>
+            <Icon name="check" size={18} color={l.campoIcono} />
+            <View style={e.recuadroTexto}>
+              <Text style={e.recuadroEtiqueta}>CELULAR CONFIRMADO</Text>
+              <Text style={e.recuadroValor}>+57 {formatoCelular(celular.telefono)}</Text>
             </View>
             <TouchableOpacity onPress={() => setCelular(null)} disabled={cargando} hitSlop={8}>
-              <Text style={styles.enlace}>Cambiar</Text>
+              <Text style={e.recuadroAccion}>Cambiar</Text>
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.label}>Nombre(s)</Text>
-          <TextInput
-            style={styles.input}
-            value={nombre}
-            onChangeText={valor => {
-              setNombre(valor);
-              limpiarError('name');
-            }}
-            placeholder="Ej: Ana María"
-            placeholderTextColor={c.mutedSoft}
-            autoCapitalize="words"
-            textContentType="givenName"
-            autoComplete="name-given"
-            editable={!cargando}
-          />
+          <View style={e.bloqueCampo}>
+            <CampoAcceso
+              rotulo="NOMBRE(S)"
+              icono="usuario"
+              value={nombre}
+              onChangeText={valor => {
+                setNombre(valor);
+                limpiarError('name');
+              }}
+              placeholder="Ej: Ana María"
+              autoCapitalize="words"
+              textContentType="givenName"
+              autoComplete="name-given"
+              editable={!cargando}
+              accessibilityLabel="Nombre(s)"
+            />
+          </View>
           <FieldError mensaje={errores.name} />
 
-          <Text style={styles.label}>Apellidos</Text>
-          <TextInput
-            style={styles.input}
-            value={apellidos}
-            onChangeText={valor => {
-              setApellidos(valor);
-              limpiarError('apellidos');
-            }}
-            placeholder="Ej: Pérez Gómez"
-            placeholderTextColor={c.mutedSoft}
-            autoCapitalize="words"
-            textContentType="familyName"
-            autoComplete="name-family"
-            editable={!cargando}
-          />
+          <View style={e.bloqueCampo}>
+            <CampoAcceso
+              rotulo="APELLIDOS"
+              icono="usuarios"
+              value={apellidos}
+              onChangeText={valor => {
+                setApellidos(valor);
+                limpiarError('apellidos');
+              }}
+              placeholder="Ej: Pérez Gómez"
+              autoCapitalize="words"
+              textContentType="familyName"
+              autoComplete="name-family"
+              editable={!cargando}
+              accessibilityLabel="Apellidos"
+            />
+          </View>
           <FieldError mensaje={errores.apellidos} />
 
-          <Text style={styles.label}>Correo (opcional)</Text>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={valor => {
-              setEmail(valor);
-              limpiarError('email');
-            }}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            placeholder="correo@ejemplo.co"
-            placeholderTextColor={c.mutedSoft}
-            editable={!cargando}
-          />
+          <View style={e.bloqueCampo}>
+            <CampoAcceso
+              rotulo="CORREO (OPCIONAL)"
+              icono="sobre"
+              value={email}
+              onChangeText={valor => {
+                setEmail(valor);
+                limpiarError('email');
+              }}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              placeholder="correo@ejemplo.co"
+              editable={!cargando}
+              accessibilityLabel="Correo"
+            />
+          </View>
           <FieldError mensaje={errores.email} />
-          <Text style={styles.ayudaCampo}>Otra forma de entrar y de recuperar tu contraseña.</Text>
+          <Text style={e.ayuda}>Otra forma de entrar y de recuperar tu contraseña.</Text>
 
-          <Text style={styles.label}>Contraseña</Text>
-          <CampoClave
-            style={styles.input}
-            value={password}
-            onChangeText={valor => {
-              setPassword(valor);
-              limpiarError('password');
-            }}
-            placeholder="Mínimo 5 caracteres"
-            placeholderTextColor={c.mutedSoft}
-            editable={!cargando}
-          />
+          <View style={e.bloqueCampo}>
+            <CampoAcceso
+              rotulo="CONTRASEÑA"
+              icono="candado"
+              value={password}
+              onChangeText={valor => {
+                setPassword(valor);
+                limpiarError('password');
+              }}
+              placeholder="Mínimo 5 caracteres"
+              editable={!cargando}
+              accessibilityLabel="Contraseña"
+              clave
+            />
+          </View>
           <FieldError mensaje={errores.password} />
 
-          <Text style={styles.label}>Confirmar contraseña</Text>
-          <CampoClave
-            style={styles.input}
-            value={confirmar}
-            onChangeText={valor => {
-              setConfirmar(valor);
-              limpiarError('confirmar');
-            }}
-            placeholder="Repite la contraseña"
-            placeholderTextColor={c.mutedSoft}
-            editable={!cargando}
-          />
+          <View style={e.bloqueCampo}>
+            <CampoAcceso
+              rotulo="CONFIRMAR CONTRASEÑA"
+              icono="candado"
+              value={confirmar}
+              onChangeText={valor => {
+                setConfirmar(valor);
+                limpiarError('confirmar');
+              }}
+              placeholder="Repite la contraseña"
+              editable={!cargando}
+              accessibilityLabel="Confirmar contraseña"
+              clave
+            />
+          </View>
           <FieldError mensaje={errores.confirmar} />
 
-          <View style={styles.terminosRow}>
-            <TouchableOpacity
-              style={[styles.casilla, aceptaTerminos && styles.casillaMarcada]}
-              onPress={() => {
-                setAceptaTerminos(v => !v);
-                limpiarError('acepta_terminos');
-              }}
-              disabled={cargando}
-              hitSlop={8}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: aceptaTerminos }}>
-              {aceptaTerminos && <Icon name="check" size={14} color={c.onAccent} />}
-            </TouchableOpacity>
-            <Text style={styles.terminosTxt}>
-              Acepto la{' '}
-              <Text style={styles.enlace} onPress={() => Linking.openURL(`${WEB_URL}/privacidad`)}>
-                política de privacidad
-              </Text>{' '}
-              y autorizo el tratamiento de mis datos para gestionar mis pedidos.
-            </Text>
-          </View>
+          <CasillaPolitica
+            marcada={aceptaTerminos}
+            alCambiar={() => {
+              setAceptaTerminos(v => !v);
+              limpiarError('acepta_terminos');
+            }}
+            deshabilitada={cargando}
+          />
           <FieldError mensaje={errores.acepta_terminos} />
 
-          <Text style={styles.nota}>¿Tienes un negocio? Créalo después desde "Mis negocios".</Text>
+          <Text style={e.nota}>¿Tienes un negocio? Créalo después desde "Mis negocios".</Text>
 
           <PressableScale
-            style={[styles.boton, cargando && styles.botonDisabled]}
+            style={[e.boton, cargando && e.botonInactivo]}
+            scaleTo={0.97}
             onPress={crearCuenta}
-            disabled={cargando}>
-            {cargando ? (
-              <ActivityIndicator color={c.onBrand} />
-            ) : (
-              <Text style={styles.botonTexto}>Crear cuenta</Text>
-            )}
+            disabled={cargando}
+            accessibilityRole="button">
+            {cargando ? <ActivityIndicator size="small" color={l.botonTexto} /> : <Text style={e.botonTexto}>Crear cuenta</Text>}
           </PressableScale>
 
-          <TouchableOpacity onPress={() => navigation.goBack()} disabled={cargando}>
-            <Text style={styles.hint}>¿Ya tienes cuenta? Inicia sesión</Text>
-          </TouchableOpacity>
-          </>
-          )}
-        </FadeInView>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          {irAlLogin}
+        </>
+      )}
+    </EscenaAcceso>
   );
 }
-
-const useStyles = makeStyles((c, shadow) => ({
-  container: { flex: 1, backgroundColor: c.bg },
-  scroll: { flexGrow: 1, justifyContent: 'center', padding: 20 },
-  card: {
-    backgroundColor: c.surface,
-    borderRadius: radius.xl,
-    padding: 24,
-    ...shadow.card,
-  },
-  logo: { fontSize: 22, fontFamily: font.display, textAlign: 'center', color: c.textStrong },
-  logoRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  subtitle: { textAlign: 'center', color: c.muted, fontFamily: font.medium, marginTop: 6, marginBottom: 20 },
-  label: { fontSize: 13, fontFamily: font.semibold, color: c.text, marginBottom: 6 },
-  input: {
-    borderWidth: 1,
-    borderColor: c.borderStrong,
-    borderRadius: radius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
-    fontFamily: font.regular,
-    marginBottom: 16,
-    color: c.textStrong,
-  },
-  ayudaCampo: { fontSize: 12, color: c.muted, fontFamily: font.regular, marginTop: -10, marginBottom: 16 },
-  celularListo: {
-    flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.successSoft,
-    borderRadius: radius.md, padding: 12, marginBottom: 18,
-  },
-  celularTexto: { flex: 1 },
-  celularEtiqueta: { fontSize: 12, fontFamily: font.semibold, color: c.success },
-  celularNumero: { fontSize: 15, fontFamily: font.bold, color: c.textStrong, marginTop: 2 },
-  nota: { fontSize: 12, color: c.muted, fontFamily: font.regular, textAlign: 'center', marginBottom: 16 },
-  terminosRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 12 },
-  casilla: {
-    width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: c.borderStrong,
-    alignItems: 'center', justifyContent: 'center', marginTop: 1,
-  },
-  casillaMarcada: { backgroundColor: c.accent, borderColor: c.accent },
-  terminosTxt: { flex: 1, fontSize: 13, color: c.text, fontFamily: font.regular, lineHeight: 19 },
-  enlace: { color: c.goldText, fontFamily: font.semibold, textDecorationLine: 'underline' },
-  boton: {
-    backgroundColor: c.brand,
-    borderRadius: radius.md,
-    paddingVertical: 15,
-    alignItems: 'center',
-    ...shadow.soft,
-  },
-  botonDisabled: { opacity: 0.7 },
-  botonTexto: { color: c.onBrand, fontFamily: font.bold, fontSize: 16 },
-  error: {
-    backgroundColor: c.dangerSoft,
-    color: c.danger,
-    fontFamily: font.medium,
-    padding: 10,
-    borderRadius: radius.sm,
-    marginBottom: 16,
-    fontSize: 13,
-  },
-  hint: { textAlign: 'center', color: c.goldText, fontSize: 14, marginTop: 18, fontFamily: font.semibold },
-  separador: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18, marginBottom: 16 },
-  separadorLinea: { flex: 1, height: 1, backgroundColor: c.borderStrong },
-  separadorTxt: { color: c.muted, fontFamily: font.medium, fontSize: 12 },
-}));
