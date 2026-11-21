@@ -46,8 +46,12 @@ function rutaActual(): Pantalla | null {
 
 /** `listo`: terminó el splash (antes no se muestra nada). */
 export function TutorialProvider({ children, listo }: { children: React.ReactNode; listo: boolean }) {
-  const { auth } = useAuth();
+  const { auth, porCompletar } = useAuth();
   const user = auth?.user ?? null;
+  // Antes de la app («Crea tu clave», «Completa tu cuenta») no se ofrece ayuda.
+  const antesDeLaApp = !!user && (user.tiene_pin === false || porCompletar === user.id);
+  const antesDeLaAppRef = useRef(antesDeLaApp);
+  antesDeLaAppRef.current = antesDeLaApp;
 
   // --- Elementos marcados -------------------------------------------------
   const objetivos = useRef(new Map<string, EntradaObjetivo[]>());
@@ -244,7 +248,7 @@ export function TutorialProvider({ children, listo }: { children: React.ReactNod
   ocupadoRef.current = !!activo || esperando || ayudaAbierta;
 
   const ofrecerAyuda = useCallback(() => {
-    if (!user || ocupadoRef.current || AppState.currentState !== 'active') return;
+    if (!user || antesDeLaAppRef.current || ocupadoRef.current || AppState.currentState !== 'active') return;
     if (Date.now() - ultimoBoton.current < PAUSA_BOTON_AYUDA) return;
     ultimoBoton.current = Date.now();
     setBotonAyuda(true);

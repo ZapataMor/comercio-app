@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { solicitar, ErrorRed, TIEMPO_SUBIDA_MS } from './red';
 import { comprimirFoto } from './fotos';
 import { API_URL } from './config';
@@ -38,7 +39,9 @@ export type Usuario = {
   en_turno?: boolean;
   /** Tiene una cuenta de Google conectada para entrar con ella. */
   google?: boolean;
-  /** false: se registró con Google y aún no ha creado contraseña. */
+  /** Clave de 4 números. false: la app le pide crearla antes de seguir (undefined: sesión de antes, aún sin el dato). */
+  tiene_pin?: boolean;
+  /** Contraseña de antes (cuentas viejas y el panel web de administración). */
   tiene_clave?: boolean;
 };
 
@@ -63,6 +66,11 @@ export type Pagina<T> = { items: T[]; pagina: number; ultima_pagina: number; tot
 export type LoginResponse = {
   user: Usuario;
   token: string;
+  /**
+   * Token del teléfono de confianza: con él, en este teléfono se entra solo
+   * con la clave («Continuar como»). AuthContext lo guarda por cuenta.
+   */
+  dispositivo?: string;
 };
 
 /**
@@ -278,9 +286,47 @@ export function alRechazarToken(cb: ((token: string) => void) | null) {
   onTokenRechazado = cb;
 }
 
+/** Modelo del teléfono, para que la persona reconozca sus teléfonos de confianza. */
+function nombreDispositivo(): string | undefined {
+  const c = Platform.constants as { Brand?: string; Model?: string } | undefined;
+  const nombre = [c?.Brand, c?.Model].filter(Boolean).join(' ').trim();
+  return nombre ? nombre.slice(0, 80) : undefined;
+}
+
+/** El backend pide un código de WhatsApp porque es la primera vez que se entra en este teléfono. */
+export type CodigoAcceso = CodigoEnviado & { requiere_codigo: true; telefono: string };
+
 /**
- * Inicia sesión contra POST /api/login del backend Laravel (Sanctum).
- * `usuario`: correo, celular verificado o nombre de usuario.
+ * Entrar con el celular verificado y la clave de 4 números (POST /api/login).
+ * En un teléfono de confianza (`dispositivo`) devuelve la sesión; en uno
+ * nuevo devuelve `requiere_codigo` y el backend envía un código por WhatsApp
+ * (ver confirmarCodigoAcceso). Con la clave bloqueada falla con 423 y
+ * `data.codigo === 'clave_bloqueada'`.
+ */
+export function entrarConClave(telefono: string, pin: string, dispositivo?: string | null): Promise<LoginResponse | CodigoAcceso> {
+  return publicPostDatos('/api/login', { telefono, pin, ...(dispositivo ? { dispositivo } : {}) }, 'No se pudo iniciar sesión.');
+}
+
+/** Segundo paso en un teléfono nuevo: el código de WhatsApp. El teléfono queda de confianza. */
+export function confirmarCodigoAcceso(telefono: string, pin: string, codigo: string): Promise<LoginResponse> {
+  return publicPostDatos(
+    '/api/login/codigo',
+    { telefono, pin, codigo, nombre_dispositivo: nombreDispositivo() },
+    'No se pudo confirmar el código.',
+  );
+}
+
+/**
+ * «Continuar como»: el teléfono de confianza dice de qué cuenta es; falta la
+ * clave. Si el teléfono ya no la recuerda falla con `data.codigo === 'dispositivo_desconocido'`.
+ */
+export function entrarEnDispositivo(dispositivo: string, pin: string): Promise<LoginResponse> {
+  return publicPostDatos('/api/login', { dispositivo, pin }, 'No se pudo iniciar sesión.');
+}
+
+/**
+ * Las cuentas de antes: correo, celular o usuario y contraseña (POST /api/login).
+ * Si aún no tienen clave de 4 números, la app se la pide al entrar.
  * Devuelve el usuario + token, o lanza un Error con el mensaje del backend.
  */
 export async function login(usuario: string, password: string): Promise<LoginResponse> {
@@ -292,7 +338,7 @@ export async function login(usuario: string, password: string): Promise<LoginRes
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
-      body: JSON.stringify({ usuario, password }),
+      body: JSON.stringify({ usuario, password, nombre_dispositivo: nombreDispositivo() }),
     });
   } catch (error) {
     if (error instanceof ErrorRed) throw error;
@@ -319,9 +365,10 @@ export async function login(usuario: string, password: string): Promise<LoginRes
 export async function register(body: {
   name: string;
   apellidos: string;
-  /** Opcional: se puede entrar con el celular verificado. */
+  /** Opcional: la app lo pide después («Completa tu cuenta»). */
   email?: string | null;
-  password: string;
+  /** Clave de 4 números: con ella y el celular se entra. */
+  pin: string;
   /** Opcionales: la dirección se pide en el primer pedido. */
   direccion?: string;
   barrio?: string;
@@ -338,8 +385,9 @@ export async function register(body: {
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
         ...body,
-        // El backend exige confirmación de contraseña (regla 'confirmed').
-        password_confirmation: body.password,
+        // El backend exige confirmar la clave (regla 'confirmed').
+        pin_confirmation: body.pin,
+        nombre_dispositivo: nombreDispositivo(),
       }),
     });
   } catch (error) {
@@ -364,22 +412,47 @@ export async function register(body: {
 export type PerfilGoogle = { name: string; apellidos: string; email: string };
 
 /**
- * Respuesta de POST /api/google: la sesión, o `nuevo` si esa cuenta de Google
- * aún no tiene cuenta en Vitrina (falta aceptar la política y revisar el nombre).
+ * Respuesta de POST /api/google: la sesión; `requiere_pin` si la cuenta ya
+ * existe y falta su clave (se vuelve a llamar con el mismo token y `pin`); o
+ * `nuevo` si esa cuenta de Google aún no tiene cuenta en Vitrina (falta
+ * aceptar la política, revisar el nombre y crear la clave).
  */
-export type RespuestaGoogle = (LoginResponse & { nuevo?: undefined }) | { nuevo: true; perfil: PerfilGoogle };
+export type RespuestaGoogle =
+  | (LoginResponse & { nuevo?: undefined; requiere_pin?: undefined })
+  | { requiere_pin: true; nuevo?: undefined; user: { id: number; name: string; apellidos?: string | null } }
+  | { nuevo: true; requiere_pin?: undefined; perfil: PerfilGoogle };
 
 /**
- * Entra con el «ID token» que Google le dio a la app (src/google.ts). Con
- * `registro` (política aceptada, nombre y apellidos) crea la cuenta nueva.
- * Si el correo ya tiene cuenta sin Google conectado falla con 409 y
- * `data.codigo === 'correo_existente'`.
+ * Entra con el «ID token» que Google le dio a la app (src/google.ts), con la
+ * clave si ya la pidió (`pin`). Con `registro` (política aceptada, nombre,
+ * apellidos y clave nueva) crea la cuenta. Si el correo ya tiene cuenta sin
+ * Google conectado falla con 409 y `data.codigo === 'correo_existente'`.
  */
 export async function entrarConGoogle(
   idToken: string,
-  registro?: { name: string; apellidos: string; acepta_terminos: true },
+  extra?: { pin?: string; dispositivo?: string | null; registro?: { name: string; apellidos: string; acepta_terminos: true; pin: string } },
 ): Promise<RespuestaGoogle> {
-  return publicPostDatos('/api/google', { id_token: idToken, ...registro }, 'No se pudo entrar con Google.');
+  const registro = extra?.registro ? { ...extra.registro, pin_confirmation: extra.registro.pin } : {};
+  return publicPostDatos(
+    '/api/google',
+    {
+      id_token: idToken,
+      ...(extra?.pin ? { pin: extra.pin } : {}),
+      ...(extra?.dispositivo ? { dispositivo: extra.dispositivo } : {}),
+      ...registro,
+      nombre_dispositivo: nombreDispositivo(),
+    },
+    'No se pudo entrar con Google.',
+  );
+}
+
+/** «¿Olvidaste tu clave?» con Google: clave nueva (también la desbloquea) y entra. */
+export function restablecerClaveConGoogle(idToken: string, pin: string): Promise<LoginResponse & { message: string }> {
+  return publicPostDatos(
+    '/api/password/google',
+    { id_token: idToken, pin, pin_confirmation: pin, nombre_dispositivo: nombreDispositivo() },
+    'No se pudo cambiar la clave.',
+  );
 }
 
 /** Conecta una cuenta de Google a la cuenta con que se entró. */
@@ -388,18 +461,44 @@ export async function conectarGoogle(token: string, idToken: string): Promise<{ 
   return { message: d.message as string, user: d.user as Usuario };
 }
 
-/** Deja de entrar con Google (exige tener contraseña). */
-export async function desconectarGoogle(token: string): Promise<{ message: string; user: Usuario }> {
-  const d = await authSend('DELETE', '/api/perfil/google', token);
+/** Deja de entrar con Google (pide la clave y el celular verificado). */
+export async function desconectarGoogle(token: string, pin: string): Promise<{ message: string; user: Usuario }> {
+  const d = await authSend('DELETE', '/api/perfil/google', token, { pin });
   return { message: d.message as string, user: d.user as Usuario };
 }
 
-// ---------- Recuperar contraseña (sin sesión) ----------
+// ---------- Clave de 4 números (con sesión) ----------
 
-/** POST público (sin token) con cuerpo JSON. Devuelve el `message` del backend. */
-async function publicPost(path: string, body: any, porDefecto: string): Promise<string> {
-  return (await publicPostDatos(path, body, porDefecto))?.message ?? '';
+/**
+ * Crea la clave (las cuentas de antes no tienen) o la cambia (con la actual).
+ * Al crearla, este teléfono queda de confianza (`dispositivo`).
+ */
+export async function guardarClave(token: string, pin: string, pinActual?: string): Promise<{ message: string; user: Usuario; dispositivo?: string }> {
+  const d = await authSend('POST', '/api/perfil/clave', token, {
+    pin,
+    pin_confirmation: pin,
+    ...(pinActual ? { pin_actual: pinActual } : {}),
+    nombre_dispositivo: nombreDispositivo(),
+  });
+  return { message: d.message as string, user: d.user as Usuario, dispositivo: d.dispositivo as string | undefined };
 }
+
+/** Revisa la clave antes de una acción en dos pasos (cuenta como un intento). */
+export async function comprobarClave(token: string, pin: string): Promise<void> {
+  await authSend('POST', '/api/perfil/clave/comprobar', token, { pin });
+}
+
+/** ¿El error es de la clave (equivocada o bloqueada)? */
+export function esErrorDeClave(e: unknown): boolean {
+  return e instanceof ApiError && (e.status === 423 || !!e.errors?.pin || !!e.errors?.pin_actual);
+}
+
+/** ¿La clave quedó bloqueada por intentos fallidos? */
+export function claveBloqueada(e: unknown): boolean {
+  return e instanceof ApiError && e.status === 423;
+}
+
+// ---------- ¿Olvidaste tu clave? (sin sesión) ----------
 
 /** POST público (sin token) con cuerpo JSON. Devuelve todo el cuerpo de la respuesta. */
 async function publicPostDatos(path: string, body: any, porDefecto: string): Promise<any> {
@@ -429,32 +528,25 @@ async function publicPostDatos(path: string, body: any, porDefecto: string): Pro
  */
 export type CodigoEnviado = { message: string; espera?: number; codigo_prueba?: string };
 
-/** Correo o celular con que la persona recupera su contraseña. */
-export type Identidad = { email: string } | { telefono: string };
-
-/**
- * Lo que escribió la persona: celular si son solo números (con o sin +57),
- * si no, correo.
- */
-export function identidadDe(texto: string): Identidad {
-  const limpio = texto.trim();
-  return /^\+?[\d\s-]+$/.test(limpio) ? { telefono: limpio.replace(/\D/g, '').replace(/^57(?=3\d{9}$)/, '') } : { email: limpio };
+/** Deja el celular en 10 dígitos (quita espacios, guiones y el +57). */
+export function limpiarCelular(texto: string): string {
+  return texto.replace(/\D/g, '').replace(/^57(?=3\d{9}$)/, '');
 }
 
 /**
- * Envía un código de 6 dígitos al correo o, con el celular verificado, por
- * WhatsApp (la respuesta no dice si la cuenta existe).
+ * Envía por WhatsApp un código de 6 números al celular verificado (la
+ * respuesta no dice si el número tiene cuenta).
  */
-export function pedirCodigoClave(identidad: Identidad): Promise<CodigoEnviado> {
-  return publicPostDatos('/api/password/codigo', identidad, 'No se pudo enviar el código.');
+export function pedirCodigoClave(telefono: string): Promise<CodigoEnviado> {
+  return publicPostDatos('/api/password/codigo', { telefono: limpiarCelular(telefono) }, 'No se pudo enviar el código.');
 }
 
-/** Pone una contraseña nueva con el código recibido por correo o WhatsApp. */
-export function restablecerClave(identidad: Identidad, codigo: string, password: string): Promise<string> {
-  return publicPost(
+/** Clave nueva con el código de WhatsApp (también la desbloquea). Entra directamente. */
+export function restablecerClave(telefono: string, codigo: string, pin: string): Promise<LoginResponse & { message: string }> {
+  return publicPostDatos(
     '/api/password/restablecer',
-    { ...identidad, codigo, password, password_confirmation: password },
-    'No se pudo cambiar la contraseña.',
+    { telefono: limpiarCelular(telefono), codigo, pin, pin_confirmation: pin, nombre_dispositivo: nombreDispositivo() },
+    'No se pudo cambiar la clave.',
   );
 }
 
@@ -471,9 +563,12 @@ export async function verificarTelefonoRegistro(telefono: string, codigo: string
   return d.verificacion as string;
 }
 
-/** Mi información: envía el código al número que se quiere verificar. */
-export async function pedirCodigoTelefonoPerfil(token: string, telefono: string): Promise<CodigoEnviado> {
-  return (await authSend('POST', '/api/perfil/telefono/codigo', token, { telefono })) as CodigoEnviado;
+/**
+ * Mi información: envía el código al número que se quiere verificar. Cambiar
+ * el celular ya verificado pide la clave (`pin`).
+ */
+export async function pedirCodigoTelefonoPerfil(token: string, telefono: string, pin?: string): Promise<CodigoEnviado> {
+  return (await authSend('POST', '/api/perfil/telefono/codigo', token, { telefono, ...(pin ? { pin } : {}) })) as CodigoEnviado;
 }
 
 /** Mi información: confirma el código; el número queda guardado y verificado. */
@@ -687,17 +782,11 @@ export async function dejarDeSerDomiciliario(token: string): Promise<{ message: 
 }
 
 /**
- * Elimina la cuenta (anonimiza los datos). Se confirma con la contraseña o,
- * sin contraseña (registro con Google), con un ID token de la cuenta de
- * Google conectada. Puede fallar con 409 si hay pedidos o entregas en curso.
+ * Elimina la cuenta (anonimiza los datos). Se confirma con la clave de 4
+ * números. Puede fallar con 409 si hay pedidos o entregas en curso.
  */
-export async function eliminarCuenta(token: string, confirmacion: string | { googleIdToken: string }): Promise<void> {
-  await authSend(
-    'DELETE',
-    '/api/cuenta',
-    token,
-    typeof confirmacion === 'string' ? { password: confirmacion } : { google_id_token: confirmacion.googleIdToken },
-  );
+export async function eliminarCuenta(token: string, pin: string): Promise<void> {
+  await authSend('DELETE', '/api/cuenta', token, { pin });
 }
 
 // ---------- Cliente: ubicaciones ----------
@@ -979,15 +1068,16 @@ export type CuentaPagoForm = {
   quitar_qr?: boolean;
 };
 
-/** Crea (sin id) o edita una cuenta de pago. */
-export async function guardarCuentaPago(token: string, negocioId: number, form: CuentaPagoForm, id?: number): Promise<CuentaPago> {
+/** Crea (sin id) o edita una cuenta de pago. Pide la clave de 4 números (`pin`). */
+export async function guardarCuentaPago(token: string, negocioId: number, form: CuentaPagoForm, pin: string, id?: number): Promise<CuentaPago> {
   const { qrUri, ...campos } = form;
-  const d = await authUpload('POST', `/api/negocios/${negocioId}/cuentas-pago${id ? `/${id}` : ''}`, token, campos, undefined, undefined, qrUri ? { qr: qrUri } : undefined);
+  const d = await authUpload('POST', `/api/negocios/${negocioId}/cuentas-pago${id ? `/${id}` : ''}`, token, { ...campos, pin }, undefined, undefined, qrUri ? { qr: qrUri } : undefined);
   return d.cuenta as CuentaPago;
 }
 
-export async function eliminarCuentaPago(token: string, negocioId: number, id: number): Promise<void> {
-  await authSend('DELETE', `/api/negocios/${negocioId}/cuentas-pago/${id}`, token);
+/** Borra una cuenta de pago. Pide la clave de 4 números. */
+export async function eliminarCuentaPago(token: string, negocioId: number, id: number, pin: string): Promise<void> {
+  await authSend('DELETE', `/api/negocios/${negocioId}/cuentas-pago/${id}`, token, { pin });
 }
 
 /** El cliente avisa que ya pagó: en qué cuenta y, si quiere, la foto del comprobante. */

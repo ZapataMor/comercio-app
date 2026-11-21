@@ -3,6 +3,10 @@
  * Bancolombia, otro banco, una llave o solo un código QR. El cliente las ve
  * cuando el negocio acepta su pedido pagado por transferencia. Las edita el
  * propietario o un administrador; quien gestiona pedidos solo las ve.
+ *
+ * Guardar o borrar una cuenta pide la clave de 4 números: quien entrara a la
+ * cuenta del comerciante no puede cambiar el número para quedarse con las
+ * transferencias.
  */
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Image, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -18,10 +22,10 @@ import {
 import { useAuth } from '../AuthContext';
 import { PressableScale } from '../components/anim';
 import ChipsEleccion from '../components/ChipsEleccion';
-import { useConfirmar } from '../components/Confirmacion';
 import ErrorCarga from '../components/ErrorCarga';
 import { ScrollTeclado } from '../components/EspacioTeclado';
 import Icon from '../components/Icon';
+import { usePedirClave } from '../components/PedirClave';
 import SelectorImagen from '../components/SelectorImagen';
 import { messageFromError } from '../formErrors';
 import { useNegocio } from '../NegocioContext';
@@ -56,7 +60,6 @@ export default function CuentasPagoScreen() {
   const token = auth!.token;
   const { negocio } = useNegocio();
   const toast = useToast();
-  const confirmar = useConfirmar();
   const [cuentas, setCuentas] = useState<CuentaPago[]>([]);
   const [puedeEditar, setPuedeEditar] = useState(false);
   const [maximo, setMaximo] = useState(6);
@@ -67,6 +70,7 @@ export default function CuentasPagoScreen() {
   const [form, setForm] = useState<CuentaPagoForm>(VACIO);
   const [qrActual, setQrActual] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const pedirClave = usePedirClave();
 
   const cargar = useCallback(async () => {
     if (!negocio) return;
@@ -93,40 +97,43 @@ export default function CuentasPagoScreen() {
       : { ...VACIO, titular: negocio?.nombre ?? '' });
   }
 
-  async function guardar() {
+  function guardar() {
     if (!negocio || editando === null) return;
-    setGuardando(true);
-    try {
-      await guardarCuentaPago(token, negocio.id, form, editando || undefined);
-      toast.exito(editando ? 'Cuenta actualizada' : 'Cuenta guardada', 'Tus clientes la verán al pagar por transferencia.');
-      setEditando(null);
-      await cargar();
-    } catch (e) {
-      toast.error('No se pudo guardar', messageFromError(e));
-    } finally {
-      setGuardando(false);
-    }
+    pedirClave.pedir({
+      titulo: 'Escribe tu clave',
+      texto: 'Para proteger dónde recibes el dinero, guardar una cuenta pide tu clave de 4 números.',
+      textoBoton: 'Guardar cuenta',
+      accion: async pin => {
+        setGuardando(true);
+        try {
+          await guardarCuentaPago(token, negocio.id, form, pin, editando || undefined);
+          toast.exito(editando ? 'Cuenta actualizada' : 'Cuenta guardada', 'Tus clientes la verán al pagar por transferencia.');
+          setEditando(null);
+          await cargar();
+        } finally {
+          setGuardando(false);
+        }
+      },
+      // Un dato del formulario que falta: se cierra la clave y se avisa.
+      onOtroError: e => toast.error('No se pudo guardar', messageFromError(e)),
+    });
   }
 
   function eliminar(cuenta: CuentaPago) {
     if (!negocio) return;
-    confirmar({
-      icono: 'basura',
+    pedirClave.pedir({
       titulo: `¿Eliminar ${cuenta.nombre}?`,
-      texto: cuentas.length === 1
+      texto: (cuentas.length === 1
         ? 'Es tu única cuenta: tus clientes ya no podrán elegir pagar por transferencia.'
-        : 'Los clientes dejarán de verla. Los pedidos ya pagados conservan sus datos.',
+        : 'Los clientes dejarán de verla. Los pedidos ya pagados conservan sus datos.') + ' Escribe tu clave para confirmar.',
       textoBoton: 'Eliminar',
       peligro: true,
-      accion: async () => {
-        try {
-          await eliminarCuentaPago(token, negocio.id, cuenta.id);
-          toast.exito('Cuenta eliminada');
-          await cargar();
-        } catch (e) {
-          toast.error('No se pudo eliminar', messageFromError(e));
-        }
+      accion: async pin => {
+        await eliminarCuentaPago(token, negocio.id, cuenta.id, pin);
+        toast.exito('Cuenta eliminada');
+        await cargar();
       },
+      onOtroError: e => toast.error('No se pudo eliminar', messageFromError(e)),
     });
   }
 
@@ -243,6 +250,7 @@ export default function CuentasPagoScreen() {
           </TouchableOpacity>
         </View>
       )}
+      {pedirClave.modal}
     </ScrollTeclado>
   );
 }

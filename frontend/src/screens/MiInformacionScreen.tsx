@@ -4,15 +4,18 @@ import { telefonoValido, errorTelefono } from '../direccion';
  *
  * Se abre desde el menú de "Mi perfil" (ícono de usuario de la topbar).
  * Primero muestra la información en modo lectura y, con "Editar información",
- * pasa al formulario (datos, dirección y cambio de contraseña opcional).
+ * pasa al formulario (nombre, apellidos, correo y teléfono de contacto).
  * Desde este perfil el dueño también desactiva, reactiva o elimina sus negocios.
  * Al final de la vista de lectura están "Dejar de ser domiciliario" (solo
  * para el domiciliario) y "Eliminar mi cuenta".
  *
- * Google: aquí se conecta (para entrar con un toque) o se desconecta. Quien
- * se registró con Google no tiene contraseña (`tiene_clave: false`): la crea
- * sin escribir la actual, y elimina su cuenta eligiendo otra vez su cuenta
- * de Google en vez de escribir la contraseña.
+ * Clave de 4 números: «Cambiar mi clave» (pide la actual). Las acciones
+ * delicadas la piden antes (usePedirClave): cambiar el celular verificado
+ * (con el que se entra), desconectar Google y eliminar la cuenta.
+ *
+ * Google: aquí se conecta (para entrar con un toque y recuperar la clave) o
+ * se desconecta (solo con el celular verificado: sin él no podría volver a
+ * entrar desde otro teléfono).
  */
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
@@ -27,11 +30,13 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { actualizarPerfil, conectarGoogle, dejarDeSerDomiciliario, desconectarGoogle, desactivarNegocio, eliminarCuenta, eliminarNegocio, Negocio, pedirCodigoTelefonoPerfil, Usuario, verificarTelefonoPerfil } from '../api';
+import { actualizarPerfil, comprobarClave, conectarGoogle, dejarDeSerDomiciliario, desconectarGoogle, desactivarNegocio, eliminarCuenta, eliminarNegocio, Negocio, pedirCodigoTelefonoPerfil, Usuario, verificarTelefonoPerfil } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import BotonGoogle, { LogoGoogle } from '../components/BotonGoogle';
-import CampoClave from '../components/CampoClave';
+import CambiarClaveModal from '../components/CambiarClaveModal';
+import CampoPin from '../components/CampoPin';
+import { usePedirClave } from '../components/PedirClave';
 import { useConfirmar } from '../components/Confirmacion';
 import FieldError from '../components/FieldError';
 import Icon, { IconName } from '../components/Icon';
@@ -90,8 +95,9 @@ export default function MiInformacionScreen(_props: Props) {
 
   const esCliente = user.roles.includes('usuario');
   const esDomiciliario = user.roles.includes('domiciliario');
-  // Se registró con Google y aún no tiene contraseña (las sesiones de antes no traen el dato).
-  const sinClave = user.tiene_clave === false;
+  // Modal de la clave para las acciones delicadas, y «Cambiar mi clave».
+  const pedirClave = usePedirClave();
+  const [cambiandoClave, setCambiandoClave] = useState(false);
   const mostrarGoogle = !!user.google || googleDisponible();
   const [cambiandoGoogle, setCambiandoGoogle] = useState(false);
 
@@ -111,23 +117,38 @@ export default function MiInformacionScreen(_props: Props) {
   }
 
   function confirmarDesconectarGoogle() {
-    confirmar({
-      icono: 'candado',
+    pedirClave.pedir({
       titulo: '¿Desconectar Google?',
-      texto: 'Ya no podrás entrar con tu cuenta de Google. Entrarás con tu correo o celular y tu contraseña.',
+      texto: 'Ya no podrás entrar con tu cuenta de Google: entrarás con tu celular y tu clave. Escribe tu clave para confirmar.',
       textoBoton: 'Desconectar',
-      textoCancelar: 'Cancelar',
       peligro: true,
-      accion: async () => {
-        try {
-          const r = await desconectarGoogle(auth!.token);
-          actualizarUsuario(r.user);
-          toast.exito('Google desconectado');
-        } catch (e) {
-          toast.error('No se pudo desconectar', messageFromError(e));
-        }
+      accion: async pin => {
+        const r = await desconectarGoogle(auth!.token, pin);
+        actualizarUsuario(r.user);
+        toast.exito('Google desconectado');
       },
     });
+  }
+
+  // Cambiar el celular verificado: primero la clave, luego el código al número nuevo.
+  const [pinCelular, setPinCelular] = useState<string | null>(null);
+  function cambiarCelular() {
+    pedirClave.pedir({
+      titulo: 'Cambiar mi celular',
+      texto: 'Con tu celular entras a Vitrina. Escribe tu clave y luego te enviaremos un código por WhatsApp al número nuevo.',
+      textoBoton: 'Continuar',
+      accion: async pin => {
+        await comprobarClave(auth!.token, pin);
+        setPinCelular(pin);
+        // Un modal se cierra y el otro se abre: con una pausa no se pisan.
+        setTimeout(() => setVerificandoCelular(true), 350);
+      },
+    });
+  }
+
+  function cerrarVerificarCelular() {
+    setVerificandoCelular(false);
+    setPinCelular(null);
   }
 
   // 'ver' = solo lectura · 'editar' = formulario.
@@ -137,21 +158,13 @@ export default function MiInformacionScreen(_props: Props) {
   const [apellidos, setApellidos] = useState(user.apellidos ?? '');
   const [email, setEmail] = useState(user.email ?? '');
   const [telefono, setTelefono] = useState(user.telefono ?? '');
-  const [passActual, setPassActual] = useState('');
-  const [passNueva, setPassNueva] = useState('');
-  const [passConfirma, setPassConfirma] = useState('');
   const [guardando, setGuardando] = useState(false);
   const [errores, setErrores] = useState<FieldErrors>({});
-
-  const cambiaPass = passActual.length > 0 || passNueva.length > 0 || passConfirma.length > 0;
-  // Sin contraseña (registro con Google) se crea una sin escribir la actual.
-  const pideActual = !sinClave;
 
   // Verificar el celular con un código por WhatsApp.
   const [verificandoCelular, setVerificandoCelular] = useState(false);
 
-  // "Eliminar mi cuenta": se confirma escribiendo la contraseña (o, sin
-  // contraseña, eligiendo otra vez la cuenta de Google).
+  // "Eliminar mi cuenta": se confirma con la clave de 4 números.
   const [eliminando, setEliminando] = useState(false);
   const [clave, setClave] = useState('');
   const [errorClave, setErrorClave] = useState<string | undefined>();
@@ -165,23 +178,18 @@ export default function MiInformacionScreen(_props: Props) {
   }
 
   async function confirmarEliminar() {
-    if (!sinClave && !clave) {
-      setErrorClave('Escribe tu contraseña para confirmar.');
+    if (clave.length !== 4) {
+      setErrorClave('Escribe tu clave de 4 números para confirmar.');
       return;
     }
     setEnviando(true);
     try {
-      if (sinClave) {
-        const googleIdToken = await elegirCuentaGoogle();
-        if (!googleIdToken) return;
-        await eliminarCuenta(auth!.token, { googleIdToken });
-      } else {
-        await eliminarCuenta(auth!.token, clave);
-      }
+      await eliminarCuenta(auth!.token, clave);
       setEliminando(false);
       toast.exito('Cuenta eliminada', 'Gracias por haber usado Vitrina.');
       salir();
     } catch (e) {
+      setClave('');
       setErrorClave(messageFromError(e, 'No se pudo eliminar la cuenta.'));
     } finally {
       setEnviando(false);
@@ -225,9 +233,6 @@ export default function MiInformacionScreen(_props: Props) {
     setApellidos(u.apellidos ?? '');
     setEmail(u.email ?? '');
     setTelefono(u.telefono ?? '');
-    setPassActual('');
-    setPassNueva('');
-    setPassConfirma('');
     setErrores({});
   }
 
@@ -255,25 +260,6 @@ export default function MiInformacionScreen(_props: Props) {
       setErrores(nuevosErrores);
       return;
     }
-    if (cambiaPass) {
-      const passErrores: FieldErrors = {};
-      if (pideActual && !passActual) passErrores.password_actual = 'El campo contraseña actual es obligatorio.';
-      if (!passNueva) passErrores.password = 'El campo nueva contraseña es obligatorio.';
-      if (!passConfirma) passErrores.confirmar = 'Confirma la nueva contraseña.';
-      if (Object.keys(passErrores).length > 0) {
-        setErrores(passErrores);
-        return;
-      }
-      if (passNueva !== passConfirma) {
-        setErrores({ confirmar: 'La nueva contraseña y su confirmación deben ser iguales.' });
-        return;
-      }
-      if (passNueva.length < 5) {
-        setErrores({ password: 'La nueva contraseña debe tener al menos 5 caracteres.' });
-        return;
-      }
-    }
-
     setGuardando(true);
     try {
       const actualizado = await actualizarPerfil(auth!.token, {
@@ -282,14 +268,13 @@ export default function MiInformacionScreen(_props: Props) {
         email: email.trim(),
         // La dirección se maneja en "Mis direcciones".
         ...(esCliente || telefono.trim() ? { telefono: telefono.trim() } : {}),
-        ...(cambiaPass ? { password: passNueva, ...(pideActual ? { password_actual: passActual } : {}) } : {}),
       });
       actualizarUsuario(actualizado);
       cargarCampos(actualizado);
       setModo('ver');
       toast.exito('Información actualizada', 'Tus datos personales quedaron guardados.');
     } catch (e) {
-      const campos = fieldErrorsFromError(e, { password_confirmation: 'confirmar' });
+      const campos = fieldErrorsFromError(e);
       if (Object.keys(campos).length > 0) {
         setErrores(campos);
       } else {
@@ -320,13 +305,16 @@ export default function MiInformacionScreen(_props: Props) {
                 <>
                   <Icon name="check" size={15} color={c.success} />
                   <Text style={[styles.celularEstadoTxt, { color: c.success }]}>
-                    Verificado por WhatsApp: puedes entrar con tu celular.
+                    Verificado por WhatsApp: entras con tu celular y tu clave.
                   </Text>
+                  <TouchableOpacity onPress={cambiarCelular} hitSlop={8}>
+                    <Text style={styles.celularVerificar}>Cambiar</Text>
+                  </TouchableOpacity>
                 </>
               ) : (
                 <>
                   <Text style={styles.celularEstadoTxt}>
-                    Sin verificar. Verifícalo para entrar y recuperar tu contraseña con el celular.
+                    Sin verificar. Verifícalo para entrar y recuperar tu clave con el celular.
                   </Text>
                   <TouchableOpacity onPress={() => setVerificandoCelular(true)} hitSlop={8}>
                     <Text style={styles.celularVerificar}>Verificar</Text>
@@ -338,6 +326,20 @@ export default function MiInformacionScreen(_props: Props) {
           </View>
         </FadeInView>
 
+        <FadeInView delay={60}>
+          <Text style={styles.seccion}>Seguridad</Text>
+          <View style={styles.tarjeta}>
+            <Dato
+              icono="candado"
+              etiqueta="Clave de 4 números"
+              valor={user.tiene_pin === false ? 'Sin crear' : '••••'}
+              ultimo
+            />
+            <TouchableOpacity accessibilityRole="button" onPress={() => setCambiandoClave(true)} hitSlop={8}>
+              <Text style={styles.dejarTxt}>Cambiar mi clave</Text>
+            </TouchableOpacity>
+          </View>
+        </FadeInView>
 
         {(!!codigoPublico || mostrarGoogle) && (
           <FadeInView delay={90}>
@@ -360,15 +362,16 @@ export default function MiInformacionScreen(_props: Props) {
                     <Text style={styles.datoValor}>{user.google ? 'Google conectado' : 'Entrar con Google'}</Text>
                     <Text style={styles.datoEtiqueta}>
                       {user.google
-                        ? sinClave
-                          ? 'Entras con tu cuenta de Google. Crea una contraseña en «Editar información» para entrar también con tu correo.'
-                          : 'Puedes entrar con tu cuenta de Google o con tu contraseña.'
-                        : 'Conecta tu cuenta de Google para entrar con un toque.'}
+                        ? user.telefono_verificado
+                          ? 'Puedes entrar con tu cuenta de Google o con tu celular, siempre con tu clave.'
+                          : 'Entras con Google y tu clave. Verifica tu celular para entrar también con tu número.'
+                        : 'Conéctala para entrar con un toque y para recuperar tu clave si cambias de número.'}
                     </Text>
                   </View>
                 </View>
                 {user.google ? (
-                  !sinClave && (
+                  // Sin celular verificado no podría volver a entrar desde otro teléfono.
+                  !!user.telefono_verificado && (
                     <TouchableOpacity accessibilityRole="button" onPress={confirmarDesconectarGoogle} hitSlop={8}>
                       <Text style={styles.dejarTxt}>Desconectar Google</Text>
                     </TouchableOpacity>
@@ -428,26 +431,38 @@ export default function MiInformacionScreen(_props: Props) {
           </TouchableOpacity>
         </FadeInView>
 
+        {pedirClave.modal}
+        <CambiarClaveModal
+          visible={cambiandoClave}
+          token={auth!.token}
+          onCerrar={() => setCambiandoClave(false)}
+          onListo={actualizado => {
+            actualizarUsuario(actualizado);
+            setCambiandoClave(false);
+            toast.exito('Clave cambiada', 'Desde ahora entras con tu clave nueva.');
+          }}
+        />
+
         <Modal
           visible={verificandoCelular}
           transparent
           animationType="fade"
-          onRequestClose={() => setVerificandoCelular(false)}>
+          onRequestClose={cerrarVerificarCelular}>
           <EspacioTecladoModal style={styles.modalFondo}>
             <View style={styles.modalCaja}>
-              <Text style={styles.modalTitulo}>Verificar mi celular</Text>
+              <Text style={styles.modalTitulo}>{pinCelular ? 'Cambiar mi celular' : 'Verificar mi celular'}</Text>
               <VerificarTelefono
-                telefonoInicial={user.telefono ?? ''}
-                pedir={tel => pedirCodigoTelefonoPerfil(auth!.token, tel)}
+                telefonoInicial={pinCelular ? '' : user.telefono ?? ''}
+                pedir={tel => pedirCodigoTelefonoPerfil(auth!.token, tel, pinCelular ?? undefined)}
                 verificar={async (tel, codigo) => {
                   const actualizado = await verificarTelefonoPerfil(auth!.token, tel, codigo);
                   actualizarUsuario(actualizado);
                   cargarCampos(actualizado);
-                  setVerificandoCelular(false);
-                  toast.exito('Celular verificado', 'Ya puedes entrar con tu número de celular.');
+                  cerrarVerificarCelular();
+                  toast.exito('Celular verificado', 'Desde ahora entras con este número y tu clave.');
                 }}
               />
-              <TouchableOpacity onPress={() => setVerificandoCelular(false)}>
+              <TouchableOpacity onPress={cerrarVerificarCelular}>
                 <Text style={styles.celularCancelar}>Cancelar</Text>
               </TouchableOpacity>
             </View>
@@ -463,22 +478,19 @@ export default function MiInformacionScreen(_props: Props) {
                 conservan sin tus datos. Si eres el único dueño de un negocio, se cierra y deja de verse.
                 No se puede deshacer.
               </Text>
-              {sinClave ? (
-                <Text style={styles.modalTexto}>Para confirmar, elige otra vez tu cuenta de Google.</Text>
-              ) : (
-                <CampoClave
-                  style={styles.inputModal}
-                  value={clave}
-                  onChangeText={v => {
-                    setClave(v);
-                    setErrorClave(undefined);
-                  }}
-                  placeholder="Tu contraseña"
-                  placeholderTextColor={c.mutedSoft}
-                  editable={!enviando}
-                  autoFocus
-                />
-              )}
+              <Text style={styles.modalTexto}>Para confirmar, escribe tu clave de 4 números.</Text>
+              <CampoPin
+                value={clave}
+                onChangeText={v => {
+                  setClave(v);
+                  setErrorClave(undefined);
+                }}
+                editable={!enviando}
+                conError={!!errorClave}
+                autoFocus
+                accessibilityLabel="Tu clave de 4 números"
+                style={styles.pinModal}
+              />
               <FieldError mensaje={errorClave} />
               <TouchableOpacity
                 style={[styles.botonPeligro, enviando && styles.botonDeshabilitado]}
@@ -487,9 +499,7 @@ export default function MiInformacionScreen(_props: Props) {
                 {enviando ? (
                   <ActivityIndicator color={c.surface} />
                 ) : (
-                  <Text style={styles.botonPeligroTxt}>
-                    {sinClave ? 'Confirmar con Google y eliminar' : 'Eliminar definitivamente'}
-                  </Text>
+                  <Text style={styles.botonPeligroTxt}>Eliminar definitivamente</Text>
                 )}
               </TouchableOpacity>
               <TouchableOpacity onPress={cerrarEliminar} disabled={enviando}>
@@ -566,71 +576,18 @@ export default function MiInformacionScreen(_props: Props) {
               placeholder="Tu número de contacto"
               placeholderTextColor={c.mutedSoft}
               keyboardType="number-pad" maxLength={10}
-              editable={!guardando}
+              editable={!guardando && !user.telefono_verificado}
             />
             <FieldError mensaje={errores.telefono} />
-            {user.telefono_verificado && telefono !== (user.telefono ?? '') ? (
+            {user.telefono_verificado ? (
               <Text style={styles.ayuda}>
-                El número nuevo queda sin verificar: después de guardar, verifícalo desde Mi información.
+                Es tu celular verificado, con el que entras: se cambia con «Cambiar» en Mi información (te pediremos
+                tu clave y un código de WhatsApp).
               </Text>
             ) : null}
           </View>
         </FadeInView>
 
-
-        <FadeInView delay={90}>
-          <Text style={styles.seccion}>{pideActual ? 'Cambiar contraseña' : 'Crear contraseña'}</Text>
-          <Text style={styles.ayuda}>
-            {pideActual
-              ? 'Opcional: déjalo vacío para no cambiarla.'
-              : 'Opcional: con una contraseña también entras con tu correo o celular, sin Google.'}
-          </Text>
-          <View style={styles.tarjeta}>
-            {pideActual ? (
-              <>
-                <Text style={styles.label}>Contraseña actual</Text>
-                <CampoClave
-                  style={styles.input}
-                  value={passActual}
-                  onChangeText={valor => {
-                    setPassActual(valor);
-                    limpiarError('password_actual');
-                  }}
-                  placeholder="••••••••"
-                  placeholderTextColor={c.mutedSoft}
-                  editable={!guardando}
-                />
-                <FieldError mensaje={errores.password_actual} />
-              </>
-            ) : null}
-            <Text style={styles.label}>Nueva contraseña</Text>
-            <CampoClave
-              style={styles.input}
-              value={passNueva}
-              onChangeText={valor => {
-                setPassNueva(valor);
-                limpiarError('password');
-              }}
-              placeholder="Mínimo 5 caracteres"
-              placeholderTextColor={c.mutedSoft}
-              editable={!guardando}
-            />
-            <FieldError mensaje={errores.password} />
-            <Text style={styles.label}>Confirmar nueva contraseña</Text>
-            <CampoClave
-              style={[styles.input, styles.inputUltimo]}
-              value={passConfirma}
-              onChangeText={valor => {
-                setPassConfirma(valor);
-                limpiarError('confirmar');
-              }}
-              placeholder="Repite la nueva contraseña"
-              placeholderTextColor={c.mutedSoft}
-              editable={!guardando}
-            />
-            <FieldError mensaje={errores.confirmar} />
-          </View>
-        </FadeInView>
 
         <FadeInView delay={120}>
           <PressableScale style={styles.btn} onPress={guardar} disabled={guardando}>
@@ -735,4 +692,5 @@ const useStyles = makeStyles((c, shadow) => ({
   },
   botonDeshabilitado: { opacity: 0.7 },
   botonPeligroTxt: { color: c.surface, fontFamily: font.bold, fontSize: 15 },
+  pinModal: { marginTop: 4 },
 }));

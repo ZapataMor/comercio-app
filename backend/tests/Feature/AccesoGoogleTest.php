@@ -69,16 +69,18 @@ test('registrarse con Google exige aceptar la política de privacidad', function
     expect(User::count())->toBe(0);
 });
 
-test('con la política aceptada crea la cuenta de cliente sin contraseña y entra', function () {
+test('con la política aceptada y la clave crea la cuenta de cliente sin contraseña y entra', function () {
     $r = $this->postJson('/api/google', [
         'id_token' => tokenGoogle(), 'acepta_terminos' => true, 'name' => ' Ana María ', 'apellidos' => 'Pérez',
+        'pin' => '2468', 'pin_confirmation' => '2468',
     ])->assertCreated()
         ->assertJsonPath('user.google', true)
         ->assertJsonPath('user.tiene_clave', false)
+        ->assertJsonPath('user.tiene_pin', true)
         ->assertJsonPath('user.name', 'Ana María')
         ->assertJsonPath('user.roles', ['usuario']);
 
-    expect($r->json('token'))->toBeString();
+    expect($r->json('token'))->toBeString()->and($r->json('dispositivo'))->toBeString();
     $user = User::firstOrFail();
     expect($user->google_id)->toBe('109876543210')
         ->and($user->password)->toBeNull()
@@ -87,18 +89,66 @@ test('con la política aceptada crea la cuenta de cliente sin contraseña y entr
         ->and($user->telefono)->toBeNull();
 });
 
+test('registrarse con Google exige crear una clave difícil de adivinar', function () {
+    $datos = ['id_token' => tokenGoogle(), 'acepta_terminos' => true, 'name' => 'Ana', 'apellidos' => 'Pérez'];
+
+    $this->postJson('/api/google', $datos)->assertStatus(422)->assertJsonValidationErrors(['pin']);
+    $this->postJson('/api/google', $datos + ['pin' => '1111', 'pin_confirmation' => '1111'])->assertStatus(422)->assertJsonValidationErrors(['pin']);
+    $this->postJson('/api/google', $datos + ['pin' => '2468', 'pin_confirmation' => '2469'])->assertStatus(422)->assertJsonValidationErrors(['pin']);
+    expect(User::count())->toBe(0);
+});
+
 test('registrarse con Google exige nombre y apellidos', function () {
     $this->postJson('/api/google', ['id_token' => tokenGoogle(), 'acepta_terminos' => true, 'name' => '', 'apellidos' => ''])
         ->assertStatus(422)->assertJsonValidationErrors(['name', 'apellidos']);
 });
 
-test('la cuenta ya conectada entra directo, aunque cambie su correo en Google', function () {
+test('una cuenta conectada que aún no tiene clave entra y la app le pide crearla', function () {
     $user = User::factory()->create(['email' => 'otro@correo.com']);
     $user->forceFill(['google_id' => '109876543210'])->save();
     $user->assignRole('usuario');
 
     $this->postJson('/api/google', ['id_token' => tokenGoogle()])
-        ->assertOk()->assertJsonPath('user.id', $user->id)->assertJsonStructure(['token']);
+        ->assertOk()->assertJsonPath('user.id', $user->id)->assertJsonPath('user.tiene_pin', false)
+        ->assertJsonStructure(['token', 'dispositivo']);
+});
+
+test('con clave, Google pide la clave y luego entra, aunque cambie su correo en Google', function () {
+    $user = User::factory()->conClave()->create(['email' => 'otro@correo.com']);
+    $user->forceFill(['google_id' => '109876543210'])->save();
+    $user->assignRole('usuario');
+
+    $this->postJson('/api/google', ['id_token' => tokenGoogle()])
+        ->assertOk()->assertJsonPath('requiere_pin', true)->assertJsonPath('user.name', $user->name)
+        ->assertJsonMissingPath('token');
+
+    $this->postJson('/api/google', ['id_token' => tokenGoogle(), 'pin' => '1357'])
+        ->assertStatus(422)->assertJsonPath('errors.pin.0', 'La clave no es correcta. Te quedan 4 intentos.');
+
+    $r = $this->postJson('/api/google', ['id_token' => tokenGoogle(), 'pin' => '2468'])
+        ->assertOk()->assertJsonPath('user.id', $user->id)->assertJsonStructure(['token', 'dispositivo']);
+    expect($user->fresh()->pin_fallidos)->toBe(0);
+
+    // Google demostró quién es: en este teléfono ya entra solo con la clave.
+    $this->postJson('/api/login', ['dispositivo' => $r->json('dispositivo'), 'pin' => '2468'])
+        ->assertOk()->assertJsonPath('user.id', $user->id);
+});
+
+test('con Google se crea una clave nueva aunque esté bloqueada', function () {
+    $user = User::factory()->conClave()->create(['pin_bloqueado_at' => now(), 'pin_fallidos' => 5]);
+    $user->forceFill(['google_id' => '109876543210'])->save();
+    $user->createToken('otro-telefono');
+
+    $this->postJson('/api/password/google', ['id_token' => tokenGoogle(['sub' => '555']), 'pin' => '1357', 'pin_confirmation' => '1357'])
+        ->assertStatus(422)->assertJsonValidationErrors(['id_token']);
+
+    $this->postJson('/api/password/google', ['id_token' => tokenGoogle(), 'pin' => '1357', 'pin_confirmation' => '1357'])
+        ->assertOk()->assertJsonPath('user.id', $user->id)->assertJsonStructure(['token', 'dispositivo']);
+
+    $user->refresh();
+    expect($user->pin_bloqueado_at)->toBeNull()->and($user->pin_fallidos)->toBe(0)
+        ->and($user->tokens()->count())->toBe(1);
+    $this->postJson('/api/google', ['id_token' => tokenGoogle(), 'pin' => '1357'])->assertOk();
 });
 
 test('un correo que ya tiene cuenta no se une solo a Google', function () {
@@ -174,15 +224,18 @@ test('no se puede conectar una cuenta de Google que ya es de otra persona', func
     expect($otro->fresh()->google_id)->toBeNull();
 });
 
-test('desconectar Google exige tener contraseña', function () {
-    $user = User::factory()->create(['password' => null]);
+test('desconectar Google exige el celular verificado y la clave', function () {
+    $user = User::factory()->conClave()->create(['password' => null]);
     $user->forceFill(['google_id' => '109876543210'])->save();
     Sanctum::actingAs($user);
 
-    $this->deleteJson('/api/perfil/google')->assertStatus(422)->assertJsonValidationErrors(['google']);
+    // Sin celular verificado no podría volver a entrar desde otro teléfono.
+    $this->deleteJson('/api/perfil/google', ['pin' => '2468'])->assertStatus(422)->assertJsonValidationErrors(['google']);
 
-    $user->forceFill(['password' => 'una-clave'])->save();
-    $this->deleteJson('/api/perfil/google')->assertOk()->assertJsonPath('user.google', false);
+    $user->forceFill(['telefono' => '3001234567', 'telefono_verificado_at' => now()])->save();
+    $this->deleteJson('/api/perfil/google')->assertStatus(422)->assertJsonValidationErrors(['pin']);
+    $this->deleteJson('/api/perfil/google', ['pin' => '1357'])->assertStatus(422)->assertJsonValidationErrors(['pin']);
+    $this->deleteJson('/api/perfil/google', ['pin' => '2468'])->assertOk()->assertJsonPath('user.google', false);
     expect($user->fresh()->google_id)->toBeNull();
 });
 
@@ -209,20 +262,19 @@ test('una cuenta sin contraseña no entra con contraseña vacía', function () {
 });
 
 // ---------------------------------------------------------------------------
-// Eliminar la cuenta confirmando con Google
+// Eliminar la cuenta (con la clave)
 // ---------------------------------------------------------------------------
 
-test('quien se registró con Google elimina su cuenta eligiendo esa cuenta de Google', function () {
-    $user = User::factory()->create(['email' => 'ana.perez@gmail.com', 'password' => null]);
+test('quien se registró con Google elimina su cuenta con su clave', function () {
+    $user = User::factory()->conClave()->create(['email' => 'ana.perez@gmail.com', 'password' => null]);
     $user->forceFill(['google_id' => '109876543210'])->save();
     $user->assignRole('usuario');
     Sanctum::actingAs($user);
 
-    $this->deleteJson('/api/cuenta', ['google_id_token' => tokenGoogle(['sub' => '555'])])
-        ->assertStatus(422)->assertJsonValidationErrors(['google_id_token']);
+    $this->deleteJson('/api/cuenta', ['pin' => '1357'])->assertStatus(422)->assertJsonValidationErrors(['pin']);
     expect($user->fresh()->eliminado_at)->toBeNull();
 
-    $this->deleteJson('/api/cuenta', ['google_id_token' => tokenGoogle()])->assertOk();
+    $this->deleteJson('/api/cuenta', ['pin' => '2468'])->assertOk();
     $user->refresh();
     expect($user->eliminado_at)->not->toBeNull()->and($user->google_id)->toBeNull();
 

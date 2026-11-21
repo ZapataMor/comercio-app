@@ -1,18 +1,19 @@
 import React from 'react';
-import { Text, TouchableOpacity } from 'react-native';
+import { Text, TextInput, TouchableOpacity } from 'react-native';
 import ReactTestRenderer, { act } from 'react-test-renderer';
-import { desactivarNegocio, eliminarNegocio, Negocio } from '../src/api';
+import { ApiError, desactivarNegocio, eliminarCuenta, eliminarNegocio, Negocio } from '../src/api';
 import MiInformacionScreen from '../src/screens/MiInformacionScreen';
 
 const mockRecargar = jest.fn(async () => {});
 let mockNegocios: Partial<Negocio>[] = [];
 const mockConfirmar = jest.fn();
 const mockToast = { exito: jest.fn(), error: jest.fn() };
+const mockSalir = jest.fn();
 jest.mock('../src/NegocioContext', () => ({
   useNegocio: () => ({ negocios: mockNegocios, codigoPublico: null, recargar: mockRecargar }),
 }));
 jest.mock('../src/AuthContext', () => ({
-  useAuth: () => ({ auth: { token: 'token', user: { name: 'Ana', email: 'ana@correo.com', roles: ['usuario'] } } }),
+  useAuth: () => ({ auth: { token: 'token', user: { name: 'Ana', email: 'ana@correo.com', roles: ['usuario'] } }, salir: mockSalir }),
 }));
 jest.mock('../src/components/Confirmacion', () => ({ useConfirmar: () => mockConfirmar }));
 jest.mock('../src/Toast', () => ({ useToast: () => mockToast }));
@@ -20,6 +21,7 @@ jest.mock('../src/api', () => ({
   ...jest.requireActual('../src/api'),
   desactivarNegocio: jest.fn(async () => ({})),
   eliminarNegocio: jest.fn(async () => {}),
+  eliminarCuenta: jest.fn(async () => {}),
 }));
 
 let pantalla: ReactTestRenderer.ReactTestRenderer;
@@ -85,4 +87,25 @@ test('explica el borrado irreversible y muestra el error si hay pedidos activos'
   expect(eliminarNegocio).toHaveBeenCalledWith('token', 4);
   expect(mockToast.error).toHaveBeenCalled();
   expect(mockRecargar).not.toHaveBeenCalled();
+});
+
+test('eliminar la cuenta se confirma con la clave de 4 números', async () => {
+  (eliminarCuenta as jest.Mock).mockRejectedValueOnce(
+    new ApiError('La clave no es correcta. Te quedan 4 intentos.', 422, { pin: ['La clave no es correcta. Te quedan 4 intentos.'] }),
+  );
+  await montar();
+  await tocar('Eliminar mi cuenta');
+  const campo = () => pantalla.root.findAllByType(TextInput).find(i => i.props.accessibilityLabel === 'Tu clave de 4 números')!;
+  expect(campo()).toBeDefined();
+
+  await act(async () => { campo().props.onChangeText('1357'); });
+  await tocar('Eliminar definitivamente');
+  expect(eliminarCuenta).toHaveBeenCalledWith('token', '1357');
+  expect(textos()).toContain('La clave no es correcta. Te quedan 4 intentos.');
+  expect(mockSalir).not.toHaveBeenCalled();
+
+  await act(async () => { campo().props.onChangeText('2468'); });
+  await tocar('Eliminar definitivamente');
+  expect(eliminarCuenta).toHaveBeenLastCalledWith('token', '2468');
+  expect(mockSalir).toHaveBeenCalled();
 });

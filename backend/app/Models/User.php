@@ -19,7 +19,7 @@ use Spatie\Permission\Traits\HasRoles;
 
 #[Fillable(['name', 'apellidos', 'username', 'email', 'password', 'direccion', 'barrio', 'telefono'])]
 // La ubicación del domiciliario solo sale por UbicacionDomiciliario::de(), a quien le toca verla.
-#[Hidden(['password', 'remember_token', 'ubicacion_lat', 'ubicacion_lng', 'ubicacion_at'])]
+#[Hidden(['password', 'pin', 'remember_token', 'ubicacion_lat', 'ubicacion_lng', 'ubicacion_at'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -36,6 +36,10 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'telefono_verificado_at' => 'datetime',
             'password' => 'hashed',
+            // Clave de 4 números (App\Support\ClavePin).
+            'pin' => 'hashed',
+            'pin_fallidos' => 'integer',
+            'pin_bloqueado_at' => 'datetime',
             'terminos_aceptados_at' => 'datetime',
             'suspendido_at' => 'datetime',
             'en_turno' => 'boolean',
@@ -196,6 +200,12 @@ class User extends Authenticatable
     public function deviceTokens(): HasMany
     {
         return $this->hasMany(DeviceToken::class);
+    }
+
+    /** Teléfonos donde entra solo con su clave (ver App\Support\ClavePin). */
+    public function dispositivosConfianza(): HasMany
+    {
+        return $this->hasMany(DispositivoConfianza::class);
     }
 
     /**

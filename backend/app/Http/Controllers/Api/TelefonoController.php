@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Rules\Telefono;
+use App\Support\ClavePin;
 use App\Support\Telefono\CodigosTelefono;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,8 +22,9 @@ use Illuminate\Validation\ValidationException;
  *    /perfil/telefono/verificar. Al acertar el número queda guardado y
  *    verificado en la cuenta.
  *
- * Un número verificado sirve para entrar y recuperar la contraseña, por eso
- * solo puede estar verificado en una cuenta.
+ * Un número verificado sirve para entrar y recuperar la clave, por eso
+ * solo puede estar verificado en una cuenta. Cambiar el que ya está
+ * verificado pide la clave de 4 números (es la forma de entrar).
  */
 class TelefonoController extends Controller
 {
@@ -34,7 +36,7 @@ class TelefonoController extends Controller
 
         if (CodigosTelefono::cuentaConTelefono($telefono)) {
             throw ValidationException::withMessages([
-                'telefono' => ['Este número ya tiene una cuenta. Inicia sesión o recupera tu contraseña.'],
+                'telefono' => ['Este número ya tiene una cuenta. Inicia sesión o recupera tu clave.'],
             ]);
         }
 
@@ -62,6 +64,10 @@ class TelefonoController extends Controller
             throw ValidationException::withMessages(['telefono' => ['Este número ya está verificado en tu cuenta.']]);
         }
         $this->asegurarLibre($telefono, $user);
+        // Cambiar el celular con que se entra pide la clave; agregar el primero, no.
+        if ($user->telefono_verificado_at !== null) {
+            ClavePin::comprobar($user, $request->input('pin'));
+        }
 
         return $this->respuestaEnvio($this->codigos->enviar($telefono, CodigosTelefono::CAMBIO, $user->id));
     }

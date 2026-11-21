@@ -21,15 +21,15 @@ test('la direccion exige al menos una via y numero de casa', function ($direccio
     ['Calle 12 # 30', true], ['Calle 12', false], [' #30', false], ['Calle 12 #', false], ['Calle   #30', false],
 ]);
 
-test('el registro admite cualquier clave de cinco caracteres y rechaza cuatro', function () {
+test('el registro exige una clave de 4 números difícil de adivinar', function ($clave) {
     Role::findOrCreate('usuario', 'web');
     $datos = ['name' => 'Ana', 'apellidos' => 'Pérez', 'email' => 'ana@example.com',
-        'password' => '1234', 'password_confirmation' => '1234', 'direccion' => 'Carrera 8 #30',
+        'pin' => $clave, 'pin_confirmation' => $clave, 'direccion' => 'Carrera 8 #30',
         'barrio' => 'Centro', 'telefono' => '3001234567', 'acepta_terminos' => true,
         'verificacion' => verificacionTelefono('3001234567')];
-    $this->postJson('/api/register', $datos)->assertUnprocessable()->assertJsonValidationErrors('password');
-    $this->postJson('/api/register', [...$datos, 'password' => '     ', 'password_confirmation' => '     '])->assertCreated();
-});
+    $this->postJson('/api/register', $datos)->assertUnprocessable()->assertJsonValidationErrors('pin');
+    $this->postJson('/api/register', [...$datos, 'pin' => '2468', 'pin_confirmation' => '2468'])->assertCreated();
+})->with(['123', '12345', 'abcd', '0000', '1234', '9876', '1212', '2000']);
 
 test('un producto no se puede crear ni actualizar con precio cero', function () {
     $user = User::factory()->create();

@@ -135,7 +135,7 @@ export default function HeaderPerfil() {
       titulo: '¿Cerrar todas las sesiones?',
       texto:
         `Saldrás de las ${cuentas.length} cuentas abiertas en este teléfono. ` +
-        'Para volver a entrar a cada una necesitarás su contraseña.',
+        'Para volver a entrar a cada una necesitarás su celular y su clave (y, en este teléfono, el código de WhatsApp).',
       textoBoton: 'Cerrar todas',
       textoCancelar: 'Cancelar',
       peligro: true,

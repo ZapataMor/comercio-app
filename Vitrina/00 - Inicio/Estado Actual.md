@@ -91,24 +91,31 @@ Roles Spatie: `administrador`, `usuario` (cliente) y `domiciliario`. Ver [[Mapa 
   negocio y admin en Inicio. Se recalcula al entrar o salir de la cuenta.
 
 ### 2.2 Registro ✅
-`POST /api/register`. Pide nombre, apellidos, correo, contraseña con confirmación, dirección, barrio
-y teléfono, y exige **aceptar la política de privacidad** (Ley 1581, `terminos_aceptados_at`). Crea
-el código público (6.2) y la dirección principal; un barrio nuevo queda como sugerencia (5.4).
+`POST /api/register`. Celular confirmado con código de WhatsApp, nombre, apellidos, la política de
+privacidad (Ley 1581, `terminos_aceptados_at`) y la **clave de 4 números** (o con Google: nombre,
+política y clave). Después, «Completa tu cuenta» ofrece el correo o el celular (opcionales). Crea
+el código público (6.2); un barrio nuevo queda como sugerencia (5.4). Ver
+[[ADR-004 Clave de 4 números y teléfono de confianza]].
 
 ### 2.3 Sesión ✅
-- Login con token Sanctum; sesión persistente en la app (`AuthContext` + AsyncStorage).
+- Se entra con **celular y clave de 4 números** (o Google y clave). En un teléfono nuevo llega
+  además un código por WhatsApp; luego el teléfono queda de confianza (`dispositivos_confianza`) y
+  «Continuar como» pide solo la clave. 5 claves equivocadas la bloquean.
+- Token Sanctum; sesión persistente en la app (`AuthContext` + AsyncStorage).
 - Logout revoca solo ese token y da de baja el token FCM.
-- **Recuperar contraseña**: código de 6 dígitos por correo, vence en 15 min, se anula tras 5 fallos
-  y cierra las demás sesiones. Nunca revela si el correo existe.
+- **¿Olvidaste tu clave?**: código de 6 números por WhatsApp (o Google) y clave nueva; la
+  desbloquea y cierra las demás sesiones. Ya no se recupera por correo.
+- Cuentas de antes: entran con su contraseña y la app les pide crear la clave.
 - **Cuenta suspendida** por un admin: no entra y sus sesiones se cierran solas (`CuentaActiva`).
 - Límites de intentos con nombre (`AppServiceProvider::limitesDeIntentos`): `acceso`, `codigo-clave`,
   `restablecer-clave`, `eliminar-cuenta`, `publico`, `ubicacion`, `codigo-pedido`.
 
 ### 2.4 Mi información ✅
 `PUT /api/perfil` y `MiInformacionScreen`, abierta desde el **menú desplegable** del ícono de
-usuario. Edita datos personales, contraseña (exige la actual), dirección, barrio y teléfono.
+usuario. Edita datos personales y el teléfono de contacto; «Cambiar mi clave» (pide la actual).
+Cambiar el celular verificado y desconectar Google piden la clave.
 
-**Eliminar mi cuenta** ✅ (app y web `/eliminar-cuenta`): pide la contraseña, anonimiza los datos y
+**Eliminar mi cuenta** ✅ (app y web `/eliminar-cuenta`): pide la clave de 4 números, anonimiza los datos y
 conserva el historial de pedidos sin contacto; archiva los negocios donde era el único propietario
 y borra lo que escribió en reseñas. No deja si hay pedidos en curso.
 
@@ -429,7 +436,8 @@ opciones, menús de restaurantes, reseñas y recetas. Imágenes aparte con
 `php artisan db:seed --class=ImagenesDemoSeeder`.
 
 - Contraseña de todos: `password123`. Usuarios: `admin@demo.co`, `comerciante@demo.co` (dueño de "El
-  Rincón Paisa"), `domiciliario@demo.co`, `cliente@demo.co`.
+  Rincón Paisa"), `domiciliario@demo.co`, `cliente@demo.co`. En la app entran con «¿Tu cuenta es de
+  antes? Entra con tu contraseña» y luego crean su clave de 4 números.
 - Cada negocio demo tiene su dueño `{slug}@demo.co`; la lista está en `comercios-demo.txt`.
 - Catálogo: unos 59 negocios, 364 categorías y 980 productos, más las cartas de restaurantes.
 

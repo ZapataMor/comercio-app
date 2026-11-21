@@ -94,7 +94,7 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('restablecer-clave', fn (Request $r) => Limit::perMinute(6)->by('restablecer|'.$correo($r).'|'.$r->ip()));
 
         // Eliminar la cuenta desde la web pública.
-        RateLimiter::for('eliminar-cuenta', fn (Request $r) => Limit::perMinute(5)->by('eliminar|'.$correo($r).'|'.$r->ip()));
+        RateLimiter::for('eliminar-cuenta', fn (Request $r) => Limit::perMinute(5)->by('eliminar|'.mb_strtolower(trim((string) $r->input('usuario', $r->input('email')))).'|'.$r->ip()));
 
         // Códigos de recogida y entrega: 4 dígitos, así que se limitan los
         // intentos por persona y pedido para que no se puedan adivinar.

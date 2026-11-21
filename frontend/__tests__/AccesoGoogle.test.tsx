@@ -88,6 +88,12 @@ async function tocarEtiqueta(etiqueta: string) {
   });
 }
 
+async function escribir(etiqueta: string, valor: string) {
+  await act(async () => {
+    await app!.root.findAllByType(TextInput).find(i => i.props.accessibilityLabel === etiqueta)!.props.onChangeText(valor);
+  });
+}
+
 async function tocarTexto(texto: string) {
   const nodo = app!.root.findAll(
     n => typeof n.props.onPress === 'function' && n.findAllByType(Text).some(t => [].concat(t.props.children).join('') === texto),
@@ -108,6 +114,29 @@ describe('login', () => {
     expect(entrarMock).toHaveBeenCalledWith('id-token-google');
     expect(sesion.auth).toEqual({ token: 'tok-ana', user: ana });
     expect(navigation.navigate).not.toHaveBeenCalled();
+  });
+
+  test('con una cuenta que ya tiene clave, pide la clave y entra', async () => {
+    elegirMock.mockResolvedValue('id-token-google');
+    entrarMock
+      .mockResolvedValueOnce({ requiere_pin: true, user: { id: 7, name: 'Ana' } })
+      .mockRejectedValueOnce(new ApiError('La clave no es correcta. Te quedan 4 intentos.', 422, { pin: ['La clave no es correcta. Te quedan 4 intentos.'] }))
+      .mockResolvedValueOnce({ token: 'tok-ana', user: ana, dispositivo: 'disp-ana' });
+    await montar(<LoginScreen {...({ navigation } as any)} />);
+
+    await tocarEtiqueta('Continuar con Google');
+    expect(sesion.auth).toBeNull();
+    expect(textos()).toContain('Hola, Ana');
+
+    await escribir('Escribe tu clave de 4 números', '1357');
+    expect(entrarMock).toHaveBeenLastCalledWith('id-token-google', { pin: '1357', dispositivo: undefined });
+    expect(textos()).toContain('Te quedan 4 intentos');
+    expect(sesion.auth).toBeNull();
+
+    await escribir('Escribe tu clave de 4 números', '2468');
+    expect(sesion.auth).toEqual({ token: 'tok-ana', user: ana });
+    // Google demostró quién es: este teléfono queda de confianza para Ana.
+    expect(sesion.dispositivos[7]).toBe('disp-ana');
   });
 
   test('con una cuenta nueva lleva al último paso del registro', async () => {
@@ -155,8 +184,8 @@ describe('login', () => {
 describe('último paso del registro', () => {
   const route = { params: { idToken: 'id-token-google', perfil } };
 
-  test('trae el nombre de Google, exige la política y crea la cuenta', async () => {
-    entrarMock.mockResolvedValue({ token: 'tok-ana', user: ana });
+  test('trae el nombre de Google, exige la política, pide crear la clave y crea la cuenta', async () => {
+    entrarMock.mockResolvedValue({ token: 'tok-ana', user: ana, dispositivo: 'disp-ana' });
     await montar(<RegistroGoogleScreen {...({ navigation, route } as any)} />);
 
     expect(textos()).toContain('ana.perez@gmail.com');
@@ -164,15 +193,31 @@ describe('último paso del registro', () => {
     expect(campos.find(c => c.props.accessibilityLabel === 'Nombre(s)')!.props.value).toBe('Ana');
     expect(campos.find(c => c.props.accessibilityLabel === 'Apellidos')!.props.value).toBe('Pérez');
 
-    await tocarTexto('Crear cuenta');
+    await tocarTexto('Continuar');
     expect(entrarMock).not.toHaveBeenCalled();
     expect(textos()).toContain('Debes aceptar la política de privacidad');
 
     await tocarEtiqueta('Acepto la política de privacidad');
-    await tocarTexto('Crear cuenta');
+    await tocarTexto('Continuar');
+    expect(textos()).toContain('Último paso: crea tu clave');
 
-    expect(entrarMock).toHaveBeenCalledWith('id-token-google', { name: 'Ana', apellidos: 'Pérez', acepta_terminos: true });
+    // Una clave fácil no se acepta, ni dos distintas.
+    await escribir('Tu clave de 4 números', '1234');
+    await escribir('Confirma tu clave', '1234');
+    expect(textos()).toContain('No uses números seguidos');
+    await escribir('Tu clave de 4 números', '2468');
+    await escribir('Confirma tu clave', '2469');
+    expect(textos()).toContain('Las dos claves no coinciden.');
+    expect(entrarMock).not.toHaveBeenCalled();
+
+    await escribir('Confirma tu clave', '2468');
+    expect(entrarMock).toHaveBeenCalledWith('id-token-google', {
+      registro: { name: 'Ana', apellidos: 'Pérez', acepta_terminos: true, pin: '2468' },
+    });
     expect(sesion.auth).toEqual({ token: 'tok-ana', user: ana });
+    expect(sesion.dispositivos[7]).toBe('disp-ana');
+    // Cuenta nueva: al entrar ve «Completa tu cuenta».
+    expect(sesion.porCompletar).toBe(7);
   });
 
   test('si el permiso de Google venció pide elegir la cuenta otra vez', async () => {
@@ -184,7 +229,9 @@ describe('último paso del registro', () => {
     await montar(<RegistroGoogleScreen {...({ navigation, route } as any)} />);
 
     await tocarEtiqueta('Acepto la política de privacidad');
-    await tocarTexto('Crear cuenta');
+    await tocarTexto('Continuar');
+    await escribir('Tu clave de 4 números', '2468');
+    await escribir('Confirma tu clave', '2468');
 
     expect(textos()).toContain('elige otra vez tu cuenta de Google');
     expect(sesion.auth).toBeNull();

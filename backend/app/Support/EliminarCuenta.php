@@ -103,6 +103,7 @@ class EliminarCuenta
             DB::afterCommit(fn () => Storage::disk('public')->delete(array_map(fn ($f) => substr((string) $f, strlen('/storage/')), $fotos)));
             $user->deviceTokens()->delete();
             $user->tokens()->delete();
+            $user->dispositivosConfianza()->delete();
             \App\Models\CodigoTelefono::where('user_id', $user->id)->delete();
 
             // Los pedidos terminados se conservan para el negocio, sin los
@@ -121,6 +122,9 @@ class EliminarCuenta
                 'apellidos' => 'eliminado',
                 'email' => "eliminado-{$user->id}@vitrina.invalid",
                 'password' => Str::random(64),
+                'pin' => null,
+                'pin_fallidos' => 0,
+                'pin_bloqueado_at' => null,
                 'google_id' => null,
                 'direccion' => null,
                 'barrio' => null,

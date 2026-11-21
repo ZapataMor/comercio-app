@@ -1,36 +1,38 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
-import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { entrarConGoogle } from '../api';
 import { useAuth } from '../AuthContext';
 import { PressableScale } from '../components/anim';
 import { LogoGoogle } from '../components/BotonGoogle';
 import FieldError from '../components/FieldError';
 import CampoAcceso from '../components/login/CampoAcceso';
+import CrearClaveVidrio from '../components/login/CrearClaveVidrio';
 import EscenaAcceso from '../components/login/EscenaAcceso';
 import { BotonVolverAcceso, CasillaPolitica, LogoAcceso, useEstilosAcceso } from '../components/login/estilosAcceso';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
-import { useTheme } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RegistroGoogle'>;
 
-// Último paso del registro con Google: la cuenta de Google ya se eligió y el
-// backend dijo que es nueva. Aquí se revisa el nombre que trae Google y se
-// acepta la política de privacidad (Ley 1581), igual que en el registro con
-// el celular. No se pide contraseña ni celular: la contraseña se puede crear
-// después en «Mi información», y el celular se pide en el primer pedido.
+// Últimos pasos del registro con Google: la cuenta de Google ya se eligió y
+// el backend dijo que es nueva. Primero se revisa el nombre que trae Google
+// y se acepta la política de privacidad (Ley 1581), igual que en el registro
+// con el celular; después se crea la clave de 4 números. El celular no se
+// pide aquí: al entrar, «Completa tu cuenta» lo ofrece (opcional), y se pide
+// en el primer pedido.
 //
 // Se ve igual que el login (EscenaAcceso): mismo fondo y misma tarjeta.
 
 export default function RegistroGoogleScreen({ navigation, route }: Props) {
   const { idToken, perfil } = route.params;
-  const { login: l } = useTheme();
   const e = useEstilosAcceso();
   const { entrar: guardarSesion } = useAuth();
   const [nombre, setNombre] = useState(perfil.name);
   const [apellidos, setApellidos] = useState(perfil.apellidos);
   const [aceptaTerminos, setAceptaTerminos] = useState(false);
+  const [creandoClave, setCreandoClave] = useState(false);
+  const [errorClave, setErrorClave] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errores, setErrores] = useState<FieldErrors>({});
@@ -43,7 +45,7 @@ export default function RegistroGoogleScreen({ navigation, route }: Props) {
     });
   }
 
-  async function crearCuenta() {
+  function seguirAClave() {
     setError(null);
     setErrores({});
     const nuevosErrores: FieldErrors = {};
@@ -56,25 +58,33 @@ export default function RegistroGoogleScreen({ navigation, route }: Props) {
       setErrores(nuevosErrores);
       return;
     }
+    setErrorClave(null);
+    setCreandoClave(true);
+  }
 
+  async function crearCuenta(pin: string) {
+    setError(null);
+    setErrorClave(null);
     setCargando(true);
     try {
       const r = await entrarConGoogle(idToken, {
-        name: nombre.trim(),
-        apellidos: apellidos.trim(),
-        acepta_terminos: true,
+        registro: { name: nombre.trim(), apellidos: apellidos.trim(), acepta_terminos: true, pin },
       });
-      if (r.nuevo) {
+      if (r.nuevo || r.requiere_pin) {
         setError('No se pudo crear la cuenta. Inténtalo de nuevo.');
       } else {
-        guardarSesion(r.token, r.user);
+        // Cuenta nueva: al entrar ve «Completa tu cuenta» (celular, opcional).
+        guardarSesion(r.token, r.user, { dispositivo: r.dispositivo, nueva: true });
       }
     } catch (err) {
       const campos = fieldErrorsFromError(err);
       if (campos.id_token) {
         // El permiso de Google vence en una hora: hay que volver a elegir la cuenta.
         setError(`${campos.id_token} Vuelve atrás y elige otra vez tu cuenta de Google.`);
+      } else if (campos.pin || campos.pin_confirmation) {
+        setErrorClave(campos.pin ?? campos.pin_confirmation);
       } else if (Object.keys(campos).length > 0) {
+        setCreandoClave(false);
         setErrores(campos);
       } else {
         setError(messageFromError(err));
@@ -84,88 +94,89 @@ export default function RegistroGoogleScreen({ navigation, route }: Props) {
     }
   }
 
+  const cuentaGoogle = (
+    <View style={e.recuadro}>
+      <View style={estiloLogo}>
+        <LogoGoogle size={16} />
+      </View>
+      <View style={e.recuadroTexto}>
+        <Text style={e.recuadroEtiqueta}>CUENTA DE GOOGLE</Text>
+        <Text style={e.recuadroValor} numberOfLines={1}>
+          {perfil.email}
+        </Text>
+      </View>
+      <TouchableOpacity onPress={() => (creandoClave ? setCreandoClave(false) : navigation.goBack())} disabled={cargando} hitSlop={8}>
+        <Text style={e.recuadroAccion}>{creandoClave ? 'Atrás' : 'Cambiar'}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <EscenaAcceso>
-      <BotonVolverAcceso onPress={() => navigation.goBack()} disabled={cargando} />
+      <BotonVolverAcceso onPress={() => (creandoClave ? setCreandoClave(false) : navigation.goBack())} disabled={cargando} />
       <LogoAcceso />
       <Text style={e.titulo}>Crear cuenta</Text>
-      <Text style={e.subtitulo}>Ya casi: revisa tus datos</Text>
+      <Text style={e.subtitulo}>{creandoClave ? 'Último paso: crea tu clave' : 'Ya casi: revisa tus datos'}</Text>
 
       {error ? <Text style={e.error}>{error}</Text> : null}
 
-      <View style={e.recuadro}>
-        <View style={estiloLogo}>
-          <LogoGoogle size={16} />
-        </View>
-        <View style={e.recuadroTexto}>
-          <Text style={e.recuadroEtiqueta}>CUENTA DE GOOGLE</Text>
-          <Text style={e.recuadroValor} numberOfLines={1}>
-            {perfil.email}
-          </Text>
-        </View>
-        <TouchableOpacity onPress={() => navigation.goBack()} disabled={cargando} hitSlop={8}>
-          <Text style={e.recuadroAccion}>Cambiar</Text>
-        </TouchableOpacity>
-      </View>
+      {cuentaGoogle}
 
-      <View style={e.bloqueCampo}>
-        <CampoAcceso
-          rotulo="NOMBRE(S)"
-          icono="usuario"
-          value={nombre}
-          onChangeText={valor => {
-            setNombre(valor);
-            limpiarError('name');
-          }}
-          placeholder="Ej: Ana María"
-          autoCapitalize="words"
-          textContentType="givenName"
-          autoComplete="name-given"
-          editable={!cargando}
-          accessibilityLabel="Nombre(s)"
-        />
-      </View>
-      <FieldError mensaje={errores.name} />
+      {creandoClave ? (
+        <CrearClaveVidrio textoBoton="Crear cuenta" cargando={cargando} onCrear={crearCuenta} errorServidor={errorClave} />
+      ) : (
+        <>
+          <View style={e.bloqueCampo}>
+            <CampoAcceso
+              rotulo="NOMBRE(S)"
+              icono="usuario"
+              value={nombre}
+              onChangeText={valor => {
+                setNombre(valor);
+                limpiarError('name');
+              }}
+              placeholder="Ej: Ana María"
+              autoCapitalize="words"
+              textContentType="givenName"
+              autoComplete="name-given"
+              accessibilityLabel="Nombre(s)"
+            />
+          </View>
+          <FieldError mensaje={errores.name} />
 
-      <View style={e.bloqueCampo}>
-        <CampoAcceso
-          rotulo="APELLIDOS"
-          icono="usuarios"
-          value={apellidos}
-          onChangeText={valor => {
-            setApellidos(valor);
-            limpiarError('apellidos');
-          }}
-          placeholder="Ej: Pérez Gómez"
-          autoCapitalize="words"
-          textContentType="familyName"
-          autoComplete="name-family"
-          editable={!cargando}
-          accessibilityLabel="Apellidos"
-        />
-      </View>
-      <FieldError mensaje={errores.apellidos} />
+          <View style={e.bloqueCampo}>
+            <CampoAcceso
+              rotulo="APELLIDOS"
+              icono="usuarios"
+              value={apellidos}
+              onChangeText={valor => {
+                setApellidos(valor);
+                limpiarError('apellidos');
+              }}
+              placeholder="Ej: Pérez Gómez"
+              autoCapitalize="words"
+              textContentType="familyName"
+              autoComplete="name-family"
+              accessibilityLabel="Apellidos"
+            />
+          </View>
+          <FieldError mensaje={errores.apellidos} />
 
-      <CasillaPolitica
-        marcada={aceptaTerminos}
-        alCambiar={() => {
-          setAceptaTerminos(v => !v);
-          limpiarError('acepta_terminos');
-        }}
-        deshabilitada={cargando}
-      />
-      <FieldError mensaje={errores.acepta_terminos} />
+          <CasillaPolitica
+            marcada={aceptaTerminos}
+            alCambiar={() => {
+              setAceptaTerminos(v => !v);
+              limpiarError('acepta_terminos');
+            }}
+            deshabilitada={false}
+          />
+          <FieldError mensaje={errores.acepta_terminos} />
 
-      <Text style={e.nota}>Entrarás con Google. Si quieres, luego creas una contraseña en «Mi información».</Text>
-
-      <PressableScale
-        style={[e.boton, cargando && e.botonInactivo]}
-        scaleTo={0.97}
-        onPress={crearCuenta}
-        disabled={cargando}
-        accessibilityRole="button">
-        {cargando ? <ActivityIndicator size="small" color={l.botonTexto} /> : <Text style={e.botonTexto}>Crear cuenta</Text>}
-      </PressableScale>
+          <PressableScale style={e.boton} scaleTo={0.97} onPress={seguirAClave} accessibilityRole="button">
+            <Text style={e.botonTexto}>Continuar</Text>
+          </PressableScale>
+        </>
+      )}
 
       <TouchableOpacity style={e.pie} onPress={() => navigation.navigate('Login')} disabled={cargando}>
         <Text style={e.pieTexto}>

@@ -152,11 +152,11 @@ it('solo el dueño edita, oculta o elimina su propiedad', function () {
 });
 
 it('al eliminar la cuenta sus propiedades dejan de publicarse', function () {
-    $dueno = User::factory()->create(['password' => 'secreta123']);
+    $dueno = User::factory()->conClave()->create(['password' => 'secreta123']);
     publicarPropiedad($dueno);
     Sanctum::actingAs($dueno);
 
-    $this->deleteJson('/api/cuenta', ['password' => 'secreta123'])->assertOk();
+    $this->deleteJson('/api/cuenta', ['pin' => '2468'])->assertOk();
 
     expect(Propiedad::count())->toBe(0);
 });

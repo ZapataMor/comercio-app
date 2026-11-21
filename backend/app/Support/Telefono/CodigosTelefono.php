@@ -16,8 +16,10 @@ use Illuminate\Validation\ValidationException;
  *  - registro: confirma el número antes de crear la cuenta. Al acertar se
  *    entrega un token que /register consume (así el formulario puede fallar
  *    por otra cosa sin gastar otro código).
- *  - clave:    "olvidé mi contraseña" con el celular.
+ *  - clave:    "olvidé mi clave" con el celular.
  *  - cambio:   verificar el número desde Mi información.
+ *  - acceso:   entrar con el celular y la clave en un teléfono nuevo (ver
+ *              App\Support\ClavePin): solo se envía tras acertar la clave.
  *
  * Cada código vence a los 10 minutos y se anula tras 5 intentos fallidos.
  * Entre dos envíos al mismo número hay que esperar 60 segundos; los topes
@@ -30,6 +32,8 @@ class CodigosTelefono
     public const CLAVE = 'clave';
 
     public const CAMBIO = 'cambio';
+
+    public const ACCESO = 'acceso';
 
     public const MINUTOS_VIGENCIA = 10;
 
@@ -77,14 +81,11 @@ class CodigosTelefono
      */
     public function enviar(string $telefono, string $proposito, ?int $userId = null): ?string
     {
-        $anterior = $this->consulta($telefono, $proposito, $userId)->latest('id')->first();
-        if ($anterior) {
-            $faltan = self::SEGUNDOS_ESPERA - (int) $anterior->created_at->diffInSeconds(now(), true);
-            if ($faltan > 0) {
-                throw ValidationException::withMessages([
-                    'telefono' => ["Espera {$faltan} segundos para pedir otro código."],
-                ]);
-            }
+        $faltan = $this->segundosParaReenviar($telefono, $proposito, $userId);
+        if ($faltan > 0) {
+            throw ValidationException::withMessages([
+                'telefono' => ["Espera {$faltan} segundos para pedir otro código."],
+            ]);
         }
 
         $codigo = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
@@ -113,6 +114,20 @@ class CodigosTelefono
         }
 
         return $this->enviador->esDePrueba() && app()->environment('local', 'testing') ? $codigo : null;
+    }
+
+    /**
+     * Cuánto falta para poder enviar otro código (0 si ya se puede). Mientras
+     * tanto el anterior sigue sirviendo.
+     */
+    public function segundosParaReenviar(string $telefono, string $proposito, ?int $userId = null): int
+    {
+        $anterior = $this->consulta($telefono, $proposito, $userId)->whereNull('verificado_at')->latest('id')->first();
+        if (! $anterior || $anterior->expira_at->isPast()) {
+            return 0;
+        }
+
+        return max(0, self::SEGUNDOS_ESPERA - (int) $anterior->created_at->diffInSeconds(now(), true));
     }
 
     /**

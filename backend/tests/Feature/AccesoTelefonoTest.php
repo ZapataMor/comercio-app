@@ -57,7 +57,7 @@ function cuentaConCelular(string $telefono = '3001234567', bool $verificado = tr
 function registroConCelular(array $extra = []): array
 {
     return $extra + [
-        'name' => 'Ana', 'apellidos' => 'Pérez', 'password' => 'clave123', 'password_confirmation' => 'clave123',
+        'name' => 'Ana', 'apellidos' => 'Pérez', 'pin' => '2468', 'pin_confirmation' => '2468',
         'direccion' => 'Calle 1 #10-20', 'barrio' => 'Centro', 'telefono' => '3001234567', 'acepta_terminos' => true,
     ];
 }
@@ -74,11 +74,18 @@ test('el registro completo con el celular: código, verificación y cuenta sin c
     $token = $this->postJson('/api/telefono/verificar', ['telefono' => '3001234567', 'codigo' => $this->enviador->ultimo()])
         ->assertOk()->json('verificacion');
 
-    $this->postJson('/api/register', registroConCelular(['verificacion' => $token]))
+    $respuesta = $this->postJson('/api/register', registroConCelular(['verificacion' => $token]))
         ->assertCreated()
         ->assertJsonPath('user.telefono', '3001234567')
         ->assertJsonPath('user.telefono_verificado', true)
+        ->assertJsonPath('user.tiene_pin', true)
+        ->assertJsonPath('user.tiene_clave', false)
         ->assertJsonPath('user.email', null);
+    // Con el código de WhatsApp ya demostró quién es: este teléfono queda de confianza.
+    $dispositivo = $respuesta->json('dispositivo');
+    expect($dispositivo)->toBeString();
+    $this->postJson('/api/login', ['telefono' => '3001234567', 'pin' => '2468', 'dispositivo' => $dispositivo])
+        ->assertOk()->assertJsonPath('user.telefono', '3001234567');
 
     // El token se gasta: no sirve para otra cuenta.
     $this->postJson('/api/register', registroConCelular(['verificacion' => $token, 'name' => 'Otra']))
@@ -182,10 +189,10 @@ test('un mismo número no puede pedir más de cinco códigos por hora', function
 });
 
 // ---------------------------------------------------------------------------
-// Login
+// Login con contraseña (cuentas de antes, sin clave de 4 números)
 // ---------------------------------------------------------------------------
 
-test('se entra con el celular verificado, con o sin +57', function ($escrito) {
+test('una cuenta de antes entra con el celular verificado y su contraseña, con o sin +57', function ($escrito) {
     $user = cuentaConCelular('3001234567');
 
     $this->postJson('/api/login', ['usuario' => $escrito, 'password' => 'clave-actual'])
@@ -213,23 +220,36 @@ test('la versión anterior de la app sigue entrando con el campo email', functio
 });
 
 // ---------------------------------------------------------------------------
-// Recuperar la contraseña
+// ¿Olvidaste tu clave?
 // ---------------------------------------------------------------------------
 
-test('se recupera la contraseña con el celular por WhatsApp', function () {
+test('con el código de WhatsApp se crea una clave nueva y se entra', function () {
     $user = cuentaConCelular('3001234567');
     $user->createToken('otro-telefono');
 
     $this->postJson('/api/password/codigo', ['telefono' => '3001234567'])
         ->assertOk()->assertJsonPath('message', 'Si el número tiene una cuenta, te enviamos un código por WhatsApp.');
 
-    $this->postJson('/api/password/restablecer', [
+    $respuesta = $this->postJson('/api/password/restablecer', [
         'telefono' => '3001234567', 'codigo' => $this->enviador->ultimo(),
-        'password' => 'nueva-clave', 'password_confirmation' => 'nueva-clave',
-    ])->assertOk();
+        'pin' => '2468', 'pin_confirmation' => '2468',
+    ])->assertOk()->assertJsonPath('user.tiene_pin', true);
 
-    expect($user->tokens()->count())->toBe(0);
-    $this->postJson('/api/login', ['usuario' => '3001234567', 'password' => 'nueva-clave'])->assertOk();
+    // Las sesiones de antes se cierran; queda solo la nueva.
+    expect($user->tokens()->count())->toBe(1);
+    $this->postJson('/api/login', ['telefono' => '3001234567', 'pin' => '2468', 'dispositivo' => $respuesta->json('dispositivo')])
+        ->assertOk()->assertJsonMissingPath('requiere_codigo');
+});
+
+test('una clave fácil de adivinar no se acepta y no gasta el código', function () {
+    cuentaConCelular('3001234567');
+    $this->postJson('/api/password/codigo', ['telefono' => '3001234567']);
+    $codigo = $this->enviador->ultimo();
+
+    $this->postJson('/api/password/restablecer', ['telefono' => '3001234567', 'codigo' => $codigo, 'pin' => '1234', 'pin_confirmation' => '1234'])
+        ->assertStatus(422)->assertJsonValidationErrors('pin');
+    $this->postJson('/api/password/restablecer', ['telefono' => '3001234567', 'codigo' => $codigo, 'pin' => '2468', 'pin_confirmation' => '2468'])
+        ->assertOk();
 });
 
 test('recuperar con un número sin cuenta responde igual y no envía nada', function ($verificado) {
@@ -250,13 +270,11 @@ test('el código de recuperación no sirve para otra cuenta ni para el registro'
         ->assertStatus(422)->assertJsonValidationErrors('codigo');
 });
 
-test('recuperar por correo sigue funcionando igual', function () {
-    $user = User::factory()->create(['email' => 'ana@correo.com']);
-    \Illuminate\Support\Facades\Notification::fake();
+test('ya no se recupera por correo: se pide el celular', function () {
+    User::factory()->create(['email' => 'ana@correo.com']);
 
-    $this->postJson('/api/password/codigo', ['email' => 'ana@correo.com'])->assertOk();
-
-    \Illuminate\Support\Facades\Notification::assertSentTo($user, \App\Notifications\CodigoRecuperacionClave::class);
+    $this->postJson('/api/password/codigo', ['email' => 'ana@correo.com'])
+        ->assertStatus(422)->assertJsonPath('errors.telefono.0', 'Escribe el celular de tu cuenta.');
     expect($this->enviador->enviados)->toBe([]);
 });
 
@@ -283,14 +301,24 @@ test('no se puede verificar un número que ya está verificado en otra cuenta', 
         ->assertStatus(422)->assertJsonPath('errors.telefono.0', 'Este número ya está verificado en otra cuenta.');
 });
 
-test('cambiar el número a mano le quita la verificación', function () {
+test('el celular verificado no se cambia a mano: se cambia con la clave y el código', function () {
     $user = cuentaConCelular('3001234567');
     $user->update(['email' => 'ana@correo.com', 'direccion' => 'Calle 1 #10-20', 'barrio' => 'Centro']);
     Sanctum::actingAs($user);
 
     $this->putJson('/api/perfil', [
         'name' => 'Ana', 'email' => 'ana@correo.com', 'direccion' => 'Calle 1 #10-20', 'barrio' => 'Centro', 'telefono' => '3109998877',
-    ])->assertOk()->assertJsonPath('user.telefono_verificado', false);
+    ])->assertStatus(422)->assertJsonValidationErrors('telefono');
+    expect($user->fresh()->telefono)->toBe('3001234567');
+});
+
+test('un celular sin verificar es solo de contacto y se cambia a mano', function () {
+    $user = cuentaConCelular('3001234567', verificado: false);
+    $user->update(['email' => 'ana@correo.com']);
+    Sanctum::actingAs($user);
+
+    $this->putJson('/api/perfil', ['name' => 'Ana', 'email' => 'ana@correo.com', 'telefono' => '3109998877'])
+        ->assertOk()->assertJsonPath('user.telefono', '3109998877')->assertJsonPath('user.telefono_verificado', false);
 });
 
 test('una cuenta sin correo no puede cambiar su celular sin verificarlo', function () {

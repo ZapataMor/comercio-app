@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Middleware\CuentaActiva;
 use App\Models\Barrio;
 use App\Models\User;
+use App\Support\ClavePin;
 use App\Support\Telefono\CodigosTelefono;
 use App\Support\UbicacionDomiciliario;
 use Illuminate\Http\JsonResponse;
@@ -36,9 +37,11 @@ class AuthController extends Controller
             // Nombre(s) y apellidos se piden por separado.
             'name' => ['required', 'string', 'max:255'],
             'apellidos' => ['required', 'string', 'max:255'],
-            // Opcional: se entra con el celular verificado; el correo es otra forma más.
+            // Opcional: la app lo pide después («Completa tu cuenta»).
             'email' => ['nullable', 'string', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['present', 'string', 'min:5', 'confirmed'],
+            // Clave de 4 números: con ella y el celular se entra.
+            'pin' => ClavePin::reglas(),
+            'nombre_dispositivo' => ['nullable', 'string', 'max:80'],
             // Opcionales: la dirección se pide en el primer pedido (Mis direcciones).
             'direccion' => ['nullable', 'string', 'max:255', new \App\Rules\Direccion],
             'barrio' => ['nullable', 'required_with:direccion', 'string', 'max:120', 'regex:/\A[\p{L}\p{N}-]+\z/u'],
@@ -50,13 +53,15 @@ class AuthController extends Controller
         ], [
             'acepta_terminos.accepted' => 'Debes aceptar la política de privacidad para crear la cuenta.',
             'verificacion.required' => 'Confirma tu número de celular con el código de WhatsApp.',
+            'pin.required' => 'Crea tu clave de 4 números.',
+            'pin.confirmed' => 'Las dos claves no coinciden.',
         ]);
 
         $user = DB::transaction(function () use ($data, $codigos) {
             $codigos->consumirTokenRegistro($data['telefono'], $data['verificacion']);
             if (CodigosTelefono::cuentaConTelefono($data['telefono'])) {
                 throw ValidationException::withMessages([
-                    'telefono' => ['Este número ya tiene una cuenta. Inicia sesión o recupera tu contraseña.'],
+                    'telefono' => ['Este número ya tiene una cuenta. Inicia sesión o recupera tu clave.'],
                 ]);
             }
 
@@ -64,14 +69,18 @@ class AuthController extends Controller
                 'name' => $data['name'],
                 'apellidos' => $data['apellidos'],
                 'email' => $data['email'] ?? null,
-                'password' => $data['password'], // se hashea solo (cast 'hashed' en el modelo)
+                'password' => null, // se entra con la clave de 4 números
                 'direccion' => $data['direccion'] ?? null,
                 'barrio' => $data['barrio'] ?? null,
                 'telefono' => $data['telefono'],
             ]);
             // Prueba de cuándo autorizó el tratamiento de sus datos, y del
             // celular confirmado por WhatsApp.
-            $user->forceFill(['terminos_aceptados_at' => now(), 'telefono_verificado_at' => now()])->save();
+            $user->forceFill([
+                'pin' => $data['pin'], // se cifra sola (cast 'hashed')
+                'terminos_aceptados_at' => now(),
+                'telefono_verificado_at' => now(),
+            ])->save();
 
             $user->assignRole('usuario');
 
@@ -90,20 +99,143 @@ class AuthController extends Controller
             return $user;
         });
 
-        $token = $user->createToken('api')->plainTextToken;
-
-        return response()->json([
-            'user' => self::userPayload($user),
-            'token' => $token,
-        ], 201);
+        // Con el código de WhatsApp ya demostró quién es: este teléfono queda de confianza.
+        return self::sesion($user, ClavePin::confiar($user, $data['nombre_dispositivo'] ?? null), 201);
     }
 
     /**
-     * Login con correo, celular verificado o nombre de usuario (campo
-     * `usuario`) + password. Devuelve un token Sanctum. Se sigue aceptando
-     * el campo `email` de las versiones anteriores de la app.
+     * Entrar. Tres formas:
+     *
+     *  - `telefono` + `pin`: celular verificado y clave de 4 números. En un
+     *    teléfono de confianza (`dispositivo`) entra; en uno nuevo responde
+     *    `requiere_codigo` y envía un código por WhatsApp (ver confirmarCodigo).
+     *  - `dispositivo` + `pin`: «Continuar como» en un teléfono de confianza
+     *    (sirve también para las cuentas de Google sin celular).
+     *  - `usuario` + `password`: las cuentas de antes, con su contraseña. Solo
+     *    mientras no tengan clave, o si no tienen celular verificado ni Google
+     *    (no tendrían otra forma de entrar). Se sigue aceptando `email` en vez
+     *    de `usuario` (versiones anteriores de la app).
      */
-    public function login(Request $request): JsonResponse
+    public function login(Request $request, CodigosTelefono $codigos): JsonResponse
+    {
+        if ($request->has('pin')) {
+            return $request->filled('dispositivo') && ! $request->filled('telefono')
+                ? $this->entrarEnDispositivo($request)
+                : $this->entrarConCelular($request, $codigos);
+        }
+
+        return $this->entrarConContrasena($request);
+    }
+
+    private function entrarConCelular(Request $request, CodigosTelefono $codigos): JsonResponse
+    {
+        $request->merge(['telefono' => CodigosTelefono::normalizar($request->input('telefono')) ?? $request->input('telefono')]);
+        $data = $request->validate([
+            'telefono' => ['required', 'string', new \App\Rules\Telefono],
+            'pin' => ['required', 'string'],
+            'dispositivo' => ['nullable', 'string', 'max:100'],
+        ], [
+            'telefono.required' => 'Escribe tu número de celular.',
+            'pin.required' => 'Escribe tu clave de 4 números.',
+        ]);
+
+        $user = CodigosTelefono::cuentaConTelefono($data['telefono']);
+        if (! $user) {
+            throw ValidationException::withMessages([
+                'telefono' => ['Este celular no tiene una cuenta verificada en Vitrina. Revisa el número o regístrate.'],
+            ]);
+        }
+        if ($user->pin === null) {
+            throw ValidationException::withMessages([
+                'pin' => ['Aún no tienes clave de 4 números. Créala con «¿Olvidaste tu clave?» o entra con tu contraseña.'],
+            ]);
+        }
+
+        ClavePin::comprobar($user, $data['pin']);
+        self::asegurarActiva($user, 'telefono');
+
+        if (ClavePin::esDeConfianza($user, $data['dispositivo'] ?? null)) {
+            return self::sesion($user, $data['dispositivo']);
+        }
+
+        // Teléfono nuevo: además de la clave, un código por WhatsApp. Si se
+        // envió uno hace menos de un minuto, ese sigue sirviendo.
+        $espera = $codigos->segundosParaReenviar($user->telefono, CodigosTelefono::ACCESO, $user->id);
+        $codigoPrueba = $espera > 0 ? null : $codigos->enviar($user->telefono, CodigosTelefono::ACCESO, $user->id);
+
+        return response()->json(array_filter([
+            'requiere_codigo' => true,
+            'message' => $espera > 0
+                ? 'Escribe el código que te enviamos por WhatsApp.'
+                : 'Es la primera vez que entras en este teléfono: te enviamos un código por WhatsApp.',
+            'telefono' => $user->telefono,
+            'espera' => $espera > 0 ? $espera : CodigosTelefono::SEGUNDOS_ESPERA,
+            'vence_en_minutos' => CodigosTelefono::MINUTOS_VIGENCIA,
+            // Solo en local con el canal de prueba (WHATSAPP_DRIVER=log).
+            'codigo_prueba' => $codigoPrueba,
+        ], fn ($v) => $v !== null));
+    }
+
+    /**
+     * Segundo paso de entrar en un teléfono nuevo: el código de WhatsApp.
+     * Se vuelve a pedir la clave (el código solo se envió tras acertarla).
+     * Al acertar, el teléfono queda de confianza.
+     */
+    public function confirmarCodigo(Request $request, CodigosTelefono $codigos): JsonResponse
+    {
+        $request->merge(['telefono' => CodigosTelefono::normalizar($request->input('telefono')) ?? $request->input('telefono')]);
+        $data = $request->validate([
+            'telefono' => ['required', 'string', new \App\Rules\Telefono],
+            'pin' => ['required', 'string'],
+            'codigo' => ['required', 'digits:6'],
+            'nombre_dispositivo' => ['nullable', 'string', 'max:80'],
+        ], [
+            'codigo.required' => 'Escribe el código de 6 números.',
+            'codigo.digits' => 'El código tiene 6 números.',
+        ]);
+
+        $user = CodigosTelefono::cuentaConTelefono($data['telefono']);
+        if (! $user) {
+            throw ValidationException::withMessages([
+                'codigo' => ['El código venció o ya no sirve. Pide uno nuevo.'],
+            ]);
+        }
+
+        ClavePin::comprobar($user, $data['pin']);
+        $codigos->comprobar($user->telefono, CodigosTelefono::ACCESO, $data['codigo'], $user->id);
+        self::asegurarActiva($user, 'codigo');
+
+        return self::sesion($user, ClavePin::confiar($user, $data['nombre_dispositivo'] ?? null));
+    }
+
+    /** «Continuar como»: el teléfono de confianza dice de qué cuenta es; falta la clave. */
+    private function entrarEnDispositivo(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'dispositivo' => ['required', 'string', 'max:100'],
+            'pin' => ['required', 'string'],
+        ], [
+            'pin.required' => 'Escribe tu clave de 4 números.',
+        ]);
+
+        $dispositivo = ClavePin::dispositivo($data['dispositivo']);
+        if (! $dispositivo) {
+            return response()->json([
+                'message' => 'Este teléfono ya no recuerda tu cuenta. Entra con tu celular o con Google.',
+                'codigo' => 'dispositivo_desconocido',
+                'errors' => ['dispositivo' => ['Este teléfono ya no recuerda tu cuenta. Entra con tu celular o con Google.']],
+            ], 422);
+        }
+
+        $user = $dispositivo->user;
+        ClavePin::comprobar($user, $data['pin']);
+        self::asegurarActiva($user, 'pin');
+
+        return self::sesion($user, $data['dispositivo']);
+    }
+
+    /** Las cuentas de antes: correo, celular o usuario y contraseña. */
+    private function entrarConContrasena(Request $request): JsonResponse
     {
         $campo = $request->has('usuario') ? 'usuario' : 'email';
         $data = $request->validate([
@@ -122,18 +254,47 @@ class AuthController extends Controller
             ]);
         }
 
+        self::asegurarActiva($user, $campo);
+
+        // Con clave y otra forma de entrar, la contraseña ya no sirve en la app
+        // (el panel web de administración la sigue usando).
+        if ($user->pin !== null && ($user->telefono_verificado_at !== null || $user->google_id !== null)) {
+            throw ValidationException::withMessages([
+                $campo => [$user->telefono_verificado_at !== null
+                    ? 'Tu cuenta ya tiene clave de 4 números: entra con tu celular y tu clave.'
+                    : 'Tu cuenta ya tiene clave de 4 números: entra con «Continuar con Google» y tu clave.'],
+            ]);
+        }
+
+        return self::sesion($user, ClavePin::confiar($user, $request->input('nombre_dispositivo')));
+    }
+
+    /**
+     * La sesión que reciben la app al entrar: datos, token y, si lo hay, el
+     * token del teléfono de confianza (la app lo guarda para «Continuar como»).
+     */
+    public static function sesion(User $user, ?string $dispositivo = null, int $estado = 200, array $extra = []): JsonResponse
+    {
+        if ($dispositivo !== null) {
+            ClavePin::usar($dispositivo);
+        }
+
+        return response()->json(array_filter([
+            ...$extra,
+            'user' => self::userPayload($user),
+            'token' => $user->createToken('api')->plainTextToken,
+            'dispositivo' => $dispositivo,
+        ], fn ($v) => $v !== null), $estado);
+    }
+
+    /** Una cuenta suspendida por un admin no puede entrar (el error va en `$campo`). */
+    public static function asegurarActiva(User $user, string $campo): void
+    {
         if ($user->suspendido_at !== null) {
             throw ValidationException::withMessages([
                 $campo => [CuentaActiva::mensajeSuspension($user)],
             ]);
         }
-
-        $token = $user->createToken('api')->plainTextToken;
-
-        return response()->json([
-            'user' => self::userPayload($user),
-            'token' => $token,
-        ]);
     }
 
     /**
@@ -197,9 +358,16 @@ class AuthController extends Controller
             'telefono' => [$esCliente ? 'required' : 'sometimes', 'nullable', 'string', new \App\Rules\Telefono],
         ]);
 
-        // Cambiar el número a mano le quita la verificación (no se confirmó el
-        // nuevo). La cuenta debe conservar al menos una forma de entrar.
+        // El celular verificado es la forma de entrar: se cambia solo con la
+        // clave y un código de WhatsApp (/perfil/telefono/codigo). Uno sin
+        // verificar es solo de contacto y se cambia aquí. La cuenta debe
+        // conservar al menos una forma de entrar.
         $cambiaTelefono = array_key_exists('telefono', $data) && $data['telefono'] !== $user->telefono;
+        if ($cambiaTelefono && $user->telefono_verificado_at !== null) {
+            throw ValidationException::withMessages([
+                'telefono' => ['Tu celular verificado se cambia con «Cambiar celular» en Mi información: te pediremos tu clave y un código de WhatsApp.'],
+            ]);
+        }
         $conservaCelular = $user->telefono_verificado_at !== null && ! $cambiaTelefono;
         if (blank($data['email']) && blank($user->username) && ! $conservaCelular && $user->google_id === null) {
             throw ValidationException::withMessages([
@@ -355,11 +523,13 @@ class AuthController extends Controller
             'direccion' => $user->direccion,
             'barrio' => $user->barrio,
             'telefono' => $user->telefono,
-            // Confirmado por WhatsApp: sirve para entrar y recuperar la contraseña.
+            // Confirmado por WhatsApp: sirve para entrar y recuperar la clave.
             'telefono_verificado' => $user->telefono_verificado_at !== null,
             // Entra con Google (cuenta de Google conectada).
             'google' => $user->google_id !== null,
-            // false: se registró con Google y aún no ha creado contraseña.
+            // Clave de 4 números. false: la app le pide crearla antes de seguir.
+            'tiene_pin' => $user->pin !== null,
+            // Contraseña de antes (cuentas viejas y el panel web de administración).
             'tiene_clave' => $user->password !== null,
             // Domiciliario: si está en turno (le llegan los avisos de pedidos).
             'en_turno' => (bool) $user->en_turno,

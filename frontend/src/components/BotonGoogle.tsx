@@ -15,6 +15,7 @@ import { messageFromError } from '../formErrors';
 import { elegirCuentaGoogle } from '../google';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { PressableScale } from './anim';
+import { usePedirClave } from './PedirClave';
 
 /** La «G» de Google, con sus cuatro colores. */
 export function LogoGoogle({ size = 20 }: { size?: number }) {
@@ -60,11 +61,18 @@ export default function BotonGoogle({ onPress, cargando, disabled, texto = 'Cont
 }
 
 /**
- * Elegir la cuenta de Google y entrar. Si la cuenta ya existe, abre la sesión;
- * si es nueva, llama a `alSerNueva` para completar el registro (política y nombre).
+ * Elegir la cuenta de Google y entrar. Si la cuenta ya existe, pide su clave
+ * de 4 números (el modal va en `modal`, que la pantalla debe poner en su
+ * árbol) y abre la sesión; si es nueva, llama a `alSerNueva` para completar
+ * el registro (política, nombre y clave). `alOlvidarClave` recibe el token de
+ * Google para crear una clave nueva con él.
  */
-export function useEntrarConGoogle(alSerNueva: (idToken: string, perfil: PerfilGoogle) => void) {
-  const { entrar } = useAuth();
+export function useEntrarConGoogle(
+  alSerNueva: (idToken: string, perfil: PerfilGoogle) => void,
+  alOlvidarClave?: (idToken: string) => void,
+) {
+  const { entrar, dispositivos } = useAuth();
+  const clave = usePedirClave();
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,8 +86,22 @@ export function useEntrarConGoogle(alSerNueva: (idToken: string, perfil: PerfilG
       const r = await entrarConGoogle(idToken);
       if (r.nuevo) {
         alSerNueva(idToken, r.perfil);
+      } else if (r.requiere_pin) {
+        const nombre = r.user.name.trim().split(/\s+/)[0];
+        const dispositivo = dispositivos[r.user.id];
+        clave.pedir({
+          titulo: nombre ? `Hola, ${nombre}` : 'Escribe tu clave',
+          texto: 'Escribe tu clave de 4 números para entrar.',
+          textoBoton: 'Entrar',
+          accion: async pin => {
+            const s = await entrarConGoogle(idToken, { pin, dispositivo });
+            if (s.nuevo || s.requiere_pin) throw new Error('No se pudo entrar. Inténtalo de nuevo.');
+            entrar(s.token, s.user, { dispositivo: s.dispositivo });
+          },
+          onOlvide: alOlvidarClave ? () => alOlvidarClave(idToken) : undefined,
+        });
       } else {
-        entrar(r.token, r.user);
+        entrar(r.token, r.user, { dispositivo: r.dispositivo });
       }
     } catch (e) {
       setError(messageFromError(e));
@@ -88,7 +110,7 @@ export function useEntrarConGoogle(alSerNueva: (idToken: string, perfil: PerfilG
     }
   }
 
-  return { iniciar, cargando, error, setError };
+  return { iniciar, cargando, error, setError, modal: clave.modal };
 }
 
 // Colores de las pautas de marca de Google (no del tema de Vitrina).

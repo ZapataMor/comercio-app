@@ -1,111 +1,137 @@
 /**
- * "¿Olvidaste tu contraseña?" (desde el Login, sin sesión).
+ * «¿Olvidaste tu clave?» (desde el login, sin sesión). También desbloquea la
+ * clave tras 5 intentos fallidos y sirve a las cuentas de antes para crear
+ * su primera clave.
  *
- * Paso 1: escribe su correo o su celular → el backend envía un código de 6
- * dígitos al correo o, si es un celular verificado, por WhatsApp.
- * Paso 2: escribe el código y la contraseña nueva → vuelve al Login con el
- * correo o celular listo para entrar.
+ * Dos caminos:
+ *  - Celular: escribe su número → llega un código de 6 números por WhatsApp
+ *    → lo escribe → crea la clave nueva.
+ *  - Google: elige su cuenta de Google conectada → crea la clave nueva. Si
+ *    ya se eligió (p. ej., al entrar con Google), llega en `googleIdToken`.
+ *
+ * Al guardar la clave nueva se entra directamente (`onListo` recibe la
+ * sesión): el código o Google demostraron quién es.
  */
 import React, { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Modal,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { identidadDe, pedirCodigoClave, restablecerClave } from '../api';
+import { ActivityIndicator, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { LoginResponse, pedirCodigoClave, restablecerClave, restablecerClaveConGoogle } from '../api';
+import { erroresClaveNueva } from '../clave';
+import { errorTelefono, telefonoValido } from '../direccion';
 import { FieldErrors, fieldErrorsFromError, messageFromError } from '../formErrors';
+import { elegirCuentaGoogle, googleDisponible } from '../google';
 import { font, makeStyles, radius, useTheme } from '../theme';
-import CampoClave from './CampoClave';
+import BotonGoogle from './BotonGoogle';
+import CampoPin from './CampoPin';
 import FieldError from './FieldError';
 import { EspacioTecladoModal } from './EspacioTeclado';
 
 type Props = {
   visible: boolean;
-  /** Lo que la persona ya escribió en el Login (correo, celular o usuario). */
-  identificadorInicial: string;
+  /** El celular que la persona ya escribió en el login. */
+  telefonoInicial: string;
+  /** Token de Google ya elegido: va directo a crear la clave nueva. */
+  googleIdToken?: string | null;
   onCerrar: () => void;
-  /** Contraseña cambiada: el Login se queda con este correo o celular. */
-  onListo: (identificador: string, mensaje: string) => void;
+  /** Clave nueva guardada: la sesión para entrar. */
+  onListo: (sesion: LoginResponse & { message: string }) => void;
 };
 
-export default function RecuperarClaveModal({ visible, identificadorInicial, onCerrar, onListo }: Props) {
+type Paso = 'telefono' | 'codigo' | 'clave';
+
+export default function RecuperarClaveModal({ visible, telefonoInicial, googleIdToken, onCerrar, onListo }: Props) {
   const { c } = useTheme();
   const styles = useStyles();
-  const [paso, setPaso] = useState<'correo' | 'codigo'>('correo');
-  const [email, setEmail] = useState(identificadorInicial);
+  const [paso, setPaso] = useState<Paso>('telefono');
+  const [telefono, setTelefono] = useState(telefonoInicial);
+  const [idToken, setIdToken] = useState<string | null>(null);
   const [codigoPrueba, setCodigoPrueba] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
   const [codigo, setCodigo] = useState('');
   const [clave, setClave] = useState('');
   const [confirmar, setConfirmar] = useState('');
-  const [aviso, setAviso] = useState<string | null>(null);
   const [errores, setErrores] = useState<FieldErrors>({});
   const [cargando, setCargando] = useState(false);
 
-  // Cada vez que se abre empieza desde el paso 1.
+  // Cada vez que se abre empieza desde el principio (o desde la clave, con Google).
   useEffect(() => {
     if (visible) {
-      setPaso('correo');
-      setEmail(identificadorInicial);
+      setPaso(googleIdToken ? 'clave' : 'telefono');
+      setIdToken(googleIdToken ?? null);
+      setTelefono(telefonoInicial.replace(/\D/g, '').replace(/^57(?=3\d{9}$)/, ''));
       setCodigoPrueba(null);
+      setAviso(null);
       setCodigo('');
       setClave('');
       setConfirmar('');
-      setAviso(null);
       setErrores({});
     }
-  }, [visible, identificadorInicial]);
-
-  function limpiar(campo: string) {
-    setErrores(prev => {
-      const next = { ...prev };
-      delete next[campo];
-      return next;
-    });
-  }
+  }, [visible, telefonoInicial, googleIdToken]);
 
   async function enviarCodigo() {
-    const identidad = identidadDe(email);
-    if (!email.trim() || ('email' in identidad && !identidad.email.includes('@'))) {
-      setErrores({ email: 'Escribe el correo o el celular de tu cuenta.' });
+    if (!telefonoValido(telefono)) {
+      setErrores({ telefono: errorTelefono });
       return;
     }
     setCargando(true);
     setErrores({});
     try {
-      const r = await pedirCodigoClave(identidad);
+      const r = await pedirCodigoClave(telefono);
       setAviso(r.message);
       setCodigoPrueba(r.codigo_prueba ?? null);
       setPaso('codigo');
     } catch (e) {
-      const campos = fieldErrorsFromError(e);
-      const mensaje = campos.email ?? campos.telefono ?? messageFromError(e);
-      setErrores(paso === 'codigo' ? { codigo: mensaje } : { email: mensaje });
+      const mensaje = fieldErrorsFromError(e).telefono ?? messageFromError(e);
+      setErrores(paso === 'codigo' ? { codigo: mensaje } : { telefono: mensaje });
     } finally {
       setCargando(false);
     }
   }
 
-  async function cambiarClave() {
-    const nuevos: FieldErrors = {};
-    if (!/^\d{6}$/.test(codigo)) nuevos.codigo = 'El código tiene 6 números.';
-    if (clave.length < 5) nuevos.password = 'La contraseña debe tener al menos 5 caracteres.';
-    else if (clave !== confirmar) nuevos.confirmar = 'Las contraseñas no coinciden.';
-    if (Object.keys(nuevos).length) {
+  function seguirConCodigo() {
+    if (!/^\d{6}$/.test(codigo)) {
+      setErrores({ codigo: 'El código tiene 6 números.' });
+      return;
+    }
+    setErrores({});
+    setPaso('clave');
+  }
+
+  async function conGoogle() {
+    setErrores({});
+    try {
+      const token = await elegirCuentaGoogle();
+      if (!token) return;
+      setIdToken(token);
+      setPaso('clave');
+    } catch (e) {
+      setErrores({ telefono: messageFromError(e) });
+    }
+  }
+
+  async function guardar() {
+    const nuevos = erroresClaveNueva(clave, confirmar);
+    if (nuevos.pin || nuevos.confirmar) {
       setErrores(nuevos);
+      if (nuevos.pin) setConfirmar('');
       return;
     }
     setCargando(true);
     setErrores({});
     try {
-      const mensaje = await restablecerClave(identidadDe(email), codigo, clave);
-      onListo(email.trim(), mensaje);
+      const sesion = idToken ? await restablecerClaveConGoogle(idToken, clave) : await restablecerClave(telefono, codigo, clave);
+      onListo(sesion);
     } catch (e) {
-      const campos = fieldErrorsFromError(e, { password_confirmation: 'confirmar' });
-      setErrores(Object.keys(campos).length ? campos : { codigo: messageFromError(e) });
+      const campos = fieldErrorsFromError(e, { pin_confirmation: 'confirmar' });
+      if (campos.codigo) {
+        // El código no sirvió: volver a escribirlo (o pedir otro).
+        setPaso('codigo');
+        setCodigo('');
+        setErrores({ codigo: campos.codigo });
+      } else if (campos.id_token) {
+        setErrores({ pin: campos.id_token });
+      } else {
+        setErrores(Object.keys(campos).length ? campos : { pin: messageFromError(e) });
+      }
     } finally {
       setCargando(false);
     }
@@ -116,93 +142,106 @@ export default function RecuperarClaveModal({ visible, identificadorInicial, onC
       <EspacioTecladoModal style={styles.fondo}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <View style={styles.caja}>
-            <Text style={styles.titulo}>Recuperar contraseña</Text>
+            <Text style={styles.titulo}>{paso === 'clave' ? 'Crea tu clave nueva' : '¿Olvidaste tu clave?'}</Text>
 
-            {paso === 'correo' ? (
+            {paso === 'telefono' ? (
               <>
                 <Text style={styles.texto}>
-                  Escribe el correo o el celular de tu cuenta. Te enviaremos un código de 6 números: al correo, o por
-                  WhatsApp si es tu celular.
+                  Escribe el celular de tu cuenta. Te enviaremos un código de 6 números por WhatsApp para crear una clave
+                  nueva. Si tu clave quedó bloqueada, así también se desbloquea.
                 </Text>
-                <TextInput
-                  style={styles.input}
-                  value={email}
-                  onChangeText={v => {
-                    setEmail(v);
-                    limpiar('email');
-                  }}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType="email-address"
-                  placeholder="correo@ejemplo.co o 3001234567"
-                  accessibilityLabel="Correo o celular"
-                  placeholderTextColor={c.mutedSoft}
-                  editable={!cargando}
-                />
-                <FieldError mensaje={errores.email} />
+                <View style={styles.fila}>
+                  <Text style={styles.prefijo}>+57</Text>
+                  <TextInput
+                    style={[styles.input, styles.inputTelefono]}
+                    value={telefono}
+                    onChangeText={v => {
+                      setTelefono(v.replace(/\D/g, '').slice(0, 10));
+                      setErrores({});
+                    }}
+                    keyboardType="number-pad"
+                    maxLength={10}
+                    placeholder="3001234567"
+                    placeholderTextColor={c.mutedSoft}
+                    accessibilityLabel="Celular de tu cuenta"
+                    editable={!cargando}
+                  />
+                </View>
+                <FieldError mensaje={errores.telefono} />
                 <TouchableOpacity style={styles.boton} onPress={enviarCodigo} disabled={cargando}>
-                  {cargando ? (
-                    <ActivityIndicator color={c.onBrand} />
-                  ) : (
-                    <Text style={styles.botonTxt}>Enviar código</Text>
-                  )}
+                  {cargando ? <ActivityIndicator color={c.onBrand} /> : <Text style={styles.botonTxt}>Enviar código por WhatsApp</Text>}
                 </TouchableOpacity>
+                {googleDisponible() ? (
+                  <>
+                    <Text style={styles.o}>o, si conectaste Google</Text>
+                    <BotonGoogle texto="Crear clave nueva con Google" onPress={conGoogle} disabled={cargando} />
+                  </>
+                ) : null}
               </>
-            ) : (
+            ) : paso === 'codigo' ? (
               <>
                 {!!aviso && <Text style={styles.texto}>{aviso}</Text>}
                 {!!codigoPrueba && (
-                  <Text style={styles.prueba}>
-                    Modo prueba (WhatsApp sin configurar): tu código es {codigoPrueba}
-                  </Text>
+                  <Text style={styles.prueba}>Modo prueba (WhatsApp sin configurar): tu código es {codigoPrueba}</Text>
                 )}
                 <TextInput
                   style={[styles.input, styles.inputCodigo]}
                   value={codigo}
                   onChangeText={v => {
                     setCodigo(v.replace(/\D/g, '').slice(0, 6));
-                    limpiar('codigo');
+                    setErrores({});
                   }}
                   keyboardType="number-pad"
                   placeholder="000000"
                   placeholderTextColor={c.mutedSoft}
                   editable={!cargando}
                   maxLength={6}
+                  autoFocus
+                  textContentType="oneTimeCode"
+                  autoComplete="sms-otp"
+                  accessibilityLabel="Código de 6 números"
                 />
                 <FieldError mensaje={errores.codigo} />
-                <CampoClave
-                  style={styles.input}
-                  value={clave}
-                  onChangeText={v => {
-                    setClave(v);
-                    limpiar('password');
-                  }}
-                  placeholder="Contraseña nueva (mínimo 5)"
-                  placeholderTextColor={c.mutedSoft}
-                  editable={!cargando}
-                />
-                <FieldError mensaje={errores.password} />
-                <CampoClave
-                  style={styles.input}
-                  value={confirmar}
-                  onChangeText={v => {
-                    setConfirmar(v);
-                    limpiar('confirmar');
-                  }}
-                  placeholder="Repite la contraseña nueva"
-                  placeholderTextColor={c.mutedSoft}
-                  editable={!cargando}
-                />
-                <FieldError mensaje={errores.confirmar} />
-                <TouchableOpacity style={styles.boton} onPress={cambiarClave} disabled={cargando}>
-                  {cargando ? (
-                    <ActivityIndicator color={c.onBrand} />
-                  ) : (
-                    <Text style={styles.botonTxt}>Cambiar contraseña</Text>
-                  )}
+                <TouchableOpacity style={styles.boton} onPress={seguirConCodigo} disabled={cargando}>
+                  <Text style={styles.botonTxt}>Continuar</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={enviarCodigo} disabled={cargando}>
                   <Text style={styles.enlace}>No me llegó: enviar otro código</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={styles.texto}>
+                  4 números que no sean fáciles de adivinar: ni repetidos (0000) ni seguidos (1234). Con ella y tu celular
+                  entras a Vitrina.
+                </Text>
+                <Text style={styles.label}>Clave nueva</Text>
+                <CampoPin
+                  value={clave}
+                  onChangeText={v => {
+                    setClave(v);
+                    setErrores({});
+                  }}
+                  autoFocus
+                  editable={!cargando}
+                  conError={!!errores.pin}
+                  accessibilityLabel="Clave nueva de 4 números"
+                />
+                <FieldError mensaje={errores.pin} />
+                <Text style={styles.label}>Escríbela otra vez</Text>
+                <CampoPin
+                  value={confirmar}
+                  onChangeText={v => {
+                    setConfirmar(v);
+                    setErrores({});
+                  }}
+                  editable={!cargando}
+                  conError={!!errores.confirmar}
+                  accessibilityLabel="Confirma la clave nueva"
+                />
+                <FieldError mensaje={errores.confirmar} />
+                <TouchableOpacity style={styles.boton} onPress={guardar} disabled={cargando}>
+                  {cargando ? <ActivityIndicator color={c.onBrand} /> : <Text style={styles.botonTxt}>Guardar clave y entrar</Text>}
                 </TouchableOpacity>
               </>
             )}
@@ -223,10 +262,17 @@ const useStyles = makeStyles((c, shadow) => ({
   caja: { backgroundColor: c.surface, borderRadius: radius.xl, padding: 22, ...shadow.card },
   titulo: { fontSize: 19, fontFamily: font.display, color: c.textStrong, marginBottom: 8 },
   texto: { fontSize: 13, fontFamily: font.regular, color: c.text, lineHeight: 19, marginBottom: 14 },
+  label: { fontSize: 13, fontFamily: font.semibold, color: c.text, marginTop: 6, marginBottom: 8 },
+  fila: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  prefijo: {
+    fontSize: 16, fontFamily: font.semibold, color: c.text, paddingHorizontal: 12, paddingVertical: 12,
+    borderWidth: 1, borderColor: c.borderStrong, borderRadius: radius.md, backgroundColor: c.bg,
+  },
   input: {
     borderWidth: 1, borderColor: c.borderStrong, borderRadius: radius.md, paddingHorizontal: 14,
     paddingVertical: 12, fontSize: 16, fontFamily: font.regular, color: c.textStrong, marginBottom: 6,
   },
+  inputTelefono: { flex: 1, marginBottom: 0 },
   prueba: {
     fontSize: 12.5, fontFamily: font.semibold, color: c.text, backgroundColor: c.accentSoft,
     borderRadius: radius.sm, padding: 10, marginBottom: 12,
@@ -234,9 +280,10 @@ const useStyles = makeStyles((c, shadow) => ({
   inputCodigo: { fontSize: 24, letterSpacing: 8, textAlign: 'center', fontFamily: font.bold },
   boton: {
     backgroundColor: c.brand, borderRadius: radius.md, paddingVertical: 14, alignItems: 'center',
-    marginTop: 10, ...shadow.soft,
+    marginTop: 14, ...shadow.soft,
   },
   botonTxt: { color: c.onBrand, fontFamily: font.bold, fontSize: 15 },
+  o: { textAlign: 'center', color: c.muted, fontFamily: font.medium, fontSize: 12.5, marginTop: 16, marginBottom: 10 },
   enlace: { textAlign: 'center', color: c.goldText, fontFamily: font.semibold, fontSize: 13, marginTop: 14 },
   cancelar: { textAlign: 'center', color: c.muted, fontFamily: font.semibold, marginTop: 14 },
 }));

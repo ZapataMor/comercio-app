@@ -1,6 +1,6 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
-import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { pedirCodigoRegistro, register, verificarTelefonoRegistro } from '../api';
 import { useAuth } from '../AuthContext';
 import { PressableScale } from '../components/anim';
@@ -8,6 +8,7 @@ import BotonGoogle, { useEntrarConGoogle } from '../components/BotonGoogle';
 import FieldError from '../components/FieldError';
 import Icon from '../components/Icon';
 import CampoAcceso from '../components/login/CampoAcceso';
+import CrearClaveVidrio from '../components/login/CrearClaveVidrio';
 import EscenaAcceso from '../components/login/EscenaAcceso';
 import {
   BotonVolverAcceso,
@@ -28,12 +29,14 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 // puede crear sus negocios (o unirse a otros) desde "Mis negocios" y hacerse
 // domiciliario desde el menú del ícono de usuario.
 //
-// Primero se confirma el celular con un código por WhatsApp (con él se
-// entra y se recupera la contraseña); después se llenan los datos. El
-// correo es opcional.
+// Tres pasos: confirmar el celular con un código por WhatsApp (con él se
+// entra y se recupera la clave), nombre y política de privacidad, y crear la
+// clave de 4 números. El correo ya no se pide aquí: al entrar, «Completa tu
+// cuenta» lo ofrece (opcional).
 //
 // O, en vez del celular, «Continuar con Google»: si la cuenta de Google es
-// nueva sigue en RegistroGoogle (nombre y política); si ya existe, entra.
+// nueva sigue en RegistroGoogle (nombre, política y clave); si ya existe,
+// pide su clave y entra.
 //
 // Se ve igual que el login (EscenaAcceso): mismo fondo y misma tarjeta, con
 // un botón de volver al login en la esquina de arriba.
@@ -44,11 +47,11 @@ export default function RegisterScreen({ navigation }: Props) {
   const { entrar: guardarSesion } = useAuth();
   const [nombre, setNombre] = useState('');
   const [apellidos, setApellidos] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmar, setConfirmar] = useState('');
   // Celular confirmado por WhatsApp y el token que pide /register.
   const [celular, setCelular] = useState<{ telefono: string; token: string } | null>(null);
+  // Después de los datos, el paso de crear la clave.
+  const [creandoClave, setCreandoClave] = useState(false);
+  const [errorClave, setErrorClave] = useState<string | null>(null);
   // Autorización del tratamiento de datos (Ley 1581): casilla sin marcar por defecto.
   const [aceptaTerminos, setAceptaTerminos] = useState(false);
   const [cargando, setCargando] = useState(false);
@@ -65,14 +68,13 @@ export default function RegisterScreen({ navigation }: Props) {
     });
   }
 
-  async function crearCuenta() {
+  /** Paso de los datos: nombre, apellidos y política. Sigue con la clave. */
+  function seguirAClave() {
     setError(null);
     setErrores({});
-
     const nuevosErrores: FieldErrors = {};
     if (!nombre.trim()) nuevosErrores.name = 'El campo nombre es obligatorio.';
     if (!apellidos.trim()) nuevosErrores.apellidos = 'El campo apellidos es obligatorio.';
-    if (!password) nuevosErrores.password = 'El campo contraseña es obligatorio.';
     if (!aceptaTerminos) {
       nuevosErrores.acepta_terminos = 'Debes aceptar la política de privacidad para crear la cuenta.';
     }
@@ -80,35 +82,37 @@ export default function RegisterScreen({ navigation }: Props) {
       setErrores(nuevosErrores);
       return;
     }
-    if (password.length < 5) {
-      setErrores({ password: 'La contraseña debe tener al menos 5 caracteres.' });
-      return;
-    }
-    if (password !== confirmar) {
-      setErrores({ confirmar: 'La contraseña y su confirmación deben ser iguales.' });
-      return;
-    }
+    setErrorClave(null);
+    setCreandoClave(true);
+  }
 
+  async function crearCuenta(pin: string) {
     if (!celular) return;
+    setError(null);
+    setErrorClave(null);
     setCargando(true);
     try {
-      const { token, user } = await register({
+      const r = await register({
         name: nombre.trim(),
         apellidos: apellidos.trim(),
-        email: email.trim() || null,
-        password,
+        pin,
         telefono: celular.telefono,
         verificacion: celular.token,
         acepta_terminos: aceptaTerminos,
       });
-      guardarSesion(token, user);
+      // Cuenta nueva: al entrar ve «Completa tu cuenta» (correo, opcional).
+      guardarSesion(r.token, r.user, { dispositivo: r.dispositivo, nueva: true });
     } catch (err) {
-      const campos = fieldErrorsFromError(err, { password_confirmation: 'confirmar' });
+      const campos = fieldErrorsFromError(err);
       if (campos.telefono || campos.verificacion) {
         // La verificación venció o el número ya tiene cuenta: volver a confirmarlo.
         setCelular(null);
+        setCreandoClave(false);
         setError(campos.telefono ?? campos.verificacion);
+      } else if (campos.pin || campos.pin_confirmation) {
+        setErrorClave(campos.pin ?? campos.pin_confirmation);
       } else if (Object.keys(campos).length > 0) {
+        setCreandoClave(false);
         setErrores(campos);
       } else {
         setError(messageFromError(err));
@@ -129,15 +133,22 @@ export default function RegisterScreen({ navigation }: Props) {
 
   return (
     <EscenaAcceso>
+      {google.modal}
       <BotonVolverAcceso
-        onPress={() => navigation.goBack()}
+        onPress={() => (creandoClave ? setCreandoClave(false) : navigation.goBack())}
         disabled={cargando || google.cargando}
         accessibilityLabel="Volver al inicio de sesión"
       />
       <LogoAcceso />
       <Text style={e.titulo}>Crear cuenta</Text>
       <Text style={e.subtitulo}>
-        {celular ? 'Únete a Vitrina' : conGoogle ? 'Empieza con Google o con tu celular' : 'Empieza con tu número de celular'}
+        {creandoClave
+          ? 'Último paso: crea tu clave'
+          : celular
+            ? 'Únete a Vitrina'
+            : conGoogle
+              ? 'Empieza con Google o con tu celular'
+              : 'Empieza con tu número de celular'}
       </Text>
 
       {avisoGeneral ? <Text style={e.error}>{avisoGeneral}</Text> : null}
@@ -166,6 +177,20 @@ export default function RegisterScreen({ navigation }: Props) {
             }}
           />
           {irAlLogin}
+        </>
+      ) : creandoClave ? (
+        <>
+          <View style={e.recuadro}>
+            <Icon name="check" size={18} color={l.campoIcono} />
+            <View style={e.recuadroTexto}>
+              <Text style={e.recuadroEtiqueta}>CELULAR CONFIRMADO</Text>
+              <Text style={e.recuadroValor}>+57 {formatoCelular(celular.telefono)}</Text>
+            </View>
+            <TouchableOpacity onPress={() => setCreandoClave(false)} disabled={cargando} hitSlop={8}>
+              <Text style={e.recuadroAccion}>Atrás</Text>
+            </TouchableOpacity>
+          </View>
+          <CrearClaveVidrio textoBoton="Crear cuenta" cargando={cargando} onCrear={crearCuenta} errorServidor={errorClave} />
         </>
       ) : (
         <>
@@ -218,60 +243,6 @@ export default function RegisterScreen({ navigation }: Props) {
           </View>
           <FieldError mensaje={errores.apellidos} />
 
-          <View style={e.bloqueCampo}>
-            <CampoAcceso
-              rotulo="CORREO (OPCIONAL)"
-              icono="sobre"
-              value={email}
-              onChangeText={valor => {
-                setEmail(valor);
-                limpiarError('email');
-              }}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              placeholder="correo@ejemplo.co"
-              editable={!cargando}
-              accessibilityLabel="Correo"
-            />
-          </View>
-          <FieldError mensaje={errores.email} />
-          <Text style={e.ayuda}>Otra forma de entrar y de recuperar tu contraseña.</Text>
-
-          <View style={e.bloqueCampo}>
-            <CampoAcceso
-              rotulo="CONTRASEÑA"
-              icono="candado"
-              value={password}
-              onChangeText={valor => {
-                setPassword(valor);
-                limpiarError('password');
-              }}
-              placeholder="Mínimo 5 caracteres"
-              editable={!cargando}
-              accessibilityLabel="Contraseña"
-              clave
-            />
-          </View>
-          <FieldError mensaje={errores.password} />
-
-          <View style={e.bloqueCampo}>
-            <CampoAcceso
-              rotulo="CONFIRMAR CONTRASEÑA"
-              icono="candado"
-              value={confirmar}
-              onChangeText={valor => {
-                setConfirmar(valor);
-                limpiarError('confirmar');
-              }}
-              placeholder="Repite la contraseña"
-              editable={!cargando}
-              accessibilityLabel="Confirmar contraseña"
-              clave
-            />
-          </View>
-          <FieldError mensaje={errores.confirmar} />
-
           <CasillaPolitica
             marcada={aceptaTerminos}
             alCambiar={() => {
@@ -284,13 +255,8 @@ export default function RegisterScreen({ navigation }: Props) {
 
           <Text style={e.nota}>¿Tienes un negocio? Créalo después desde "Mis negocios".</Text>
 
-          <PressableScale
-            style={[e.boton, cargando && e.botonInactivo]}
-            scaleTo={0.97}
-            onPress={crearCuenta}
-            disabled={cargando}
-            accessibilityRole="button">
-            {cargando ? <ActivityIndicator size="small" color={l.botonTexto} /> : <Text style={e.botonTexto}>Crear cuenta</Text>}
+          <PressableScale style={e.boton} scaleTo={0.97} onPress={seguirAClave} accessibilityRole="button">
+            <Text style={e.botonTexto}>Continuar</Text>
           </PressableScale>
 
           {irAlLogin}

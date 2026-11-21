@@ -14,11 +14,20 @@
  * «Cerrar sesión» cierra solo la cuenta activa y sigue con la más reciente
  * de las demás; «Cerrar todas las sesiones» deja el teléfono sin ninguna.
  *
- * Las cuentas que entran con Google se recuerdan aunque se cierre su sesión
- * (`recordadas`, en `cuentasGoogle`): siguen en «Continuar como» y vuelven a
- * entrar con un toque eligiendo la cuenta de Google. De esas no se guarda el
- * token, solo los datos para mostrarlas. «Cerrar todas las sesiones» y
- * «Quitar de este teléfono» las olvidan.
+ * Teléfono de confianza: al entrar, el backend entrega un token por cuenta
+ * (`dispositivos`, en `dispositivos`) que dice que en este teléfono la
+ * persona ya demostró quién es (código de WhatsApp o Google). Con él entra
+ * solo con su clave de 4 números.
+ *
+ * Las cuentas con la sesión cerrada se recuerdan si tienen ese token o
+ * entran con Google (`recordadas`, en `cuentasGoogle`, el nombre de antes):
+ * siguen en «Continuar como» y vuelven a entrar con la clave (o eligiendo la
+ * cuenta de Google). De esas no se guarda el token de sesión, solo los datos
+ * para mostrarlas. «Cerrar todas las sesiones» y «Quitar de este teléfono»
+ * las olvidan, junto con su token de confianza.
+ *
+ * `porCompletar`: la cuenta que acaba de registrarse (o de crear su clave)
+ * ve una vez «Completa tu cuenta» (correo o celular, opcionales).
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
@@ -29,8 +38,10 @@ import { detenerRastreo } from './ubicacion';
 
 /** Una sesión abierta en este teléfono. */
 export type Cuenta = { token: string; user: Usuario };
-/** Cuenta de Google con la sesión cerrada que el teléfono recuerda (sin token). */
+/** Cuenta con la sesión cerrada que el teléfono recuerda (sin token de sesión). */
 export type CuentaRecordada = { user: Usuario };
+/** Cómo se entró: el token del teléfono de confianza y si la cuenta es nueva. */
+export type OpcionesEntrar = { dispositivo?: string | null; nueva?: boolean };
 type Sesion = Cuenta | null;
 
 type AuthContextType = {
@@ -40,11 +51,23 @@ type AuthContextType = {
   cuentas: Cuenta[];
   /** true mientras se agrega otra cuenta desde «Mi perfil»: el login puede volver a la anterior. */
   agregando: boolean;
-  /** Cuentas de Google con la sesión cerrada: en el login vuelven a entrar con Google en un toque. */
+  /** Cuentas con la sesión cerrada: en el login vuelven a entrar con la clave (o con Google). */
   recordadas: CuentaRecordada[];
-  /** Deja de recordar una cuenta de Google en este teléfono. */
+  /** Deja de recordar una cuenta en este teléfono (y deja de ser de confianza para ella). */
   olvidarRecordada: (userId: number) => void;
-  entrar: (token: string, user: Usuario) => void;
+  /** Token del teléfono de confianza de cada cuenta (por id). */
+  dispositivos: Record<number, string>;
+  /** Guarda el token de confianza de una cuenta (p. ej., al crear su clave). */
+  guardarDispositivo: (userId: number, token: string) => void;
+  /** El backend dijo que este teléfono ya no es de confianza para la cuenta. */
+  olvidarDispositivo: (userId: number) => void;
+  /** Cuenta que debe ver «Completa tu cuenta» (una vez). */
+  porCompletar: number | null;
+  /** Muestra «Completa tu cuenta» a esa cuenta. */
+  pedirCompletar: (userId: number) => void;
+  /** Termina (o salta) «Completa tu cuenta». */
+  terminarCompletar: () => void;
+  entrar: (token: string, user: Usuario, opciones?: OpcionesEntrar) => void;
   /** Pasa a otra de las cuentas guardadas, sin contraseña. */
   cambiarCuenta: (userId: number) => void;
   /** Lleva al login para entrar con otra cuenta, sin cerrar las sesiones abiertas. */
@@ -63,6 +86,7 @@ type AuthContextType = {
 const CLAVE = 'sesion';
 const CLAVE_CUENTAS = 'cuentas';
 const CLAVE_RECORDADAS = 'cuentasGoogle';
+const CLAVE_DISPOSITIVOS = 'dispositivos';
 
 const AuthContext = createContext<AuthContextType>({
   auth: null,
@@ -71,6 +95,12 @@ const AuthContext = createContext<AuthContextType>({
   agregando: false,
   recordadas: [],
   olvidarRecordada: () => {},
+  dispositivos: {},
+  guardarDispositivo: () => {},
+  olvidarDispositivo: () => {},
+  porCompletar: null,
+  pedirCompletar: () => {},
+  terminarCompletar: () => {},
   entrar: () => {},
   cambiarCuenta: () => {},
   agregarCuenta: () => {},
@@ -89,6 +119,10 @@ function esRecordada(valor: unknown): valor is CuentaRecordada {
   return !!c && !!c.user && typeof c.user.id === 'number' && typeof c.user.name === 'string';
 }
 
+function esMapaDispositivos(valor: unknown): valor is Record<string, string> {
+  return !!valor && typeof valor === 'object' && !Array.isArray(valor) && Object.values(valor).every(v => typeof v === 'string');
+}
+
 function leer(raw: string | null): unknown {
   if (!raw) return null;
   try {
@@ -103,6 +137,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [cuentas, setCuentas] = useState<Cuenta[]>([]);
   const [agregando, setAgregando] = useState(false);
   const [recordadas, setRecordadas] = useState<CuentaRecordada[]>([]);
+  const [dispositivos, setDispositivos] = useState<Record<number, string>>({});
+  const [porCompletar, setPorCompletar] = useState<number | null>(null);
   const [cargando, setCargando] = useState(true);
 
   // Copias al día para las funciones del contexto (que no cambian entre renders)
@@ -110,6 +146,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const authRef = useRef<Sesion>(null);
   const cuentasRef = useRef<Cuenta[]>([]);
   const recordadasRef = useRef<CuentaRecordada[]>([]);
+  const dispositivosRef = useRef<Record<number, string>>({});
+  const porCompletarRef = useRef<number | null>(null);
+  porCompletarRef.current = porCompletar;
   // Token de la última cuenta activa. Sigue puesto mientras se agrega otra:
   // si se vuelve a la misma, lo que compartía (el GPS del domiciliario) sigue.
   const ultimoToken = useRef<string | null>(null);
@@ -144,10 +183,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  /** Si la cuenta entra con Google, la recuerda (sin token) para volver con un toque. */
-  const recordarSiEsGoogle = useCallback(
+  const fijarDispositivos = useCallback((mapa: Record<number, string>) => {
+    dispositivosRef.current = mapa;
+    setDispositivos(mapa);
+    if (Object.keys(mapa).length > 0) {
+      AsyncStorage.setItem(CLAVE_DISPOSITIVOS, JSON.stringify(mapa)).catch(() => {});
+    } else {
+      AsyncStorage.removeItem(CLAVE_DISPOSITIVOS).catch(() => {});
+    }
+  }, []);
+
+  const guardarDispositivo = useCallback(
+    (userId: number, token: string) => {
+      if (dispositivosRef.current[userId] === token) return;
+      fijarDispositivos({ ...dispositivosRef.current, [userId]: token });
+    },
+    [fijarDispositivos],
+  );
+
+  const olvidarDispositivo = useCallback(
+    (userId: number) => {
+      if (!(userId in dispositivosRef.current)) return;
+      const resto = { ...dispositivosRef.current };
+      delete resto[userId];
+      fijarDispositivos(resto);
+    },
+    [fijarDispositivos],
+  );
+
+  /**
+   * Recuerda la cuenta (sin token de sesión) para volver desde «Continuar
+   * como»: con la clave si este teléfono es de confianza, o con Google.
+   */
+  const recordar = useCallback(
     (user: Usuario) => {
-      if (!user.google) return;
+      if (!user.google && !dispositivosRef.current[user.id]) return;
       fijarRecordadas([{ user }, ...recordadasRef.current.filter(r => r.user.id !== user.id)]);
     },
     [fijarRecordadas],
@@ -155,8 +225,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Al arrancar, recupera la sesión activa y las demás cuentas guardadas.
   useEffect(() => {
-    Promise.all([AsyncStorage.getItem(CLAVE), AsyncStorage.getItem(CLAVE_CUENTAS), AsyncStorage.getItem(CLAVE_RECORDADAS)])
-      .then(([rawSesion, rawCuentas, rawRecordadas]) => {
+    Promise.all([
+      AsyncStorage.getItem(CLAVE),
+      AsyncStorage.getItem(CLAVE_CUENTAS),
+      AsyncStorage.getItem(CLAVE_RECORDADAS),
+      AsyncStorage.getItem(CLAVE_DISPOSITIVOS),
+    ])
+      .then(([rawSesion, rawCuentas, rawRecordadas, rawDispositivos]) => {
+        const mapa = leer(rawDispositivos);
+        if (esMapaDispositivos(mapa)) {
+          const porId: Record<number, string> = {};
+          Object.entries(mapa).forEach(([id, token]) => {
+            if (Number(id) > 0) porId[Number(id)] = token;
+          });
+          dispositivosRef.current = porId;
+          setDispositivos(porId);
+        }
         const recordadasGuardadas = leer(rawRecordadas);
         const listaRecordadas = Array.isArray(recordadasGuardadas) ? recordadasGuardadas.filter(esRecordada) : [];
         recordadasRef.current = listaRecordadas;
@@ -186,7 +270,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const rechazada = cuentasRef.current.find(c => c.token === token);
       if (rechazada) {
         fijarCuentas(cuentasRef.current.filter(c => c.token !== token));
-        recordarSiEsGoogle(rechazada.user);
+        recordar(rechazada.user);
       }
       if (token !== authRef.current?.token) {
         return;
@@ -198,7 +282,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       fijarSesion(null);
     });
     return () => alRechazarToken(null);
-  }, [fijarCuentas, fijarSesion, recordarSiEsGoogle]);
+  }, [fijarCuentas, fijarSesion, recordar]);
 
   useEffect(() => {
     if (!auth?.token) {
@@ -224,7 +308,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [auth?.token, auth?.user.id]);
 
   const entrar = useCallback(
-    (token: string, user: Usuario) => {
+    (token: string, user: Usuario, opciones?: OpcionesEntrar) => {
+      if (opciones?.dispositivo) guardarDispositivo(user.id, opciones.dispositivo);
+      if (opciones?.nueva) setPorCompletar(user.id);
       // Otra cuenta: lo que compartía la anterior se apaga.
       if (ultimoToken.current && ultimoToken.current !== token) detenerRastreo();
       ultimoToken.current = token;
@@ -237,13 +323,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         fijarRecordadas(recordadasRef.current.filter(r => r.user.id !== user.id));
       }
     },
-    [fijarCuentas, fijarSesion, fijarRecordadas],
+    [fijarCuentas, fijarSesion, fijarRecordadas, guardarDispositivo],
   );
 
   const olvidarRecordada = useCallback(
-    (userId: number) => fijarRecordadas(recordadasRef.current.filter(r => r.user.id !== userId)),
-    [fijarRecordadas],
+    (userId: number) => {
+      fijarRecordadas(recordadasRef.current.filter(r => r.user.id !== userId));
+      olvidarDispositivo(userId);
+    },
+    [fijarRecordadas, olvidarDispositivo],
   );
+
+  const pedirCompletar = useCallback((userId: number) => setPorCompletar(userId), []);
+  const terminarCompletar = useCallback(() => setPorCompletar(null), []);
 
   const cambiarCuenta = useCallback(
     (userId: number) => {
@@ -291,9 +383,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAgregando(false);
     fijarCuentas(resto);
     fijarSesion(siguiente);
-    recordarSiEsGoogle(actual.user);
+    recordar(actual.user);
+    if (porCompletarRef.current === actual.user.id) setPorCompletar(null);
     return siguiente;
-  }, [fijarCuentas, fijarSesion, recordarSiEsGoogle]);
+  }, [fijarCuentas, fijarSesion, recordar]);
 
   const salirDeTodas = useCallback(() => {
     detenerRastreo();
@@ -302,10 +395,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     ultimoToken.current = null;
     setAgregando(false);
+    setPorCompletar(null);
     fijarCuentas([]);
     fijarRecordadas([]);
+    // El teléfono queda sin ninguna cuenta: tampoco es de confianza para ninguna.
+    fijarDispositivos({});
     fijarSesion(null);
-  }, [fijarCuentas, fijarSesion, fijarRecordadas]);
+  }, [fijarCuentas, fijarSesion, fijarRecordadas, fijarDispositivos]);
 
   const valor = useMemo(
     () => ({
@@ -315,6 +411,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       agregando,
       recordadas,
       olvidarRecordada,
+      dispositivos,
+      guardarDispositivo,
+      olvidarDispositivo,
+      porCompletar,
+      pedirCompletar,
+      terminarCompletar,
       entrar,
       cambiarCuenta,
       agregarCuenta,
@@ -322,7 +424,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       salir,
       salirDeTodas,
     }),
-    [auth, cargando, cuentas, agregando, recordadas, olvidarRecordada, entrar, cambiarCuenta, agregarCuenta, actualizarUsuario, salir, salirDeTodas],
+    [
+      auth, cargando, cuentas, agregando, recordadas, olvidarRecordada, dispositivos, guardarDispositivo, olvidarDispositivo,
+      porCompletar, pedirCompletar, terminarCompletar, entrar, cambiarCuenta, agregarCuenta, actualizarUsuario, salir, salirDeTodas,
+    ],
   );
 
   return <AuthContext.Provider value={valor}>{children}</AuthContext.Provider>;

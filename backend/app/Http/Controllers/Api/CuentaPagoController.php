@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\CuentaPago;
 use App\Models\Negocio;
+use App\Support\ClavePin;
 use App\Support\FotoOptimizada;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,6 +19,10 @@ use Illuminate\Validation\ValidationException;
  * Las administra el propietario o un administrador del negocio; las ve quien
  * gestiona pedidos (para saber dónde revisar) y el cliente de un pedido
  * aceptado por transferencia.
+ *
+ * Crear, editar o borrar una pide la clave de 4 números (`pin`): quien
+ * entrara a la cuenta de un comerciante no puede cambiar el número para
+ * quedarse con las transferencias.
  */
 class CuentaPagoController extends Controller
 {
@@ -39,6 +44,7 @@ class CuentaPagoController extends Controller
         if (! $negocio->administra($request->user())) {
             return $this->sinAcceso();
         }
+        ClavePin::comprobar($request->user(), $request->input('pin'));
 
         $datos = $this->validar($request, null);
 
@@ -71,6 +77,7 @@ class CuentaPagoController extends Controller
         if (! $cuenta) {
             return response()->json(['message' => 'Cuenta no encontrada.'], 404);
         }
+        ClavePin::comprobar($request->user(), $request->input('pin'));
 
         $datos = $this->validar($request, $cuenta);
         $cuenta->fill($datos);
@@ -103,6 +110,8 @@ class CuentaPagoController extends Controller
         if (! $cuenta) {
             return response()->json(['message' => 'Cuenta no encontrada.'], 404);
         }
+
+        ClavePin::comprobar($request->user(), $request->input('pin'));
 
         // Los pedidos ya pagados conservan su copia de la cuenta (pago_cuenta).
         $cuenta->delete();

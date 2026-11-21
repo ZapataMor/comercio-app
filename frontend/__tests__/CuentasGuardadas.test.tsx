@@ -9,7 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React from 'react';
 import { BackHandler, TextInput } from 'react-native';
 import ReactTestRenderer, { act } from 'react-test-renderer';
-import { alRechazarToken, getMisNegocios, Usuario } from '../src/api';
+import { alRechazarToken, ApiError, entrarConClave, entrarEnDispositivo, getMisNegocios, Usuario } from '../src/api';
 import { AuthProvider, useAuth } from '../src/AuthContext';
 import { NegocioProvider, useNegocio } from '../src/NegocioContext';
 import { eliminarPush, registrarPush } from '../src/pushNotifications';
@@ -21,6 +21,9 @@ jest.mock('../src/api', () => ({
   ...jest.requireActual('../src/api'),
   alRechazarToken: jest.fn(),
   getMisNegocios: jest.fn(() => new Promise(() => {})),
+  entrarConClave: jest.fn(),
+  confirmarCodigoAcceso: jest.fn(),
+  entrarEnDispositivo: jest.fn(),
 }));
 jest.mock('../src/pushNotifications', () => ({
   registrarPush: jest.fn(),
@@ -229,9 +232,16 @@ describe('login', () => {
   const campoClave = () => app!.root.findAll(n => n.type === TextInput && n.props.accessibilityLabel === 'Contraseña')[0];
   const boton = (etiqueta: string) =>
     app!.root.findAll(n => n.props.accessibilityLabel === etiqueta && typeof n.props.onPress === 'function')[0];
+  const conTexto = (texto: string) =>
+    app!.root
+      .findAll(n => typeof n.props.onPress === 'function' && n.findAll(t => t.props.children === texto || (Array.isArray(t.props.children) && t.props.children.join('') === texto)).length > 0)
+      .pop()!;
+  const escribir = (etiqueta: string, valor: string) =>
+    hacer(() => app!.root.findAll(n => n.type === TextInput && n.props.accessibilityLabel === etiqueta)[0].props.onChangeText(valor));
 
-  test('el ojo muestra y oculta la contraseña', async () => {
+  test('el ojo muestra y oculta la contraseña de las cuentas de antes', async () => {
     await montar(true);
+    await hacer(() => conTexto('¿Tu cuenta es de antes? Entra con tu contraseña').props.onPress());
     expect(campoClave().props.secureTextEntry).toBe(true);
 
     await hacer(() => boton('Mostrar contraseña').props.onPress());
@@ -256,6 +266,70 @@ describe('login', () => {
 
     await hacer(() => boton('Continuar como Bruno').props.onPress());
     expect(sesion.auth).toEqual({ token: 't-bruno', user: bruno });
+  });
+
+  test('con el celular y la clave en un teléfono nuevo pide el código; en uno de confianza entra', async () => {
+    const entrarMock = entrarConClave as jest.Mock;
+    entrarMock.mockResolvedValueOnce({ requiere_codigo: true, telefono: '3001234567', message: 'ok', espera: 60, codigo_prueba: '482913' });
+    await montar(true);
+
+    await escribir('Número de celular', '300 123 4567');
+    await escribir('Clave de 4 números', '2468');
+    expect(entrarMock).toHaveBeenLastCalledWith('3001234567', '2468', undefined);
+    expect(sesion.auth).toBeNull();
+    expect(JSON.stringify(app!.toJSON())).toContain('482913');
+  });
+
+  test('una cuenta con teléfono de confianza vuelve desde «Continuar como» con su clave', async () => {
+    const dispositivoMock = entrarEnDispositivo as jest.Mock;
+    await montar(true);
+    await hacer(() => sesion.entrar('t-bruno', bruno, { dispositivo: 'disp-bruno' }));
+    await hacer(() => sesion.salir());
+    // Sin la sesión, sigue recordada (sin su token de sesión) con su token de confianza.
+    expect(sesion.recordadas).toEqual([{ user: bruno }]);
+    expect(sesion.dispositivos[2]).toBe('disp-bruno');
+    expect(await guardado('dispositivos')).toEqual({ 2: 'disp-bruno' });
+
+    dispositivoMock.mockRejectedValueOnce(
+      new ApiError('La clave no es correcta. Te quedan 4 intentos.', 422, { pin: ['La clave no es correcta. Te quedan 4 intentos.'] }),
+    );
+    dispositivoMock.mockResolvedValueOnce({ token: 't-bruno-2', user: bruno, dispositivo: 'disp-bruno' });
+    await hacer(() => boton('Continuar como Bruno con tu clave').props.onPress());
+    await escribir('Escribe tu clave de 4 números', '1357');
+    expect(dispositivoMock).toHaveBeenLastCalledWith('disp-bruno', '1357');
+    expect(sesion.auth).toBeNull();
+
+    await escribir('Escribe tu clave de 4 números', '2468');
+    expect(sesion.auth).toEqual({ token: 't-bruno-2', user: bruno });
+  });
+
+  test('si el teléfono ya no es de confianza, lo olvida y deja el celular listo para entrar', async () => {
+    (entrarEnDispositivo as jest.Mock).mockRejectedValueOnce(
+      new ApiError('Este teléfono ya no recuerda tu cuenta.', 422, { dispositivo: ['Este teléfono ya no recuerda tu cuenta.'] }, { codigo: 'dispositivo_desconocido' }),
+    );
+    const brunoVerificado = { ...bruno, telefono_verificado: true };
+    await montar(true);
+    await hacer(() => sesion.entrar('t-bruno', brunoVerificado, { dispositivo: 'disp-bruno' }));
+    await hacer(() => sesion.salir());
+
+    await hacer(() => boton('Continuar como Bruno con tu clave').props.onPress());
+    await escribir('Escribe tu clave de 4 números', '2468');
+
+    expect(sesion.dispositivos[2]).toBeUndefined();
+    expect(app!.root.findAll(n => n.type === TextInput && n.props.accessibilityLabel === 'Número de celular')[0].props.value).toBe('3001234567');
+  });
+
+  test('«Cerrar todas las sesiones» y «Quitar de este teléfono» olvidan el teléfono de confianza', async () => {
+    await montar();
+    await hacer(() => sesion.entrar('t-ana', ana, { dispositivo: 'disp-ana' }));
+    await hacer(() => sesion.entrar('t-bruno', bruno, { dispositivo: 'disp-bruno' }));
+    await hacer(() => sesion.salir());
+    await hacer(() => sesion.olvidarRecordada(2));
+    expect(sesion.dispositivos).toEqual({ 1: 'disp-ana' });
+
+    await hacer(() => sesion.salirDeTodas());
+    expect(sesion.dispositivos).toEqual({});
+    expect(await guardado('dispositivos')).toBeNull();
   });
 
   test('desde «Agregar cuenta», «atrás» vuelve a la cuenta anterior', async () => {

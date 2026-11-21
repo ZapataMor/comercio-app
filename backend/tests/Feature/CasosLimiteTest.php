@@ -30,7 +30,7 @@ beforeEach(function () {
 
 function limPersona(string $rol = 'usuario'): User
 {
-    $user = User::factory()->create(['telefono' => '3001234567', 'password' => 'ClaveSegura1']);
+    $user = User::factory()->conClave()->create(['telefono' => '3001234567', 'password' => 'ClaveSegura1']);
     $user->syncRoles(User::rolesDelTipo($rol));
 
     return $user;
@@ -234,12 +234,12 @@ test('el dueño no elimina su cuenta con pedidos en curso en su negocio', functi
     $pedido = limPedido(limPersona(), $negocio, 'aceptado');
     Sanctum::actingAs($dueno);
 
-    $this->deleteJson('/api/cuenta', ['password' => 'ClaveSegura1'])
+    $this->deleteJson('/api/cuenta', ['pin' => '2468'])
         ->assertStatus(409)->assertJsonPath('message', 'Tienda tiene pedidos en curso. Termínalos o cancélalos antes de eliminar tu cuenta.');
     expect($negocio->fresh()->archivado_at)->toBeNull();
 
     $pedido->update(['estado' => 'entregado']);
-    $this->deleteJson('/api/cuenta', ['password' => 'ClaveSegura1'])->assertOk();
+    $this->deleteJson('/api/cuenta', ['pin' => '2468'])->assertOk();
     expect($negocio->fresh()->archivado_at)->not->toBeNull();
 });
 

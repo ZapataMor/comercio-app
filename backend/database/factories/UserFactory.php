@@ -32,4 +32,10 @@ class UserFactory extends Factory
             'remember_token' => Str::random(10),
         ];
     }
+
+    /** Con clave de 4 números (por defecto 2468; ver App\Support\ClavePin). */
+    public function conClave(string $pin = '2468'): static
+    {
+        return $this->state(['pin' => $pin]);
+    }
 }

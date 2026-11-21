@@ -255,7 +255,10 @@ class EnVivo
         return [
             // --- Sesión, dispositivos y lectura: no cambian lo que ven otros ---
             AuthController::class.'@login' => null,
+            AuthController::class.'@confirmarCodigo' => null,
             AuthController::class.'@logout' => null,
+            Api\ClaveController::class.'@comprobar' => null,
+            Api\GoogleController::class.'@restablecerClave' => null,
             Api\DeviceTokenController::class.'@store' => null,
             Api\DeviceTokenController::class.'@destroy' => null,
             Api\RecuperarClaveController::class.'@enviarCodigo' => null,
@@ -280,6 +283,8 @@ class EnVivo
                 }
             }],
             Api\GoogleController::class.'@conectar' => ['despues' => fn (Request $r) => self::perfil($yo($r))],
+            // La clave nueva llega a sus otros teléfonos (dejan de pedir crearla).
+            Api\ClaveController::class.'@guardar' => ['despues' => fn (Request $r) => self::perfil($yo($r))],
             Api\GoogleController::class.'@desconectar' => ['despues' => fn (Request $r) => self::perfil($yo($r))],
             AuthController::class.'@actualizarPerfil' => ['despues' => fn (Request $r) => self::perfil($yo($r))],
             AuthController::class.'@hacerseDomiciliario' => ['despues' => fn (Request $r) => self::perfil($yo($r))],

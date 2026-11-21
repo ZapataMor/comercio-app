@@ -29,7 +29,7 @@ beforeEach(function () {
 
 function ptPersona(string $rol = 'usuario'): User
 {
-    $user = User::factory()->create(['telefono' => '3001234567', 'password' => 'ClaveSegura1']);
+    $user = User::factory()->conClave()->create(['telefono' => '3001234567', 'password' => 'ClaveSegura1']);
     $user->syncRoles(User::rolesDelTipo($rol));
 
     return $user;
@@ -220,20 +220,24 @@ test('el propietario maneja las cuentas; quien gestiona pedidos solo las ve', fu
     $base = "/api/negocios/{$negocio->id}/cuentas-pago";
 
     Sanctum::actingAs($dueno);
+    // Crear, editar o borrar una cuenta pide la clave de 4 números.
+    $this->postJson($base, ['tipo' => 'nequi', 'numero' => '3001112233', 'titular' => 'Ana Pérez'])->assertJsonValidationErrors('pin');
+    $this->postJson($base, ['tipo' => 'nequi', 'numero' => '3001112233', 'titular' => 'Ana Pérez', 'pin' => '1357'])->assertJsonValidationErrors('pin');
+    expect($negocio->cuentasPago()->count())->toBe(0);
     // Cada tipo pide lo suyo.
-    $this->postJson($base, ['tipo' => 'nequi', 'titular' => 'Ana Pérez'])->assertJsonValidationErrors('numero');
-    $this->postJson($base, ['tipo' => 'banco', 'numero' => '123456789', 'titular' => 'Ana Pérez'])
+    $this->postJson($base, ['tipo' => 'nequi', 'titular' => 'Ana Pérez', 'pin' => '2468'])->assertJsonValidationErrors('numero');
+    $this->postJson($base, ['tipo' => 'banco', 'numero' => '123456789', 'titular' => 'Ana Pérez', 'pin' => '2468'])
         ->assertJsonValidationErrors(['banco', 'tipo_cuenta']);
-    $this->postJson($base, ['tipo' => 'qr', 'titular' => 'Ana Pérez'])->assertJsonValidationErrors('qr');
+    $this->postJson($base, ['tipo' => 'qr', 'titular' => 'Ana Pérez', 'pin' => '2468'])->assertJsonValidationErrors('qr');
 
-    $this->postJson($base, ['tipo' => 'bancolombia', 'numero' => '123 4567  8901', 'tipo_cuenta' => 'ahorros', 'titular' => 'Ana Pérez'])
+    $this->postJson($base, ['tipo' => 'bancolombia', 'numero' => '123 4567  8901', 'tipo_cuenta' => 'ahorros', 'titular' => 'Ana Pérez', 'pin' => '2468'])
         ->assertCreated()->assertJsonPath('cuenta.numero', '123 4567 8901');
-    $qr = $this->post($base, ['tipo' => 'qr', 'titular' => 'Ana Pérez', 'qr' => UploadedFile::fake()->image('qr.png')], ['Accept' => 'application/json'])
+    $qr = $this->post($base, ['tipo' => 'qr', 'titular' => 'Ana Pérez', 'qr' => UploadedFile::fake()->image('qr.png'), 'pin' => '2468'], ['Accept' => 'application/json'])
         ->assertCreated()->json('cuenta');
     expect($qr['qr'])->toStartWith('/storage/cuentas-pago/');
 
     $id = CuentaPago::where('tipo', 'bancolombia')->value('id');
-    $this->postJson("{$base}/{$id}", ['tipo' => 'llave', 'numero' => '@tienda', 'titular' => 'Ana Pérez'])
+    $this->postJson("{$base}/{$id}", ['tipo' => 'llave', 'numero' => '@tienda', 'titular' => 'Ana Pérez', 'pin' => '2468'])
         ->assertOk()->assertJsonPath('cuenta.tipo_cuenta', null)->assertJsonPath('cuenta.nombre', 'Llave');
 
     Sanctum::actingAs($trabajador);
@@ -245,9 +249,10 @@ test('el propietario maneja las cuentas; quien gestiona pedidos solo las ve', fu
     $this->getJson($base)->assertForbidden();
 
     Sanctum::actingAs($dueno);
-    $this->deleteJson("{$base}/{$id}")->assertOk();
+    $this->deleteJson("{$base}/{$id}")->assertJsonValidationErrors('pin');
+    $this->deleteJson("{$base}/{$id}", ['pin' => '2468'])->assertOk();
     foreach (range(1, CuentaPago::MAXIMO - 1) as $i) {
-        $this->postJson($base, ['tipo' => 'nequi', 'numero' => "300000000{$i}", 'titular' => 'Ana Pérez'])->assertCreated();
+        $this->postJson($base, ['tipo' => 'nequi', 'numero' => "300000000{$i}", 'titular' => 'Ana Pérez', 'pin' => '2468'])->assertCreated();
     }
-    $this->postJson($base, ['tipo' => 'nequi', 'numero' => '3009999999', 'titular' => 'Ana Pérez'])->assertUnprocessable();
+    $this->postJson($base, ['tipo' => 'nequi', 'numero' => '3009999999', 'titular' => 'Ana Pérez', 'pin' => '2468'])->assertUnprocessable();
 });

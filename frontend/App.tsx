@@ -49,6 +49,8 @@ import MiInformacionScreen from './src/screens/MiInformacionScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import RegistroGoogleScreen from './src/screens/RegistroGoogleScreen';
+import CrearClaveScreen from './src/screens/CrearClaveScreen';
+import CompletarCuentaScreen from './src/screens/CompletarCuentaScreen';
 import MiTiendaScreen from './src/screens/MiTiendaScreen';
 import ResenasScreen from './src/screens/ResenasScreen';
 import MisNegociosScreen from './src/screens/MisNegociosScreen';
@@ -114,7 +116,7 @@ function Navegacion({ listo }: { listo: boolean }) {
   const { c, modo, login } = useTheme();
   const styles = useStyles();
   const insets = useSafeAreaInsets();
-  const { auth, cargando } = useAuth();
+  const { auth, cargando, porCompletar } = useAuth();
   const roles = auth?.user.roles ?? [];
   // Ruta actual: la barra flotante del cliente decide con ella qué mostrar.
   const [ruta, setRuta] = React.useState<ReturnType<typeof navigationRef.getCurrentRoute>>();
@@ -128,7 +130,18 @@ function Navegacion({ listo }: { listo: boolean }) {
     );
   }
 
-  const inicial = !auth ? 'Login' : rutaInicio(auth.user);
+  // Con la sesión abierta, antes de la app: la cuenta sin clave de 4 números
+  // debe crearla, y la recién registrada ve una vez «Completa tu cuenta».
+  // (`tiene_pin` undefined: sesión de antes; el dato llega en vivo y entonces
+  // sale «Crea tu clave».)
+  const fase = !auth
+    ? 'acceso'
+    : auth.user.tiene_pin === false
+      ? 'clave'
+      : porCompletar === auth.user.id
+        ? 'completar'
+        : 'app';
+  const inicial = fase === 'acceso' ? 'Login' : fase === 'clave' ? 'CrearClave' : fase === 'completar' ? 'CompletarCuenta' : rutaInicio(auth!.user);
   // Pantallas que llegan hasta el borde de abajo y dejan ellas mismas el
   // espacio de la barra de navegación del sistema (mapas, login, la barra fija
   // de la propiedad). Las demás terminan encima de esa barra.
@@ -148,7 +161,7 @@ function Navegacion({ listo }: { listo: boolean }) {
             dejan libre: aquí solo falta el resto. */}
         <EspacioTeclado style={styles.raiz} descontar={insets.bottom}>
         <NavigationContainer
-          key={auth ? `usuario-${auth.user.id}` : 'sin-sesion'}
+          key={auth ? `usuario-${auth.user.id}-${fase}` : 'sin-sesion'}
           ref={navigationRef}
           theme={temaNavegacion(c, modo === 'noche')}
           onReady={() => {
@@ -170,9 +183,13 @@ function Navegacion({ listo }: { listo: boolean }) {
           // de las listas, porque Android 15+ dibuja la app debajo de ella.
           contentStyle: { backgroundColor: c.bg, paddingBottom: insets.bottom },
           // "Mi perfil" (la persona, no el negocio) visible en todos los roles.
-          headerRight: auth ? () => <HeaderPerfil /> : undefined,
+          headerRight: fase === 'app' ? () => <HeaderPerfil /> : undefined,
         }}>
-        {!auth ? (
+        {fase === 'clave' ? (
+          <Stack.Screen name="CrearClave" component={CrearClaveScreen} options={accesoOpciones} />
+        ) : fase === 'completar' ? (
+          <Stack.Screen name="CompletarCuenta" component={CompletarCuentaScreen} options={accesoOpciones} />
+        ) : !auth ? (
           <>
             {/* Las tres pantallas de acceso comparten fondo y tarjeta
                 (EscenaAcceso): sin animación de pantalla el fondo no se mueve
@@ -340,6 +357,8 @@ function huellaUsuario(u: Usuario): string {
   return JSON.stringify([
     u.name, u.apellidos ?? null, u.email, [...u.roles].sort(), u.direccion ?? null, u.barrio ?? null,
     u.telefono ?? null, u.codigo_publico ?? null, !!u.en_turno,
+    // Clave y formas de entrar: sin clave, la app pide crearla.
+    u.tiene_pin ?? null, !!u.telefono_verificado, !!u.google,
     (u.negocios ?? []).map(n => [n.id, n.nombre, n.rol]).sort((a, b) => Number(a[0]) - Number(b[0])),
   ]);
 }

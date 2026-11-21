@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\BarrioController;
 use App\Http\Controllers\Api\CarritoController;
 use App\Http\Controllers\Api\CatalogoController;
 use App\Http\Controllers\Api\CitaController;
+use App\Http\Controllers\Api\ClaveController;
 use App\Http\Controllers\Api\ClienteDireccionController;
 use App\Http\Controllers\Api\ComercioPedidoController;
 use App\Http\Controllers\Api\CuentaController;
@@ -45,14 +46,18 @@ Route::pattern('userId', '[0-9]{1,18}');
 // Rutas públicas de autenticación.
 // Límites de intentos con nombre: ver AppServiceProvider::limitesDeIntentos().
 Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:acceso');
+// Entrar con celular y clave de 4 números (ver AuthController::login). En un
+// teléfono nuevo, el segundo paso es el código de WhatsApp.
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:acceso');
+Route::post('/login/codigo', [AuthController::class, 'confirmarCodigo'])->middleware('throttle:verificar-telefono');
 // Entrar o registrarse con Google (ver GoogleController).
 Route::post('/google', [GoogleController::class, 'entrar'])->middleware('throttle:google');
 
-// "Olvidé mi contraseña": se envía un código de 6 dígitos al correo y con él
-// se pone una contraseña nueva.
+// "¿Olvidaste tu clave?": un código de 6 números por WhatsApp (o Google) y
+// con él se crea una clave nueva de 4 números.
 Route::post('/password/codigo', [RecuperarClaveController::class, 'enviarCodigo'])->middleware('throttle:codigo-clave');
 Route::post('/password/restablecer', [RecuperarClaveController::class, 'restablecer'])->middleware('throttle:restablecer-clave');
+Route::post('/password/google', [GoogleController::class, 'restablecerClave'])->middleware('throttle:google');
 
 // Registro con el celular: un código por WhatsApp confirma el número y
 // devuelve el token `verificacion` que /register exige.
@@ -72,6 +77,9 @@ Route::middleware(['auth:sanctum', 'throttle:api-usuario'])->group(function () {
 
     // Perfil personal del usuario logueado (cualquier rol).
     Route::put('/perfil', [AuthController::class, 'actualizarPerfil']);
+    // Crear o cambiar la clave de 4 números, y revisarla antes de una acción en dos pasos.
+    Route::post('/perfil/clave', [ClaveController::class, 'guardar']);
+    Route::post('/perfil/clave/comprobar', [ClaveController::class, 'comprobar']);
     // Un cliente se vuelve domiciliario (sigue siendo cliente), o deja de serlo.
     // Verificar el celular desde Mi información (código por WhatsApp).
     Route::post('/perfil/telefono/codigo', [TelefonoController::class, 'codigoPerfil'])->middleware('throttle:codigo-telefono');
@@ -81,7 +89,7 @@ Route::middleware(['auth:sanctum', 'throttle:api-usuario'])->group(function () {
     Route::delete('/perfil/google', [GoogleController::class, 'desconectar']);
     Route::post('/perfil/domiciliario', [AuthController::class, 'hacerseDomiciliario']);
     Route::delete('/perfil/domiciliario', [AuthController::class, 'dejarDeSerDomiciliario']);
-    // Eliminar mi cuenta (anonimiza; exige la contraseña).
+    // Eliminar mi cuenta (anonimiza; exige la clave).
     Route::delete('/cuenta', [CuentaController::class, 'destroy']);
 
     // Panel adaptativo: responde distinto según el rol del usuario logueado.

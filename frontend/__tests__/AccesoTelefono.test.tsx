@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text, TextInput, TouchableOpacity } from 'react-native';
 import ReactTestRenderer, { act } from 'react-test-renderer';
-import { ApiError, identidadDe } from '../src/api';
+import { ApiError, limpiarCelular } from '../src/api';
 import VerificarTelefono, { formatoCelular } from '../src/components/VerificarTelefono';
 
 let pantalla: ReactTestRenderer.ReactTestRenderer;
@@ -69,9 +69,9 @@ test('no envía con un número inválido y muestra el error del código', async 
   expect(textos()).toContain('El código no es correcto.');
 });
 
-test('al recuperar la contraseña distingue celular de correo', () => {
-  expect(identidadDe('3001234567')).toEqual({ telefono: '3001234567' });
-  expect(identidadDe('+57 300 123 4567')).toEqual({ telefono: '3001234567' });
-  expect(identidadDe(' ana@correo.com ')).toEqual({ email: 'ana@correo.com' });
+test('el celular se limpia de espacios, guiones y el +57', () => {
+  expect(limpiarCelular('3001234567')).toBe('3001234567');
+  expect(limpiarCelular('+57 300 123 4567')).toBe('3001234567');
+  expect(limpiarCelular('300-123-4567')).toBe('3001234567');
   expect(formatoCelular('3001234567')).toBe('300 123 4567');
 });

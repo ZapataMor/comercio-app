@@ -2,9 +2,9 @@
 
 use App\Models\Negocio;
 use App\Models\User;
-use App\Notifications\CodigoRecuperacionClave;
+use App\Support\Telefono\EnviadorCodigos;
+use App\Support\Telefono\EnviadorLog;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Notification;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
 
@@ -16,7 +16,7 @@ beforeEach(function () {
 
 function clienteCuenta(): User
 {
-    $user = User::factory()->create([
+    $user = User::factory()->conClave()->create([
         'password' => 'clave-actual',
         'telefono' => '3001112233',
         'direccion' => 'Calle 1 #10-20',
@@ -31,7 +31,7 @@ function datosRegistro(array $extra = []): array
 {
     return [
         'name' => 'Ana', 'apellidos' => 'Pérez', 'email' => 'ana@correo.com',
-        'password' => 'password123', 'password_confirmation' => 'password123',
+        'pin' => '2468', 'pin_confirmation' => '2468',
         'direccion' => 'Calle 1 #10-20', 'barrio' => 'Centro', 'telefono' => '3001234567',
         'verificacion' => verificacionTelefono('3001234567'),
     ] + $extra;
@@ -56,11 +56,13 @@ test('el registro guarda cuándo se aceptó la política', function () {
 // Eliminar cuenta
 // ---------------------------------------------------------------------------
 
-test('eliminar la cuenta exige la contraseña correcta', function () {
+test('eliminar la cuenta exige la clave correcta', function () {
     Sanctum::actingAs(clienteCuenta());
 
-    $this->deleteJson('/api/cuenta', ['password' => 'otra'])
-        ->assertStatus(422)->assertJsonValidationErrors(['password']);
+    $this->deleteJson('/api/cuenta', ['password' => 'clave-actual'])
+        ->assertStatus(422)->assertJsonValidationErrors(['pin']);
+    $this->deleteJson('/api/cuenta', ['pin' => '1357'])
+        ->assertStatus(422)->assertJsonValidationErrors(['pin']);
 });
 
 test('eliminar la cuenta anonimiza los datos y conserva los pedidos', function () {
@@ -74,7 +76,7 @@ test('eliminar la cuenta anonimiza los datos y conserva los pedidos', function (
     $user->deviceTokens()->create(['token' => 'tok-1', 'plataforma' => 'android']);
     Sanctum::actingAs($user);
 
-    $this->deleteJson('/api/cuenta', ['password' => 'clave-actual'])->assertOk();
+    $this->deleteJson('/api/cuenta', ['pin' => '2468'])->assertOk();
 
     $user->refresh();
     expect($user->eliminado_at)->not->toBeNull()
@@ -99,7 +101,7 @@ test('no se puede eliminar la cuenta con un pedido en curso', function () {
     ]);
     Sanctum::actingAs($user);
 
-    $this->deleteJson('/api/cuenta', ['password' => 'clave-actual'])->assertStatus(409);
+    $this->deleteJson('/api/cuenta', ['pin' => '2468'])->assertStatus(409);
     expect($user->fresh()->eliminado_at)->toBeNull();
 });
 
@@ -112,7 +114,7 @@ test('el negocio del único propietario se cierra y archiva; el compartido no', 
     $compartido->miembros()->attach($user->id, ['rol' => Negocio::ROL_PROPIETARIO, 'activo' => true]);
     Sanctum::actingAs($user);
 
-    $this->deleteJson('/api/cuenta', ['password' => 'clave-actual'])->assertOk();
+    $this->deleteJson('/api/cuenta', ['pin' => '2468'])->assertOk();
 
     expect($solo->fresh()->activo)->toBeFalse()
         ->and($solo->fresh()->archivado_at)->not->toBeNull()
@@ -120,13 +122,25 @@ test('el negocio del único propietario se cierra y archiva; el compartido no', 
         ->and($compartido->fresh()->esMiembroActivo($user->fresh()))->toBeFalse();
 });
 
-test('la cuenta también se puede eliminar desde la web pública', function () {
+test('la cuenta también se puede eliminar desde la web pública con el celular y la clave', function () {
     $user = clienteCuenta();
+    $user->forceFill(['telefono_verificado_at' => now()])->save();
 
     $this->get('/eliminar-cuenta')->assertOk()->assertSee('Eliminar mi cuenta');
-    $this->post('/eliminar-cuenta', ['email' => $user->email, 'password' => 'clave-actual'])
-        ->assertRedirect(route('eliminar-cuenta'));
+    $this->from('/eliminar-cuenta')->post('/eliminar-cuenta', ['usuario' => '300 111 2233', 'clave' => '1357'])
+        ->assertRedirect('/eliminar-cuenta')->assertSessionHasErrors('usuario');
+    expect($user->fresh()->eliminado_at)->toBeNull()->and($user->fresh()->pin_fallidos)->toBe(1);
 
+    $this->post('/eliminar-cuenta', ['usuario' => '300 111 2233', 'clave' => '2468'])
+        ->assertRedirect(route('eliminar-cuenta'));
+    expect($user->fresh()->eliminado_at)->not->toBeNull();
+});
+
+test('una cuenta de antes sin clave se elimina en la web con su correo y contraseña', function () {
+    $user = User::factory()->create(['password' => 'clave-actual']);
+
+    $this->post('/eliminar-cuenta', ['usuario' => $user->email, 'clave' => 'clave-actual'])
+        ->assertRedirect(route('eliminar-cuenta'));
     expect($user->fresh()->eliminado_at)->not->toBeNull();
 });
 
@@ -158,75 +172,78 @@ test('al suspender la cuenta su token deja de servir', function () {
 });
 
 // ---------------------------------------------------------------------------
-// Recuperar contraseña
+// ¿Olvidaste tu clave? (código por WhatsApp; ver también AccesoTelefonoTest)
 // ---------------------------------------------------------------------------
+
+/** Cliente con el celular verificado; el código llega por el canal de prueba. */
+function clienteConCelular(): User
+{
+    $user = clienteCuenta();
+    $user->forceFill(['telefono_verificado_at' => now()])->save();
+    app()->instance(EnviadorCodigos::class, new EnviadorLog);
+
+    return $user;
+}
 
 function pedirCodigo(User $user): string
 {
-    Notification::fake();
-    test()->postJson('/api/password/codigo', ['email' => $user->email])->assertOk();
-
-    $codigo = null;
-    Notification::assertSentTo($user, CodigoRecuperacionClave::class, function ($n) use (&$codigo) {
-        $codigo = $n->codigo;
-
-        return true;
-    });
-
-    return $codigo;
+    return test()->postJson('/api/password/codigo', ['telefono' => $user->telefono])->assertOk()->json('codigo_prueba');
 }
 
-function restablecer(User $user, string $codigo, string $clave = 'nueva-clave-1')
+function restablecer(User $user, string $codigo, string $clave = '1357')
 {
     return test()->postJson('/api/password/restablecer', [
-        'email' => $user->email,
+        'telefono' => $user->telefono,
         'codigo' => $codigo,
-        'password' => $clave,
-        'password_confirmation' => $clave,
+        'pin' => $clave,
+        'pin_confirmation' => $clave,
     ]);
 }
 
 test('fallar el login no bloquea pedir el código de recuperación', function () {
-    $user = clienteCuenta();
+    $user = clienteConCelular();
     foreach (range(1, 6) as $i) {
         $this->postJson('/api/login', ['email' => $user->email, 'password' => 'mala'])->assertStatus(422);
     }
     $this->postJson('/api/login', ['email' => $user->email, 'password' => 'mala'])->assertStatus(429);
 
-    Notification::fake();
-    $this->postJson('/api/password/codigo', ['email' => $user->email])->assertOk();
-    Notification::assertSentTo($user, CodigoRecuperacionClave::class);
+    expect(pedirCodigo($user))->toMatch('/^\d{6}$/');
 
-    // Y el límite del login es por correo: otra persona en la misma IP entra.
-    $otro = clienteCuenta();
+    // Y el límite del login es por cuenta: otra persona en la misma IP entra.
+    $otro = User::factory()->create(['password' => 'clave-actual']);
     $this->postJson('/api/login', ['email' => $otro->email, 'password' => 'clave-actual'])->assertOk();
 });
 
-test('pedir código no revela si el correo existe', function () {
-    Notification::fake();
+test('pedir código no revela si el número tiene cuenta', function () {
+    app()->instance(EnviadorCodigos::class, new EnviadorLog);
 
-    $this->postJson('/api/password/codigo', ['email' => 'nadie@correo.com'])->assertOk();
-    Notification::assertNothingSent();
+    $this->postJson('/api/password/codigo', ['telefono' => '3209876543'])
+        ->assertOk()->assertJsonMissingPath('codigo_prueba');
 });
 
-test('con el código correcto se cambia la contraseña y se cierran las sesiones', function () {
-    $user = clienteCuenta();
+test('con el código correcto se cambia la clave, se desbloquea y se cierran las sesiones', function () {
+    $user = clienteConCelular();
+    $user->forceFill(['pin_bloqueado_at' => now(), 'pin_fallidos' => 5])->save();
     $user->createToken('api');
+    \App\Support\ClavePin::confiar($user, 'Teléfono viejo');
     $codigo = pedirCodigo($user);
 
-    restablecer($user, $codigo)->assertOk();
+    restablecer($user, $codigo)->assertOk()->assertJsonStructure(['token', 'dispositivo']);
 
-    expect(Hash::check('nueva-clave-1', $user->fresh()->password))->toBeTrue()
-        ->and($user->tokens()->count())->toBe(0);
+    $user->refresh();
+    expect(Hash::check('1357', $user->pin))->toBeTrue()
+        ->and($user->pin_bloqueado_at)->toBeNull()
+        ->and($user->tokens()->count())->toBe(1)
+        ->and($user->dispositivosConfianza()->count())->toBe(1);
 
     // El código no sirve dos veces.
-    restablecer($user, $codigo, 'otra-clave-22')->assertStatus(422);
+    restablecer($user, $codigo, '9753')->assertStatus(422);
 });
 
-test('un código equivocado no cambia la contraseña y tras 5 intentos se anula', function () {
+test('un código equivocado no cambia la clave y tras 5 intentos se anula', function () {
     // Aquí se prueba el límite propio del código, no el throttle por IP.
     $this->withoutMiddleware(Illuminate\Routing\Middleware\ThrottleRequests::class);
-    $user = clienteCuenta();
+    $user = clienteConCelular();
     $codigo = pedirCodigo($user);
     $malo = $codigo === '000000' ? '111111' : '000000';
 
@@ -237,13 +254,13 @@ test('un código equivocado no cambia la contraseña y tras 5 intentos se anula'
     // Ni el código bueno sirve ya.
     restablecer($user, $codigo)->assertStatus(422);
 
-    expect(Hash::check('clave-actual', $user->fresh()->password))->toBeTrue();
+    expect(Hash::check('2468', $user->fresh()->pin))->toBeTrue();
 });
 
 test('un código vencido no sirve', function () {
-    $user = clienteCuenta();
+    $user = clienteConCelular();
     $codigo = pedirCodigo($user);
-    $this->travel(16)->minutes();
+    $this->travel(11)->minutes();
 
     restablecer($user, $codigo)->assertStatus(422)->assertJsonValidationErrors(['codigo']);
 });

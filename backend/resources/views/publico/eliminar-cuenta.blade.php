@@ -8,7 +8,7 @@
 
     <p>
         La forma más rápida es desde la app: <strong>Mi perfil → Eliminar mi cuenta</strong>.
-        Si ya no tienes la app instalada, puedes hacerlo aquí con tu correo y contraseña.
+        Si ya no tienes la app instalada, puedes hacerlo aquí con tu celular (o correo) y tu clave.
     </p>
     <p class="text-slate-600">
         Se borran tu nombre, correo, teléfono, direcciones y sesiones. Los pedidos ya hechos se conservan sin tus
@@ -26,14 +26,15 @@
               onsubmit="return confirm('¿Seguro? Tu cuenta se eliminará y no se puede deshacer.');">
             @csrf
             <div>
-                <label class="block font-medium mb-1">Correo</label>
-                <input type="email" name="email" value="{{ old('email') }}" required
+                <label class="block font-medium mb-1">Celular o correo</label>
+                <input type="text" name="usuario" value="{{ old('usuario') }}" required autocomplete="username"
                        class="w-full rounded-lg border-slate-300 border px-3 py-2">
             </div>
             <div>
-                <label class="block font-medium mb-1">Contraseña</label>
-                <input type="password" name="password" required
+                <label class="block font-medium mb-1">Clave de 4 números</label>
+                <input type="password" name="clave" required autocomplete="current-password"
                        class="w-full rounded-lg border-slate-300 border px-3 py-2">
+                <p class="text-slate-500 text-xs mt-1">Si tu cuenta es de antes y no tiene clave, escribe tu contraseña.</p>
             </div>
             <button class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg py-2.5">
                 Eliminar mi cuenta

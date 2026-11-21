@@ -22,6 +22,7 @@ decisión = un ADR. No se borran; si una cambia, se marca `reemplazado por` y se
 | [[ADR-001 Inicio de sesión con Google]] | Login social con Google | propuesto |
 | [[ADR-002 Notificaciones en tiempo real]] | Tiempo real por usuario (FCM + WebSockets) | propuesto |
 | [[ADR-003 Botón llamar o WhatsApp al cliente]] | Contacto directo sin copiar el número | propuesto |
+| [[ADR-004 Clave de 4 números y teléfono de confianza]] | Entrar con celular (o Google) y clave de 4 números | aceptado |
 
 ## Conecta con
 - [[_MOC Ideas]] · [[Estado Actual]] · [[_MOC Convenciones]]
