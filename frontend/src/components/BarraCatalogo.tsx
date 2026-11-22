@@ -5,9 +5,9 @@
  * el mismo menú de la topbar (MenuDesplegable). El catálogo activo lleva una
  * píldora suave detrás que, al tocar otro, se desliza hasta él.
  *
- * Mientras la lista se desplaza la barra se encoge (sin volverse
- * transparente) y al quedarse quieta vuelve a su tamaño: ver
- * encogerAlDesplazar. Las listas avisan con `useDesplazarCatalogo()`.
+ * Mientras la lista se desplaza la barra se encoge y se aclara un poco, y al
+ * quedarse quieta vuelve a como estaba: ver encogerAlDesplazar. Las listas
+ * avisan con `useDesplazarCatalogo()`.
  *
  * Flota sobre el contenido (Explorar es bordeABorde en App.tsx): las listas
  * dejan abajo `espacioAbajo` para que lo último no quede tapado. Con el
@@ -34,8 +34,9 @@ export const SECCIONES: { valor: SeccionCatalogo; titulo: string; icono: IconNam
 export const ALTO_BARRA_CATALOGO = 64;
 export const MARGEN_BARRA_CATALOGO = 10;
 
-/** Tamaño de la barra encogida (al desplazarse) respecto del normal. */
+/** Tamaño y opacidad de la barra encogida (al desplazarse) respecto de lo normal. */
 const ESCALA_ENCOGIDA = 0.84;
+const OPACIDAD_ENCOGIDA = 0.7;
 /** Relleno lateral de la barra, casillas (3 catálogos + perfil) y ancho de la píldora. */
 const RELLENO_BARRA = 8;
 const CASILLAS = SECCIONES.length + 1;
@@ -85,6 +86,7 @@ export default function BarraCatalogo({
   });
 
   const escala = encogida.interpolate({ inputRange: [0, 1], outputRange: [1, ESCALA_ENCOGIDA] });
+  const opacidad = encogida.interpolate({ inputRange: [0, 1], outputRange: [1, OPACIDAD_ENCOGIDA] });
   // Encoge hacia abajo: el borde inferior se queda en su sitio.
   const bajar = encogida.interpolate({
     inputRange: [0, 1],
@@ -94,7 +96,10 @@ export default function BarraCatalogo({
   return (
     <Animated.View
       pointerEvents="box-none"
-      style={[styles.zona, { bottom: abajo, transform: [{ translateY: bajar }, { scale: escala }] }]}>
+      style={[
+        styles.zona,
+        { bottom: abajo, opacity: opacidad, transform: [{ translateY: bajar }, { scale: escala }] },
+      ]}>
       <Objetivo
         id="catalogo.selector"
         style={styles.barra}
