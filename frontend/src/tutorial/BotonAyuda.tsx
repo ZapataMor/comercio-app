@@ -13,7 +13,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '../components/anim';
 import AvisoTemporal from '../components/AvisoTemporal';
 import { ALTO_BARRA_CATALOGO, MARGEN_BARRA_CATALOGO } from '../components/BarraCatalogo';
-import { ALTO_PILA_CLIENTE, MARGEN_BARRA_CLIENTE } from '../components/BarraCliente';
+import {
+  ALTO_BARRA_CLIENTE,
+  MARGEN_BARRA_CLIENTE,
+  SEPARACION_LADO_CLIENTE,
+  useHayBotonesCliente,
+} from '../components/BarraCliente';
 import Icon from '../components/Icon';
 import { navigationRef } from '../RootNavigation';
 import { font, makeStyles, radius, useTheme } from '../theme';
@@ -21,6 +26,9 @@ import { useTutorial } from './contexto';
 
 /** Cuánto se queda el aviso si nadie lo toca. */
 const DURACION_AVISO = 12000;
+/** Alto del aviso (ícono de 40 + relleno de 10 arriba y abajo + borde) y margen izquierdo de los botones redondos. */
+const ALTO_AVISO = 66;
+const MARGEN_IZQ_BOTONES = 20;
 
 export default function BotonAyuda() {
   const { botonAyuda } = useTutorial();
@@ -37,6 +45,7 @@ function AvisoAyuda() {
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { abrirAyuda, cerrarBotonAyuda } = useTutorial();
+  const conBotones = useHayBotonesCliente();
   const entrada = useRef(new Animated.Value(0)).current;
   const translateY = useRef(entrada.interpolate({ inputRange: [0, 1], outputRange: [40, 0] })).current;
 
@@ -49,17 +58,18 @@ function AvisoAyuda() {
       cerrarBotonAyuda,
     );
 
-  // Encima de los botones Carrito / Mis pedidos (y, en Explorar, de la barra
-  // de catálogos), para no taparlos.
+  // A la altura del botón de abajo (Mis pedidos) y a su derecha; sin los
+  // botones, abajo a todo lo ancho. En Explorar, encima de la barra de catálogos.
   const enExplorar = navigationRef.isReady() && navigationRef.getCurrentRoute()?.name === 'Explorar';
   const bottom =
-    insets.bottom + MARGEN_BARRA_CLIENTE + ALTO_PILA_CLIENTE + 14 +
+    insets.bottom + MARGEN_BARRA_CLIENTE - (ALTO_AVISO - ALTO_BARRA_CLIENTE) / 2 +
     (enExplorar ? MARGEN_BARRA_CATALOGO + ALTO_BARRA_CATALOGO : 0);
+  const lado = conBotones ? { left: MARGEN_IZQ_BOTONES + ALTO_BARRA_CLIENTE + SEPARACION_LADO_CLIENTE } : null;
 
   return (
     <Animated.View
       pointerEvents="box-none"
-      style={[styles.zona, { bottom, opacity: entrada, transform: [{ translateY }] }]}>
+      style={[styles.zona, lado, { bottom, opacity: entrada, transform: [{ translateY }] }]}>
       <AvisoTemporal
         duracion={DURACION_AVISO}
         onCerrar={motivo => (motivo === 'deslizado' ? cerrarBotonAyuda() : salir())}
@@ -76,7 +86,10 @@ function AvisoAyuda() {
             <Icon name="ayuda" size={22} color={c.onAccent} strokeWidth={2.2} />
           </View>
           <View style={styles.textos}>
-            <Text style={styles.pregunta}>¿No sabes cómo hacer algo?</Text>
+            {/* En una línea: al lado de los botones redondos el ancho es justo. */}
+            <Text style={styles.pregunta} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+              ¿No sabes cómo hacer algo?
+            </Text>
             <Text style={styles.pulsa}>Pulsa aquí</Text>
           </View>
           <Icon name="chevron" size={18} color={c.muted} strokeWidth={2.2} />
@@ -138,7 +151,7 @@ function ListaAyuda() {
 const useStyles = makeStyles((c, shadow) => ({
   zona: { position: 'absolute', left: 16, right: 16, alignItems: 'center' },
   aviso: { width: '100%', maxWidth: 380, ...shadow.card, elevation: 8 },
-  contenido: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingLeft: 10, paddingRight: 18 },
+  contenido: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingLeft: 10, paddingRight: 14 },
   icono: {
     width: 40,
     height: 40,
@@ -148,7 +161,7 @@ const useStyles = makeStyles((c, shadow) => ({
     justifyContent: 'center',
   },
   textos: { flex: 1 },
-  pregunta: { color: c.textStrong, fontFamily: font.bold, fontSize: 15 },
+  pregunta: { color: c.textStrong, fontFamily: font.bold, fontSize: 14 },
   pulsa: { color: c.goldText, fontFamily: font.semibold, fontSize: 13, marginTop: 1 },
   fondo: { flex: 1, justifyContent: 'flex-end', backgroundColor: c.scrim },
   cerrarFuera: { flex: 1 },

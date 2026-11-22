@@ -46,13 +46,34 @@ export const MARGEN_BARRA_CLIENTE = 14;
 const SEPARACION_BOTONES = 12;
 export const ALTO_PILA_CLIENTE = ALTO_BARRA_CLIENTE * 2 + SEPARACION_BOTONES;
 
+/** Separación horizontal entre los botones y lo que va a su lado (el aviso de ayuda). */
+export const SEPARACION_LADO_CLIENTE = 12;
+
 type Props = { ruta?: string; seccion?: SeccionCatalogo };
+
+/** ¿Van los botones en esta ruta? (según las reglas de arriba, sin el carrito). */
+function vanBotones(esCliente: boolean, ruta?: string, seccion?: SeccionCatalogo): ruta is string {
+  return esCliente && !!ruta && RUTAS_CLIENTE.has(ruta) && seccion !== 'servicios' && seccion !== 'propiedades';
+}
+
+/**
+ * ¿Se ve algún botón en la pantalla actual? Lo usa el aviso de ayuda para
+ * ponerse a su lado. En el Seguimiento solo va el Carrito, si tiene productos.
+ */
+export function useHayBotonesCliente(): boolean {
+  const { auth } = useAuth();
+  const cart = useCart();
+  const actual = navigationRef.isReady() ? navigationRef.getCurrentRoute() : undefined;
+  const seccion = (actual?.params as { seccion?: SeccionCatalogo } | undefined)?.seccion;
+  const esCliente = auth?.user.roles.includes('usuario') ?? false;
+  return vanBotones(esCliente, actual?.name, seccion) && (actual?.name !== 'PedidoDetalle' || cart.count > 0);
+}
 
 export default function BarraCliente({ ruta, seccion }: Props) {
   const { auth } = useAuth();
   const esCliente = auth?.user.roles.includes('usuario') ?? false;
 
-  if (!esCliente || !ruta || !RUTAS_CLIENTE.has(ruta) || seccion === 'servicios' || seccion === 'propiedades') {
+  if (!vanBotones(esCliente, ruta, seccion)) {
     return null;
   }
   return <Barra ruta={ruta} />;

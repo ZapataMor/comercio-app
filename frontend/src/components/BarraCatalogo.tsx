@@ -126,7 +126,8 @@ export default function BarraCatalogo({
               accessibilityLabel={s.titulo}
               accessibilityState={{ selected: activa }}
               onPress={() => !activa && onCambiar(s.valor)}>
-              <View style={[styles.marca, activa && styles.marcaActiva]}>
+              <View style={styles.marca}>
+                <FondoActivo visible={activa} />
                 <Icon name={s.icono} size={26} color={c.textStrong} strokeWidth={activa ? 2.4 : 1.9} />
               </View>
             </Pressable>
@@ -140,6 +141,7 @@ export default function BarraCatalogo({
 
 /** "Mi perfil": la inicial de la persona; abre sus opciones en un panel que sube. */
 function PestanaPerfil() {
+  const { c } = useTheme();
   const styles = useStyles();
   const { auth } = useAuth();
   const opciones = useOpcionesPerfil();
@@ -152,13 +154,24 @@ function PestanaPerfil() {
       accessibilityLabel="Mi perfil"
       accessibilityState={{ expanded: panel.abierto }}
       onPress={() => panel.abrir(opciones, 'Mi perfil')}>
-      <Objetivo id="perfil.menu" style={[styles.marca, panel.abierto && styles.marcaActiva]}>
-        <View style={[styles.avatar, panel.abierto && styles.avatarActivo]}>
+      <Objetivo id="perfil.menu" style={styles.marca}>
+        <FondoActivo visible={panel.abierto} />
+        <View style={[styles.avatar, { borderColor: panel.abierto ? c.textStrong : 'transparent' }]}>
           <Text style={styles.avatarTxt}>{inicial}</Text>
         </View>
       </Objetivo>
     </Pressable>
   );
+}
+
+/**
+ * La píldora suave detrás del ícono activo. Siempre está montada y solo se
+ * muestra u oculta: si el fondo se le agrega a una vista que ya estaba en
+ * pantalla, Android (RN 0.86) la dibuja sin las esquinas redondeadas.
+ */
+function FondoActivo({ visible }: { visible: boolean }) {
+  const styles = useStyles();
+  return <View pointerEvents="none" style={[styles.fondoActivo, { opacity: visible ? 1 : 0 }]} />;
 }
 
 function useTecladoAbierto() {
@@ -200,25 +213,26 @@ const useStyles = makeStyles((c, shadow) => ({
     ...shadow.card,
   },
   pestana: { flex: 1, alignItems: 'center', justifyContent: 'center', height: '100%' },
-  // Radio exacto (la mitad del alto): con radius.pill (999) algunos
-  // teléfonos dibujan la píldora activa con esquinas rectas.
   marca: {
     width: 72,
     height: 48,
-    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  marcaActiva: { backgroundColor: c.surface2 },
+  // Radio exacto (la mitad del alto): con radius.pill (999) algunos
+  // teléfonos dibujan la píldora con esquinas rectas.
+  fondoActivo: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, borderRadius: 24, backgroundColor: c.surface2 },
   avatar: {
     width: 30,
     height: 30,
     borderRadius: 15,
+    // Con el panel abierto el borde se pinta: un aro como el de la foto de
+    // perfil en Instagram (el ancho va siempre, por lo mismo que FondoActivo).
+    borderWidth: 2,
     backgroundColor: c.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Abierto, un aro como el de la foto de perfil en Instagram.
-  avatarActivo: { borderWidth: 2, borderColor: c.textStrong },
+
   avatarTxt: { color: c.onAccent, fontFamily: font.displayExtra, fontSize: 14 },
 }));
