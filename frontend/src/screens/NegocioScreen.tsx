@@ -21,6 +21,7 @@ import {
   Negocio,
   Producto,
   RecetaPreferida,
+  registrarVisita,
   Servicio,
 } from '../api';
 import { useAuth } from '../AuthContext';
@@ -153,6 +154,12 @@ export default function NegocioScreen({ navigation, route }: Props) {
       .then(setRecetas)
       .catch(() => {});
   }, [token, id, seccion]);
+
+  // Entrar a la tienda cuenta como una visita (la ve su administrador en
+  // «Mi tienda»). Una sola vez por entrada: refrescar el catálogo no suma.
+  useEffect(() => {
+    registrarVisita(token, id).catch(() => {});
+  }, [token, id]);
 
   useLectura(() => {
     cargarCatalogo()

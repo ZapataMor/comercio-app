@@ -1463,6 +1463,24 @@ export async function getEstadoNegocio(token: string, id: number): Promise<Estad
   return (await authGet(`/api/negocios/${id}/estado`, token)) as EstadoNegocio;
 }
 
+/**
+ * El cliente entró a ver la tienda. El servidor no cuenta al equipo del
+ * negocio ni a quien vuelve a entrar a los pocos minutos.
+ */
+export async function registrarVisita(token: string, negocioId: number): Promise<void> {
+  await authSend('POST', `/api/negocios/${negocioId}/visita`, token);
+}
+
+export type ConteoVisitas = { visitas: number; personas: number };
+
+/** Visitas a la tienda y personas distintas, por periodo (solo el administrador). */
+export type VisitasNegocio = { hoy: ConteoVisitas; semana: ConteoVisitas; mes: ConteoVisitas; total: ConteoVisitas };
+
+export async function getVisitasNegocio(token: string, negocioId: number): Promise<VisitasNegocio> {
+  const data = await authGet(`/api/negocios/${negocioId}/visitas`, token);
+  return data.visitas as VisitasNegocio;
+}
+
 /** Un plato que el cliente ya pidió varias veces con los mismos ajustes. */
 export type RecetaPreferida = {
   producto: Producto;

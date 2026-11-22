@@ -11,7 +11,7 @@ import { direccionValida, errorDireccion, telefonoValido, errorTelefono } from '
  *    en secciones. También crea OTRO negocio (`nuevo`).
  */
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -24,7 +24,19 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { tienePermiso, ClaveHorario, Coordenadas, DiaSemana, HorarioSemana, imagenUrl, Negocio } from '../api';
+import {
+  tienePermiso,
+  ClaveHorario,
+  ConteoVisitas,
+  Coordenadas,
+  DiaSemana,
+  getVisitasNegocio,
+  HorarioSemana,
+  imagenUrl,
+  Negocio,
+  VisitasNegocio,
+} from '../api';
+import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import BarrioSelect from '../components/BarrioSelect';
 import { DropdownMultiple } from '../components/Dropdown';
@@ -41,6 +53,7 @@ import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { DesplazableTutorial, Objetivo, useDesplazableTutorial } from '../tutorial/Objetivo';
 import { useToast } from '../Toast';
+import { useLecturaEnFoco } from '../useLectura';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MiTienda'>;
 
@@ -351,6 +364,8 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
           </PressableScale>
         </FadeInView>
 
+        {tienePermiso(negocioActivo, 'administrador') && <VisitasTienda negocioId={negocio.id} />}
+
         <FadeInView delay={120} style={styles.seccion}>
           <Text style={styles.seccionTitulo}>Ubicación y contacto</Text>
           <Fila icono="ubicacion" etiqueta="Dirección" valor={negocio.direccion} />
@@ -660,6 +675,85 @@ function Dato({ icono, valor, etiqueta }: { icono: IconName; valor: string; etiq
   );
 }
 
+function cuantas(n: number, singular: string, plural: string) {
+  return `${n.toLocaleString('es-CO')} ${n === 1 ? singular : plural}`;
+}
+
+/**
+ * Cuántas veces han entrado a ver la tienda y cuántas personas distintas
+ * (solo el administrador). Se pide de nuevo cada vez que se vuelve a la pantalla.
+ */
+function VisitasTienda({ negocioId }: { negocioId: number }) {
+  const { c } = useTheme();
+  const styles = useStyles();
+  const { auth } = useAuth();
+  const token = auth?.token;
+  const [visitas, setVisitas] = useState<VisitasNegocio | null>(null);
+  const [error, setError] = useState(false);
+
+  useLecturaEnFoco(
+    useCallback(() => {
+      if (!token) return;
+      let vigente = true;
+      getVisitasNegocio(token, negocioId)
+        .then(v => { if (vigente) { setVisitas(v); setError(false); } })
+        .catch(() => { if (vigente) setError(true); });
+      return () => { vigente = false; };
+    }, [token, negocioId]),
+  );
+
+  const periodos: { etiqueta: string; conteo: ConteoVisitas }[] = visitas
+    ? [
+        { etiqueta: 'Hoy', conteo: visitas.hoy },
+        { etiqueta: 'Últimos 7 días', conteo: visitas.semana },
+        { etiqueta: 'Últimos 30 días', conteo: visitas.mes },
+      ]
+    : [];
+
+  return (
+    <FadeInView delay={110} style={styles.seccion}>
+      <Text style={styles.seccionTitulo}>Visitas a tu tienda</Text>
+      {!visitas ? (
+        error ? (
+          <Text style={styles.sinHorario}>No se pudieron cargar las visitas. Vuelve a abrir esta pantalla.</Text>
+        ) : (
+          <ActivityIndicator color={c.accent} style={styles.visitasCargando} />
+        )
+      ) : (
+        <>
+          <View style={styles.visitasTotales}>
+            <View style={styles.visitasTotal}>
+              <Icon name="ojo" size={18} color={c.accent} strokeWidth={2} />
+              <Text style={styles.visitasNumero} numberOfLines={1} adjustsFontSizeToFit>
+                {visitas.total.visitas.toLocaleString('es-CO')}
+              </Text>
+              <Text style={styles.datoEtiqueta}>Veces que entraron</Text>
+            </View>
+            <View style={styles.visitasTotal}>
+              <Icon name="usuarios" size={18} color={c.accent} strokeWidth={2} />
+              <Text style={styles.visitasNumero} numberOfLines={1} adjustsFontSizeToFit>
+                {visitas.total.personas.toLocaleString('es-CO')}
+              </Text>
+              <Text style={styles.datoEtiqueta}>Personas distintas</Text>
+            </View>
+          </View>
+          {periodos.map(({ etiqueta, conteo }, i) => (
+            <View key={etiqueta} style={[styles.visitasFila, i < periodos.length - 1 && styles.filaBorde]}>
+              <Text style={styles.visitasPeriodo}>{etiqueta}</Text>
+              <Text style={styles.visitasValor}>
+                {`${cuantas(conteo.visitas, 'visita', 'visitas')} · ${cuantas(conteo.personas, 'persona', 'personas')}`}
+              </Text>
+            </View>
+          ))}
+          <Text style={styles.visitasNota}>
+            Cuenta cada vez que un cliente entra a ver tu tienda. Tú y tu equipo no cuentan, ni quien vuelve a entrar en menos de 10 minutos.
+          </Text>
+        </>
+      )}
+    </FadeInView>
+  );
+}
+
 /** Renglón de una sección: ícono, etiqueta y valor (o el texto de vacío). */
 function Fila({
   icono,
@@ -731,6 +825,15 @@ const useStyles = makeStyles((c, shadow) => ({
     borderRadius: radius.lg, paddingHorizontal: 18, paddingVertical: 15, marginTop: 16, ...shadow.soft,
   },
   resenasTxt: { flex: 1, color: c.textStrong, fontFamily: font.semibold, fontSize: 14 },
+  // Visitas a la tienda
+  visitasCargando: { paddingVertical: 12 },
+  visitasTotales: { flexDirection: 'row', gap: 12, marginBottom: 6 },
+  visitasTotal: { flex: 1, backgroundColor: c.accentSoft, borderRadius: radius.md, padding: 14, gap: 4 },
+  visitasNumero: { fontSize: 26, lineHeight: 32, fontFamily: font.displayExtra, color: c.textStrong, marginTop: 4 },
+  visitasFila: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 11 },
+  visitasPeriodo: { fontSize: 14, fontFamily: font.medium, color: c.text },
+  visitasValor: { flexShrink: 1, textAlign: 'right', fontSize: 14, fontFamily: font.semibold, color: c.textStrong },
+  visitasNota: { fontSize: 12, lineHeight: 17, fontFamily: font.regular, color: c.mutedSoft, marginTop: 8 },
   fila: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11 },
   filaBorde: { borderBottomWidth: 1, borderBottomColor: c.border },
   filaIcono: {

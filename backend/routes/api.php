@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\ResenaController;
 use App\Http\Controllers\Api\RutaController;
 use App\Http\Controllers\Api\TelefonoController;
 use App\Http\Controllers\Api\TrabajadorController;
+use App\Http\Controllers\Api\VisitaNegocioController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoriaController;
 use App\Http\Controllers\DashboardController;
@@ -153,6 +154,8 @@ Route::middleware(['auth:sanctum', 'throttle:api-usuario'])->group(function () {
     Route::get('/negocios/{id}', [CatalogoController::class, 'show'])->whereNumber('id');
     // Solo si está abierto: lo que la app refresca cada pocos segundos.
     Route::get('/negocios/{id}/estado', [CatalogoController::class, 'estado'])->whereNumber('id');
+    // El cliente entró a ver la tienda: cuenta para las visitas del negocio.
+    Route::post('/negocios/{id}/visita', [VisitaNegocioController::class, 'registrar'])->whereNumber('id');
     // Lo que el cliente ya pidió varias veces con los mismos ajustes en esta tienda.
     Route::get('/negocios/{id}/recetas-preferidas', [RecetaPreferidaController::class, 'index'])->whereNumber('id');
     // Reseñas de la tienda o, con ?producto_id=, de uno de sus productos.
@@ -218,6 +221,8 @@ Route::middleware(['auth:sanctum', 'throttle:api-usuario'])->group(function () {
 
         // Nivel de confiabilidad del negocio y sus últimos eventos.
         Route::get('/reputacion', [NegocioController::class, 'reputacion']);
+        // Cuántas veces han entrado a ver la tienda y cuántas personas distintas.
+        Route::get('/visitas', [VisitaNegocioController::class, 'resumen']);
 
         // Equipo: miembros e invitaciones por código público.
         Route::get('/miembros', [TrabajadorController::class, 'miembros']);

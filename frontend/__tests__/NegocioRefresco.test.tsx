@@ -7,7 +7,7 @@
 import React from 'react';
 import { Text } from 'react-native';
 import ReactTestRenderer, { act } from 'react-test-renderer';
-import { getCatalogo, getEstadoNegocio, getRecetasPreferidas, Negocio, Producto } from '../src/api';
+import { getCatalogo, getEstadoNegocio, getRecetasPreferidas, Negocio, Producto, registrarVisita } from '../src/api';
 import NegocioScreen from '../src/screens/NegocioScreen';
 
 jest.mock('../src/AuthContext', () => ({
@@ -19,6 +19,7 @@ jest.mock('../src/api', () => ({
   getCatalogo: jest.fn(),
   getEstadoNegocio: jest.fn(),
   getRecetasPreferidas: jest.fn(async () => []),
+  registrarVisita: jest.fn(async () => {}),
 }));
 
 jest.mock('../src/Toast', () => ({ useToast: () => ({ exito: jest.fn(), error: jest.fn(), info: jest.fn() }) }));
@@ -100,6 +101,9 @@ test('ya cargada, solo pregunta el estado y conserva los productos', async () =>
   expect(textos()).toContain('Cerrado');
   expect(textos()).toContain('Hoy no abre');
   expect(textos()).toContain('Pollo asado');
+  // Entrar a la tienda cuenta una visita; los refrescos no suman otra.
+  expect(registrarVisita).toHaveBeenCalledTimes(1);
+  expect(registrarVisita).toHaveBeenCalledWith('t', 3);
 });
 
 test('si el estado falla, lo que se ve no cambia', async () => {

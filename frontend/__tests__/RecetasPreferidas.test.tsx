@@ -22,6 +22,7 @@ jest.mock('../src/api', () => ({
   ...jest.requireActual('../src/api'),
   getCatalogo: jest.fn(),
   getRecetasPreferidas: jest.fn(),
+  registrarVisita: jest.fn(async () => {}),
   // Las reseñas de la ficha no son parte de esto: se quedan cargando.
   getResenas: jest.fn(() => new Promise(() => {})),
 }));
