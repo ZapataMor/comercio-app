@@ -19,6 +19,7 @@ import AjustarPedido from '../components/AjustarPedido';
 import { PagarTransferencia } from '../components/PagoTransferencia';
 import ReportarPedido from '../components/ReportarPedido';
 import { messageFromError } from '../formErrors';
+import { avisarDesplazamiento } from '../encogerAlDesplazar';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
@@ -181,11 +182,15 @@ export default function PedidoDetalleScreen({ route }: Props) {
     <DesplazableTutorial value={tutorialScroll.valor}>
     <ScrollTeclado
       ref={tutorialScroll.scrollRef}
-      onScroll={tutorialScroll.onScroll}
+      onScroll={e => {
+        tutorialScroll.onScroll(e);
+        // Los botones flotantes (Carrito) se encogen al desplazar.
+        avisarDesplazamiento();
+      }}
       style={styles.container}
       // Con el teclado abierto, tocar una estrella cuenta al primer toque.
       keyboardShouldPersistTaps="handled"
-      // Aire abajo para la barra flotante fija (Carrito / Mis pedidos).
+      // Aire abajo para los botones flotantes (Carrito / Mis pedidos).
       contentContainerStyle={{ padding: 16, paddingBottom: 170 }}>
       <Text style={styles.titulo}>Pedido #{pedido.codigo}</Text>
       {pedido.estado === 'devolviendo' && <View style={styles.card}>

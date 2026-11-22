@@ -2,7 +2,8 @@
  * Botones flotantes del CLIENTE: dos círculos solo con ícono abajo a la
  * izquierda, uno sobre otro ("Carrito" arriba, "Mis pedidos" abajo), fijos en
  * todas las vistas del cliente. En Explorar van encima de la barra de
- * catálogos (BarraCatalogo).
+ * catálogos (BarraCatalogo). Mientras la lista se desplaza se encogen y se
+ * aclaran un poco, como la barra (ver encogerAlDesplazar).
  *
  * Reglas:
  *  - Solo aparece para usuarios con rol 'usuario' y en rutas del cliente. El
@@ -23,6 +24,7 @@ import { Animated, Easing, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../AuthContext';
 import { useCart } from '../CartContext';
+import { encogida } from '../encogerAlDesplazar';
 import { SeccionCatalogo } from '../navTypes';
 import { navigationRef } from '../RootNavigation';
 import { font, makeStyles, radius, useTheme } from '../theme';
@@ -45,6 +47,9 @@ export const MARGEN_BARRA_CLIENTE = 14;
 /** Separación entre los dos círculos y alto de la pila completa. */
 const SEPARACION_BOTONES = 12;
 export const ALTO_PILA_CLIENTE = ALTO_BARRA_CLIENTE * 2 + SEPARACION_BOTONES;
+/** Al desplazar la lista: tamaño y opacidad de los botones. */
+const ESCALA_ENCOGIDA = 0.82;
+const OPACIDAD_ENCOGIDA = 0.7;
 
 /** Separación horizontal entre los botones y lo que va a su lado (el aviso de ayuda). */
 export const SEPARACION_LADO_CLIENTE = 12;
@@ -139,8 +144,14 @@ function Barra({ ruta }: { ruta: string }) {
     Animated.spring(badge, { toValue: 1, speed: 30, bounciness: 18, useNativeDriver: true }).start();
   }, [cart.count, badge]);
 
+  // Se encogen hacia la esquina de abajo a la izquierda (su lugar no se mueve).
+  const escala = encogida.interpolate({ inputRange: [0, 1], outputRange: [1, ESCALA_ENCOGIDA] });
+  const opacidad = encogida.interpolate({ inputRange: [0, 1], outputRange: [1, OPACIDAD_ENCOGIDA] });
+
   return (
-    <View style={[styles.zona, { bottom }]} pointerEvents="box-none">
+    <Animated.View
+      style={[styles.zona, styles.esquina, { bottom, opacity: opacidad, transform: [{ scale: escala }] }]}
+      pointerEvents="box-none">
       {/* La key remonta la fila cuando cambia qué botones se ven, para que
           la transición entre en escena con la animación de Entrada. */}
       <Entrada key={`${mostrarCarrito}-${mostrarPedidos}`} style={styles.fila}>
@@ -179,7 +190,7 @@ function Barra({ ruta }: { ruta: string }) {
           </Objetivo>
         )}
       </Entrada>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -205,6 +216,7 @@ function Entrada({ children, style }: { children: React.ReactNode; style?: objec
 const useStyles = makeStyles((c, shadow) => ({
   // Abajo a la izquierda: deja libre el resto del ancho para ver la lista.
   zona: { position: 'absolute', left: 20 },
+  esquina: { transformOrigin: 'left bottom' },
   fila: { flexDirection: 'column', gap: SEPARACION_BOTONES },
   boton: {
     alignItems: 'center',

@@ -31,12 +31,12 @@ import BarraCatalogo, {
   MARGEN_BARRA_CATALOGO,
   ProveedorDesplazamiento,
   useDesplazarCatalogo,
-  useEncogerAlDesplazar,
 } from '../components/BarraCatalogo';
 import { ALTO_PILA_CLIENTE, MARGEN_BARRA_CLIENTE } from '../components/BarraCliente';
 import ExplorarPropiedades from '../components/ExplorarPropiedades';
 import Icon, { IconName } from '../components/Icon';
 import { PuntajeResenas } from '../components/Resenas';
+import { avisarDesplazamiento } from '../encogerAlDesplazar';
 import { RootStackParamList } from '../navTypes';
 import { precioDe } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
@@ -114,11 +114,10 @@ export default function ExplorarScreen({ navigation, route }: Props) {
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const seccion = route.params?.seccion ?? 'productos';
-  const { encogida, alDesplazar } = useEncogerAlDesplazar();
   const abajo = insets.bottom + MARGEN_BARRA_CATALOGO;
   const desplazamiento = useMemo(
-    () => ({ alDesplazar, espacioAbajo: abajo + ALTO_BARRA_CATALOGO }),
-    [alDesplazar, abajo],
+    () => ({ alDesplazar: avisarDesplazamiento, espacioAbajo: abajo + ALTO_BARRA_CATALOGO }),
+    [abajo],
   );
   return (
     <ProveedorDesplazamiento value={desplazamiento}>
@@ -131,7 +130,6 @@ export default function ExplorarScreen({ navigation, route }: Props) {
         <BarraCatalogo
           seccion={seccion}
           onCambiar={nueva => navigation.setParams({ seccion: nueva })}
-          encogida={encogida}
           abajo={abajo}
         />
       </View>

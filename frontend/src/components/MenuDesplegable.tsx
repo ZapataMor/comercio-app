@@ -16,6 +16,9 @@
  * Con `texto` el botón es una píldora con nombre (los filtros del Mapa; con
  * `enTopbar`, en los colores de la topbar: el catálogo de Explorar), y con
  * OpcionCheck el menú sirve para marcar varias opciones sin cerrarse.
+ *
+ * Con `boton` el botón lo dibuja quien lo usa, y con `haciaArriba` el menú se
+ * despliega encima de él: "Mi perfil" en la barra inferior de Explorar.
  */
 import React, {
   createContext,
@@ -32,10 +35,12 @@ import {
   Easing,
   Pressable,
   ScrollView,
+  StyleProp,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
+  ViewStyle,
 } from 'react-native';
 import { navigationRef } from '../RootNavigation';
 import { font, makeStyles, radius, useTheme } from '../theme';
@@ -62,6 +67,12 @@ type Props = {
   alinear?: 'derecha' | 'izquierda';
   /** Píldora con texto en los colores de la topbar (no clara, como sobre el mapa). */
   enTopbar?: boolean;
+  /** Botón propio (en vez del ícono de la topbar); también se dibuja nítido con el menú abierto. */
+  boton?: (abierto: boolean, onPress: () => void) => React.ReactNode;
+  /** El menú se despliega encima del botón (el botón está abajo en la pantalla). */
+  haciaArriba?: boolean;
+  /** Estilo de la vista que envuelve el botón (la que se mide). */
+  estilo?: StyleProp<ViewStyle>;
 };
 
 /**
@@ -73,18 +84,13 @@ type Ancla = { x: number; y: number; w: number; h: number; n: number };
 type Capa = {
   mostrar: (n: number, menu: React.ReactNode) => void;
   quitar: (n: number) => void;
-  /** Esquina de la capa en la ventana (las medidas de los botones son de la ventana). */
-  origen: React.MutableRefObject<{ x: number; y: number }>;
+  /** Esquina de la capa en la ventana (las medidas de los botones son de la ventana) y su alto. */
+  origen: React.MutableRefObject<{ x: number; y: number; alto: number }>;
 };
 
 const CapaContext = createContext<Capa | null>(null);
 
 let aperturas = 0;
-
-/** Para otras piezas que se pintan en la capa de los menús (PanelInferior). */
-export const useCapaMenus = () => useContext(CapaContext);
-/** Número único de apertura, compartido con los menús. */
-export const nuevaApertura = () => ++aperturas;
 
 /**
  * Capa sobre toda la app donde se pintan los menús abiertos. Va FUERA de la
@@ -95,7 +101,7 @@ export const nuevaApertura = () => ++aperturas;
 export function CapaMenus({ children }: { children: React.ReactNode }) {
   const [menus, setMenus] = useState<{ n: number; menu: React.ReactNode }[]>([]);
   const capa = useRef<View>(null);
-  const origen = useRef({ x: 0, y: 0 });
+  const origen = useRef({ x: 0, y: 0, alto: 0 });
   const api = useMemo<Capa>(
     () => ({
       mostrar: (n, menu) => setMenus(lista => [...lista, { n, menu }]),
@@ -106,9 +112,9 @@ export function CapaMenus({ children }: { children: React.ReactNode }) {
   );
 
   function medir() {
-    capa.current?.measureInWindow((x, y) => {
+    capa.current?.measureInWindow((x, y, _ancho, alto) => {
       if (Number.isFinite(x) && Number.isFinite(y)) {
-        origen.current = { x, y };
+        origen.current = { x, y, alto: Number.isFinite(alto) ? alto : 0 };
       }
     });
   }
@@ -166,6 +172,8 @@ export default function MenuDesplegable(props: Props) {
         texto={actuales.texto}
         alinear={actuales.alinear}
         enTopbar={actuales.enTopbar}
+        boton={actuales.boton}
+        haciaArriba={actuales.haciaArriba}
         // Solo si sigue siendo este menú (no otro abierto mientras se recogía).
         onCerrado={() => setAncla(a => (a === ancla ? null : a))}
       />,
@@ -175,8 +183,12 @@ export default function MenuDesplegable(props: Props) {
 
   return (
     // PressableScale no reenvía la ref: este View es el que se mide.
-    <View ref={boton} collapsable={false}>
-      <BotonMenu icono={icono} etiqueta={etiqueta} texto={props.texto} enTopbar={props.enTopbar} abierto={!!ancla} onPress={abrir} />
+    <View ref={boton} collapsable={false} style={props.estilo}>
+      {props.boton ? (
+        props.boton(!!ancla, abrir)
+      ) : (
+        <BotonMenu icono={icono} etiqueta={etiqueta} texto={props.texto} enTopbar={props.enTopbar} abierto={!!ancla} onPress={abrir} />
+      )}
     </View>
   );
 }
@@ -252,7 +264,7 @@ function BotonMenu({
 
 type MenuProps = Omit<Props, 'ancho'> & { ancho: number; ancla: Ancla; onCerrado: () => void };
 
-function Menu({ ancla, icono, etiqueta, renglones, ancho, texto, alinear, enTopbar, onCerrado }: MenuProps) {
+function Menu({ ancla, icono, etiqueta, renglones, ancho, texto, alinear, enTopbar, boton, haciaArriba, onCerrado }: MenuProps) {
   const styles = useStyles();
   const { width, height } = useWindowDimensions();
   const capa = useContext(CapaContext);
@@ -308,12 +320,13 @@ function Menu({ ancla, icono, etiqueta, renglones, ancho, texto, alinear, enTopb
         easing: Easing.inOut(Easing.cubic),
         useNativeDriver: false,
       }),
-      // Los renglones arrancan cuando la caja ya asoma, cada uno 60 ms después.
+      // Los renglones arrancan cuando la caja ya asoma, cada uno 60 ms después
+      // (hacia arriba, desde el más cercano al botón).
       Animated.sequence([
         Animated.delay(80),
         Animated.stagger(
           60,
-          filas.map(v =>
+          (haciaArriba ? [...filas].reverse() : filas).map(v =>
             Animated.timing(v, { toValue: 1, duration: 300, easing: suave, useNativeDriver: true }),
           ),
         ),
@@ -336,7 +349,7 @@ function Menu({ ancla, icono, etiqueta, renglones, ancho, texto, alinear, enTopb
     Animated.parallel([
       Animated.stagger(
         40,
-        [...filas].reverse().map(v =>
+        (haciaArriba ? filas : [...filas].reverse()).map(v =>
           Animated.timing(v, { toValue: 0, duration: 200, easing: rapido, useNativeDriver: true }),
         ),
       ),
@@ -380,9 +393,12 @@ function Menu({ ancla, icono, etiqueta, renglones, ancho, texto, alinear, enTopb
     pico = { right: Math.max(14, width - (x + ancla.w / 2) - derecha - 7) };
   }
   const top = y + ancla.h + 10;
+  // Hacia arriba, el borde de abajo del menú queda 10 sobre el botón.
+  const altoCapa = capa?.origen.current.alto || height;
+  const vertical = haciaArriba ? { bottom: altoCapa - y + 10 } : { top };
   // Una lista larga (los tipos de negocio) no se sale de la pantalla: se desliza.
-  const altoMax = Math.max(120, height - top - 40);
-  const translateY = a.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] });
+  const altoMax = Math.max(120, haciaArriba ? y - 90 : height - top - 40);
+  const translateY = a.interpolate({ inputRange: [0, 1], outputRange: [haciaArriba ? 8 : -8, 0] });
   const scale = a.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] });
   const altoVisible = despliegue.interpolate({ inputRange: [0, 1], outputRange: [0, Math.min(alto, altoMax)] });
 
@@ -396,30 +412,35 @@ function Menu({ ancla, icono, etiqueta, renglones, ancho, texto, alinear, enTopb
       <View
         style={[
           styles.botonNitido,
-          texto && !enTopbar ? styles.sinFondo : null,
+          (texto && !enTopbar) || boton ? styles.sinFondo : null,
           { left: x, top: y, width: ancla.w, height: ancla.h },
         ]}>
-        <BotonMenu icono={icono} etiqueta={etiqueta} texto={texto} enTopbar={enTopbar} abierto onPress={() => cerrar()} />
+        {boton ? (
+          boton(true, () => cerrar())
+        ) : (
+          <BotonMenu icono={icono} etiqueta={etiqueta} texto={texto} enTopbar={enTopbar} abierto onPress={() => cerrar()} />
+        )}
       </View>
       <Animated.View
         style={[
           styles.menu,
           alinear === 'izquierda' && styles.menuIzquierda,
+          haciaArriba && (alinear === 'izquierda' ? styles.menuArribaIzquierda : styles.menuArriba),
           {
-            top,
+            ...vertical,
             ...borde,
             width: anchoMenu,
             opacity: a,
             transform: [{ translateY }, { scale }],
           },
         ]}>
-        <View style={[styles.pico, pico]} />
+        <View style={[styles.pico, haciaArriba && styles.picoAbajo, pico]} />
         <View style={styles.caja}>
           {/* La lista se mide en una capa absoluta y la caja crece hasta su
               alto (o hasta altoMax: entonces se desliza). */}
           <Animated.View style={[styles.lista, { height: altoVisible }]}>
             <ScrollView
-              style={[styles.listaScroll, { maxHeight: altoMax }]}
+              style={[styles.listaScroll, haciaArriba && styles.listaScrollAbajo, { maxHeight: altoMax }]}
               contentContainerStyle={styles.listaContenido}
               scrollEnabled={alto > altoMax}
               showsVerticalScrollIndicator={alto > altoMax}
@@ -432,7 +453,7 @@ function Menu({ ancla, icono, etiqueta, renglones, ancho, texto, alinear, enTopb
                 }
               }}>
               {contenido.map((renglon, i) => (
-                <Cascada key={i} v={filas[i]}>
+                <Cascada key={i} v={filas[i]} desde={haciaArriba ? 12 : -12}>
                   {renglon}
                 </Cascada>
               ))}
@@ -445,8 +466,8 @@ function Menu({ ancla, icono, etiqueta, renglones, ancho, texto, alinear, enTopb
 }
 
 /** Renglón del menú que cae a su lugar con un fundido (entrada en cascada). */
-function Cascada({ v, children }: { v: Animated.Value; children: React.ReactNode }) {
-  const translateY = v.interpolate({ inputRange: [0, 1], outputRange: [-12, 0] });
+function Cascada({ v, desde, children }: { v: Animated.Value; desde: number; children: React.ReactNode }) {
+  const translateY = v.interpolate({ inputRange: [0, 1], outputRange: [desde, 0] });
   return <Animated.View style={{ opacity: v, transform: [{ translateY }] }}>{children}</Animated.View>;
 }
 
@@ -583,14 +604,19 @@ const useStyles = makeStyles((c, shadow) => ({
   // Crece desde la esquina del ícono.
   menu: { position: 'absolute', transformOrigin: 'top right' },
   menuIzquierda: { transformOrigin: 'top left' },
+  menuArriba: { transformOrigin: 'bottom right' },
+  menuArribaIzquierda: { transformOrigin: 'bottom left' },
   // Pico que une el menú con el ícono (queda medio oculto tras la caja).
   pico: {
     position: 'absolute', top: -6, width: 14, height: 14, borderRadius: 3,
     backgroundColor: c.surface, transform: [{ rotate: '45deg' }],
   },
+  picoAbajo: { top: undefined, bottom: -6 },
   caja: { backgroundColor: c.surface, borderRadius: radius.lg, padding: 10, ...shadow.card },
   lista: { overflow: 'hidden' },
   listaScroll: { position: 'absolute', top: 0, left: 0, right: 0 },
+  // Hacia arriba la caja crece desde abajo: se descubre primero lo de abajo.
+  listaScrollAbajo: { top: undefined, bottom: 0 },
   listaContenido: { gap: 8 },
   opcion: {
     flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, paddingHorizontal: 10,

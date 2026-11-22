@@ -4,7 +4,6 @@
  * @format
  */
 import React from 'react';
-import { Animated } from 'react-native';
 import ReactTestRenderer, { act } from 'react-test-renderer';
 import BarraCatalogo from '../src/components/BarraCatalogo';
 
@@ -12,14 +11,17 @@ const mockAbrir = jest.fn();
 const mockOpciones = () => [];
 jest.mock('../src/AuthContext', () => ({ useAuth: () => ({ auth: { user: { name: 'Ana' } } }) }));
 jest.mock('../src/components/HeaderPerfil', () => ({ useOpcionesPerfil: () => mockOpciones }));
-jest.mock('../src/components/PanelInferior', () => ({
-  usePanelInferior: () => ({ abrir: mockAbrir, abierto: false }),
-}));
+// El menú (y su capa) tiene su propia prueba: aquí solo el botón que lo abre.
+let mockMenu: any;
+jest.mock('../src/components/MenuDesplegable', () => (props: any) => {
+  mockMenu = props;
+  return props.boton(false, mockAbrir);
+});
 
 async function montar(seccion: 'productos' | 'servicios' | 'propiedades', cambiar = jest.fn()) {
   let raiz!: ReactTestRenderer.ReactTestRenderer;
   await act(async () => {
-    raiz = ReactTestRenderer.create(<BarraCatalogo seccion={seccion} onCambiar={cambiar} encogida={new Animated.Value(0)} abajo={10} />);
+    raiz = ReactTestRenderer.create(<BarraCatalogo seccion={seccion} onCambiar={cambiar} abajo={10} />);
   });
   return raiz;
 }
@@ -51,11 +53,13 @@ test('tocar otra pestaña cambia el catálogo; la activa no hace nada', async ()
   act(() => raiz.unmount());
 });
 
-test('al final va "Mi perfil" con la inicial, y abre sus opciones en el panel', async () => {
+test('al final va "Mi perfil" con la inicial, y despliega sus opciones hacia arriba', async () => {
   const raiz = await montar('productos');
   const perfil = raiz.root.find(n => typeof n.type !== 'string' && n.props.accessibilityLabel === 'Mi perfil' && !!n.props.onPress);
   expect(raiz.root.findAll(n => n.props.children === 'A').length).toBeGreaterThan(0);
   act(() => perfil.props.onPress());
-  expect(mockAbrir).toHaveBeenCalledWith(mockOpciones, 'Mi perfil');
+  expect(mockAbrir).toHaveBeenCalled();
+  expect(mockMenu.renglones).toBe(mockOpciones);
+  expect(mockMenu.haciaArriba).toBe(true);
   act(() => raiz.unmount());
 });

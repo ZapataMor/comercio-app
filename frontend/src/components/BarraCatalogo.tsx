@@ -1,27 +1,28 @@
 /**
  * Barra de Explorar, como la de Instagram: una píldora flotante abajo con los
  * tres catálogos (Productos, Servicios y Propiedades), solo con íconos, y al
- * final "Mi perfil" (la inicial de la persona), que abre sus opciones en un
- * panel que sube (PanelInferior). El activo lleva una píldora suave detrás;
- * tocar otro catálogo lo cambia.
+ * final "Mi perfil" (la inicial de la persona), que despliega hacia arriba
+ * el mismo menú de la topbar (MenuDesplegable). El activo lleva una píldora
+ * suave detrás; tocar otro catálogo lo cambia.
  *
- * Mientras la lista se desplaza la barra se encoge y se vuelve translúcida
- * (deja ver lo de atrás); al quedarse quieta vuelve a su tamaño. Las listas
- * avisan con `useDesplazarCatalogo()` en su onScroll.
+ * Mientras la lista se desplaza la barra se encoge (sin volverse
+ * transparente) y al quedarse quieta vuelve a su tamaño: ver
+ * encogerAlDesplazar. Las listas avisan con `useDesplazarCatalogo()`.
  *
  * Flota sobre el contenido (Explorar es bordeABorde en App.tsx): las listas
  * dejan abajo `espacioAbajo` para que lo último no quede tapado. Con el
  * teclado abierto (escribiendo en el buscador) se esconde.
  */
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Animated, Keyboard, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../AuthContext';
+import { avisarDesplazamiento, encogida } from '../encogerAlDesplazar';
 import { SeccionCatalogo } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { Objetivo } from '../tutorial/Objetivo';
 import { useOpcionesPerfil } from './HeaderPerfil';
 import Icon, { IconName } from './Icon';
-import { usePanelInferior } from './PanelInferior';
+import MenuDesplegable from './MenuDesplegable';
 
 export const SECCIONES: { valor: SeccionCatalogo; titulo: string; icono: IconName }[] = [
   { valor: 'productos', titulo: 'Productos', icono: 'bolsa' },
@@ -35,11 +36,9 @@ export const MARGEN_BARRA_CATALOGO = 10;
 
 /** Tamaño de la barra encogida (al desplazarse) respecto del normal. */
 const ESCALA_ENCOGIDA = 0.84;
-/** Tras el último movimiento de la lista, cuánto espera para volver a crecer (ms). */
-const ESPERA_QUIETA = 260;
 
 type Desplazamiento = { alDesplazar: () => void; espacioAbajo: number };
-const DesplazamientoContexto = createContext<Desplazamiento>({ alDesplazar: () => {}, espacioAbajo: 0 });
+const DesplazamientoContexto = createContext<Desplazamiento>({ alDesplazar: avisarDesplazamiento, espacioAbajo: 0 });
 export const ProveedorDesplazamiento = DesplazamientoContexto.Provider;
 
 /** Para las listas de Explorar: su onScroll y el aire que dejan abajo. */
@@ -47,51 +46,13 @@ export function useDesplazarCatalogo() {
   return useContext(DesplazamientoContexto);
 }
 
-/** Valor animado de 0 (normal) a 1 (encogida) y el aviso de que la lista se movió. */
-export function useEncogerAlDesplazar() {
-  const encogida = useRef(new Animated.Value(0)).current;
-  const moviendose = useRef(false);
-  const espera = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const animar = useCallback(
-    (hacia: number) =>
-      Animated.spring(encogida, {
-        toValue: hacia,
-        speed: 20,
-        bounciness: hacia ? 0 : 6,
-        useNativeDriver: true,
-      }).start(),
-    [encogida],
-  );
-
-  const alDesplazar = useCallback(() => {
-    if (!moviendose.current) {
-      moviendose.current = true;
-      animar(1);
-    }
-    if (espera.current) clearTimeout(espera.current);
-    espera.current = setTimeout(() => {
-      moviendose.current = false;
-      animar(0);
-    }, ESPERA_QUIETA);
-  }, [animar]);
-
-  useEffect(() => () => {
-    if (espera.current) clearTimeout(espera.current);
-  }, []);
-
-  return { encogida, alDesplazar };
-}
-
 export default function BarraCatalogo({
   seccion,
   onCambiar,
-  encogida,
   abajo,
 }: {
   seccion: SeccionCatalogo;
   onCambiar: (seccion: SeccionCatalogo) => void;
-  encogida: Animated.Value;
   /** Distancia al borde de abajo de la pantalla. */
   abajo: number;
 }) {
@@ -106,16 +67,13 @@ export default function BarraCatalogo({
     inputRange: [0, 1],
     outputRange: [0, (ALTO_BARRA_CATALOGO * (1 - ESCALA_ENCOGIDA)) / 2],
   });
-  // La capa blanca con sombra se desvanece y deja la translúcida de debajo.
-  const opaca = encogida.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
 
   return (
     <Animated.View
       pointerEvents="box-none"
       style={[styles.zona, { bottom: abajo, transform: [{ translateY: bajar }, { scale: escala }] }]}>
       <Objetivo id="catalogo.selector" style={styles.barra} accessibilityRole="tablist">
-        <View style={[StyleSheet.absoluteFill, styles.fondoTranslucido]} />
-        <Animated.View style={[StyleSheet.absoluteFill, styles.fondoOpaco, { opacity: opaca }]} />
+        <View style={[StyleSheet.absoluteFill, styles.fondo]} />
         {SECCIONES.map(s => {
           const activa = s.valor === seccion;
           return (
@@ -133,33 +91,52 @@ export default function BarraCatalogo({
             </Pressable>
           );
         })}
-        <PestanaPerfil />
+        <Objetivo id="perfil.menu" style={styles.pestanaPerfil}>
+          <PestanaPerfil />
+        </Objetivo>
       </Objetivo>
     </Animated.View>
   );
 }
 
-/** "Mi perfil": la inicial de la persona; abre sus opciones en un panel que sube. */
+/**
+ * "Mi perfil": la inicial de la persona. Despliega hacia arriba el menú de la
+ * cuenta, angosto como el de la topbar; el ícono queda nítido encima del
+ * desenfoque (MenuDesplegable dibuja ahí una copia de este botón).
+ */
 function PestanaPerfil() {
+  const styles = useStyles();
+  const opciones = useOpcionesPerfil();
+  return (
+    <MenuDesplegable
+      icono="usuario"
+      etiqueta="Mi perfil"
+      renglones={opciones}
+      haciaArriba
+      estilo={styles.pestanaPerfil}
+      boton={(abierto, onPress) => <BotonPerfil abierto={abierto} onPress={onPress} />}
+    />
+  );
+}
+
+function BotonPerfil({ abierto, onPress }: { abierto: boolean; onPress: () => void }) {
   const { c } = useTheme();
   const styles = useStyles();
   const { auth } = useAuth();
-  const opciones = useOpcionesPerfil();
-  const panel = usePanelInferior();
   const inicial = auth?.user.name.trim().charAt(0).toUpperCase() || '?';
   return (
     <Pressable
       style={styles.pestana}
       accessibilityRole="button"
       accessibilityLabel="Mi perfil"
-      accessibilityState={{ expanded: panel.abierto }}
-      onPress={() => panel.abrir(opciones, 'Mi perfil')}>
-      <Objetivo id="perfil.menu" style={styles.marca}>
-        <FondoActivo visible={panel.abierto} />
-        <View style={[styles.avatar, { borderColor: panel.abierto ? c.textStrong : 'transparent' }]}>
+      accessibilityState={{ expanded: abierto }}
+      onPress={onPress}>
+      <View style={styles.marca}>
+        <FondoActivo visible={abierto} />
+        <View style={[styles.avatar, { borderColor: abierto ? c.textStrong : 'transparent' }]}>
           <Text style={styles.avatarTxt}>{inicial}</Text>
         </View>
-      </Objetivo>
+      </View>
     </Pressable>
   );
 }
@@ -198,14 +175,7 @@ const useStyles = makeStyles((c, shadow) => ({
     paddingHorizontal: 8,
     borderRadius: radius.pill,
   },
-  // Superficie del tema con transparencia (los colores son #RRGGBB).
-  fondoTranslucido: {
-    borderRadius: radius.pill,
-    backgroundColor: `${c.surface}C7`,
-    borderWidth: 1.5,
-    borderColor: `${c.surface}F0`,
-  },
-  fondoOpaco: {
+  fondo: {
     borderRadius: radius.pill,
     backgroundColor: c.surface,
     borderWidth: 1,
@@ -213,6 +183,7 @@ const useStyles = makeStyles((c, shadow) => ({
     ...shadow.card,
   },
   pestana: { flex: 1, alignItems: 'center', justifyContent: 'center', height: '100%' },
+  pestanaPerfil: { flex: 1, height: '100%' },
   marca: {
     width: 72,
     height: 48,
@@ -221,18 +192,25 @@ const useStyles = makeStyles((c, shadow) => ({
   },
   // Radio exacto (la mitad del alto): con radius.pill (999) algunos
   // teléfonos dibujan la píldora con esquinas rectas.
-  fondoActivo: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, borderRadius: 24, backgroundColor: c.surface2 },
+  fondoActivo: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    borderRadius: 24,
+    backgroundColor: c.surface2,
+  },
   avatar: {
     width: 30,
     height: 30,
     borderRadius: 15,
-    // Con el panel abierto el borde se pinta: un aro como el de la foto de
+    // Con el menú abierto el borde se pinta: un aro como el de la foto de
     // perfil en Instagram (el ancho va siempre, por lo mismo que FondoActivo).
     borderWidth: 2,
     backgroundColor: c.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
-
   avatarTxt: { color: c.onAccent, fontFamily: font.displayExtra, fontSize: 14 },
 }));

@@ -31,6 +31,7 @@ import Icon from '../components/Icon';
 import BotonesContacto from '../components/BotonesContacto';
 import RecetasPreferidas from '../components/RecetasPreferidas';
 import { PuntajeResenas } from '../components/Resenas';
+import { avisarDesplazamiento } from '../encogerAlDesplazar';
 import { RootStackParamList } from '../navTypes';
 import { precioDe } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
@@ -234,8 +235,11 @@ export default function NegocioScreen({ navigation, route }: Props) {
       style={styles.container}
       data={catalogo}
       keyExtractor={fila => fila.key}
-      // Aire abajo para la barra flotante fija (Carrito / Mis pedidos).
+      // Aire abajo para los botones flotantes (Carrito / Mis pedidos), que
+      // se encogen mientras la lista se desplaza.
       contentContainerStyle={styles.contenido}
+      onScroll={avisarDesplazamiento}
+      scrollEventThrottle={16}
       // El scroll a un índice puede fallar si aún no se midió: reintentamos por
       // offset aproximado y luego al índice exacto.
       onScrollToIndexFailed={info => {
