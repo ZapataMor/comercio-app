@@ -25,6 +25,7 @@ import {
 } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale, Skeleton } from '../components/anim';
+import BarraCatalogo from '../components/BarraCatalogo';
 import ExplorarPropiedades from '../components/ExplorarPropiedades';
 import Icon, { IconName } from '../components/Icon';
 import { PuntajeResenas } from '../components/Resenas';
@@ -98,15 +99,24 @@ function filasBusqueda(negocios: NegocioLista[], productos: ProductoConNegocio[]
 }
 
 /**
- * Explorar del cliente: el catálogo elegido en el desplegable de la topbar.
+ * Explorar del cliente: el catálogo elegido en la barra inferior.
  * Productos y Servicios listan negocios; Propiedades, casas y patios.
  */
 export default function ExplorarScreen({ navigation, route }: Props) {
+  const styles = useStyles();
   const seccion = route.params?.seccion ?? 'productos';
-  if (seccion === 'propiedades') {
-    return <ExplorarPropiedades navigation={navigation} />;
-  }
-  return <ExplorarNegocios key={seccion} navigation={navigation} seccion={seccion} />;
+  return (
+    <View style={styles.container}>
+      <View style={styles.catalogo}>
+        {seccion === 'propiedades' ? (
+          <ExplorarPropiedades navigation={navigation} />
+        ) : (
+          <ExplorarNegocios key={seccion} navigation={navigation} seccion={seccion} />
+        )}
+      </View>
+      <BarraCatalogo seccion={seccion} onCambiar={nueva => navigation.setParams({ seccion: nueva })} />
+    </View>
+  );
 }
 
 function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigation']; seccion: 'productos' | 'servicios' }) {
@@ -284,7 +294,7 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
       style={styles.container}
       data={filas}
       keyExtractor={fila => fila.key}
-      // Aire abajo para la barra flotante fija (Carrito / Mis pedidos).
+      // Aire abajo para los botones flotantes (Carrito / Mis pedidos).
       contentContainerStyle={styles.contenido}
       keyboardShouldPersistTaps="handled"
       refreshControl={
@@ -297,8 +307,8 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
       }
       ListHeaderComponent={
         <View>
-          {/* Carrito y Mis pedidos viven en la barra flotante inferior; salir
-              de la cuenta se hace desde "Mi perfil" (topbar). */}
+          {/* Carrito y Mis pedidos son los botones redondos de abajo a la
+              izquierda; salir de la cuenta se hace desde "Mi perfil" (topbar). */}
           <View style={styles.cabecera}>
             {!!nombre && <Text style={styles.saludo}>Hola, {nombre}</Text>}
             <Text style={styles.titular}>¿Qué necesitas hoy?</Text>
@@ -587,7 +597,8 @@ function SinResultados({
 
 const useStyles = makeStyles(c => ({
   container: { flex: 1, backgroundColor: c.bg },
-  contenido: { paddingBottom: 110 },
+  catalogo: { flex: 1 },
+  contenido: { paddingBottom: 90 },
   cabecera: { paddingHorizontal: 20, paddingTop: 22 },
   saludo: { color: c.muted, fontFamily: font.medium, fontSize: 14, marginBottom: 2 },
   titular: { color: c.textStrong, fontFamily: font.display, fontSize: 26, lineHeight: 33 },

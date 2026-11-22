@@ -5,7 +5,6 @@
  */
 
 import React from 'react';
-import { Text } from 'react-native';
 import ReactTestRenderer, { act } from 'react-test-renderer';
 import BarraCliente from '../src/components/BarraCliente';
 
@@ -17,6 +16,7 @@ jest.mock('../src/AuthContext', () => ({
   useAuth: () => ({ auth: { user: { roles: mockRoles } } }),
 }));
 jest.mock('../src/CartContext', () => ({ useCart: () => ({ count: mockCount }) }));
+// Los botones son círculos con solo el ícono: se reconocen por su nombre accesible.
 jest.mock('../src/components/FlyToCart', () => ({
   useFlyToCart: () => ({ registrarDestino: () => {}, registrarAterrizaje: () => {} }),
 }));
@@ -26,7 +26,9 @@ async function textos(ruta: string, seccion?: 'productos' | 'servicios') {
   await act(async () => {
     app = ReactTestRenderer.create(<BarraCliente ruta={ruta} seccion={seccion} />);
   });
-  const vistos = app.root.findAllByType(Text).map(t => t.props.children);
+  const vistos = app.root
+    .findAll(n => typeof n.type !== 'string' && n.props.accessibilityRole === 'button')
+    .map(n => String(n.props.accessibilityLabel).split(',')[0]);
   await act(async () => app.unmount());
   return vistos;
 }
@@ -42,7 +44,7 @@ test.each(['Home', 'Entregas', 'Mapa'])('en %s no aparece, aunque la cuenta sea 
 });
 
 test.each(['Explorar', 'Negocio'])('en %s aparece', async ruta => {
-  expect(await textos(ruta)).toEqual(expect.arrayContaining(['Carrito', 'Mis pedidos']));
+  expect([...new Set(await textos(ruta))]).toEqual(['Carrito', 'Mis pedidos']);
 });
 
 test.each(['Explorar', 'Negocio'])('viendo servicios en %s no aparece', async ruta => {

@@ -1,6 +1,7 @@
 /**
- * Barra flotante inferior del CLIENTE: dos rectángulos ("Carrito" y
- * "Mis pedidos") con ícono + nombre, fijos en todas las vistas del cliente.
+ * Botones flotantes del CLIENTE: dos círculos solo con ícono ("Carrito" y
+ * "Mis pedidos") abajo a la izquierda, fijos en todas las vistas del cliente.
+ * En Explorar van encima de la barra de catálogos (BarraCatalogo).
  *
  * Reglas:
  *  - Solo aparece para usuarios con rol 'usuario' y en rutas del cliente. El
@@ -24,7 +25,9 @@ import { useCart } from '../CartContext';
 import { SeccionCatalogo } from '../navTypes';
 import { navigationRef } from '../RootNavigation';
 import { font, makeStyles, radius, useTheme } from '../theme';
+import { Objetivo } from '../tutorial/Objetivo';
 import { PressableScale } from './anim';
+import { ALTO_BARRA_CATALOGO } from './BarraCatalogo';
 import { useFlyToCart } from './FlyToCart';
 import Icon from './Icon';
 
@@ -35,7 +38,7 @@ const RUTAS_CLIENTE = new Set([
   'PedidoDetalle',
 ]);
 
-/** Alto de los botones y su distancia al borde inferior (sobre el área segura). */
+/** Diámetro de los botones y su distancia al borde inferior (sobre el área segura). */
 export const ALTO_BARRA_CLIENTE = 54;
 export const MARGEN_BARRA_CLIENTE = 14;
 
@@ -61,7 +64,7 @@ function Barra({ ruta }: { ruta: string }) {
   const enSeguimiento = ruta === 'PedidoDetalle';
   const mostrarCarrito = !enSeguimiento || cart.count > 0;
   const mostrarPedidos = !enSeguimiento;
-  const bottom = insets.bottom + MARGEN_BARRA_CLIENTE;
+  const bottom = insets.bottom + MARGEN_BARRA_CLIENTE + (ruta === 'Explorar' ? ALTO_BARRA_CATALOGO : 0);
 
   // --- Destino del paquete volador: centro del botón Carrito ---
   const carritoRef = useRef<View>(null);
@@ -119,29 +122,35 @@ function Barra({ ruta }: { ruta: string }) {
           <Animated.View
             ref={carritoRef}
             onLayout={medirCarrito}
-            style={[styles.flex1, { transform: [{ scale: rebote }] }]}>
-            <PressableScale
-              style={[styles.boton, styles.botonCarrito]}
-              onPress={() => navigationRef.isReady() && navigationRef.navigate('Carrito')}>
-              <Icon name="carrito" size={20} color={c.onAccent} strokeWidth={2} />
-              <Text style={[styles.botonTxt, styles.botonTxtCarrito]}>Carrito</Text>
-              {cart.count > 0 && (
-                <Animated.View style={[styles.badge, { transform: [{ scale: badge }] }]}>
-                  <Text style={styles.badgeTxt}>{cart.count}</Text>
-                </Animated.View>
-              )}
-            </PressableScale>
+            style={{ transform: [{ scale: rebote }] }}>
+            <Objetivo id="barra.carrito">
+              <PressableScale
+                style={[styles.boton, styles.botonCarrito]}
+                scaleTo={0.9}
+                accessibilityRole="button"
+                accessibilityLabel={cart.count > 0 ? `Carrito, ${cart.count} en total` : 'Carrito'}
+                onPress={() => navigationRef.isReady() && navigationRef.navigate('Carrito')}>
+                <Icon name="carrito" size={24} color={c.onAccent} strokeWidth={2} />
+              </PressableScale>
+            </Objetivo>
+            {cart.count > 0 && (
+              <Animated.View pointerEvents="none" style={[styles.badge, { transform: [{ scale: badge }] }]}>
+                <Text style={styles.badgeTxt}>{cart.count}</Text>
+              </Animated.View>
+            )}
           </Animated.View>
         )}
         {mostrarPedidos && (
-          <View style={styles.flex1}>
+          <Objetivo id="barra.pedidos">
             <PressableScale
               style={[styles.boton, styles.botonPedidos]}
+              scaleTo={0.9}
+              accessibilityRole="button"
+              accessibilityLabel="Mis pedidos"
               onPress={() => navigationRef.isReady() && navigationRef.navigate('MisPedidos')}>
-              <Icon name="lista" size={20} color={c.onBrand} strokeWidth={2} />
-              <Text style={styles.botonTxt}>Mis pedidos</Text>
+              <Icon name="lista" size={24} color={c.onBrand} strokeWidth={2} />
             </PressableScale>
-          </View>
+          </Objetivo>
         )}
       </Entrada>
     </View>
@@ -168,31 +177,22 @@ function Entrada({ children, style }: { children: React.ReactNode; style?: objec
 }
 
 const useStyles = makeStyles((c, shadow) => ({
-  zona: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
-  fila: {
-    flexDirection: 'row',
-    gap: 12,
-    paddingHorizontal: 20,
-    width: '100%',
-    maxWidth: 460,
-  },
-  flex1: { flex: 1 },
+  // Abajo a la izquierda: deja libre el resto del ancho para ver la lista.
+  zona: { position: 'absolute', left: 20 },
+  fila: { flexDirection: 'row', gap: 12 },
   boton: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    width: ALTO_BARRA_CLIENTE,
     height: ALTO_BARRA_CLIENTE,
-    borderRadius: radius.lg,
+    borderRadius: radius.pill,
   },
   botonCarrito: { backgroundColor: c.accent, ...shadow.gold },
   botonPedidos: { backgroundColor: c.brand, ...shadow.card },
-  botonTxt: { fontFamily: font.bold, fontSize: 15, color: c.onBrand },
-  botonTxtCarrito: { color: c.onAccent },
   badge: {
     position: 'absolute',
-    top: -8,
-    right: 14,
+    top: -4,
+    right: -4,
     minWidth: 22,
     height: 22,
     borderRadius: radius.pill,

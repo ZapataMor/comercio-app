@@ -48,7 +48,7 @@ export const TUTORIALES: Tutorial[] = [
       {
         objetivo: 'catalogo.selector',
         titulo: 'Productos, servicios y propiedades',
-        texto: 'Desde aquí cambias de catálogo: servicios para pedir citas, o casas en venta y alquiler.',
+        texto: 'En esta barra de abajo cambias de catálogo: servicios para pedir citas, o casas en venta y alquiler.',
       },
       {
         objetivo: 'barra.carrito',
@@ -152,7 +152,7 @@ export const TUTORIALES: Tutorial[] = [
       {
         objetivo: 'barra.pedidos',
         titulo: 'Abre tus pedidos',
-        texto: 'Toca «Mis pedidos» para ver los que tienes en camino y los anteriores.',
+        texto: 'Toca este botón redondo para ver los pedidos que tienes en camino y los anteriores.',
       },
     ],
   },

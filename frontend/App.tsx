@@ -27,7 +27,6 @@ import EspacioTeclado from './src/components/EspacioTeclado';
 import { FlyToCartProvider } from './src/components/FlyToCart';
 import HeaderPerfil from './src/components/HeaderPerfil';
 import HeaderVitrina from './src/components/HeaderVitrina';
-import HeaderCatalogo from './src/components/HeaderCatalogo';
 import { CapaMenus } from './src/components/MenuDesplegable';
 import { VitrinaHeaderLogo } from './src/components/Logo';
 import SplashVitrina from './src/components/SplashVitrina';
@@ -198,10 +197,9 @@ function Navegacion({ listo }: { listo: boolean }) {
                 <Stack.Screen
                   name="Explorar"
                   component={ExplorarScreen}
-                  options={({ route, navigation }) => ({
-                    title: 'Vitrina', headerTitle: tituloVitrina,
-                    headerRight: () => <HeaderCatalogo seccion={route.params?.seccion ?? 'productos'} onCambiar={seccion => navigation.setParams({ seccion })} />,
-                  })}
+                  // Productos, Servicios y Propiedades van en la barra
+                  // inferior de la pantalla, que llega hasta el borde.
+                  options={{ title: 'Vitrina', headerTitle: tituloVitrina, ...bordeABorde }}
                 />
                 <Stack.Screen
                   name="Negocio"
