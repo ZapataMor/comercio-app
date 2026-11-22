@@ -186,7 +186,7 @@ export default function PedidoDetalleScreen({ route }: Props) {
       // Con el teclado abierto, tocar una estrella cuenta al primer toque.
       keyboardShouldPersistTaps="handled"
       // Aire abajo para la barra flotante fija (Carrito / Mis pedidos).
-      contentContainerStyle={{ padding: 16, paddingBottom: 110 }}>
+      contentContainerStyle={{ padding: 16, paddingBottom: 170 }}>
       <Text style={styles.titulo}>Pedido #{pedido.codigo}</Text>
       {pedido.estado === 'devolviendo' && <View style={styles.card}>
         <Text style={styles.cardTitulo}>{pedido.cliente_no_encontrado_at ? 'Cliente no encontrado' : 'Pedido en devolución'}</Text>

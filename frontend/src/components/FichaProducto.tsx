@@ -47,7 +47,7 @@ import {
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useAgregarAlCarrito } from '../useAgregarAlCarrito';
 import { animarDespliegue, FadeInView, PressableScale } from './anim';
-import { ALTO_BARRA_CLIENTE, MARGEN_BARRA_CLIENTE } from './BarraCliente';
+import { ALTO_PILA_CLIENTE, MARGEN_BARRA_CLIENTE } from './BarraCliente';
 import CantidadPeso from './CantidadPeso';
 import ChipsEleccion from './ChipsEleccion';
 import { useConfirmar } from './Confirmacion';
@@ -270,7 +270,7 @@ export default function FichaProducto({ producto, retirado, abierto, negocioId, 
   // Sin insets.bottom: la pantalla ya termina encima de la barra de
   // navegación del sistema (contentStyle en App.tsx), justo donde la barra del
   // cliente empieza a contar su margen.
-  const bottom = MARGEN_BARRA_CLIENTE + ALTO_BARRA_CLIENTE + HUECO_BARRA;
+  const bottom = MARGEN_BARRA_CLIENTE + ALTO_PILA_CLIENTE + HUECO_BARRA;
   const izquierda = conPestanas ? MARGEN + ANCHO_PESTANA : MARGEN;
   const translateY = entrada.interpolate({ inputRange: [0, 1], outputRange: [36, 0] });
   // Al pasar la foto aparece una franja con el nombre bajo la X: así la X

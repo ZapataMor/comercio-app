@@ -12,8 +12,13 @@ import ExplorarScreen from '../src/screens/ExplorarScreen';
 
 // Objeto fijo, como en la app: si cambiara en cada render, la pantalla recargaría sin parar.
 const mockSesion = { auth: { token: 't', user: { id: 7, name: 'Ana María', roles: ['usuario'] } } };
+jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 // La barra de catálogos (Productos / Servicios / Propiedades) tiene su propia prueba.
-jest.mock('../src/components/BarraCatalogo', () => () => null);
+jest.mock('../src/components/BarraCatalogo', () => ({
+  ...jest.requireActual('../src/components/BarraCatalogo'),
+  __esModule: true,
+  default: () => null,
+}));
 jest.mock('../src/AuthContext', () => ({ useAuth: () => mockSesion }));
 
 jest.mock('../src/api', () => ({

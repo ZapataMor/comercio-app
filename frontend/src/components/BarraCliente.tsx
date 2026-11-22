@@ -1,7 +1,8 @@
 /**
- * Botones flotantes del CLIENTE: dos círculos solo con ícono ("Carrito" y
- * "Mis pedidos") abajo a la izquierda, fijos en todas las vistas del cliente.
- * En Explorar van encima de la barra de catálogos (BarraCatalogo).
+ * Botones flotantes del CLIENTE: dos círculos solo con ícono abajo a la
+ * izquierda, uno sobre otro ("Carrito" arriba, "Mis pedidos" abajo), fijos en
+ * todas las vistas del cliente. En Explorar van encima de la barra de
+ * catálogos (BarraCatalogo).
  *
  * Reglas:
  *  - Solo aparece para usuarios con rol 'usuario' y en rutas del cliente. El
@@ -27,7 +28,7 @@ import { navigationRef } from '../RootNavigation';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { Objetivo } from '../tutorial/Objetivo';
 import { PressableScale } from './anim';
-import { ALTO_BARRA_CATALOGO } from './BarraCatalogo';
+import { ALTO_BARRA_CATALOGO, MARGEN_BARRA_CATALOGO } from './BarraCatalogo';
 import { useFlyToCart } from './FlyToCart';
 import Icon from './Icon';
 
@@ -41,6 +42,9 @@ const RUTAS_CLIENTE = new Set([
 /** Diámetro de los botones y su distancia al borde inferior (sobre el área segura). */
 export const ALTO_BARRA_CLIENTE = 54;
 export const MARGEN_BARRA_CLIENTE = 14;
+/** Separación entre los dos círculos y alto de la pila completa. */
+const SEPARACION_BOTONES = 12;
+export const ALTO_PILA_CLIENTE = ALTO_BARRA_CLIENTE * 2 + SEPARACION_BOTONES;
 
 type Props = { ruta?: string; seccion?: SeccionCatalogo };
 
@@ -64,7 +68,8 @@ function Barra({ ruta }: { ruta: string }) {
   const enSeguimiento = ruta === 'PedidoDetalle';
   const mostrarCarrito = !enSeguimiento || cart.count > 0;
   const mostrarPedidos = !enSeguimiento;
-  const bottom = insets.bottom + MARGEN_BARRA_CLIENTE + (ruta === 'Explorar' ? ALTO_BARRA_CATALOGO : 0);
+  const bottom =
+    insets.bottom + MARGEN_BARRA_CLIENTE + (ruta === 'Explorar' ? MARGEN_BARRA_CATALOGO + ALTO_BARRA_CATALOGO : 0);
 
   // --- Destino del paquete volador: centro del botón Carrito ---
   const carritoRef = useRef<View>(null);
@@ -179,7 +184,7 @@ function Entrada({ children, style }: { children: React.ReactNode; style?: objec
 const useStyles = makeStyles((c, shadow) => ({
   // Abajo a la izquierda: deja libre el resto del ancho para ver la lista.
   zona: { position: 'absolute', left: 20 },
-  fila: { flexDirection: 'row', gap: 12 },
+  fila: { flexDirection: 'column', gap: SEPARACION_BOTONES },
   boton: {
     alignItems: 'center',
     justifyContent: 'center',

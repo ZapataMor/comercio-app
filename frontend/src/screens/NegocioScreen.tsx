@@ -392,7 +392,7 @@ const useStyles = makeStyles(c => ({
   solicitarCita: { backgroundColor: c.accent, borderRadius: radius.md, padding: 14, marginTop: 12, alignItems: 'center' },
   solicitarTexto: { color: c.onBrand, fontFamily: font.semibold },
   container: { flex: 1, backgroundColor: c.bg },
-  contenido: { paddingBottom: 110 },
+  contenido: { paddingBottom: 170 },
   fondoDetalle: { flex: 1, justifyContent: 'center', backgroundColor: '#0008', padding: 20 },
   detalleServicio: { flexGrow: 0, maxHeight: '90%', borderRadius: radius.lg, backgroundColor: c.bg },
   detalleContenido: { padding: 20, gap: 12 },

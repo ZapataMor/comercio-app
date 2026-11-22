@@ -12,8 +12,8 @@ import { Animated, Easing, Modal, Pressable, ScrollView, Text, View } from 'reac
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '../components/anim';
 import AvisoTemporal from '../components/AvisoTemporal';
-import { ALTO_BARRA_CATALOGO } from '../components/BarraCatalogo';
-import { ALTO_BARRA_CLIENTE, MARGEN_BARRA_CLIENTE } from '../components/BarraCliente';
+import { ALTO_BARRA_CATALOGO, MARGEN_BARRA_CATALOGO } from '../components/BarraCatalogo';
+import { ALTO_PILA_CLIENTE, MARGEN_BARRA_CLIENTE } from '../components/BarraCliente';
 import Icon from '../components/Icon';
 import { navigationRef } from '../RootNavigation';
 import { font, makeStyles, radius, useTheme } from '../theme';
@@ -52,7 +52,9 @@ function AvisoAyuda() {
   // Encima de los botones Carrito / Mis pedidos (y, en Explorar, de la barra
   // de catálogos), para no taparlos.
   const enExplorar = navigationRef.isReady() && navigationRef.getCurrentRoute()?.name === 'Explorar';
-  const bottom = insets.bottom + MARGEN_BARRA_CLIENTE + ALTO_BARRA_CLIENTE + 14 + (enExplorar ? ALTO_BARRA_CATALOGO : 0);
+  const bottom =
+    insets.bottom + MARGEN_BARRA_CLIENTE + ALTO_PILA_CLIENTE + 14 +
+    (enExplorar ? MARGEN_BARRA_CATALOGO + ALTO_BARRA_CATALOGO : 0);
 
   return (
     <Animated.View

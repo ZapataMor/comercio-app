@@ -4,15 +4,14 @@
  * @format
  */
 import React from 'react';
+import { Animated } from 'react-native';
 import ReactTestRenderer, { act } from 'react-test-renderer';
 import BarraCatalogo from '../src/components/BarraCatalogo';
-
-jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 
 async function montar(seccion: 'productos' | 'servicios' | 'propiedades', cambiar = jest.fn()) {
   let raiz!: ReactTestRenderer.ReactTestRenderer;
   await act(async () => {
-    raiz = ReactTestRenderer.create(<BarraCatalogo seccion={seccion} onCambiar={cambiar} />);
+    raiz = ReactTestRenderer.create(<BarraCatalogo seccion={seccion} onCambiar={cambiar} encogida={new Animated.Value(0)} abajo={10} />);
   });
   return raiz;
 }

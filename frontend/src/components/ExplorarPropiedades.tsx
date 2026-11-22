@@ -25,6 +25,7 @@ import { datosClave, haceCuantoPublicada, periodoPrecio, pesos, TIPOS_PROPIEDAD,
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { usePolling } from '../usePolling';
 import { FadeInView, PressableScale, Skeleton } from './anim';
+import { useDesplazarCatalogo } from './BarraCatalogo';
 import Icon from './Icon';
 import { colorPropiedad } from './Mapa';
 
@@ -36,6 +37,7 @@ type Props = { navigation: NativeStackNavigationProp<RootStackParamList> };
 export default function ExplorarPropiedades({ navigation }: Props) {
   const { c } = useTheme();
   const styles = useStyles();
+  const { alDesplazar, espacioAbajo } = useDesplazarCatalogo();
   const { auth } = useAuth();
   const token = auth!.token;
   const [propiedades, setPropiedades] = useState<PropiedadResumen[]>([]);
@@ -128,7 +130,10 @@ export default function ExplorarPropiedades({ navigation }: Props) {
       style={styles.container}
       data={propiedades}
       keyExtractor={p => String(p.id)}
-      contentContainerStyle={styles.contenido}
+      // Aire abajo para la barra de catálogos, que flota encima.
+      contentContainerStyle={{ paddingBottom: espacioAbajo + 24 }}
+      onScroll={alDesplazar}
+      scrollEventThrottle={16}
       keyboardShouldPersistTaps="handled"
       refreshControl={
         <RefreshControl refreshing={refrescando} onRefresh={() => cargar(true)} colors={[c.accent]} tintColor={c.accent} />
@@ -291,7 +296,6 @@ function Fantasmas() {
 
 const useStyles = makeStyles((c, shadow) => ({
   container: { flex: 1, backgroundColor: c.bg },
-  contenido: { paddingBottom: 40 },
   lleno: { flex: 1 },
   cabecera: { paddingHorizontal: 20, paddingTop: 22 },
   saludo: { color: c.muted, fontFamily: font.medium, fontSize: 14, marginBottom: 2 },

@@ -1,6 +1,7 @@
 import { useLectura } from '../useLectura';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ActivityIndicator,
   FlatList,
@@ -25,7 +26,14 @@ import {
 } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale, Skeleton } from '../components/anim';
-import BarraCatalogo from '../components/BarraCatalogo';
+import BarraCatalogo, {
+  ALTO_BARRA_CATALOGO,
+  MARGEN_BARRA_CATALOGO,
+  ProveedorDesplazamiento,
+  useDesplazarCatalogo,
+  useEncogerAlDesplazar,
+} from '../components/BarraCatalogo';
+import { ALTO_PILA_CLIENTE, MARGEN_BARRA_CLIENTE } from '../components/BarraCliente';
 import ExplorarPropiedades from '../components/ExplorarPropiedades';
 import Icon, { IconName } from '../components/Icon';
 import { PuntajeResenas } from '../components/Resenas';
@@ -104,18 +112,30 @@ function filasBusqueda(negocios: NegocioLista[], productos: ProductoConNegocio[]
  */
 export default function ExplorarScreen({ navigation, route }: Props) {
   const styles = useStyles();
+  const insets = useSafeAreaInsets();
   const seccion = route.params?.seccion ?? 'productos';
+  const { encogida, alDesplazar } = useEncogerAlDesplazar();
+  const abajo = insets.bottom + MARGEN_BARRA_CATALOGO;
+  const desplazamiento = useMemo(
+    () => ({ alDesplazar, espacioAbajo: abajo + ALTO_BARRA_CATALOGO }),
+    [alDesplazar, abajo],
+  );
   return (
-    <View style={styles.container}>
-      <View style={styles.catalogo}>
+    <ProveedorDesplazamiento value={desplazamiento}>
+      <View style={styles.container}>
         {seccion === 'propiedades' ? (
           <ExplorarPropiedades navigation={navigation} />
         ) : (
           <ExplorarNegocios key={seccion} navigation={navigation} seccion={seccion} />
         )}
+        <BarraCatalogo
+          seccion={seccion}
+          onCambiar={nueva => navigation.setParams({ seccion: nueva })}
+          encogida={encogida}
+          abajo={abajo}
+        />
       </View>
-      <BarraCatalogo seccion={seccion} onCambiar={nueva => navigation.setParams({ seccion: nueva })} />
-    </View>
+    </ProveedorDesplazamiento>
   );
 }
 
@@ -123,6 +143,7 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
   const { c } = useTheme();
   const styles = useStyles();
   const { auth } = useAuth();
+  const { alDesplazar, espacioAbajo } = useDesplazarCatalogo();
   const [negocios, setNegocios] = useState<NegocioLista[]>([]);
   const [productos, setProductos] = useState<ProductoConNegocio[]>([]);
   // Texto de los resultados en pantalla; vacío = listado normal. Va aparte de
@@ -294,8 +315,11 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
       style={styles.container}
       data={filas}
       keyExtractor={fila => fila.key}
-      // Aire abajo para los botones flotantes (Carrito / Mis pedidos).
-      contentContainerStyle={styles.contenido}
+      // Aire abajo para la barra de catálogos y, encima, los botones
+      // flotantes (Carrito / Mis pedidos).
+      contentContainerStyle={{ paddingBottom: espacioAbajo + MARGEN_BARRA_CLIENTE + ALTO_PILA_CLIENTE + 16 }}
+      onScroll={alDesplazar}
+      scrollEventThrottle={16}
       keyboardShouldPersistTaps="handled"
       refreshControl={
         <RefreshControl
@@ -597,8 +621,6 @@ function SinResultados({
 
 const useStyles = makeStyles(c => ({
   container: { flex: 1, backgroundColor: c.bg },
-  catalogo: { flex: 1 },
-  contenido: { paddingBottom: 90 },
   cabecera: { paddingHorizontal: 20, paddingTop: 22 },
   saludo: { color: c.muted, fontFamily: font.medium, fontSize: 14, marginBottom: 2 },
   titular: { color: c.textStrong, fontFamily: font.display, fontSize: 26, lineHeight: 33 },
