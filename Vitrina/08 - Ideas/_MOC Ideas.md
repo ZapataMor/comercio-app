@@ -16,7 +16,7 @@ Backlog conceptual. No son compromisos: son semillas. Cada una con impacto y esf
 | [[Idea - Mapa en tiempo real]] | semilla | alto | alto |
 | [[Idea - Busqueda semantica]] | semilla | alto | alto |
 | [[Idea - Calificaciones y reseñas]] | hecho (2026-10-28) | medio | medio |
-| [[Idea - Pagos en linea]] | semilla | alto | alto |
+| [[Idea - Pagos en linea]] | descartada | alto | alto |
 | [[Idea - Inventario y facturación DIAN]] | semilla | alto | alto |
 | [[Idea - Actividades]] | semilla | medio | medio |
 

@@ -329,7 +329,10 @@ Route::middleware(['auth:sanctum', 'throttle:api-usuario'])->group(function () {
         Route::put('/pedidos/{id}/tomar', [ApiDomiciliarioController::class, 'tomar']);
         // Devolver un pedido tomado: solo antes de recogerlo.
         Route::put('/pedidos/{id}/soltar', [ApiDomiciliarioController::class, 'soltar']);
+        // Por transferencia: al salir dice si el negocio le dio el domicilio.
         Route::put('/pedidos/{id}/en-camino', [ApiDomiciliarioController::class, 'enCamino']);
+        // Dijo que no se lo dieron y luego el negocio se lo pagó.
+        Route::put('/pedidos/{id}/domicilio-recibido', [ApiDomiciliarioController::class, 'domicilioRecibido']);
         Route::put('/pedidos/{id}/llegada', [ApiDomiciliarioController::class, 'llegada']);
         Route::put('/pedidos/{id}/cliente-no-encontrado', [ApiDomiciliarioController::class, 'clienteNoEncontrado']);
         // Se confirma con el código que le da el cliente.

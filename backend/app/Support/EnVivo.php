@@ -441,6 +441,7 @@ class EnVivo
             Api\DomiciliarioController::class.'@soltar' => $pedido,
             Api\DomiciliarioController::class.'@ocupado' => $pedido,
             Api\DomiciliarioController::class.'@enCamino' => $pedido,
+            Api\DomiciliarioController::class.'@domicilioRecibido' => $pedido,
             Api\DomiciliarioController::class.'@llegada' => $pedido,
             Api\DomiciliarioController::class.'@clienteNoEncontrado' => $pedido,
             Api\DomiciliarioController::class.'@entregado' => $pedido,

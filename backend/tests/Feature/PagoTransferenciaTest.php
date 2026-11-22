@@ -3,6 +3,7 @@
 use App\Models\CuentaPago;
 use App\Models\Negocio;
 use App\Models\Pedido;
+use App\Models\PedidoReporte;
 use App\Models\Producto;
 use App\Models\User;
 use App\Notifications\EstadoPedidoActualizado;
@@ -169,6 +170,60 @@ test('el domiciliario no cobra nada y sabe que el negocio le entrega el domicili
     $this->getJson('/api/domiciliario/entregas')
         ->assertJsonPath('pedidos.0.cobrar', 0)
         ->assertJsonPath('pedidos.0.domicilio_lo_entrega_negocio', true);
+});
+
+test('antes de salir el domiciliario dice si el negocio le dio el domicilio', function () {
+    [$dueno, $negocio, $producto] = ptNegocio();
+    $pedido = ptPedir($this, ptPersona(), $negocio, $producto);
+    $domiciliario = ptPersona('domiciliario');
+    $pedido->update([
+        'estado' => 'recogido', 'domiciliario_id' => $domiciliario->id, 'tomado_at' => now(), 'recogido_at' => now(),
+        'pago_estado' => 'confirmado', 'costo_domicilio' => 5000,
+    ]);
+
+    Sanctum::actingAs($domiciliario);
+    $this->getJson('/api/domiciliario/entregas')->assertJsonPath('pedidos.0.pide_confirmar_domicilio', true);
+    // Sin responder no sale.
+    $this->putJson("/api/domiciliario/pedidos/{$pedido->id}/en-camino")->assertUnprocessable()->assertJsonValidationErrors('domicilio_recibido');
+    expect($pedido->fresh()->estado)->toBe('recogido');
+
+    // No se lo dieron: sale igual, el negocio queda debiéndolo y se entera.
+    $this->putJson("/api/domiciliario/pedidos/{$pedido->id}/en-camino", ['domicilio_recibido' => false])->assertOk();
+    expect($pedido->fresh())->estado->toBe('en_camino')->domicilio_recibido->toBeFalse();
+    expect(PedidoReporte::where('pedido_id', $pedido->id)->where('tipo', 'domicilio_no_entregado')->whereNull('resuelto_at')->exists())->toBeTrue();
+    Notification::assertSentTo($dueno, EstadoPedidoActualizado::class);
+    Sanctum::actingAs($dueno);
+    $this->getJson("/api/negocios/{$negocio->id}/pedidos/{$pedido->id}")->assertJsonPath('debe_domicilio', true);
+
+    // Entregado, sigue en sus entregas hasta que el negocio le paga.
+    $pedido->update(['estado' => 'entregado', 'entregado_at' => now()]);
+    Sanctum::actingAs($domiciliario);
+    $this->getJson('/api/domiciliario/entregas')->assertJsonPath('pedidos.0.negocio_debe_domicilio', true);
+    $this->putJson("/api/domiciliario/pedidos/{$pedido->id}/domicilio-recibido")->assertOk();
+    expect($pedido->fresh()->domicilio_recibido)->toBeTrue();
+    expect(PedidoReporte::where('pedido_id', $pedido->id)->where('tipo', 'domicilio_no_entregado')->first()->resuelto_at)->not->toBeNull();
+    $this->getJson('/api/domiciliario/entregas')->assertJsonCount(0, 'pedidos');
+    $this->putJson("/api/domiciliario/pedidos/{$pedido->id}/domicilio-recibido")->assertConflict();
+});
+
+test('si se lo dieron, sale sin reporte; en efectivo no se pregunta', function () {
+    [, $negocio, $producto] = ptNegocio();
+    $pedido = ptPedir($this, ptPersona(), $negocio, $producto);
+    $domiciliario = ptPersona('domiciliario');
+    $pedido->update([
+        'estado' => 'recogido', 'domiciliario_id' => $domiciliario->id, 'recogido_at' => now(),
+        'pago_estado' => 'confirmado', 'costo_domicilio' => 5000,
+    ]);
+    Sanctum::actingAs($domiciliario);
+    $this->putJson("/api/domiciliario/pedidos/{$pedido->id}/en-camino", ['domicilio_recibido' => true])->assertOk();
+    expect($pedido->fresh()->domicilio_recibido)->toBeTrue();
+    expect(PedidoReporte::where('pedido_id', $pedido->id)->count())->toBe(0);
+
+    $efectivo = $pedido->replicate()->fill(['metodo_pago' => 'efectivo', 'estado' => 'recogido', 'domicilio_recibido' => null, 'pago_estado' => null]);
+    $efectivo->codigo = null;
+    $efectivo->save();
+    $this->putJson("/api/domiciliario/pedidos/{$efectivo->id}/en-camino")->assertOk();
+    expect($efectivo->fresh()->domicilio_recibido)->toBeNull();
 });
 
 test('el negocio cancela sin perder confiabilidad si el cliente no paga', function () {

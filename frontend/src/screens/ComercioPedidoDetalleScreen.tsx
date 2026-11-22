@@ -361,7 +361,9 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
           <Text style={styles.totalLabel}>Total que paga el cliente</Text>
           <Text style={styles.totalValor}>{cop(pedido.total)}</Text>
         </View>
-        {pedido.domicilio_lo_entrega_negocio && pedido.estado !== 'cancelado' && (
+        {pedido.debe_domicilio ? (
+          <Text style={[styles.notaIzq, { color: c.danger }]}>El domiciliario dice que no le diste {cop(pedido.costo_domicilio ?? 0)} del domicilio. Págaselo: el cliente ya te lo pagó en la transferencia. Cuando lo reciba, él lo confirma en su app.</Text>
+        ) : pedido.domicilio_lo_entrega_negocio && pedido.estado !== 'cancelado' && (
           <Text style={styles.notaIzq}>Por transferencia el cliente te paga todo: al recoger, entrégale al domiciliario {cop(pedido.costo_domicilio ?? 0)} del domicilio.</Text>
         )}
       </FadeInView>

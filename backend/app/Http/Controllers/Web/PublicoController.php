@@ -24,6 +24,12 @@ class PublicoController extends Controller
         return view('publico.privacidad');
     }
 
+    /** Reglas de cancelación y devolución, en palabras para el cliente. */
+    public function cancelaciones(): View
+    {
+        return view('publico.cancelaciones');
+    }
+
     public function eliminarCuentaForm(): View
     {
         return view('publico.eliminar-cuenta');

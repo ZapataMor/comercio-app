@@ -12,6 +12,7 @@ Route::redirect('/', '/admin');
 
 // --- Páginas públicas que exige Play Store (sin sesión) ---
 Route::get('/privacidad', [PublicoController::class, 'privacidad'])->name('privacidad');
+Route::get('/cancelaciones', [PublicoController::class, 'cancelaciones'])->name('cancelaciones');
 Route::get('/eliminar-cuenta', [PublicoController::class, 'eliminarCuentaForm'])->name('eliminar-cuenta');
 Route::post('/eliminar-cuenta', [PublicoController::class, 'eliminarCuenta'])->middleware('throttle:eliminar-cuenta');
 

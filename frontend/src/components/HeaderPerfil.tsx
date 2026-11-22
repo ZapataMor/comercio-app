@@ -90,6 +90,8 @@ function modulosPara(roles: string[], enNegocio: boolean, serDomiciliario: () =>
   modulos.push({ titulo: 'Mis citas', icono: 'calendario', abrir: () => navigationRef.navigate('MisCitas') });
   // Política de privacidad: página pública del servidor.
   modulos.push({ titulo: 'Privacidad', icono: 'escudo', abrir: () => Linking.openURL(`${WEB_URL}/privacidad`) });
+  // Cuándo se puede cancelar y cómo se devuelve una transferencia.
+  modulos.push({ titulo: 'Cancelaciones y devoluciones', icono: 'refrescar', abrir: () => Linking.openURL(`${WEB_URL}/cancelaciones`) });
   if (roles.includes('usuario') && !roles.includes('domiciliario')) {
     modulos.push({
       titulo: 'Ser domiciliario',

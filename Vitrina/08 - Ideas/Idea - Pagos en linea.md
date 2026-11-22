@@ -1,13 +1,16 @@
 ---
 title: Idea - Pagos en linea
 tags: [idea]
-estado: semilla
+estado: descartada
 impacto: alto
 esfuerzo: alto
-actualizado: 2026-06-28
+actualizado: 2026-11-22
 ---
 
 # 💡 Pagos en línea
+
+> [!warning] Descartada el 2026-11-22
+> El propietario decidió que Vitrina nunca cobrará comisión por pedido ni recibirá pagos: se paga siempre en efectivo o por transferencia directa al negocio. No integrar pasarela.
 
 > Integrar una pasarela de pago, además de efectivo/transferencia manual.
 

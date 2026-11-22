@@ -136,6 +136,10 @@ test('la cuenta también se puede eliminar desde la web pública con el celular 
     expect($user->fresh()->eliminado_at)->not->toBeNull();
 });
 
+test('las reglas de cancelación y devolución son públicas', function () {
+    $this->get('/cancelaciones')->assertOk()->assertSee('ni cobra comisiones')->assertSee('la mitad del valor de los productos');
+});
+
 test('la política de privacidad es pública', function () {
     $this->get('/privacidad')->assertOk()->assertSee('Ley 1581 de 2012');
 });

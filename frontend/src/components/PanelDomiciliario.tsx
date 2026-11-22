@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import {
   confirmarEntrega,
+  confirmarDomicilioRecibido,
   avisarOcupado,
   clienteNoEncontrado,
   registrarLlegada,
@@ -187,16 +188,40 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
     } finally { setAvanzando(null); }
   }
 
-  async function onEnCamino(id: number) {
+  async function onEnCamino(id: number, domicilioRecibido?: boolean) {
     setAvanzando(id);
     try {
-      await marcarEnCamino(token, id);
+      await marcarEnCamino(token, id, domicilioRecibido);
       await actualizarAnimado();
     } catch (e) {
       toast.error('No se pudo actualizar', e instanceof Error ? e.message : 'Error');
     } finally {
       setAvanzando(null);
     }
+  }
+
+  /** Por transferencia: el negocio no me dio el domicilio. Salgo igual y queda anotado. */
+  function onSinDomicilio(pedido: Pedido) {
+    confirmar({ icono: 'alerta', titulo: '¿No te dieron el domicilio?',
+      texto: `Pídeselo al negocio antes de salir: el cliente ya pagó los ${cop(pedido.costo_domicilio)} por transferencia. Si de todas formas no te lo dan, sal con el pedido y quedará anotado que el negocio te lo debe.`,
+      puntos: [
+        { icono: 'tienda', texto: 'Le avisamos al negocio y queda el reporte para Vitrina.' },
+        { icono: 'check', texto: 'Cuando te lo paguen, toca «Ya me lo pagaron».' },
+      ],
+      textoBoton: 'Salir sin el domicilio', textoCancelar: 'Volver a pedirlo',
+      accion: () => onEnCamino(pedido.id, false),
+    });
+  }
+
+  function onDomicilioPagado(pedido: Pedido) {
+    confirmar({ icono: 'efectivo', titulo: '¿Ya te pagaron el domicilio?',
+      texto: `Confirma solo si el negocio ya te dio los ${cop(pedido.costo_domicilio)}.`,
+      textoBoton: 'Sí, ya me lo pagaron', textoCancelar: 'Todavía no',
+      accion: async () => {
+        try { await confirmarDomicilioRecibido(token, pedido.id); await actualizarAnimado(); toast.info('Domicilio recibido', 'Quedó anotado que ya te lo pagaron.'); }
+        catch (e) { toast.error('No se pudo guardar', e instanceof Error ? e.message : 'Error'); }
+      },
+    });
   }
 
   async function onLlegada(id: number) {
@@ -389,13 +414,27 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
                       ayuda="Dáselo al negocio para que te entregue el pedido."
                     />
                   )}
-                  {p.estado === 'recogido' && (
+                  {p.estado === 'recogido' && (p.pide_confirmar_domicilio ? <>
+                    <Text style={styles.pregunta}>Antes de salir: ¿el negocio te dio {cop(p.costo_domicilio)} del domicilio?</Text>
+                    <Boton
+                      icon="moto"
+                      texto="Sí, me lo dio. Salir"
+                      cargando={avanzando === p.id}
+                      onPress={() => onEnCamino(p.id, true)}
+                    />
+                    <PressableScale style={styles.ausente} disabled={avanzando === p.id} onPress={() => onSinDomicilio(p)}>
+                      <Text style={styles.soltarTxt}>No me lo dio</Text>
+                    </PressableScale>
+                  </> : (
                     <Boton
                       icon="moto"
                       texto="Salir / En camino"
                       cargando={avanzando === p.id}
                       onPress={() => onEnCamino(p.id)}
                     />
+                  ))}
+                  {p.negocio_debe_domicilio && (
+                    <Boton icon="efectivo" texto="Ya me pagaron el domicilio" color={c.success} onPress={() => onDomicilioPagado(p)} />
                   )}
                   {p.estado === 'en_camino' && (!p.llegada_at ? (
                     <Boton icon="ubicacion" texto="Llegué al destino" cargando={avanzando === p.id} onPress={() => onLlegada(p.id)} />
@@ -569,9 +608,11 @@ function resumenPago(p: Pedido, c: Colores): { titulo: string; texto: string; mo
   }
   // Solo llega aquí con la transferencia ya confirmada por el negocio.
   const domicilio = p.domicilio_lo_entrega_negocio && p.costo_domicilio > 0
-    ? ['tomado'].includes(p.estado)
-      ? ` Al recoger, el negocio te entrega ${cop(p.costo_domicilio)} del domicilio.`
-      : ` El negocio te entregó ${cop(p.costo_domicilio)} del domicilio al recoger.`
+    ? p.negocio_debe_domicilio
+      ? ` El negocio aún te debe ${cop(p.costo_domicilio)} del domicilio.`
+      : p.domicilio_recibido
+        ? ` El negocio te entregó ${cop(p.costo_domicilio)} del domicilio al recoger.`
+        : ` Al recoger, el negocio te entrega ${cop(p.costo_domicilio)} del domicilio.`
     : '';
   return { titulo: 'No cobrar', texto: `Pagado por transferencia y confirmado por el negocio: no le cobres nada al cliente.${domicilio}`, icono: 'banco', fg: c.success, bg: c.successSoft };
 }
@@ -796,6 +837,7 @@ const useStyles = makeStyles((c, shadow) => ({
   },
   ocupadoTxt: { color: c.textStrong, fontFamily: font.semibold, fontSize: 14 },
   ayuda: { color: c.muted, marginTop: 12, fontSize: 13, fontFamily: font.regular, textAlign: 'center' },
+  pregunta: { color: c.text, marginTop: 14, fontSize: 14, fontFamily: font.semibold, textAlign: 'center' },
   ausente: {
     alignItems: 'center', paddingVertical: 11, marginTop: 8, borderRadius: radius.sm,
     borderWidth: 1, borderColor: c.danger,

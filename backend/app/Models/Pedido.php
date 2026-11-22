@@ -117,6 +117,8 @@ class Pedido extends Model
         'pago_confirmado_at',
         'pago_confirmado_por',
         'pago_no_llego_at',
+        'domicilio_recibido',
+        'domicilio_respondido_at',
         'reembolso_solicitado_at',
         'reembolso_estado',
         'reembolso_cuenta',
@@ -174,6 +176,8 @@ class Pedido extends Model
             'pago_informado_at' => 'datetime',
             'pago_confirmado_at' => 'datetime',
             'pago_no_llego_at' => 'datetime',
+            'domicilio_recibido' => 'boolean',
+            'domicilio_respondido_at' => 'datetime',
             'reembolso_solicitado_at' => 'datetime',
             'reembolso_monto' => 'decimal:2',
             'reembolso_devuelto_at' => 'datetime',
@@ -316,6 +320,18 @@ class Pedido extends Model
     public function domicilioLoEntregaNegocio(): bool
     {
         return $this->metodo_pago === 'transferencia';
+    }
+
+    /** ¿El domiciliario debe decir, antes de salir, si le dieron el domicilio? */
+    public function pideConfirmarDomicilio(): bool
+    {
+        return $this->domicilioLoEntregaNegocio() && (float) $this->costo_domicilio > 0;
+    }
+
+    /** El domiciliario dijo que el negocio no le dio el domicilio y aún no se lo paga. */
+    public function negocioDebeDomicilio(): bool
+    {
+        return $this->pideConfirmarDomicilio() && $this->domicilio_recibido === false;
     }
 
     public function segundosParaReportarAusencia(): ?int

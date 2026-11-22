@@ -187,6 +187,8 @@ class ComercioPedidoController extends Controller
             'pago' => PagoTransferencia::paraNegocio($p),
             // Por transferencia, el negocio le entrega el domicilio al domiciliario al recoger.
             'domicilio_lo_entrega_negocio' => $p->domicilioLoEntregaNegocio(),
+            // El domiciliario dijo al salir que no se lo diste (y no ha dicho que ya se lo pagaste).
+            'debe_domicilio' => $p->negocioDebeDomicilio(),
             'reembolso_solicitado' => $p->reembolso_solicitado_at !== null,
             // Devolución de la transferencia si se canceló.
             'reembolso' => Reembolso::datos($p),

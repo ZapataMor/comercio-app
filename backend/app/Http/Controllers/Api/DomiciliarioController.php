@@ -102,7 +102,9 @@ class DomiciliarioController extends Controller
     public function entregas(Request $request): JsonResponse
     {
         $pedidos = Pedido::where('domiciliario_id', $request->user()->id)
-            ->where(fn ($q) => $q->whereIn('estado', Pedido::EN_RUTA)->orWhere(fn ($q) => $q->efectivoPendiente()))
+            ->where(fn ($q) => $q->whereIn('estado', Pedido::EN_RUTA)->orWhere(fn ($q) => $q->efectivoPendiente())
+                // Sigue a la vista mientras el negocio le deba el domicilio.
+                ->orWhere(fn ($q) => $q->where('domicilio_recibido', false)->where('estado', '!=', 'cancelado')))
             ->with(['negocio', 'cliente', 'items'])
             ->latest('tomado_at')
             ->latest('id')
@@ -262,9 +264,52 @@ class DomiciliarioController extends Controller
         return response()->json(['message' => 'Soltaste el pedido. Ya está disponible para otros domiciliarios.']);
     }
 
+    /**
+     * Sale con el pedido. Si el cliente pagó por transferencia, antes dice si
+     * el negocio le dio el domicilio; si no, sale igual y queda anotado que
+     * el negocio se lo debe (con aviso al negocio y reporte para el admin).
+     */
     public function enCamino(Request $request, int $id): JsonResponse
     {
-        return $this->avanzar($this->pedidoMio($request, $id, 'recogido'), 'en_camino', 'Pedido en camino.');
+        $pedido = $this->pedidoMio($request, $id, 'recogido');
+        if (! $pedido?->pideConfirmarDomicilio()) {
+            return $this->avanzar($pedido, 'en_camino', 'Pedido en camino.');
+        }
+
+        $recibido = $request->validate(
+            ['domicilio_recibido' => ['required', 'boolean']],
+            ['domicilio_recibido.required' => 'Antes de salir, dinos si el negocio te dio el domicilio.'],
+        )['domicilio_recibido'];
+        $recibido = filter_var($recibido, FILTER_VALIDATE_BOOLEAN);
+        $respuesta = $this->avanzar($pedido, 'en_camino', $recibido ? 'Pedido en camino.' : 'Pedido en camino. Anotamos que el negocio te debe el domicilio y le avisamos.', [
+            'domicilio_recibido' => $recibido,
+            'domicilio_respondido_at' => now(),
+        ]);
+
+        if (! $recibido && $respuesta->getStatusCode() === 200) {
+            $pedido->refresh();
+            $monto = '$'.number_format((float) $pedido->costo_domicilio, 0, ',', '.');
+            PedidoReporte::registrar($pedido, 'negocio', 'domicilio_no_entregado', "El domiciliario salió con el pedido y dice que el negocio no le dio el domicilio ({$monto}).", $request->user()->id);
+            Push::enviar($pedido->negocio->miembrosActivos()->get(), new EstadoPedidoActualizado($pedido, [
+                'Domicilio sin entregar',
+                "El domiciliario dice que no le diste los {$monto} del domicilio del pedido {$pedido->codigo}. Págaselo: el cliente ya te lo pagó por transferencia.",
+            ]));
+        }
+
+        return $respuesta;
+    }
+
+    /** El negocio ya le pagó el domicilio que le debía (lo confirma el domiciliario). */
+    public function domicilioRecibido(Request $request, int $id): JsonResponse
+    {
+        $pedido = Pedido::whereKey($id)->where('domiciliario_id', $request->user()->id)->first();
+        abort_unless($pedido?->negocioDebeDomicilio(), 409, 'Ese pedido no tiene un domicilio pendiente por recibir.');
+
+        $pedido->update(['domicilio_recibido' => true, 'domicilio_respondido_at' => now()]);
+        PedidoReporte::where('pedido_id', $pedido->id)->where('tipo', 'domicilio_no_entregado')->whereNull('resuelto_at')
+            ->update(['resuelto_at' => now(), 'resuelto_por' => $request->user()->id, 'resolucion' => 'El domiciliario confirmó que el negocio ya le pagó el domicilio.']);
+
+        return response()->json(['message' => 'Listo, quedó anotado que ya te pagaron el domicilio.']);
     }
 
     public function llegada(Request $request, int $id): JsonResponse
@@ -411,6 +456,10 @@ class DomiciliarioController extends Controller
             'cobrar' => $p->aCobrar(),
             // Por transferencia, el negocio le entrega el domicilio al recoger.
             'domicilio_lo_entrega_negocio' => $p->domicilioLoEntregaNegocio(),
+            // Antes de salir dice si se lo dieron; si no, el negocio se lo debe.
+            'pide_confirmar_domicilio' => $p->pideConfirmarDomicilio(),
+            'domicilio_recibido' => $p->domicilio_recibido,
+            'negocio_debe_domicilio' => $p->negocioDebeDomicilio(),
             'minutos_recogida' => $p->minutos_recogida,
             // Se lo dicta al negocio al llegar por el pedido.
             'codigo_recogida' => $p->estado === 'tomado' ? $p->codigo_confirmacion : null,

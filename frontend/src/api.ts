@@ -1111,6 +1111,8 @@ export type ComercioPedido = {
   reembolso?: ReembolsoPedido | null;
   /** Por transferencia el negocio le entrega el domicilio al domiciliario al recoger. */
   domicilio_lo_entrega_negocio?: boolean;
+  /** El domiciliario dijo al salir que no le diste el domicilio. */
+  debe_domicilio?: boolean;
   direccion_entrega: string;
   telefono_contacto: string | null;
   cliente: string | null;
@@ -1785,6 +1787,11 @@ export type Pedido = {
   cobrar: number;
   /** Pagado por transferencia: el negocio me entrega el domicilio al recoger. */
   domicilio_lo_entrega_negocio?: boolean;
+  /** Antes de salir debo decir si el negocio me dio el domicilio. */
+  pide_confirmar_domicilio?: boolean;
+  domicilio_recibido?: boolean | null;
+  /** Dije que no me lo dieron y aún no me lo pagan. */
+  negocio_debe_domicilio?: boolean;
   metodo_pago: string;
   minutos_recogida: number | null;
   /** Lo dicto al negocio para que me entregue el pedido (solo si lo tomé y no lo he recogido). */
@@ -1921,8 +1928,15 @@ export async function soltarPedido(token: string, id: number): Promise<void> {
   await authSend('PUT', `/api/domiciliario/pedidos/${id}/soltar`, token);
 }
 
-export async function marcarEnCamino(token: string, id: number): Promise<void> {
-  await authSend('PUT', `/api/domiciliario/pedidos/${id}/en-camino`, token);
+/** Salir con el pedido. Por transferencia, digo antes si el negocio me dio el domicilio. */
+export async function marcarEnCamino(token: string, id: number, domicilioRecibido?: boolean): Promise<void> {
+  await authSend('PUT', `/api/domiciliario/pedidos/${id}/en-camino`, token,
+    domicilioRecibido === undefined ? undefined : { domicilio_recibido: domicilioRecibido });
+}
+
+/** El negocio ya me pagó el domicilio que me debía. */
+export async function confirmarDomicilioRecibido(token: string, id: number): Promise<void> {
+  await authSend('PUT', `/api/domiciliario/pedidos/${id}/domicilio-recibido`, token);
 }
 
 /** Confirmar la entrega con el código que da el cliente. */
