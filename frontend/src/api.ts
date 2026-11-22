@@ -1372,16 +1372,16 @@ export async function getNegocios(
   pagina = 1,
   tipoNegocioId?: number | null,
   seccion?: 'productos' | 'servicios',
+  filtros?: FiltrosBusqueda,
 ): Promise<NegociosPagina> {
   const params = new URLSearchParams();
-  filtros?: FiltrosBusqueda,
   if (buscar && buscar.trim()) params.set('buscar', buscar.trim());
   if (pagina > 1) params.set('page', String(pagina));
   if (tipoNegocioId != null) params.set('tipo_negocio_id', String(tipoNegocioId));
-  const q = params.toString() ? `?${params.toString()}` : '';
-  const data = await authGet(`/api/negocios${q}`, token);
   if (seccion) params.set('seccion', seccion);
   paramsFiltros(params, filtros);
+  const q = params.toString() ? `?${params.toString()}` : '';
+  const data = await authGet(`/api/negocios${q}`, token);
   const negocios = (data.negocios ?? []) as NegocioLista[];
   return {
     negocios,
@@ -1431,17 +1431,17 @@ export async function buscarProductos(
   buscar: string,
   tipoNegocioId?: number | null,
   todos = false,
+  filtros?: FiltrosBusqueda,
 ): Promise<ProductoConNegocio[]> {
   const texto = buscar.trim();
-  filtros?: FiltrosBusqueda,
   if (!texto && tipoNegocioId == null && filtros?.categoriaCatalogoId == null && !todos) return [];
   const params = new URLSearchParams();
   if (texto) params.set('buscar', texto);
   if (todos) params.set('todos', '1');
   if (tipoNegocioId != null) params.set('tipo_negocio_id', String(tipoNegocioId));
+  paramsFiltros(params, { ...filtros, porNombre: false });
   const data = await authGet(`/api/productos?${params.toString()}`, token);
   return (data.productos ?? []) as ProductoConNegocio[];
-  paramsFiltros(params, { ...filtros, porNombre: false });
 }
 
 /** Catálogo de un negocio (negocio + productos disponibles). */
