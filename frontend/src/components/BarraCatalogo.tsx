@@ -2,8 +2,8 @@
  * Barra de Explorar, como la de Instagram: una píldora flotante abajo con los
  * tres catálogos (Productos, Servicios y Propiedades), solo con íconos, y al
  * final "Mi perfil" (la inicial de la persona), que despliega hacia arriba
- * el mismo menú de la topbar (MenuDesplegable). El activo lleva una píldora
- * suave detrás; tocar otro catálogo lo cambia.
+ * el mismo menú de la topbar (MenuDesplegable). El catálogo activo lleva una
+ * píldora suave detrás que, al tocar otro, se desliza hasta él.
  *
  * Mientras la lista se desplaza la barra se encoge (sin volverse
  * transparente) y al quedarse quieta vuelve a su tamaño: ver
@@ -13,7 +13,7 @@
  * dejan abajo `espacioAbajo` para que lo último no quede tapado. Con el
  * teclado abierto (escribiendo en el buscador) se esconde.
  */
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Animated, Keyboard, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../AuthContext';
 import { avisarDesplazamiento, encogida } from '../encogerAlDesplazar';
@@ -36,6 +36,10 @@ export const MARGEN_BARRA_CATALOGO = 10;
 
 /** Tamaño de la barra encogida (al desplazarse) respecto del normal. */
 const ESCALA_ENCOGIDA = 0.84;
+/** Relleno lateral de la barra, casillas (3 catálogos + perfil) y ancho de la píldora. */
+const RELLENO_BARRA = 8;
+const CASILLAS = SECCIONES.length + 1;
+const ANCHO_PILDORA = 72;
 
 type Desplazamiento = { alDesplazar: () => void; espacioAbajo: number };
 const DesplazamientoContexto = createContext<Desplazamiento>({ alDesplazar: avisarDesplazamiento, espacioAbajo: 0 });
@@ -59,7 +63,26 @@ export default function BarraCatalogo({
   const { c } = useTheme();
   const styles = useStyles();
   const teclado = useTecladoAbierto();
+  const indice = Math.max(0, SECCIONES.findIndex(s => s.valor === seccion));
+  // Ancho de la barra (medido) y posición de la píldora: va de un ícono al otro.
+  const [ancho, setAncho] = useState(0);
+  const posicion = useRef(new Animated.Value(indice)).current;
+  useEffect(() => {
+    Animated.spring(posicion, {
+      toValue: indice,
+      speed: 16,
+      bounciness: 7,
+      useNativeDriver: true,
+    }).start();
+  }, [indice, posicion]);
   if (teclado) return null;
+
+  const casilla = (ancho - RELLENO_BARRA * 2) / CASILLAS;
+  const xPildora = (i: number) => RELLENO_BARRA + i * casilla + (casilla - ANCHO_PILDORA) / 2;
+  const deslizar = posicion.interpolate({
+    inputRange: SECCIONES.map((_, i) => i),
+    outputRange: SECCIONES.map((_, i) => xPildora(i)),
+  });
 
   const escala = encogida.interpolate({ inputRange: [0, 1], outputRange: [1, ESCALA_ENCOGIDA] });
   // Encoge hacia abajo: el borde inferior se queda en su sitio.
@@ -72,8 +95,15 @@ export default function BarraCatalogo({
     <Animated.View
       pointerEvents="box-none"
       style={[styles.zona, { bottom: abajo, transform: [{ translateY: bajar }, { scale: escala }] }]}>
-      <Objetivo id="catalogo.selector" style={styles.barra} accessibilityRole="tablist">
+      <Objetivo
+        id="catalogo.selector"
+        style={styles.barra}
+        accessibilityRole="tablist"
+        onLayout={e => setAncho(e.nativeEvent.layout.width)}>
         <View style={[StyleSheet.absoluteFill, styles.fondo]} />
+        {ancho > 0 && (
+          <Animated.View pointerEvents="none" style={[styles.pildora, { transform: [{ translateX: deslizar }] }]} />
+        )}
         {SECCIONES.map(s => {
           const activa = s.valor === seccion;
           return (
@@ -85,7 +115,6 @@ export default function BarraCatalogo({
               accessibilityState={{ selected: activa }}
               onPress={() => !activa && onCambiar(s.valor)}>
               <View style={styles.marca}>
-                <FondoActivo visible={activa} />
                 <Icon name={s.icono} size={26} color={c.textStrong} strokeWidth={activa ? 2.4 : 1.9} />
               </View>
             </Pressable>
@@ -172,7 +201,7 @@ const useStyles = makeStyles((c, shadow) => ({
     width: '100%',
     maxWidth: 420,
     height: ALTO_BARRA_CATALOGO,
-    paddingHorizontal: 8,
+    paddingHorizontal: RELLENO_BARRA,
     borderRadius: radius.pill,
   },
   fondo: {
@@ -183,9 +212,19 @@ const useStyles = makeStyles((c, shadow) => ({
     ...shadow.card,
   },
   pestana: { flex: 1, alignItems: 'center', justifyContent: 'center', height: '100%' },
+  // La del catálogo activo: una sola, que se desliza (radio = mitad del alto).
+  pildora: {
+    position: 'absolute',
+    left: 0,
+    top: (ALTO_BARRA_CATALOGO - 48) / 2,
+    width: ANCHO_PILDORA,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: c.surface2,
+  },
   pestanaPerfil: { flex: 1, height: '100%' },
   marca: {
-    width: 72,
+    width: ANCHO_PILDORA,
     height: 48,
     alignItems: 'center',
     justifyContent: 'center',
