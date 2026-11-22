@@ -6,6 +6,7 @@ use App\Models\Concerns\Buscable;
 use App\Support\Busqueda;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Producto extends Model
@@ -34,6 +35,7 @@ class Producto extends Model
 
     protected $fillable = [
         'nombre',
+        'nombres_alternos',
         'descripcion',
         'precio',
         'tipo_venta',
@@ -55,6 +57,7 @@ class Producto extends Model
         return [
             'precio' => 'decimal:2',
             'disponible' => 'boolean',
+            'nombres_alternos' => 'array',
             'atributos' => 'array',
             'colores' => 'array',
             'ingredientes_fijos' => 'array',
@@ -88,9 +91,24 @@ class Producto extends Model
         return $this->belongsTo(TipoProducto::class);
     }
 
-    /** Texto para la búsqueda tolerante a errores. */
+    /**
+     * Categorías globales del catálogo (Comida, Bebidas...). Opcionales y
+     * pueden ser varias.
+     */
+    public function categoriasCatalogo(): BelongsToMany
+    {
+        return $this->belongsToMany(CategoriaCatalogo::class, 'categoria_catalogo_producto');
+    }
+
+    /**
+     * Texto para la búsqueda tolerante a errores. Los otros nombres
+     * («bolígrafo» para un lapicero) cuentan como el nombre.
+     */
     public function textoBusqueda(): string
     {
-        return Busqueda::indexar($this->nombre, [$this->descripcion, $this->atributos ?? []]);
+        return Busqueda::indexar(
+            implode(' ', [$this->nombre, ...($this->nombres_alternos ?? [])]),
+            [$this->descripcion, $this->atributos ?? []],
+        );
     }
 }

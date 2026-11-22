@@ -21,8 +21,10 @@ import {
 } from 'react-native';
 import {
   actualizarProducto,
+  CategoriaCatalogo,
   crearProducto,
   eliminarProducto,
+  getCategoriasCatalogo,
   getProductos,
   getTiposProducto,
   imagenUrl,
@@ -34,7 +36,7 @@ import { useAuth } from '../AuthContext';
 import { useNegocio } from '../NegocioContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import { useConfirmar } from '../components/Confirmacion';
-import { Dropdown } from '../components/Dropdown';
+import { Dropdown, DropdownMultiple } from '../components/Dropdown';
 import EditorComida, { DatosComida } from '../components/EditorComida';
 import FieldError from '../components/FieldError';
 import Icon from '../components/Icon';
@@ -75,6 +77,24 @@ function precioCOP(n: number) {
   return '$' + Math.round(n).toLocaleString('es-CO');
 }
 
+/** Sin tildes ni mayúsculas, para comparar nombres. */
+const sinTildes = (texto: string) =>
+  texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+/** Máximo de categorías globales por producto (igual que el servidor). */
+const MAX_CATEGORIAS = 8;
+
+/**
+ * Categorías que se proponen para un producto nuevo: las que se llaman como
+ * algún tipo del negocio («Panadería», «Droguería» → Medicamentos).
+ */
+function categoriasSugeridas(categorias: CategoriaCatalogo[], tiposNegocio: string[]): string[] {
+  const tipos = new Set(tiposNegocio.map(sinTildes));
+  return categorias
+    .filter(cat => [cat.nombre, ...(cat.nombres_alternos ?? [])].some(n => tipos.has(sinTildes(n))))
+    .map(cat => String(cat.id));
+}
+
 /**
  * Catálogo del comerciante: TODOS los productos de su negocio, con el botón
  * "Añadir producto". El tipo de producto (Comida, Medicamento...) se elige en
@@ -94,6 +114,8 @@ export default function MisProductosScreen({ navigation }: Props) {
 
   const [productos, setProductos] = useState<Producto[]>([]);
   const [tipos, setTipos] = useState<TipoProducto[]>([]);
+  // Categorías globales (Comida, Bebidas...) que creó el administrador.
+  const [categoriasCatalogo, setCategoriasCatalogo] = useState<CategoriaCatalogo[]>([]);
   const [cargando, setCargando] = useState(true);
   const [refrescando, setRefrescando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -106,6 +128,11 @@ export default function MisProductosScreen({ navigation }: Props) {
   const [precio, setPrecio] = useState('');
   const [unidad, setUnidad] = useState<UnidadKey>('cantidad');
   const [tipoId, setTipoId] = useState<number | null>(null);
+  // Ids (como texto, para el selector) de las categorías globales elegidas.
+  const [categoriasIds, setCategoriasIds] = useState<string[]>([]);
+  // Otros nombres («bolígrafo» para un lapicero); se remonta como los atributos.
+  const [nombresAlternos, setNombresAlternos] = useState<string[]>([]);
+  const [alternosIniciales, setAlternosIniciales] = useState<string[]>([]);
   const [atributos, setAtributos] = useState<string[]>([]);
   // Valores con los que se monta ListaAtributos (se limpia al cambiar de tipo).
   const [atributosIniciales, setAtributosIniciales] = useState<string[]>([]);
@@ -191,10 +218,16 @@ export default function MisProductosScreen({ navigation }: Props) {
       if (modo === 'carga') setCargando(true);
       if (modo === 'refresco') setRefrescando(true);
       if (modo !== 'silencioso') setError(null);
-      Promise.all([getProductos(token, negocioId, { porPagina: 100 }), getTiposProducto(token)])
-        .then(([ps, ts]) => {
+      Promise.all([
+        getProductos(token, negocioId, { porPagina: 100 }),
+        getTiposProducto(token),
+        // Si fallan, el formulario sigue sirviendo sin categorías.
+        getCategoriasCatalogo(token).catch(() => [] as CategoriaCatalogo[]),
+      ])
+        .then(([ps, ts, cats]) => {
           setProductos(ps);
           setTipos(ts);
+          setCategoriasCatalogo(cats);
         })
         .catch(e => (modo === 'silencioso' ? toast.error('No se pudo actualizar', e.message) : setError(e.message)))
         .finally(() => {
@@ -217,6 +250,9 @@ export default function MisProductosScreen({ navigation }: Props) {
     setPrecio('');
     setUnidad('cantidad');
     setTipoId(null);
+    setCategoriasIds(categoriasSugeridas(categoriasCatalogo, negocio?.categorias ?? []));
+    setNombresAlternos([]);
+    setAlternosIniciales([]);
     setAtributos([]);
     setAtributosIniciales([]);
     setColores([]);
@@ -236,6 +272,9 @@ export default function MisProductosScreen({ navigation }: Props) {
     setPrecio(String(Math.round(p.precio)));
     setUnidad(unidadDesdeProducto(p));
     setTipoId(p.tipo_producto?.id ?? null);
+    setCategoriasIds((p.categorias_catalogo ?? []).map(cat => String(cat.id)));
+    setNombresAlternos(p.nombres_alternos ?? []);
+    setAlternosIniciales(p.nombres_alternos ?? []);
     setAtributos(p.atributos ?? []);
     setAtributosIniciales(p.atributos ?? []);
     setColores(p.colores ?? []);
@@ -280,6 +319,11 @@ export default function MisProductosScreen({ navigation }: Props) {
     const fijosLimpios = esComida ? comida.fijos.filter(f => atributosLimpios.includes(f)) : [];
     const extrasLimpios = esComida ? comida.extras.map(e => ({ nombre: e.nombre, precio: e.precio ?? 0 })) : [];
     const coloresLimpios = [...new Set(colores.map(a => a.trim()).filter(Boolean))];
+    const alternosLimpios = [...new Set(nombresAlternos.map(a => a.trim()).filter(Boolean))];
+    if (categoriasIds.length > MAX_CATEGORIAS) {
+      setErrores({ categorias_catalogo: `Elige máximo ${MAX_CATEGORIAS} categorías.` });
+      return;
+    }
     setGuardando(true);
     try {
       const body = {
@@ -294,6 +338,8 @@ export default function MisProductosScreen({ navigation }: Props) {
         colores: coloresLimpios.length ? coloresLimpios : null,
         ingredientes_fijos: fijosLimpios.length ? fijosLimpios : null,
         extras: extrasLimpios.length ? extrasLimpios : null,
+        nombres_alternos: alternosLimpios.length ? alternosLimpios : null,
+        categorias_catalogo: categoriasIds.length ? categoriasIds.map(Number) : null,
         disponible,
       };
       if (editando) {
@@ -474,6 +520,45 @@ export default function MisProductosScreen({ navigation }: Props) {
                 editable={!guardando}
               />
               <FieldError mensaje={errores.nombre} />
+
+              <ListaAtributos
+                key={`alternos-${editando?.id ?? 'nuevo'}-${modal}`}
+                label="Otros nombres (opcional)"
+                textoBoton="Añadir otro nombre"
+                placeholder="Ej: Bolígrafo"
+                maxLength={60}
+                iniciales={alternosIniciales}
+                onChange={valores => {
+                  setNombresAlternos(valores);
+                  limpiarError('nombres_alternos');
+                }}
+                disabled={guardando}
+              />
+              <Text style={styles.ayudaGrupo}>
+                Cómo más le dicen tus clientes. Ej: a un lapicero también le dicen bolígrafo.
+              </Text>
+              <FieldError mensaje={errores.nombres_alternos ?? errorDeLista(errores, 'nombres_alternos.')} />
+
+              {categoriasCatalogo.length > 0 && (
+                <>
+                  <Text style={styles.label}>Categorías (opcional)</Text>
+                  <DropdownMultiple
+                    titulo="Categorías"
+                    valores={categoriasIds}
+                    opciones={categoriasCatalogo.map(cat => ({ label: cat.nombre, value: String(cat.id) }))}
+                    onChange={valores => {
+                      setCategoriasIds(valores);
+                      limpiarError('categorias_catalogo');
+                    }}
+                    placeholder="Elige una o varias"
+                    disabled={guardando}
+                  />
+                  <Text style={styles.ayudaGrupo}>
+                    Con ellas te encuentran cuando filtran la búsqueda: Comida, Bebidas…
+                  </Text>
+                  <FieldError mensaje={errores.categorias_catalogo ?? errorDeLista(errores, 'categorias_catalogo.')} />
+                </>
+              )}
 
               <Text style={styles.label}>Descripción</Text>
               <TextInput

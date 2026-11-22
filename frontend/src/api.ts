@@ -114,6 +114,8 @@ export type Negocio = {
   permisos?: PermisosNegocio;
   id: number;
   nombre: string;
+  /** Otros nombres con que lo buscan («barbería» para una peluquería). */
+  nombres_alternos?: string[];
   descripcion: string | null;
   /** Tipo de negocio: Restaurante, Almacén de ropa, Farmacia, etc. */
   categoria: string | null;
@@ -164,6 +166,14 @@ export function direccionConBarrio(n: { direccion?: string | null; barrio?: stri
 }
 
 export type Categoria = { id: number; nombre: string; productos?: number };
+
+/**
+ * Categoría GLOBAL del catálogo (Comida, Bebidas...). La crea el
+ * administrador; el comerciante marca varias por producto (opcionales) y el
+ * cliente filtra la búsqueda por ellas. No confundir con `Categoria`, las
+ * secciones del menú de un negocio.
+ */
+export type CategoriaCatalogo = { id: number; nombre: string; nombres_alternos?: string[] };
 export type TipoNegocio = { id: number; nombre: string; slug: string };
 
 /**
@@ -196,6 +206,10 @@ export type Producto = {
   disponible: boolean;
   resenas?: ResumenResenas;
   categoria: Categoria | null;
+  /** Otros nombres con que lo buscan («bolígrafo» para un lapicero). */
+  nombres_alternos?: string[];
+  /** Categorías globales (Comida, Bebidas...). */
+  categorias_catalogo?: { id: number; nombre: string }[];
   /** Ingredientes, usos, tallas... según el tipo de producto. */
   atributos?: string[];
   /** Colores disponibles (ropa y calzado). */
@@ -838,6 +852,8 @@ export type NegocioInput = {
   descripcion?: string | null;
   categoria?: string | null;
   categorias?: string[];
+  /** Otros nombres con que lo buscan. `null` los borra. */
+  nombres_alternos?: string[] | null;
   direccion?: string | null;
   barrio?: string;
   telefono?: string | null;
@@ -919,7 +935,37 @@ export type ProductoInput = {
   ingredientes_fijos?: string[] | null;
   /** Comida: extras con su precio por porción. */
   extras?: ExtraProducto[] | null;
+  /** Otros nombres («bolígrafo» para un lapicero). `null` los borra. */
+  nombres_alternos?: string[] | null;
+  /** Ids de categorías globales (opcionales, varias). `null` las quita. */
+  categorias_catalogo?: number[] | null;
 };
+
+/**
+ * Categorías globales visibles. `uso: 'filtro'` trae solo las que hoy
+ * encuentran algo (para los botones de la búsqueda); sin él, todas (para el
+ * formulario de producto).
+ */
+export async function getCategoriasCatalogo(token: string, uso?: 'filtro'): Promise<CategoriaCatalogo[]> {
+  const data = await authGet(`/api/categorias-catalogo${uso ? `?uso=${uso}` : ''}`, token);
+  return (data.categorias ?? []) as CategoriaCatalogo[];
+}
+
+/** Filtros de la búsqueda del cliente (los botones bajo la barra). */
+export type FiltrosBusqueda = {
+  /** Solo negocios abiertos ahora (y sus productos). */
+  abierto?: boolean;
+  /** Categoría global (Comida, Bebidas...). */
+  categoriaCatalogoId?: number | null;
+  /** «Negocios»: el texto se busca solo en el nombre del negocio, no en lo que vende. */
+  porNombre?: boolean;
+};
+
+function paramsFiltros(params: URLSearchParams, filtros?: FiltrosBusqueda) {
+  if (filtros?.abierto) params.set('abierto', '1');
+  if (filtros?.categoriaCatalogoId != null) params.set('categoria_catalogo_id', String(filtros.categoriaCatalogoId));
+  if (filtros?.porNombre) params.set('por', 'nombre');
+}
 
 /** Tipos globales de producto con su configuración de atributos. */
 export async function getTiposProducto(token: string): Promise<TipoProducto[]> {
@@ -1326,11 +1372,14 @@ export async function getNegocios(
   seccion?: 'productos' | 'servicios',
 ): Promise<NegociosPagina> {
   const params = new URLSearchParams();
+  filtros?: FiltrosBusqueda,
   if (buscar && buscar.trim()) params.set('buscar', buscar.trim());
   if (pagina > 1) params.set('page', String(pagina));
   if (tipoNegocioId != null) params.set('tipo_negocio_id', String(tipoNegocioId));
   const q = params.toString() ? `?${params.toString()}` : '';
-  const data = await authGet(`/api/negocios${q}${seccion ? `${q ? '&' : '?'}seccion=${seccion}` : ''}`, token);
+  const data = await authGet(`/api/negocios${q}`, token);
+  if (seccion) params.set('seccion', seccion);
+  paramsFiltros(params, filtros);
   const negocios = (data.negocios ?? []) as NegocioLista[];
   return {
     negocios,
@@ -1382,13 +1431,15 @@ export async function buscarProductos(
   todos = false,
 ): Promise<ProductoConNegocio[]> {
   const texto = buscar.trim();
-  if (!texto && tipoNegocioId == null && !todos) return [];
+  filtros?: FiltrosBusqueda,
+  if (!texto && tipoNegocioId == null && filtros?.categoriaCatalogoId == null && !todos) return [];
   const params = new URLSearchParams();
   if (texto) params.set('buscar', texto);
   if (todos) params.set('todos', '1');
   if (tipoNegocioId != null) params.set('tipo_negocio_id', String(tipoNegocioId));
   const data = await authGet(`/api/productos?${params.toString()}`, token);
   return (data.productos ?? []) as ProductoConNegocio[];
+  paramsFiltros(params, { ...filtros, porNombre: false });
 }
 
 /** Catálogo de un negocio (negocio + productos disponibles). */

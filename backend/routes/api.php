@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AdminCategoriaController;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\AdminPedidoController;
 use App\Http\Controllers\Api\AdminReputacionController;
@@ -108,6 +109,9 @@ Route::middleware(['auth:sanctum', 'throttle:api-usuario'])->group(function () {
     // Tipos globales de producto (Comida, Medicamento...) con la config del
     // formulario de creación (atributos y sugerencias).
     Route::get('/tipos-producto', [CatalogoController::class, 'tiposProducto']);
+    // Categorías globales (Comida, Bebidas...): filtros de la búsqueda y
+    // opciones del formulario de producto. Las crea el administrador.
+    Route::get('/categorias-catalogo', [CatalogoController::class, 'categoriasCatalogo']);
     Route::get('/negocios', [CatalogoController::class, 'index']);
     // Negocios con su pin, para el mapa (sin paginar).
     Route::get('/negocios/mapa', [CatalogoController::class, 'mapa']);
@@ -286,6 +290,11 @@ Route::middleware(['auth:sanctum', 'throttle:api-usuario'])->group(function () {
         Route::put('/ajustes', [AjusteController::class, 'actualizar']);
         // Barrios sugeridos por clientes (aprobar → entra a la lista pública).
         Route::get('/barrios/pendientes', [BarrioController::class, 'pendientes']);
+        // Categorías globales del catálogo (Comida, Bebidas...).
+        Route::get('/categorias-catalogo', [AdminCategoriaController::class, 'index']);
+        Route::post('/categorias-catalogo', [AdminCategoriaController::class, 'store']);
+        Route::put('/categorias-catalogo/{id}', [AdminCategoriaController::class, 'update']);
+        Route::delete('/categorias-catalogo/{id}', [AdminCategoriaController::class, 'destroy']);
         Route::put('/barrios/{id}/aprobar', [BarrioController::class, 'aprobar']);
         Route::delete('/barrios/{id}', [BarrioController::class, 'rechazar']);
         // Confiabilidad de domiciliarios y negocios: vetados, en riesgo, eventos.

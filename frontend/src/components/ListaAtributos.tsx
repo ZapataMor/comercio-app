@@ -29,6 +29,10 @@ type Props = {
   iniciales?: string[];
   onChange: (valores: string[]) => void;
   disabled?: boolean;
+  /** Texto de ayuda en cada casilla (por defecto, el `label`). */
+  placeholder?: string;
+  /** Largo máximo de cada casilla (por defecto 100). */
+  maxLength?: number;
 };
 
 export default function ListaAtributos({
@@ -38,6 +42,8 @@ export default function ListaAtributos({
   iniciales,
   onChange,
   disabled,
+  placeholder,
+  maxLength = 100,
 }: Props) {
   const { c } = useTheme();
   const styles = useStyles();
@@ -113,10 +119,10 @@ export default function ListaAtributos({
             style={styles.input}
             value={l.texto}
             onChangeText={t => editarLibre(l.id, t)}
-            placeholder={label}
+            placeholder={placeholder ?? label}
             placeholderTextColor={c.mutedSoft}
             editable={!disabled}
-            maxLength={100}
+            maxLength={maxLength}
           />
           <TouchableOpacity
             style={styles.quitar}

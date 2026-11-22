@@ -20,6 +20,8 @@ class ProductoResource extends JsonResource
         return PrecioCarrito::cotizar($this->resource, $request->user()?->id) + [
             'id' => $this->id,
             'nombre' => $this->nombre,
+            // Otros nombres con que lo buscan («bolígrafo» para un lapicero).
+            'nombres_alternos' => $this->nombres_alternos ?? [],
             'descripcion' => $this->descripcion,
             // El cast decimal:2 devuelve string "2500.00"; lo damos como número.
             'precio' => (float) $this->precio,
@@ -44,6 +46,9 @@ class ProductoResource extends JsonResource
                 ->values()->all(),
             // Solo incluye la categoría si fue cargada (evita consultas N+1).
             'categoria' => new CategoriaResource($this->whenLoaded('categoria')),
+            // Categorías globales (Comida, Bebidas...), si se cargaron.
+            'categorias_catalogo' => $this->whenLoaded('categoriasCatalogo', fn () => $this->categoriasCatalogo
+                ->map(fn ($c) => ['id' => $c->id, 'nombre' => $c->nombre])->values()->all()),
             // Tipo global (Comida, Medicamento...); null en productos antiguos.
             'tipo_producto' => $this->whenLoaded('tipoProducto', fn () => $this->tipoProducto ? [
                 'id' => $this->tipoProducto->id,

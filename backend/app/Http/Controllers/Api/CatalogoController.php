@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ProductoResource;
+use App\Models\CategoriaCatalogo;
 use App\Models\Negocio;
 use App\Models\Producto;
 use App\Models\TipoNegocio;
@@ -14,6 +15,7 @@ use App\Support\Reputacion;
 use App\Support\Resenas;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -31,6 +33,11 @@ class CatalogoController extends Controller
      *   ?buscar=texto -> filtra por nombre/descripción del negocio, o por
      *                    negocios que tengan algún producto disponible que
      *                    coincida (por nombre o por su categoría).
+     *   ?por=nombre   -> la búsqueda mira solo el nombre (y otros nombres) y el
+     *                    tipo del negocio, no lo que vende.
+     *   ?abierto=1    -> solo los abiertos ahora.
+     *   ?categoria_catalogo_id=N -> los que venden algo de esa categoría global
+     *                    o cuyo tipo se llama como ella (ver categoriasCatalogo()).
      */
     public function index(Request $request): JsonResponse
     {
@@ -51,6 +58,23 @@ class CatalogoController extends Controller
             $query->whereHas('tiposNegocio', fn ($q) => $q->where('tipos_negocio.id', $tipoId));
         }
 
+        if ($request->boolean('abierto')) {
+            $query->where('activo', true);
+        }
+
+        $categoria = $this->categoriaPedida($request);
+        if ($categoria === false) {
+            $query->whereRaw('1 = 0');
+        } elseif ($categoria) {
+            $query->where(fn ($q) => $q
+                ->whereHas('productos', fn ($p) => $p->where('disponible', true)
+                    ->whereHas('categoriasCatalogo', fn ($c) => $c->whereKey($categoria->id)))
+                ->orWhereHas('tiposNegocio', fn ($t) => $t->whereIn('tipos_negocio.busqueda', self::clavesTipo($categoria))));
+        }
+
+        // «Negocios»: la búsqueda solo mira cómo se llama el negocio.
+        $soloNombre = $request->input('por') === 'nombre';
+
         // Búsqueda tolerante a errores (ver App\Support\Busqueda): cada palabra
         // debe aparecer en el negocio, en su tipo o en algún producto/servicio
         // disponible. Una consulta sin letras ni números («%») no encuentra nada.
@@ -59,16 +83,17 @@ class CatalogoController extends Controller
             $query->whereRaw('1 = 0');
         }
         foreach ($terminos ?? [] as $alternativas) {
-            $query->where(function ($q) use ($alternativas, $seccion) {
+            $query->where(function ($q) use ($alternativas, $seccion, $soloNombre) {
                 Busqueda::orContiene($q, 'negocios.busqueda', $alternativas)
                     ->orWhereHas('tiposNegocio', fn ($t) => Busqueda::contieneAlguna($t, 'tipos_negocio.busqueda', $alternativas))
                     // Por un producto disponible: su nombre, descripción,
                     // atributos o el nombre de su categoría.
-                    ->when($seccion !== 'servicios', fn ($q) => $q->orWhereHas('productos', function ($p) use ($alternativas) {
+                    ->when($seccion !== 'servicios' && ! $soloNombre, fn ($q) => $q->orWhereHas('productos', function ($p) use ($alternativas) {
                         $p->where('disponible', true)->where(fn ($pp) => Busqueda::orContiene($pp, 'productos.busqueda', $alternativas)
-                            ->orWhereHas('categoria', fn ($c) => Busqueda::contieneAlguna($c, 'categorias.busqueda', $alternativas)));
+                            ->orWhereHas('categoria', fn ($c) => Busqueda::contieneAlguna($c, 'categorias.busqueda', $alternativas))
+                            ->orWhereHas('categoriasCatalogo', fn ($c) => Busqueda::contieneAlguna($c, 'categorias_catalogo.busqueda', $alternativas)));
                     }))
-                    ->when($seccion !== 'productos', fn ($q) => $q->orWhereHas('servicios', function ($s) use ($alternativas) {
+                    ->when($seccion !== 'productos' && ! $soloNombre, fn ($q) => $q->orWhereHas('servicios', function ($s) use ($alternativas) {
                         $s->where('disponible', true)->where(fn ($ss) => Busqueda::orContiene($ss, 'servicios.busqueda', $alternativas));
                     }));
             });
@@ -167,6 +192,71 @@ class CatalogoController extends Controller
     }
 
     /**
+     * Categorías globales del catálogo (Comida, Bebidas...) que el
+     * administrador dejó visibles, en su orden.
+     *
+     * ?uso=filtro -> solo las que hoy encuentran algo: un producto disponible
+     *                de un negocio visible, o un negocio cuyo tipo se llama
+     *                como la categoría o como uno de sus otros nombres.
+     */
+    public function categoriasCatalogo(Request $request): JsonResponse
+    {
+        $categorias = CategoriaCatalogo::activas()->orderBy('orden')->orderBy('nombre')->get();
+
+        if ($request->input('uso') === 'filtro') {
+            $conProductos = DB::table('categoria_catalogo_producto')
+                ->join('productos', 'productos.id', '=', 'categoria_catalogo_producto.producto_id')
+                ->join('negocios', 'negocios.id', '=', 'productos.negocio_id')
+                ->whereNull('productos.deleted_at')->where('productos.disponible', true)->where('productos.precio', '>', 0)
+                ->whereNull('negocios.vetado_at')->whereNull('negocios.archivado_at')->whereNull('negocios.desactivado_at')
+                ->distinct()->pluck('categoria_catalogo_id')->flip();
+            $tipos = DB::table('tipos_negocio')
+                ->whereExists(fn ($q) => $q->from('negocio_tipo_negocio')
+                    ->join('negocios', 'negocios.id', '=', 'negocio_tipo_negocio.negocio_id')
+                    ->whereColumn('negocio_tipo_negocio.tipo_negocio_id', 'tipos_negocio.id')
+                    ->whereNull('negocios.vetado_at')->whereNull('negocios.archivado_at')->whereNull('negocios.desactivado_at'))
+                ->pluck('busqueda')->flip();
+            $categorias = $categorias->filter(fn (CategoriaCatalogo $c) => $conProductos->has($c->id)
+                || collect(self::clavesTipo($c))->contains(fn ($clave) => $tipos->has($clave)));
+        }
+
+        return response()->json([
+            'categorias' => $categorias->map(fn (CategoriaCatalogo $c) => [
+                'id' => $c->id,
+                'nombre' => $c->nombre,
+                'nombres_alternos' => $c->nombres_alternos ?? [],
+            ])->values(),
+        ]);
+    }
+
+    /**
+     * La categoría global de ?categoria_catalogo_id: null si no se pidió,
+     * false si no existe o está oculta (entonces no se encuentra nada).
+     */
+    private function categoriaPedida(Request $request): CategoriaCatalogo|false|null
+    {
+        if (! $request->filled('categoria_catalogo_id')) {
+            return null;
+        }
+
+        return CategoriaCatalogo::activas()->find($request->integer('categoria_catalogo_id')) ?? false;
+    }
+
+    /**
+     * Cómo queda en tipos_negocio.busqueda un tipo que se llame como la
+     * categoría o como uno de sus otros nombres («Droguería» → Medicamentos).
+     *
+     * @return list<string>
+     */
+    private static function clavesTipo(CategoriaCatalogo $categoria): array
+    {
+        return array_values(array_unique(array_map(
+            fn (string $nombre) => Busqueda::indexar($nombre),
+            $categoria->nombres(),
+        )));
+    }
+
+    /**
      * Tipos globales de producto (Comida, Medicamento...) con la configuración
      * del formulario: qué pregunta hacer (atributo_label), el texto del botón
      * de añadir y las sugerencias pre-creadas.
@@ -189,16 +279,22 @@ class CatalogoController extends Controller
      * negocio que los vende. El orden es por RELEVANCIA: de la coincidencia más
      * cercana a la más lejana (nombre exacto → empieza por → contiene → otros),
      * y a igualdad de relevancia, alfabético.
+     *
+     * También: ?abierto=1 (solo de negocios abiertos ahora) y
+     * ?categoria_catalogo_id=N (solo los de esa categoría global).
      */
     public function buscarProductos(Request $request): JsonResponse
     {
         $texto = trim((string) $request->string('buscar'));
         $tipoNegocioId = $request->integer('tipo_negocio_id') ?: null;
         $terminos = $texto !== '' ? Busqueda::terminos($texto) : [];
+        $categoria = $this->categoriaPedida($request);
+        $abierto = $request->boolean('abierto');
 
         // Sin texto ni categoria no buscamos productos (la app muestra negocios).
         // Un texto sin letras ni números («%», «...») tampoco encuentra nada.
-        if (($texto === '' && ! $tipoNegocioId && ! $request->boolean('todos')) || ($texto !== '' && $terminos === [])) {
+        if (($texto === '' && ! $tipoNegocioId && ! $categoria && ! $request->boolean('todos'))
+            || ($texto !== '' && $terminos === []) || $categoria === false) {
             return response()->json(['productos' => []]);
         }
 
@@ -208,8 +304,11 @@ class CatalogoController extends Controller
 
         $productos = Producto::query()
             ->where('disponible', true)->where('precio', '>', 0)
-            ->whereHas('negocio', function ($q) use ($tipoNegocioId) {
+            ->whereHas('negocio', function ($q) use ($tipoNegocioId, $abierto) {
                 $q->whereNull('vetado_at')->whereNull('archivado_at')->whereNull('desactivado_at');
+                if ($abierto) {
+                    $q->where('activo', true);
+                }
                 if ($tipoNegocioId) {
                     $q->whereHas('tiposNegocio', fn ($t) => $t->where('tipos_negocio.id', $tipoNegocioId));
                 }
@@ -219,9 +318,11 @@ class CatalogoController extends Controller
             ->when($terminos !== [], function ($q) use ($terminos) {
                 foreach ($terminos as $alternativas) {
                     $q->where(fn ($qq) => Busqueda::orContiene($qq, 'productos.busqueda', $alternativas)
-                        ->orWhereHas('categoria', fn ($c) => Busqueda::contieneAlguna($c, 'categorias.busqueda', $alternativas)));
+                        ->orWhereHas('categoria', fn ($c) => Busqueda::contieneAlguna($c, 'categorias.busqueda', $alternativas))
+                        ->orWhereHas('categoriasCatalogo', fn ($c) => Busqueda::contieneAlguna($c, 'categorias_catalogo.busqueda', $alternativas)));
                 }
             })
+            ->when($categoria, fn ($q) => $q->whereHas('categoriasCatalogo', fn ($c) => $c->whereKey($categoria->id)))
             ->with(['categoria', 'negocio'])
             ->orderByDesc(
                 Negocio::select('activo')

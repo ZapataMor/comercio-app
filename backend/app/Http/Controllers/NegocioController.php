@@ -10,6 +10,7 @@ use App\Models\TipoNegocio;
 use App\Support\EliminarNegocio;
 use App\Support\FotoOptimizada;
 use App\Support\HorarioNegocio;
+use App\Support\NombresAlternos;
 use App\Support\Reputacion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -97,10 +98,13 @@ class NegocioController extends Controller
             // Tiempo promedio que promete para tener listo un pedido (minutos).
             'tiempo_preparacion' => ['sometimes', 'integer', 'min:5', 'max:180'],
             'imagen' => ['sometimes', 'image', 'max:4096'], // máx 4 MB
-        ] + self::reglasUbicacion() + HorarioNegocio::reglas());
+        ] + NombresAlternos::reglas() + self::reglasUbicacion() + HorarioNegocio::reglas());
 
         if (array_key_exists('horario', $data)) {
             $data['horario'] = HorarioNegocio::normalizar($data['horario']);
+        }
+        if (array_key_exists('nombres_alternos', $data)) {
+            $data['nombres_alternos'] = NombresAlternos::limpiar($data['nombres_alternos'], $data['nombre']);
         }
 
         $categorias = $this->normalizarCategorias($data);
@@ -248,10 +252,13 @@ class NegocioController extends Controller
             // Tiempo promedio que promete para tener listo un pedido (minutos).
             'tiempo_preparacion' => ['sometimes', 'integer', 'min:5', 'max:180'],
             'imagen' => ['sometimes', 'image', 'max:4096'],
-        ] + self::reglasUbicacion() + HorarioNegocio::reglas());
+        ] + NombresAlternos::reglas() + self::reglasUbicacion() + HorarioNegocio::reglas());
 
         if (array_key_exists('horario', $data)) {
             $data['horario'] = HorarioNegocio::normalizar($data['horario']);
+        }
+        if (array_key_exists('nombres_alternos', $data)) {
+            $data['nombres_alternos'] = NombresAlternos::limpiar($data['nombres_alternos'], $data['nombre'] ?? $negocio->nombre);
         }
 
         if (array_key_exists('categorias', $data) || array_key_exists('categoria', $data)) {

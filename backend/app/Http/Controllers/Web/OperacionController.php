@@ -140,6 +140,12 @@ class OperacionController extends Controller
         return view('admin.configuracion', ['tarifa' => Ajuste::tarifaDomicilio(), 'barrios' => Barrio::with('creador')->orderBy('aprobado')->orderBy('nombre')->paginate(30)]);
     }
 
+    /** Categorías globales del catálogo: crear, renombrar, ocultar y borrar. */
+    public function categorias()
+    {
+        return view('admin.categorias', app(Api\AdminCategoriaController::class)->index()->getData(true));
+    }
+
     public function mapa()
     {
         return view('admin.mapa', app(Api\AdminController::class)->mapaDomiciliarios()->getData(true));
@@ -185,6 +191,9 @@ class OperacionController extends Controller
             'tarifa' => app(Api\AjusteController::class)->actualizar($request),
             'aprobar-barrio' => app(Api\BarrioController::class)->aprobar($id),
             'rechazar-barrio' => app(Api\BarrioController::class)->rechazar($id),
+            'crear-categoria' => app(Api\AdminCategoriaController::class)->store($request),
+            'editar-categoria' => app(Api\AdminCategoriaController::class)->update($request, $id),
+            'eliminar-categoria' => app(Api\AdminCategoriaController::class)->destroy($id),
             'ocultar' => app(Api\AdminResenaController::class)->ocultar($request, $id),
             'restaurar' => app(Api\AdminResenaController::class)->restaurar($request, $id),
             'descartar-reportes' => app(Api\AdminResenaController::class)->descartarReportes($request, $id),

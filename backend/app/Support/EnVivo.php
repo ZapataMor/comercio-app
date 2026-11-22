@@ -527,6 +527,10 @@ class EnVivo
             Api\AjusteController::class.'@actualizar' => ['despues' => fn () => self::avisar([self::CATALOGO, self::ADMIN], 'ajustes')],
             Api\BarrioController::class.'@aprobar' => ['despues' => fn () => self::avisar([self::CATALOGO, self::ADMIN], 'barrios')],
             Api\BarrioController::class.'@rechazar' => ['despues' => fn () => self::avisar([self::CATALOGO, self::ADMIN], 'barrios')],
+            // Categorías globales: cambian los filtros de la búsqueda.
+            Api\AdminCategoriaController::class.'@store' => ['despues' => fn () => self::avisar([self::CATALOGO, self::ADMIN], 'catalogo')],
+            Api\AdminCategoriaController::class.'@update' => ['despues' => fn () => self::avisar([self::CATALOGO, self::ADMIN], 'catalogo')],
+            Api\AdminCategoriaController::class.'@destroy' => ['despues' => fn () => self::avisar([self::CATALOGO, self::ADMIN], 'catalogo')],
             Api\AdminResenaController::class.'@ocultar' => ['despues' => fn (Request $r) => self::resenas(Resena::whereKey($id($r))->value('negocio_id'))],
             Api\AdminResenaController::class.'@restaurar' => ['despues' => fn (Request $r) => self::resenas(Resena::whereKey($id($r))->value('negocio_id'))],
             Api\AdminResenaController::class.'@descartarReportes' => ['despues' => fn () => self::avisar(self::ADMIN, 'resenas')],

@@ -31,6 +31,7 @@ import { DropdownMultiple } from '../components/Dropdown';
 import EditorHorario, { DIAS, errorHorario, hora12 } from '../components/EditorHorario';
 import FieldError from '../components/FieldError';
 import Icon, { IconName } from '../components/Icon';
+import ListaAtributos from '../components/ListaAtributos';
 import { PuntajeResenas } from '../components/Resenas';
 import SelectorImagen from '../components/SelectorImagen';
 import SelectorUbicacion from '../components/SelectorUbicacion';
@@ -101,6 +102,11 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
   // Campos del formulario.
   const [nombre, setNombre] = useState('');
   const [descripcion, setDescripcion] = useState('');
+  // Otros nombres («barbería» para una peluquería). La lista se remonta en
+  // cada edición (`edicion`) con los valores guardados.
+  const [nombresAlternos, setNombresAlternos] = useState<string[]>([]);
+  const [alternosIniciales, setAlternosIniciales] = useState<string[]>([]);
+  const [edicion, setEdicion] = useState(0);
   const [categorias, setCategorias] = useState<string[]>([]);
   const [categoriaPersonalizada, setCategoriaPersonalizada] = useState('');
   // true cuando el tipo no está en la lista y se escribe a mano ("Otro").
@@ -163,6 +169,9 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
   function empezarEdicion(n: Negocio | null) {
     setNombre(n?.nombre ?? '');
     setDescripcion(n?.descripcion ?? '');
+    setNombresAlternos(n?.nombres_alternos ?? []);
+    setAlternosIniciales(n?.nombres_alternos ?? []);
+    setEdicion(e => e + 1);
     const cats = n ? categoriasDe(n) : [];
     const conocidas = cats.filter(cat => CATEGORIAS_NEGOCIO.includes(cat));
     const personalizada = cats.find(cat => !CATEGORIAS_NEGOCIO.includes(cat) && cat !== 'Otro') ?? '';
@@ -229,6 +238,10 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
       const input = {
         nombre: nombre.trim(),
         descripcion: descripcion.trim() || null,
+        nombres_alternos: (() => {
+          const limpios = [...new Set(nombresAlternos.map(a => a.trim()).filter(Boolean))];
+          return limpios.length ? limpios : null;
+        })(),
         categoria: categoriasFinales[0],
         categorias: categoriasFinales,
         direccion: normalizarDireccion(direccion) || null,
@@ -485,6 +498,24 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
             editable={!guardando}
           />
           <FieldError mensaje={errores.descripcion} />
+
+          <ListaAtributos
+            key={`alternos-${edicion}`}
+            label="Otros nombres (opcional)"
+            textoBoton="Añadir otro nombre"
+            placeholder="Ej: Barbería"
+            maxLength={60}
+            iniciales={alternosIniciales}
+            onChange={valores => {
+              setNombresAlternos(valores);
+              limpiarError('nombres_alternos');
+            }}
+            disabled={guardando}
+          />
+          <Text style={[styles.ayuda, styles.ayudaAlternos]}>
+            Cómo más le dicen los clientes a tu negocio. Ej: a una peluquería también le dicen barbería.
+          </Text>
+          <FieldError mensaje={errores.nombres_alternos} />
         </Objetivo>}
 
         {(!guia || pasoGuia === 1) && <View style={[styles.seccion, guia && { borderWidth: 2, borderColor: c.accent }]}>
@@ -738,4 +769,5 @@ const useStyles = makeStyles((c, shadow) => ({
   cancelar: { textAlign: 'center', color: c.muted, fontFamily: font.semibold, marginTop: 14 },
   notaTrabajador: { textAlign: 'center', color: c.muted, fontFamily: font.regular, fontSize: 13, marginTop: 18 },
   ayuda: { color: c.mutedSoft, fontSize: 12, marginTop: -8, marginBottom: 16, fontFamily: font.regular },
+  ayudaAlternos: { marginTop: 6 },
 }));

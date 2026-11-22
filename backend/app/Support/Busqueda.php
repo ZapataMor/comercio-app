@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Categoria;
+use App\Models\CategoriaCatalogo;
 use App\Models\Negocio;
 use App\Models\Producto;
 use App\Models\Propiedad;
@@ -36,7 +37,7 @@ use Illuminate\Support\Str;
 class Busqueda
 {
     /** Modelos con columna `busqueda`; de ellos sale el vocabulario. */
-    public const MODELOS = [Producto::class, Servicio::class, Negocio::class, Categoria::class, TipoNegocio::class, Propiedad::class];
+    public const MODELOS = [Producto::class, Servicio::class, Negocio::class, Categoria::class, CategoriaCatalogo::class, TipoNegocio::class, Propiedad::class];
 
     private const CACHE_VOCABULARIO = 'busqueda.vocabulario';
 

@@ -26,6 +26,8 @@ class NegocioResource extends JsonResource
         return [
             'id' => $this->id,
             'nombre' => $this->nombre,
+            // Otros nombres con que lo buscan («barbería» para una peluquería).
+            'nombres_alternos' => $this->nombres_alternos ?? [],
             'descripcion' => $this->descripcion,
             'categoria' => $categorias[0] ?? $this->categoria,
             'categorias' => $categorias,

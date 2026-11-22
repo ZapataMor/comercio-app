@@ -23,6 +23,8 @@ class Negocio extends Model
 
     protected $fillable = [
         'nombre',
+        // Otros nombres con que lo buscan («barbería» para una peluquería).
+        'nombres_alternos',
         'descripcion',
         'categoria',
         'direccion',
@@ -50,6 +52,7 @@ class Negocio extends Model
             'resenas_total' => 'integer',
             'vetado_at' => 'datetime',
             'horario' => 'array',
+            'nombres_alternos' => 'array',
             'activo_cambiado_at' => 'datetime',
             'cierre_original' => 'datetime',
             'cierre_ajustado' => 'datetime',
@@ -208,6 +211,7 @@ class Negocio extends Model
     /** Texto para la búsqueda tolerante a errores. */
     public function textoBusqueda(): string
     {
-        return Busqueda::indexar($this->nombre, [$this->descripcion]);
+        // Los otros nombres («barbería» para una peluquería) cuentan como el nombre.
+        return Busqueda::indexar(implode(' ', [$this->nombre, ...($this->nombres_alternos ?? [])]), [$this->descripcion]);
     }
 }

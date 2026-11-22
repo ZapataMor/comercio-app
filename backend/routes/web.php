@@ -39,6 +39,7 @@ Route::middleware(['auth', 'auth.session', 'role:administrador', AdminWeb::class
         Route::get('/negocios/{negocio}/pedidos/{pedido}', 'negocioPedido')->whereNumber('negocio')->whereNumber('pedido')->name('negocio.pedido');
         Route::get('/configuracion', 'configuracion')->name('configuracion');
         Route::get('/mapa', 'mapa')->name('mapa');
+        Route::get('/categorias', 'categorias')->name('categorias');
         Route::get('/resenas', 'resenas')->name('resenas');
         Route::get('/reputacion', 'reputacion')->name('reputacion');
         Route::get('/reputacion/{tipo}/{id}', 'reputacionDetalle')->whereIn('tipo', ['negocio', 'domiciliario'])->whereNumber('id')->name('reputacion-detalle');

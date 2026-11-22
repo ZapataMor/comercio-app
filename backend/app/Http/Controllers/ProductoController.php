@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Notifications\PrecioProductoActualizado;
 use App\Support\Busqueda;
 use App\Support\FotoOptimizada;
+use App\Support\NombresAlternos;
 use App\Support\Push;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -35,7 +36,7 @@ class ProductoController extends Controller
             return $this->sinAcceso();
         }
 
-        $query = $negocio->productos()->with(['categoria', 'tipoProducto'])->latest();
+        $query = $negocio->productos()->with(['categoria', 'tipoProducto', 'categoriasCatalogo'])->latest();
 
         if ($request->filled('buscar')) {
             // Tolerante a errores, como la del cliente (ver App\Support\Busqueda).
@@ -68,13 +69,17 @@ class ProductoController extends Controller
         }
 
         $data = $this->normalizarAtributos($request->validate($this->reglas($negocio, creando: true)));
+        [$data, $categorias] = $this->separarCategorias($data);
 
         $producto = $negocio->productos()->create($data);
+        if ($categorias !== null) {
+            $producto->categoriasCatalogo()->sync($categorias);
+        }
 
         $this->guardarImagen($request, $producto);
 
         return response()->json([
-            'producto' => new ProductoResource($producto->load(['categoria', 'tipoProducto'])),
+            'producto' => new ProductoResource($producto->load(['categoria', 'tipoProducto', 'categoriasCatalogo'])),
         ], 201);
     }
 
@@ -94,7 +99,7 @@ class ProductoController extends Controller
         }
 
         return response()->json([
-            'producto' => new ProductoResource($producto->load(['categoria', 'tipoProducto'])),
+            'producto' => new ProductoResource($producto->load(['categoria', 'tipoProducto', 'categoriasCatalogo'])),
         ]);
     }
 
@@ -114,8 +119,16 @@ class ProductoController extends Controller
         }
 
         $data = $this->normalizarAtributos($request->validate($this->reglas($negocio, creando: false)));
+        [$data, $categorias] = $this->separarCategorias($data);
+        if (array_key_exists('nombres_alternos', $data)) {
+            // El nombre principal puede venir o no en la misma petición.
+            $data['nombres_alternos'] = NombresAlternos::limpiar($data['nombres_alternos'], $data['nombre'] ?? $producto->nombre);
+        }
 
         $producto->update($data);
+        if ($categorias !== null) {
+            $producto->categoriasCatalogo()->sync($categorias);
+        }
         if ($producto->wasChanged('precio')) {
             $usuarios = User::whereIn('id', DB::table('carrito_reservas')
                 ->where('producto_id', $producto->id)->where('vence_at', '>', now())->select('user_id'))->get();
@@ -125,7 +138,7 @@ class ProductoController extends Controller
         $this->guardarImagen($request, $producto);
 
         return response()->json([
-            'producto' => new ProductoResource($producto->load(['categoria', 'tipoProducto'])),
+            'producto' => new ProductoResource($producto->load(['categoria', 'tipoProducto', 'categoriasCatalogo'])),
         ]);
     }
 
@@ -151,6 +164,23 @@ class ProductoController extends Controller
     }
 
     // ---------- Helpers privados ----------
+
+    /**
+     * Saca las categorías globales de los datos del producto: van en su propia
+     * tabla. null = no vinieron (no se tocan); [] = quitarlas todas.
+     *
+     * @return array{0: array<string, mixed>, 1: ?array<int, int>}
+     */
+    private function separarCategorias(array $data): array
+    {
+        if (! array_key_exists('categorias_catalogo', $data)) {
+            return [$data, null];
+        }
+        $ids = array_values(array_unique(array_map('intval', $data['categorias_catalogo'] ?? [])));
+        unset($data['categorias_catalogo']);
+
+        return [$data, $ids];
+    }
 
     /**
      * Reglas de validación. La categoría debe existir Y pertenecer a este
@@ -191,6 +221,11 @@ class ProductoController extends Controller
             // Etiqueta de la medida del precio: 'unidad', 'kg', 'litro', 'metro', 'combo'...
             'unidad_medida' => ['sometimes', 'string', 'max:20'],
             'disponible' => ['sometimes', 'boolean'],
+            // Categorías globales (Comida, Bebidas...): opcionales y varias.
+            // Las crea el administrador; aquí solo se eligen.
+            'categorias_catalogo' => ['sometimes', 'nullable', 'array', 'max:8'],
+            'categorias_catalogo.*' => ['integer', 'distinct', Rule::exists('categorias_catalogo', 'id')],
+            ...NombresAlternos::reglas(),
             'categoria_id' => [
                 'nullable',
                 Rule::exists('categorias', 'id')->where('negocio_id', $negocio->id),
@@ -224,6 +259,10 @@ class ProductoController extends Controller
         // Un ingrediente fijo tiene que estar entre los ingredientes.
         if (isset($data['ingredientes_fijos'], $data['atributos'])) {
             $data['ingredientes_fijos'] = array_values(array_intersect($data['ingredientes_fijos'], $data['atributos']));
+        }
+
+        if (array_key_exists('nombres_alternos', $data)) {
+            $data['nombres_alternos'] = NombresAlternos::limpiar($data['nombres_alternos'], $data['nombre'] ?? null);
         }
 
         if (array_key_exists('extras', $data)) {

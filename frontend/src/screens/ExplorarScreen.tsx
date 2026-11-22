@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  Keyboard,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -16,13 +17,15 @@ import {
 } from 'react-native';
 import {
   buscarProductos,
+  FiltrosBusqueda,
+  getCategoriasCatalogo,
   getNegocios,
   getTiposNegocio,
   imagenUrl,
   NegocioLista,
+  NegociosPagina,
   ProductoConNegocio,
   ResumenResenas,
-  TipoNegocio,
 } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale, Skeleton } from '../components/anim';
@@ -137,6 +140,30 @@ export default function ExplorarScreen({ navigation, route }: Props) {
   );
 }
 
+/** Qué se busca con los botones bajo la barra: todo, solo negocios o solo productos. */
+type Modo = 'todo' | 'negocios' | 'productos';
+
+/** Una categoría para filtrar: global (Productos) o tipo de negocio (Servicios). */
+type Opcion = { id: number; nombre: string };
+
+/**
+ * Qué pedir a la API y cómo mostrarlo. `resultados` = filas compactas de
+ * búsqueda; si no, el listado de negocios con foto, por páginas.
+ */
+function planBusqueda(seccion: 'productos' | 'servicios', modo: Modo, texto: string, filtroId: number | null) {
+  if (seccion === 'servicios') {
+    return { negocios: true, productos: false, porNombre: false, resultados: false, todosProductos: false };
+  }
+  if (modo === 'negocios') {
+    return { negocios: true, productos: false, porNombre: true, resultados: !!texto, todosProductos: false };
+  }
+  if (modo === 'productos') {
+    return { negocios: false, productos: true, porNombre: false, resultados: true, todosProductos: !texto && filtroId == null };
+  }
+  const conFiltro = !!texto || filtroId != null;
+  return { negocios: true, productos: conFiltro, porNombre: false, resultados: conFiltro, todosProductos: false };
+}
+
 function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigation']; seccion: 'productos' | 'servicios' }) {
   const { c } = useTheme();
   const styles = useStyles();
@@ -144,12 +171,16 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
   const { alDesplazar, espacioAbajo } = useDesplazarCatalogo();
   const [negocios, setNegocios] = useState<NegocioLista[]>([]);
   const [productos, setProductos] = useState<ProductoConNegocio[]>([]);
-  // Texto de los resultados en pantalla; vacío = listado normal. Va aparte de
-  // `busqueda`, que cambia con cada tecla antes de que lleguen los resultados.
-  const [consulta, setConsulta] = useState('');
+  // Cómo se muestran los resultados en pantalla. Va aparte de `busqueda`, que
+  // cambia con cada tecla antes de que lleguen los resultados.
+  const [vista, setVista] = useState({ resultados: false, consulta: '' });
   const [consultaAplicada, setConsultaAplicada] = useState('');
-  const [tiposNegocio, setTiposNegocio] = useState<TipoNegocio[]>([]);
-  const [tipoSeleccionadoId, setTipoSeleccionadoId] = useState<number | null>(null);
+  // Categorías para filtrar: las globales en Productos, los tipos de negocio en Servicios.
+  const [opciones, setOpciones] = useState<Opcion[]>([]);
+  const [filtroId, setFiltroId] = useState<number | null>(null);
+  const [modo, setModo] = useState<Modo>('todo');
+  const [soloAbiertos, setSoloAbiertos] = useState(false);
+  const [enfocado, setEnfocado] = useState(false);
   const [cargando, setCargando] = useState(true);
   const [cargandoMas, setCargandoMas] = useState(false);
   const [refrescando, setRefrescando] = useState(false);
@@ -161,26 +192,56 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
   const cargandoMasRef = useRef(false);
   const paginaRef = useRef(pagina);
   paginaRef.current = pagina;
+  const buscadorRef = useRef<TextInput>(null);
   // Solo vale la respuesta de la última petición: una búsqueda vieja que llegue
   // tarde no puede pisar los resultados de la nueva.
   const ultimaPeticion = useRef(0);
   const ultimaBusqueda = useRef('');
 
-  const tipoSeleccionado = tiposNegocio.find(tipo => tipo.id === tipoSeleccionadoId) ?? null;
+  const opcionElegida = opciones.find(o => o.id === filtroId) ?? null;
   const filas = useMemo(
-    () => (seccion === 'productos' && consulta ? filasBusqueda(negocios, productos, consulta) : filasListado(negocios)),
-    [negocios, productos, consulta, seccion],
+    () => (vista.resultados ? filasBusqueda(negocios, productos, vista.consulta) : filasListado(negocios)),
+    [negocios, productos, vista],
   );
 
   useLectura(() => {
     if (!auth?.token) return;
     let vigente = true;
-    setTiposNegocio([]);
-    getTiposNegocio(auth.token, seccion)
-      .then(tipos => { if (vigente) setTiposNegocio(tipos); })
-      .catch(() => {});
+    setOpciones([]);
+    const peticion: Promise<Opcion[]> =
+      seccion === 'productos' ? getCategoriasCatalogo(auth.token, 'filtro') : getTiposNegocio(auth.token, seccion);
+    peticion.then(o => { if (vigente) setOpciones(o); }).catch(() => {});
     return () => { vigente = false; };
   }, [auth, seccion]);
+
+  // Al bajar el teclado (atrás de Android) la barra suelta el foco: así se
+  // esconden los filtros si no hay ninguno puesto.
+  useEffect(() => {
+    const sub = Keyboard.addListener('keyboardDidHide', () => buscadorRef.current?.blur());
+    return () => sub.remove();
+  }, []);
+
+  /** Lo que se le pide a la API para un texto y unas páginas, con los filtros de ahora. */
+  const pedir = useCallback(
+    (texto: string, paginas: number[]) => {
+      const plan = planBusqueda(seccion, modo, texto, filtroId);
+      const tipoId = seccion === 'servicios' ? filtroId : null;
+      const filtros: FiltrosBusqueda = {
+        abierto: soloAbiertos,
+        categoriaCatalogoId: seccion === 'productos' ? filtroId : null,
+        porNombre: plan.porNombre,
+      };
+      return Promise.all([
+        plan.negocios
+          ? Promise.all(paginas.map(n => getNegocios(auth!.token, texto || undefined, n, tipoId, seccion, filtros)))
+          : Promise.resolve([] as NegociosPagina[]),
+        plan.productos
+          ? buscarProductos(auth!.token, texto, null, plan.todosProductos, filtros)
+          : Promise.resolve([] as ProductoConNegocio[]),
+      ]).then(([respuestas, hallados]) => ({ plan, respuestas, hallados }));
+    },
+    [auth, seccion, modo, filtroId, soloAbiertos],
+  );
 
   const cargar = useCallback(
     (texto: string, refresco = false) => {
@@ -188,22 +249,17 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
       setError(null);
       const turno = ++ultimaPeticion.current;
       const t = texto.trim();
-      // Con una categoría elegida el texto filtra sus negocios; sin ella se
-      // buscan negocios y productos a la vez.
-      const conProductos = seccion === 'productos' && !!t && tipoSeleccionadoId == null;
 
-      Promise.all([
-        getNegocios(auth!.token, t || undefined, 1, tipoSeleccionadoId, seccion),
-        conProductos ? buscarProductos(auth!.token, t) : Promise.resolve([]),
-      ])
-        .then(([p, hallados]) => {
+      pedir(t, [1])
+        .then(({ plan, respuestas, hallados }) => {
           if (turno !== ultimaPeticion.current) return;
+          const primera = respuestas[0];
           setConsultaAplicada(t);
-          setNegocios(p.negocios);
-          setPagina(p.pagina);
-          setUltimaPagina(p.ultimaPagina);
+          setNegocios(primera?.negocios ?? []);
+          setPagina(primera?.pagina ?? 1);
+          setUltimaPagina(primera?.ultimaPagina ?? 1);
           setProductos(hallados);
-          setConsulta(conProductos ? t : '');
+          setVista({ resultados: plan.resultados, consulta: t });
         })
         .catch(e => {
           if (turno === ultimaPeticion.current) setError(e.message);
@@ -214,19 +270,20 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
           setRefrescando(false);
         });
     },
-    [auth, tipoSeleccionadoId, seccion],
+    [pedir],
   );
 
-  // Carga la siguiente página de negocios al llegar al final de la lista.
+  // Carga la siguiente página de negocios al llegar al final del listado.
   const cargarMas = useCallback(() => {
-    if ((seccion === 'productos' && consulta) || cargando || refrescando) return;
+    if (vista.resultados || cargando || refrescando) return;
     if (cargandoMasRef.current || pagina >= ultimaPagina) return;
     cargandoMasRef.current = true;
     setCargandoMas(true);
     const turno = ultimaPeticion.current;
-    getNegocios(auth!.token, consultaAplicada || undefined, pagina + 1, tipoSeleccionadoId, seccion)
-      .then(p => {
-        if (turno !== ultimaPeticion.current) return;
+    pedir(consultaAplicada, [pagina + 1])
+      .then(({ respuestas }) => {
+        const p = respuestas[0];
+        if (turno !== ultimaPeticion.current || !p) return;
         setNegocios(prev => {
           // Evita duplicados si una página se repite (p. ej. tras un refresco).
           const vistos = new Set(prev.map(n => n.id));
@@ -240,7 +297,7 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
         cargandoMasRef.current = false;
         setCargandoMas(false);
       });
-  }, [auth, consulta, cargando, refrescando, pagina, ultimaPagina, tipoSeleccionadoId, consultaAplicada, seccion]);
+  }, [vista, cargando, refrescando, pagina, ultimaPagina, consultaAplicada, pedir]);
 
   // Trae de nuevo lo que hay en pantalla, sin indicadores ni avisos de error, para
   // que un negocio que abre o cierra cambie solo. Son todas las páginas cargadas:
@@ -249,15 +306,9 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
     if (cargando || refrescando || cargandoMasRef.current) return;
     const turno = ultimaPeticion.current;
     const paginaVista = pagina;
-    const t = consultaAplicada;
-    const conProductos = seccion === 'productos' && !!t && tipoSeleccionadoId == null;
-    const paginas = Array.from({ length: paginaVista }, (_, i) => i + 1);
 
-    Promise.all([
-      Promise.all(paginas.map(n => getNegocios(auth!.token, t || undefined, n, tipoSeleccionadoId, seccion))),
-      conProductos ? buscarProductos(auth!.token, t) : Promise.resolve([]),
-    ])
-      .then(([respuestas, hallados]) => {
+    pedir(consultaAplicada, Array.from({ length: paginaVista }, (_, i) => i + 1))
+      .then(({ plan, respuestas, hallados }) => {
         // Si mientras tanto cambió la lista (búsqueda, otra página), esto ya es viejo.
         if (
           turno !== ultimaPeticion.current ||
@@ -266,10 +317,12 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
         ) {
           return;
         }
-        // Un negocio puede salir en dos páginas si cambió de lugar entre peticiones.
-        const porId = new Map(respuestas.flatMap(p => p.negocios).map(n => [n.id, n]));
-        setNegocios(Array.from(porId.values()));
-        setUltimaPagina(respuestas[0].ultimaPagina);
+        if (plan.negocios) {
+          // Un negocio puede salir en dos páginas si cambió de lugar entre peticiones.
+          const porId = new Map(respuestas.flatMap(p => p.negocios).map(n => [n.id, n]));
+          setNegocios(Array.from(porId.values()));
+          setUltimaPagina(respuestas[0]?.ultimaPagina ?? 1);
+        }
         setProductos(hallados);
       })
       .catch(() => {});
@@ -277,25 +330,48 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
 
   useEffect(() => {
     ++ultimaPeticion.current;
-    setNegocios([]); setProductos([]); setConsulta(''); setPagina(1); setCargando(true);
-    setTipoSeleccionadoId(null); setBusqueda('');
+    setNegocios([]); setProductos([]); setVista({ resultados: false, consulta: '' }); setPagina(1); setCargando(true);
+    setFiltroId(null); setModo('todo'); setSoloAbiertos(false); setBusqueda('');
   }, [seccion]);
 
-  // Solo el teclado espera a que dejen de escribir; cambiar de categoría es inmediato.
+  // Solo el teclado espera a que dejen de escribir; los filtros son inmediatos.
   useLectura(() => {
     const espera = busqueda === ultimaBusqueda.current ? 0 : ESPERA_BUSQUEDA;
     ultimaBusqueda.current = busqueda;
     const t = setTimeout(() => cargar(busqueda), espera);
     return () => clearTimeout(t);
-  }, [busqueda, tipoSeleccionadoId, cargar]);
+  }, [busqueda, cargar]);
 
-  function elegirTipo(id: number | null) {
-    if (id === tipoSeleccionadoId) return;
-    // Otra categoría es otra lista: se muestran los fantasmas, no la anterior.
+  /** Otro filtro es otra lista: se muestran los fantasmas, no la anterior. */
+  function alCambiarFiltro() {
     setNegocios([]);
     setProductos([]);
     setCargando(true);
-    setTipoSeleccionadoId(id);
+  }
+
+  function elegirFiltro(id: number | null) {
+    if (id === filtroId) return;
+    alCambiarFiltro();
+    setFiltroId(id);
+  }
+
+  // «Negocios» y «Productos» se prenden y apagan: ninguno = buscar todo.
+  function elegirModo(nuevo: Exclude<Modo, 'todo'>) {
+    alCambiarFiltro();
+    setModo(actual => (actual === nuevo ? 'todo' : nuevo));
+  }
+
+  function elegirAbiertos(valor: boolean) {
+    if (valor === soloAbiertos) return;
+    alCambiarFiltro();
+    setSoloAbiertos(valor);
+  }
+
+  function quitarFiltros() {
+    alCambiarFiltro();
+    setFiltroId(null);
+    setModo('todo');
+    setSoloAbiertos(false);
   }
 
   const abrirNegocio = useCallback(
@@ -307,6 +383,34 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
   const nombre = auth?.user.name.trim().split(/\s+/)[0];
   // El tutorial señala el primer negocio de la lista.
   const primerNegocio = filas.findIndex(f => f.tipo === 'negocio');
+  // Los botones de filtro aparecen al tocar la barra y se quedan mientras haya
+  // algo puesto. Sin ellos, las categorías van como pestañas.
+  const filtrosPuestos = modo !== 'todo' || soloAbiertos || filtroId != null;
+  const mostrarFiltros = enfocado || modo !== 'todo' || soloAbiertos || texto.length > 0;
+
+  const placeholder =
+    seccion === 'servicios'
+      ? 'Busca negocios o servicios'
+      : modo === 'negocios'
+        ? 'Busca negocios por su nombre'
+        : modo === 'productos'
+          ? 'Busca productos'
+          : 'Busca negocios o productos';
+
+  function textoVacio(): { titulo: string; detalle: string | null } {
+    if (texto) {
+      return {
+        titulo: `No encontramos "${texto}"`,
+        detalle: filtrosPuestos ? 'Prueba con otro nombre o quita algún filtro.' : 'Prueba con otro nombre o producto.',
+      };
+    }
+    const que = modo === 'productos' ? 'productos' : 'negocios';
+    if (soloAbiertos) {
+      return { titulo: `No hay ${que} abiertos ahora${opcionElegida ? ` en ${opcionElegida.nombre}` : ''}`, detalle: null };
+    }
+    return { titulo: opcionElegida ? `Aún no hay ${que} en ${opcionElegida.nombre}` : `Aún no hay ${que}`, detalle: null };
+  }
+  const vacio = textoVacio();
 
   return (
     <FlatList<Fila>
@@ -339,10 +443,13 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
               <Objetivo id="explorar.buscador" style={styles.buscador}>
                 <Icon name="lupa" size={18} color={c.muted} />
                 <TextInput
+                  ref={buscadorRef}
                   style={styles.buscadorTexto}
                   value={busqueda}
                   onChangeText={setBusqueda}
-                  placeholder={seccion === 'servicios' ? 'Busca negocios o servicios' : 'Busca negocios o productos'}
+                  onFocus={() => setEnfocado(true)}
+                  onBlur={() => setEnfocado(false)}
+                  placeholder={placeholder}
                   placeholderTextColor={c.mutedSoft}
                   autoCapitalize="none"
                   returnKeyType="search"
@@ -369,26 +476,86 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
             </View>
           </View>
 
-          {tiposNegocio.length > 0 && (
+          {mostrarFiltros ? (
+            <FadeInView offset={6} duration={220} style={styles.filtros}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.filaChips}>
+                {seccion === 'productos' && (
+                  <>
+                    <FiltroChip
+                      texto="Negocios"
+                      icono="tienda"
+                      activo={modo === 'negocios'}
+                      ayuda="Solo negocios con ese nombre o parecido"
+                      onPress={() => elegirModo('negocios')}
+                    />
+                    <FiltroChip
+                      texto="Productos"
+                      icono="caja"
+                      activo={modo === 'productos'}
+                      ayuda="Solo productos"
+                      onPress={() => elegirModo('productos')}
+                    />
+                    <View style={styles.separadorChips} />
+                  </>
+                )}
+                <FiltroChip
+                  texto="Abierto ahora"
+                  icono="reloj"
+                  activo={soloAbiertos}
+                  onPress={() => elegirAbiertos(true)}
+                />
+                <FiltroChip
+                  texto="Todos"
+                  activo={!soloAbiertos}
+                  ayuda="Abiertos y cerrados"
+                  onPress={() => elegirAbiertos(false)}
+                />
+              </ScrollView>
+              {opciones.length > 0 && (
+                <>
+                  <Text style={styles.filtrosTitulo}>Categorías</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    contentContainerStyle={styles.filaChips}>
+                    {opciones.map(o => (
+                      <FiltroChip
+                        key={o.id}
+                        texto={o.nombre}
+                        activo={o.id === filtroId}
+                        // Tocar la categoría activa vuelve a mostrar todas.
+                        onPress={() => elegirFiltro(o.id === filtroId ? null : o.id)}
+                      />
+                    ))}
+                  </ScrollView>
+                </>
+              )}
+            </FadeInView>
+          ) : opciones.length > 0 ? (
             <Objetivo id="explorar.tipos">
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={styles.pestanas}>
-              <Pestana texto="Todos" activa={tipoSeleccionadoId == null} onPress={() => elegirTipo(null)} />
-              {tiposNegocio.map(tipo => (
+              <Pestana texto="Todos" activa={filtroId == null} onPress={() => elegirFiltro(null)} />
+              {opciones.map(o => (
                 <Pestana
-                  key={tipo.id}
-                  texto={tipo.nombre}
-                  activa={tipo.id === tipoSeleccionadoId}
+                  key={o.id}
+                  texto={o.nombre}
+                  activa={o.id === filtroId}
                   // Tocar la categoría activa vuelve a mostrar todos.
-                  onPress={() => elegirTipo(tipo.id === tipoSeleccionadoId ? null : tipo.id)}
+                  onPress={() => elegirFiltro(o.id === filtroId ? null : o.id)}
                 />
               ))}
             </ScrollView>
             </Objetivo>
-          )}
+          ) : null}
 
           {cargando && filas.length === 0 && <NegociosFantasma />}
           {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -404,16 +571,10 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
       ListEmptyComponent={
         !cargando && !error ? (
           <SinResultados
-            titulo={
-              texto
-                ? `No encontramos "${texto}"`
-                : tipoSeleccionado
-                  ? `Aún no hay negocios en ${tipoSeleccionado.nombre}`
-                  : 'Aún no hay negocios'
-            }
-            detalle={texto ? 'Prueba con otro nombre o producto.' : null}
-            accion={tipoSeleccionado ? 'Ver todas las categorías' : null}
-            onAccion={() => elegirTipo(null)}
+            titulo={vacio.titulo}
+            detalle={vacio.detalle}
+            accion={filtrosPuestos ? 'Quitar filtros' : null}
+            onAccion={quitarFiltros}
           />
         ) : null
       }
@@ -468,6 +629,41 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
         }
       }}
     />
+  );
+}
+
+/**
+ * Botón de filtro bajo la barra de búsqueda. El fondo va en una vista siempre
+ * montada que solo cambia de opacidad: Android dibuja sin esquinas un fondo
+ * que se le agrega a una vista ya en pantalla.
+ */
+function FiltroChip({
+  texto,
+  activo,
+  icono,
+  ayuda,
+  onPress,
+}: {
+  texto: string;
+  activo: boolean;
+  icono?: IconName;
+  ayuda?: string;
+  onPress: () => void;
+}) {
+  const { c } = useTheme();
+  const styles = useStyles();
+  return (
+    <Pressable
+      style={[styles.chip, { borderColor: activo ? c.brand : c.borderStrong }]}
+      hitSlop={{ top: 4, bottom: 4 }}
+      accessibilityRole="button"
+      accessibilityState={{ selected: activo }}
+      accessibilityLabel={ayuda ? `${texto}: ${ayuda}` : texto}
+      onPress={onPress}>
+      <View pointerEvents="none" style={[styles.chipFondo, { opacity: activo ? 1 : 0 }]} />
+      {!!icono && <Icon name={icono} size={15} color={activo ? c.onBrand : c.muted} />}
+      <Text style={[styles.chipTxt, { color: activo ? c.onBrand : c.text }]}>{texto}</Text>
+    </Pressable>
   );
 }
 
@@ -655,6 +851,39 @@ const useStyles = makeStyles(c => ({
   },
   // De borde a borde: las categorías se deslizan por debajo del margen.
   pestanas: { gap: 22, paddingHorizontal: 20, marginTop: 14 },
+  // Botones de filtro bajo la barra de búsqueda.
+  filtros: { marginTop: 14 },
+  filaChips: { gap: 8, paddingHorizontal: 20, alignItems: 'center' },
+  filtrosTitulo: {
+    color: c.muted,
+    fontFamily: font.medium,
+    fontSize: 12,
+    paddingHorizontal: 20,
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  separadorChips: { width: 1, height: 22, backgroundColor: c.border, marginHorizontal: 4 },
+  // Alto fijo y radio de la mitad: ver FiltroChip.
+  chip: {
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    overflow: 'hidden',
+  },
+  chipFondo: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    borderRadius: 18,
+    backgroundColor: c.brand,
+  },
+  chipTxt: { fontFamily: font.medium, fontSize: 14 },
   pestana: { paddingTop: 8 },
   pestanaTxt: { color: c.muted, fontFamily: font.medium, fontSize: 14 },
   pestanaTxtActiva: { color: c.textStrong, fontFamily: font.semibold },
