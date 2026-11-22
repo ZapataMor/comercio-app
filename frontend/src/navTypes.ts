@@ -55,6 +55,9 @@ export type RootStackParamList = {
   PedidosNegocio: undefined;
   // Cliente
   Explorar: { seccion?: SeccionCatalogo } | undefined;
+  // Búsqueda en pantalla aparte. `filtroId`: la categoría (Productos) o el
+  // tipo de negocio (Servicios) que estaba elegido en Explorar.
+  Buscar: { seccion: 'productos' | 'servicios'; filtroId?: number | null };
   // Mapa de negocios; `admin` suma a los domiciliarios en vivo.
   Mapa: { admin?: boolean } | undefined;
   // Propiedades: mapa con sus propios filtros, detalle, y las que publico.

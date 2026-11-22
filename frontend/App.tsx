@@ -61,6 +61,7 @@ import CitasScreen from './src/screens/CitasScreen';
 import ComercioPedidoDetalleScreen from './src/screens/ComercioPedidoDetalleScreen';
 import PedidosNegocioScreen from './src/screens/PedidosNegocioScreen';
 import ExplorarScreen from './src/screens/ExplorarScreen';
+import BuscarScreen from './src/screens/BuscarScreen';
 import NegocioScreen from './src/screens/NegocioScreen';
 import AdminTableroScreen from './src/screens/AdminTableroScreen';
 import AdminUsuariosScreen from './src/screens/AdminUsuariosScreen';
@@ -206,6 +207,13 @@ function Navegacion({ listo }: { listo: boolean }) {
                     headerRight: () => <HeaderPerfil menu={false} />,
                     ...bordeABorde,
                   }}
+                />
+                {/* Búsqueda: pantalla aparte sin la barra de arriba; trae su
+                    propia flecha para volver. */}
+                <Stack.Screen
+                  name="Buscar"
+                  component={BuscarScreen}
+                  options={{ title: 'Buscar', headerShown: false, animation: 'fade' }}
                 />
                 <Stack.Screen
                   name="Negocio"

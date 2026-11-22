@@ -1,13 +1,13 @@
 /**
  * Pantalla Explorar: un toque lleva al catálogo, los cerrados van aparte y la
- * búsqueda encuentra negocios y productos.
+ * barra de búsqueda abre la pantalla Buscar.
  * @format
  */
 
 import React from 'react';
-import { FlatList, Text, TextInput } from 'react-native';
+import { FlatList, Text } from 'react-native';
 import ReactTestRenderer, { act } from 'react-test-renderer';
-import { buscarProductos, getCategoriasCatalogo, getNegocios, NegocioLista, ProductoConNegocio } from '../src/api';
+import { buscarProductos, getCategoriasCatalogo, getNegocios, NegocioLista } from '../src/api';
 import ExplorarScreen from '../src/screens/ExplorarScreen';
 
 // Objeto fijo, como en la app: si cambiara en cada render, la pantalla recargaría sin parar.
@@ -61,18 +61,6 @@ function negocio(id: number, nombre: string, abierto = true): NegocioLista {
   };
 }
 
-function producto(id: number, nombre: string, negocioNombre: string): ProductoConNegocio {
-  return {
-    id,
-    nombre,
-    descripcion: null,
-    precio: 15000,
-    unidad_medida: 'unidad',
-    disponible: true,
-    categoria: null,
-    negocio: { id: 90, nombre: negocioNombre, abierto: true },
-  };
-}
 
 const pagina = (negocios: NegocioLista[]) => ({ negocios, pagina: 1, ultimaPagina: 1 });
 
@@ -97,20 +85,6 @@ async function montar(seccion: 'productos' | 'servicios' = 'productos') {
   await esperar();
   const textos = () =>
     raiz.root.findAllByType(Text).map(t => [t.props.children].flat(Infinity).join(''));
-  // Los botones de filtro también dicen «Negocios» y «Productos»: un título
-  // de sección suma una vez más.
-  const veces = (texto: string) => textos().filter(t => t === texto).length;
-  const enfocar = async () => {
-    await act(async () => {
-      raiz.root.findByType(TextInput).props.onFocus();
-    });
-  };
-  const buscar = async (texto: string) => {
-    await act(async () => {
-      raiz.root.findByProps({ placeholder: 'Busca negocios o productos' }).props.onChangeText(texto);
-    });
-    await esperar();
-  };
   const tocar = async (etiqueta: string) => {
     await act(async () => {
       raiz.root.findAll(n => n.props.accessibilityLabel === etiqueta && !!n.props.onPress)[0].props.onPress();
@@ -121,7 +95,7 @@ async function montar(seccion: 'productos' | 'servicios' = 'productos') {
       raiz.root.findByType(FlatList).props.onEndReached();
     });
   };
-  return { navigation, textos, veces, enfocar, buscar, tocar, finDeLista, raiz: raiz! };
+  return { navigation, textos, tocar, finDeLista, raiz: raiz! };
 }
 
 async function refrescar() {
@@ -188,20 +162,6 @@ test('un refresco fallido no borra la lista ni muestra error', async () => {
   expect(textos()).not.toContain('Sin conexión');
 });
 
-test('el refresco mantiene los resultados de la búsqueda', async () => {
-  mockNegocios.mockResolvedValue(pagina([negocio(1, 'El Rincón')]));
-  mockProductos.mockResolvedValue([producto(5, 'Empanada', 'El Rincón')]);
-  const { textos, buscar } = await montar();
-  await buscar('empa');
-
-  mockProductos.mockResolvedValue([
-    { ...producto(5, 'Empanada', 'El Rincón'), negocio: { id: 90, nombre: 'El Rincón', abierto: false } },
-  ]);
-  await refrescar();
-
-  expect(textos()).toEqual(expect.arrayContaining(['Empanada', 'El Rincón · Cerrado']));
-});
-
 test('si todos están abiertos no aparece la sección de cerrados', async () => {
   mockNegocios.mockResolvedValue(pagina([negocio(1, 'El Rincón')]));
   const { textos } = await montar();
@@ -230,59 +190,6 @@ test('el descanso agrupa el negocio aparte y mantiene su tarjeta sin etiquetas',
   expect(navigation.navigate).toHaveBeenLastCalledWith('Negocio', { id: 1, nombre: 'Salón', seccion: 'productos' });
 });
 
-test('la búsqueda encuentra negocios por su nombre, sin importar las tildes', async () => {
-  mockNegocios.mockResolvedValue(pagina([negocio(1, 'El Rincón Paisa')]));
-  const { buscar, textos, veces } = await montar();
-
-  await buscar('rincon');
-
-  expect(textos()).toContain('El Rincón Paisa');
-  expect(veces('Negocios')).toBe(2);
-  expect(veces('Productos')).toBe(1);
-});
-
-test('un negocio que solo vende lo buscado sale en Productos, no en Negocios', async () => {
-  mockNegocios.mockResolvedValue(pagina([negocio(1, 'El Rincón Paisa')]));
-  mockProductos.mockResolvedValue([producto(5, 'Bandeja paisa', 'El Rincón Paisa')]);
-  const { buscar, textos, veces } = await montar();
-
-  await buscar('bandeja');
-
-  expect(textos()).toEqual(expect.arrayContaining(['Bandeja paisa', '$15.000', 'El Rincón Paisa']));
-  expect(veces('Productos')).toBe(2);
-  expect(veces('Negocios')).toBe(1);
-});
-
-test('sin resultados lo dice y sugiere qué hacer', async () => {
-  mockNegocios.mockResolvedValue(pagina([]));
-  const { buscar, textos } = await montar();
-
-  await buscar('zzz');
-
-  expect(textos()).toEqual(
-    expect.arrayContaining(['No encontramos "zzz"', 'Prueba con otro nombre o producto.']),
-  );
-});
-
-test('una búsqueda vieja que responde tarde no pisa la nueva', async () => {
-  mockNegocios.mockResolvedValue(pagina([]));
-  const { buscar, textos } = await montar();
-
-  let responderVieja: (valor: unknown) => void = () => {};
-  mockNegocios.mockReturnValueOnce(new Promise(resolver => (responderVieja = resolver)));
-  await buscar('pollo');
-
-  mockNegocios.mockResolvedValue(pagina([negocio(2, 'Pizza Nostra')]));
-  await buscar('pizza');
-  await act(async () => {
-    responderVieja(pagina([negocio(3, 'Pollo Express')]));
-  });
-  await esperar();
-
-  expect(textos()).toContain('Pizza Nostra');
-  expect(textos()).not.toContain('Pollo Express');
-});
-
 test('el catálogo inicial lista tiendas y no consulta todos los productos', async () => {
   mockNegocios.mockResolvedValue(pagina([negocio(1, 'Mi tienda')]));
   const { textos } = await montar();
@@ -301,94 +208,18 @@ test('Servicios mantiene las tarjetas de negocios y abre su catálogo de servici
   expect(navigation.navigate).toHaveBeenLastCalledWith('Negocio', { id: 1, nombre: 'Taller mixto', seccion: 'servicios' });
 });
 
-test('el refresco conserva la consulta aplicada mientras se escribe otra búsqueda', async () => {
-  mockNegocios.mockResolvedValue(pagina([negocio(1, 'Panadería')]));
-  const pantalla = await montar();
-  await pantalla.buscar('pan');
-  mockProductos.mockClear();
-  await act(async () => {
-    pantalla.raiz.root.findByProps({ placeholder: 'Busca negocios o productos' }).props.onChangeText('pan con');
-  });
-  await refrescar();
-  expect(mockProductos).toHaveBeenLastCalledWith('t', 'pan', null, false, SIN_FILTROS);
-});
-
-test('al tocar la barra aparecen los filtros y las categorías reemplazan las pestañas', async () => {
+test('la barra de búsqueda abre la pantalla Buscar con la categoría elegida', async () => {
   mockNegocios.mockResolvedValue(pagina([negocio(1, 'El Rincón')]));
   mockCategorias.mockResolvedValue([{ id: 4, nombre: 'Comidas rápidas' }]);
-  const { textos, enfocar } = await montar();
-  expect(mockCategorias).toHaveBeenCalledWith('t', 'filtro');
-  // Sin tocar la barra: las categorías como pestañas, sin botones de filtro.
-  expect(textos()).toContain('Comidas rápidas');
+  const { navigation, tocar, textos } = await montar();
+  // La barra no busca aquí: no hay botones de filtro en Explorar.
   expect(textos()).not.toContain('Abierto ahora');
 
-  await enfocar();
-
-  expect(textos()).toEqual(
-    expect.arrayContaining(['Negocios', 'Productos', 'Abierto ahora', 'Todos', 'Categorías', 'Comidas rápidas']),
-  );
-});
-
-test('«Negocios» busca solo por el nombre del negocio y no pide productos', async () => {
-  mockNegocios.mockResolvedValue(pagina([negocio(1, 'Barbería Juancho')]));
-  const pantalla = await montar();
-  await pantalla.enfocar();
-  await pantalla.tocar('Negocios: Solo negocios con ese nombre o parecido');
+  await tocar('Comidas rápidas');
   await esperar();
-  mockProductos.mockClear();
-  await act(async () => {
-    pantalla.raiz.root.findByProps({ placeholder: 'Busca negocios por su nombre' }).props.onChangeText('barberia');
-  });
-  await esperar();
-
-  expect(mockNegocios).toHaveBeenLastCalledWith('t', 'barberia', 1, null, 'productos', { ...SIN_FILTROS, porNombre: true });
+  expect(mockNegocios).toHaveBeenLastCalledWith('t', undefined, 1, null, 'productos', { ...SIN_FILTROS, categoriaCatalogoId: 4 });
   expect(mockProductos).not.toHaveBeenCalled();
-  expect(pantalla.textos()).toContain('Barbería Juancho');
-});
 
-test('«Productos» lista solo productos, también sin escribir', async () => {
-  mockNegocios.mockResolvedValue(pagina([negocio(1, 'El Rincón')]));
-  mockProductos.mockResolvedValue([producto(5, 'Bandeja paisa', 'El Rincón')]);
-  const pantalla = await montar();
-  await pantalla.enfocar();
-  mockNegocios.mockClear();
-  await pantalla.tocar('Productos: Solo productos');
-  await esperar();
-
-  expect(mockProductos).toHaveBeenLastCalledWith('t', '', null, true, SIN_FILTROS);
-  expect(mockNegocios).not.toHaveBeenCalled();
-  expect(pantalla.textos()).toContain('Bandeja paisa');
-  expect(pantalla.textos()).not.toContain('Abiertos ahora');
-});
-
-test('«Abierto ahora» y una categoría se mandan a la búsqueda', async () => {
-  mockNegocios.mockResolvedValue(pagina([negocio(1, 'El Rincón')]));
-  mockCategorias.mockResolvedValue([{ id: 4, nombre: 'Comidas rápidas' }]);
-  const pantalla = await montar();
-  await pantalla.enfocar();
-  await pantalla.tocar('Abierto ahora');
-  await esperar();
-  expect(mockNegocios).toHaveBeenLastCalledWith('t', undefined, 1, null, 'productos', { ...SIN_FILTROS, abierto: true });
-
-  await pantalla.tocar('Comidas rápidas');
-  await esperar();
-  const filtros = { ...SIN_FILTROS, abierto: true, categoriaCatalogoId: 4 };
-  expect(mockNegocios).toHaveBeenLastCalledWith('t', undefined, 1, null, 'productos', filtros);
-  // Con una categoría también salen sus productos.
-  expect(mockProductos).toHaveBeenLastCalledWith('t', '', null, false, filtros);
-
-  // «Todos» vuelve a mostrar abiertos y cerrados.
-  await pantalla.tocar('Todos: Abiertos y cerrados');
-  await esperar();
-  expect(mockNegocios).toHaveBeenLastCalledWith('t', undefined, 1, null, 'productos', { ...filtros, abierto: false });
-});
-
-test('sin resultados con filtros ofrece quitarlos', async () => {
-  mockNegocios.mockResolvedValue(pagina([]));
-  const pantalla = await montar();
-  await pantalla.enfocar();
-  await pantalla.tocar('Abierto ahora');
-  await esperar();
-
-  expect(pantalla.textos()).toEqual(expect.arrayContaining(['No hay negocios abiertos ahora', 'Quitar filtros']));
+  await tocar('Busca negocios o productos');
+  expect(navigation.navigate).toHaveBeenLastCalledWith('Buscar', { seccion: 'productos', filtroId: 4 });
 });
