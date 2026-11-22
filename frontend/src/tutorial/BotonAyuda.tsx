@@ -26,9 +26,9 @@ import { useTutorial } from './contexto';
 
 /** Cuánto se queda el aviso si nadie lo toca. */
 const DURACION_AVISO = 12000;
-/** Alto del aviso (ícono de 40 + relleno de 10 arriba y abajo + borde) y margen izquierdo de los botones redondos. */
+/** Alto del aviso (ícono de 40 + relleno de 10 arriba y abajo + borde) y margen derecho de los botones redondos. */
 const ALTO_AVISO = 66;
-const MARGEN_IZQ_BOTONES = 20;
+const MARGEN_DER_BOTONES = 20;
 
 export default function BotonAyuda() {
   const { botonAyuda } = useTutorial();
@@ -58,13 +58,13 @@ function AvisoAyuda() {
       cerrarBotonAyuda,
     );
 
-  // A la altura del botón de abajo (Mis pedidos) y a su derecha; sin los
+  // A la altura del botón de abajo (Mis pedidos) y a su izquierda; sin los
   // botones, abajo a todo lo ancho. En Explorar, encima de la barra de catálogos.
   const enExplorar = navigationRef.isReady() && navigationRef.getCurrentRoute()?.name === 'Explorar';
   const bottom =
     insets.bottom + MARGEN_BARRA_CLIENTE - (ALTO_AVISO - ALTO_BARRA_CLIENTE) / 2 +
     (enExplorar ? MARGEN_BARRA_CATALOGO + ALTO_BARRA_CATALOGO : 0);
-  const lado = conBotones ? { left: MARGEN_IZQ_BOTONES + ALTO_BARRA_CLIENTE + SEPARACION_LADO_CLIENTE } : null;
+  const lado = conBotones ? { right: MARGEN_DER_BOTONES + ALTO_BARRA_CLIENTE + SEPARACION_LADO_CLIENTE } : null;
 
   return (
     <Animated.View

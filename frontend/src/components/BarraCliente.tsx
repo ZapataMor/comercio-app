@@ -1,6 +1,6 @@
 /**
  * Botones flotantes del CLIENTE: dos círculos solo con ícono abajo a la
- * izquierda, uno sobre otro ("Carrito" arriba, "Mis pedidos" abajo), fijos en
+ * derecha, uno sobre otro ("Carrito" arriba, "Mis pedidos" abajo), fijos en
  * todas las vistas del cliente. En Explorar van encima de la barra de
  * catálogos (BarraCatalogo). Mientras la lista se desplaza se encogen y se
  * aclaran un poco, como la barra (ver encogerAlDesplazar).
@@ -144,7 +144,7 @@ function Barra({ ruta }: { ruta: string }) {
     Animated.spring(badge, { toValue: 1, speed: 30, bounciness: 18, useNativeDriver: true }).start();
   }, [cart.count, badge]);
 
-  // Se encogen hacia la esquina de abajo a la izquierda (su lugar no se mueve).
+  // Se encogen hacia la esquina de abajo a la derecha (su lugar no se mueve).
   const escala = encogida.interpolate({ inputRange: [0, 1], outputRange: [1, ESCALA_ENCOGIDA] });
   const opacidad = encogida.interpolate({ inputRange: [0, 1], outputRange: [1, OPACIDAD_ENCOGIDA] });
 
@@ -214,9 +214,9 @@ function Entrada({ children, style }: { children: React.ReactNode; style?: objec
 }
 
 const useStyles = makeStyles((c, shadow) => ({
-  // Abajo a la izquierda: deja libre el resto del ancho para ver la lista.
-  zona: { position: 'absolute', left: 20 },
-  esquina: { transformOrigin: 'left bottom' },
+  // Abajo a la derecha: deja libre el resto del ancho para ver la lista.
+  zona: { position: 'absolute', right: 20, alignItems: 'flex-end' },
+  esquina: { transformOrigin: 'right bottom' },
   fila: { flexDirection: 'column', gap: SEPARACION_BOTONES },
   boton: {
     alignItems: 'center',
