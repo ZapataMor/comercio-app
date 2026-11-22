@@ -171,10 +171,12 @@ const useStyles = makeStyles((c, shadow) => ({
     ...shadow.card,
   },
   pestana: { flex: 1, alignItems: 'center', justifyContent: 'center', height: '100%' },
+  // Radio exacto (la mitad del alto): con radius.pill (999) algunos
+  // teléfonos dibujan la píldora activa con esquinas rectas.
   marca: {
     width: 84,
     height: 48,
-    borderRadius: radius.pill,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
