@@ -150,7 +150,7 @@ function Navegacion({ listo }: { listo: boolean }) {
             abriría la primera pantalla de la lista en vez de rutaInicio. */}
         {/* El teclado tapa también la barra de navegación, que las pantallas ya
             dejan libre: aquí solo falta el resto. */}
-        <EspacioTeclado style={styles.raiz} descontar={insets.bottom}>
+        <EspacioTeclado style={styles.raiz} descontar={insets.bottom} cederAPantallas>
         <NavigationContainer
           key={auth ? `usuario-${auth.user.id}-${fase}` : 'sin-sesion'}
           ref={navigationRef}
@@ -205,15 +205,20 @@ function Navegacion({ listo }: { listo: boolean }) {
                     title: 'Vitrina',
                     headerTitle: tituloVitrina,
                     headerRight: () => <HeaderPerfil menu={false} />,
+                    // Tapada (p. ej. por Buscar) no se vuelve a dibujar: el
+                    // teclado cambia el alto de toda la app y redibujar este
+                    // catálogo con sus fotos trababa la otra pantalla.
+                    freezeOnBlur: true,
                     ...bordeABorde,
                   }}
                 />
                 {/* Búsqueda: pantalla aparte sin la barra de arriba; trae su
-                    propia flecha para volver. */}
+                    propia flecha para volver. Aparece sin animación: el
+                    fundido sobre el catálogo, sumado al teclado, se trababa. */}
                 <Stack.Screen
                   name="Buscar"
                   component={BuscarScreen}
-                  options={{ title: 'Buscar', headerShown: false, animation: 'fade' }}
+                  options={{ title: 'Buscar', headerShown: false, animation: 'none' }}
                 />
                 <Stack.Screen
                   name="Negocio"

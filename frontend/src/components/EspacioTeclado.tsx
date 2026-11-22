@@ -50,13 +50,39 @@ import {
   View,
   ViewProps,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 
 type Props = ViewProps & {
   descontar?: number;
   /** Margen inferior mínimo, con o sin teclado. */
   minimo?: number;
+  /**
+   * La raíz de la app: no se encoge mientras la pantalla al frente maneja el
+   * teclado por su cuenta (ver useTecladoPropio).
+   */
+  cederAPantallas?: boolean;
 };
+
+/** Pantallas enfocadas que manejan el teclado por su cuenta (Buscar). */
+let pantallasConTecladoPropio = 0;
+
+/**
+ * Para una pantalla que deja ella misma el espacio del teclado (solo en su
+ * lista): mientras está al frente, la raíz no cambia de alto. Cambiar el alto
+ * de la raíz recalcula todas las pantallas montadas, también las de atrás con
+ * sus fotos, y la búsqueda se trababa al abrir y cerrar.
+ */
+export function useTecladoPropio() {
+  useFocusEffect(
+    useCallback(() => {
+      pantallasConTecladoPropio++;
+      return () => {
+        pantallasConTecladoPropio--;
+      };
+    }, []),
+  );
+}
 
 /** Aire entre el campo enfocado y el teclado: sin él queda pegado al borde. */
 export const AIRE_TECLADO = 16;
@@ -68,13 +94,14 @@ export function tramoTapado(y: number, alto: number, arribaTeclado: number, desc
   return tapado > 0 ? tapado + AIRE_TECLADO : 0;
 }
 
-export default function EspacioTeclado({ descontar = 0, minimo = 0, style, children, ...props }: Props) {
+export default function EspacioTeclado({ descontar = 0, minimo = 0, cederAPantallas = false, style, children, ...props }: Props) {
   const ref = useRef<View>(null);
   const [tapado, setTapado] = useState(0);
 
   useEffect(() => {
     const ios = Platform.OS === 'ios';
     const medir = (e: KeyboardEvent) => {
+      if (cederAPantallas && pantallasConTecladoPropio > 0) return;
       const arriba = e.endCoordinates.screenY;
       ref.current?.measureInWindow((_x, y, _ancho, alto) => {
         setTapado(tramoTapado(y, alto, arriba, descontar));
@@ -86,7 +113,7 @@ export default function EspacioTeclado({ descontar = 0, minimo = 0, style, child
       abre.remove();
       cierra.remove();
     };
-  }, [descontar]);
+  }, [descontar, cederAPantallas]);
 
   return (
     <View ref={ref} style={[style, Math.max(tapado, minimo) > 0 && { paddingBottom: Math.max(tapado, minimo) }]} {...props}>

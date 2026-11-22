@@ -1,6 +1,17 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  BackHandler,
+  FlatList,
+  Keyboard,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   buscarProductos,
@@ -13,6 +24,7 @@ import {
 } from '../api';
 import { useAuth } from '../AuthContext';
 import { PressableScale } from '../components/anim';
+import { useTecladoPropio } from '../components/EspacioTeclado';
 import Icon from '../components/Icon';
 import { FilaResultado, FiltroChip, metaNegocio, normalizar, SinResultados } from '../components/ResultadosBusqueda';
 import { RootStackParamList } from '../navTypes';
@@ -110,6 +122,17 @@ export default function BuscarScreen({ navigation, route }: Props) {
   const [refrescando, setRefrescando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const buscadorRef = useRef<TextInput>(null);
+  // El teclado lo maneja esta pantalla: solo la lista deja su espacio abajo.
+  useTecladoPropio();
+  const [altoTeclado, setAltoTeclado] = useState(0);
+  useEffect(() => {
+    const abre = Keyboard.addListener('keyboardDidShow', e => setAltoTeclado(e.endCoordinates.height));
+    const cierra = Keyboard.addListener('keyboardDidHide', () => setAltoTeclado(0));
+    return () => {
+      abre.remove();
+      cierra.remove();
+    };
+  }, []);
   // Solo vale la respuesta de la última petición: una búsqueda vieja que llegue
   // tarde no puede pisar los resultados de la nueva.
   const ultimaPeticion = useRef(0);
@@ -132,9 +155,42 @@ export default function BuscarScreen({ navigation, route }: Props) {
     return () => { vigente = false; };
   }, [auth, seccion]);
 
-  // El teclado sale al terminar de entrar a la pantalla (autoFocus solo, a
-  // veces, no lo abre en Android mientras corre la animación).
-  useEffect(() => navigation.addListener('transitionEnd', () => buscadorRef.current?.focus()), [navigation]);
+  // El teclado sale cuando la pantalla ya está puesta: abrirlo mientras se
+  // monta cambia el alto de toda la app a la vez y se trababa.
+  useEffect(() => {
+    const t = setTimeout(() => buscadorRef.current?.focus(), 80);
+    return () => clearTimeout(t);
+  }, []);
+
+  /** Salir: primero baja el teclado y luego vuelve, para no hacer las dos cosas a la vez. */
+  const salir = useCallback(() => {
+    if (!Keyboard.isVisible()) {
+      navigation.goBack();
+      return;
+    }
+    let salio = false;
+    const volver = () => {
+      if (salio) return;
+      salio = true;
+      sub.remove();
+      clearTimeout(respaldo);
+      navigation.goBack();
+    };
+    const sub = Keyboard.addListener('keyboardDidHide', volver);
+    // Si el aviso no llega, no se queda trabada la flecha.
+    const respaldo = setTimeout(volver, 400);
+    Keyboard.dismiss();
+  }, [navigation]);
+
+  // El botón atrás de Android hace lo mismo que la flecha. Con el teclado
+  // abierto, Android lo usa primero para bajarlo.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      salir();
+      return true;
+    });
+    return () => sub.remove();
+  }, [salir]);
 
   /** Lo que se le pide a la API para un texto, con los filtros de ahora. */
   const pedir = useCallback(
@@ -236,8 +292,11 @@ export default function BuscarScreen({ navigation, route }: Props) {
     setSoloAbiertos(false);
   }
 
-  const abrirNegocio = (n: { id: number; nombre: string }, productoId?: number) =>
+  const abrirNegocio = (n: { id: number; nombre: string }, productoId?: number) => {
+    // La tienda no maneja el teclado como esta pantalla: se baja antes de ir.
+    Keyboard.dismiss();
     navigation.navigate('Negocio', { id: n.id, nombre: n.nombre, seccion, ...(productoId ? { productoId } : {}) });
+  };
 
   const filtrosPuestos = modo !== 'todo' || soloAbiertos || filtroId != null;
   const opcionElegida = opciones.find(o => o.id === filtroId) ?? null;
@@ -283,7 +342,7 @@ export default function BuscarScreen({ navigation, route }: Props) {
         <PressableScale
           style={styles.atras}
           scaleTo={0.9}
-          onPress={() => navigation.goBack()}
+          onPress={salir}
           accessibilityRole="button"
           accessibilityLabel="Volver">
           <Icon name="atras" size={22} color={c.textStrong} />
@@ -298,7 +357,6 @@ export default function BuscarScreen({ navigation, route }: Props) {
             placeholder={placeholder}
             placeholderTextColor={c.mutedSoft}
             autoCapitalize="none"
-            autoFocus
             returnKeyType="search"
           />
           {busqueda.length > 0 && (
@@ -315,7 +373,9 @@ export default function BuscarScreen({ navigation, route }: Props) {
         keyExtractor={fila => fila.key}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-        contentContainerStyle={styles.listaContenido}
+        // Lo que tapa el teclado, menos la barra de navegación que la
+        // pantalla ya deja libre.
+        contentContainerStyle={{ paddingBottom: 24 + Math.max(0, altoTeclado - insets.bottom) }}
         refreshControl={
           <RefreshControl
             refreshing={refrescando}
@@ -453,7 +513,6 @@ const useStyles = makeStyles(c => ({
     fontFamily: font.regular,
   },
   lista: { flex: 1 },
-  listaContenido: { paddingBottom: 24 },
   filaChips: { gap: 8, paddingHorizontal: 20, alignItems: 'center' },
   separadorChips: { width: 1, height: 22, backgroundColor: c.border, marginHorizontal: 4 },
   filtrosTitulo: {

@@ -14,6 +14,11 @@ import BuscarScreen from '../src/screens/BuscarScreen';
 const mockSesion = { auth: { token: 't', user: { id: 7, name: 'Ana María', roles: ['usuario'] } } };
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 jest.mock('../src/AuthContext', () => ({ useAuth: () => mockSesion }));
+// Sin navegador no hay foco: la pantalla se toma como enfocada al montarse.
+jest.mock('@react-navigation/native', () => ({
+  ...jest.requireActual('@react-navigation/native'),
+  useFocusEffect: (callback: () => void) => { require('react').useEffect(callback, [callback]); },
+}));
 
 jest.mock('../src/api', () => ({
   ...jest.requireActual('../src/api'),
