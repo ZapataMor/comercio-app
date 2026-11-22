@@ -12,6 +12,12 @@ import ExplorarScreen from '../src/screens/ExplorarScreen';
 
 const mockSesion = { auth: { token: 't', user: { id: 7, name: 'Ana', roles: ['usuario'] } } };
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
+// La barra de catálogos (con "Mi perfil") tiene su propia prueba.
+jest.mock('../src/components/BarraCatalogo', () => ({
+  ...jest.requireActual('../src/components/BarraCatalogo'),
+  __esModule: true,
+  default: () => null,
+}));
 jest.mock('../src/AuthContext', () => ({ useAuth: () => mockSesion }));
 jest.mock('../src/api', () => ({
   ...jest.requireActual('../src/api'),

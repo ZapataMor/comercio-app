@@ -8,6 +8,14 @@ import { Animated } from 'react-native';
 import ReactTestRenderer, { act } from 'react-test-renderer';
 import BarraCatalogo from '../src/components/BarraCatalogo';
 
+const mockAbrir = jest.fn();
+const mockOpciones = () => [];
+jest.mock('../src/AuthContext', () => ({ useAuth: () => ({ auth: { user: { name: 'Ana' } } }) }));
+jest.mock('../src/components/HeaderPerfil', () => ({ useOpcionesPerfil: () => mockOpciones }));
+jest.mock('../src/components/PanelInferior', () => ({
+  usePanelInferior: () => ({ abrir: mockAbrir, abierto: false }),
+}));
+
 async function montar(seccion: 'productos' | 'servicios' | 'propiedades', cambiar = jest.fn()) {
   let raiz!: ReactTestRenderer.ReactTestRenderer;
   await act(async () => {
@@ -40,5 +48,14 @@ test('tocar otra pestaña cambia el catálogo; la activa no hace nada', async ()
   expect(cambiar).toHaveBeenLastCalledWith('servicios');
   tocar('Productos');
   expect(cambiar).toHaveBeenCalledTimes(2);
+  act(() => raiz.unmount());
+});
+
+test('al final va "Mi perfil" con la inicial, y abre sus opciones en el panel', async () => {
+  const raiz = await montar('productos');
+  const perfil = raiz.root.find(n => typeof n.type !== 'string' && n.props.accessibilityLabel === 'Mi perfil' && !!n.props.onPress);
+  expect(raiz.root.findAll(n => n.props.children === 'A').length).toBeGreaterThan(0);
+  act(() => perfil.props.onPress());
+  expect(mockAbrir).toHaveBeenCalledWith(mockOpciones, 'Mi perfil');
   act(() => raiz.unmount());
 });

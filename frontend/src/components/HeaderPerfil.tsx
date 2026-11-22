@@ -1,7 +1,9 @@
 import ReembolsosPerfil from './ReembolsosPerfil';
 /**
  * Botón "Mi perfil" de la topbar (parte superior derecha), visible para
- * TODOS los roles. Solo muestra el ícono de la persona; al tocarlo despliega
+ * TODOS los roles. En Explorar va en la barra inferior (BarraCatalogo) y se
+ * abre como un panel que sube: ahí la topbar lo lleva con `menu={false}`, y
+ * ambos usan las mismas opciones (useOpcionesPerfil). Solo muestra el ícono de la persona; al tocarlo despliega
  * justo debajo (MenuDesplegable) el menú de la cuenta PERSONAL (la persona,
  * no el negocio): recuadros pequeños con "Mi información", "Mis negocios" y
  * "Privacidad", y al final "Cerrar sesión". Estando en sus negocios, en vez
@@ -35,7 +37,7 @@ import HeaderConfiabilidad from './HeaderConfiabilidad';
 import HeaderNegocios from './HeaderNegocios';
 import HeaderTurno from './HeaderTurno';
 import Icon, { IconName } from './Icon';
-import MenuDesplegable, { OpcionMenu } from './MenuDesplegable';
+import MenuDesplegable, { Elegir, OpcionMenu } from './MenuDesplegable';
 import { Objetivo } from '../tutorial/Objetivo';
 import { useTutorial } from '../tutorial/contexto';
 
@@ -105,7 +107,11 @@ const inicial = (u: Usuario) => u.name.trim().charAt(0).toUpperCase() || '?';
 /** Correo o, si se registró con el celular, el celular. */
 const contacto = (u: Usuario) => u.email || u.telefono || '';
 
-export default function HeaderPerfil() {
+/**
+ * Las opciones del menú de la cuenta: devuelve la función que arma sus
+ * renglones (se llama al abrir el menú o el panel).
+ */
+export function useOpcionesPerfil(): (elegir: Elegir) => React.ReactNode[] {
   const styles = useStyles();
   const { c } = useTheme();
   const { auth, cuentas, actualizarUsuario, cambiarCuenta, agregarCuenta, salir, salirDeTodas } = useAuth();
@@ -177,16 +183,7 @@ export default function HeaderPerfil() {
     }
   }
 
-  return (
-    <View style={styles.fila}>
-      <HeaderConfiabilidad />
-      <HeaderTurno />
-      <HeaderNegocios />
-      <Objetivo id="perfil.menu" enBarra>
-      <MenuDesplegable
-        icono="usuario"
-        etiqueta="Mi perfil"
-        renglones={elegir => [
+  return (elegir: Elegir) => [
           !!user && (
             <View style={styles.cabecera}>
               <View style={styles.avatar}>
@@ -251,9 +248,23 @@ export default function HeaderPerfil() {
               onPress={() => elegir(cerrarTodas)}
             />
           ),
-        ]}
-      />
-      </Objetivo>
+        ];
+}
+
+/** `menu={false}`: sin el ícono de usuario (en Explorar va en la barra inferior). */
+export default function HeaderPerfil({ menu = true }: { menu?: boolean }) {
+  const styles = useStyles();
+  const opciones = useOpcionesPerfil();
+  return (
+    <View style={styles.fila}>
+      <HeaderConfiabilidad />
+      <HeaderTurno />
+      <HeaderNegocios />
+      {menu && (
+        <Objetivo id="perfil.menu" enBarra>
+          <MenuDesplegable icono="usuario" etiqueta="Mi perfil" renglones={opciones} />
+        </Objetivo>
+      )}
     </View>
   );
 }

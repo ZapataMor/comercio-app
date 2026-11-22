@@ -165,7 +165,7 @@ export const TUTORIALES: Tutorial[] = [
       {
         objetivo: 'perfil.menu',
         titulo: 'Abre tu perfil',
-        texto: 'Toca este ícono y elige «Ser domiciliario». Sigues siendo cliente: puedes comprar como siempre.',
+        texto: 'Toca tu perfil, en la barra de abajo, y elige «Ser domiciliario». Sigues siendo cliente: puedes comprar como siempre.',
       },
     ],
   },

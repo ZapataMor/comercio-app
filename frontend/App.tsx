@@ -197,9 +197,15 @@ function Navegacion({ listo }: { listo: boolean }) {
                 <Stack.Screen
                   name="Explorar"
                   component={ExplorarScreen}
-                  // Productos, Servicios y Propiedades van en la barra
-                  // inferior de la pantalla, que llega hasta el borde.
-                  options={{ title: 'Vitrina', headerTitle: tituloVitrina, ...bordeABorde }}
+                  // Productos, Servicios, Propiedades y "Mi perfil" van en la
+                  // barra inferior de la pantalla, que llega hasta el borde:
+                  // arriba quedan solo los botones de negocio y domiciliario.
+                  options={{
+                    title: 'Vitrina',
+                    headerTitle: tituloVitrina,
+                    headerRight: () => <HeaderPerfil menu={false} />,
+                    ...bordeABorde,
+                  }}
                 />
                 <Stack.Screen
                   name="Negocio"

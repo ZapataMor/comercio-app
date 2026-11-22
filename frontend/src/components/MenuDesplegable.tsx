@@ -81,6 +81,11 @@ const CapaContext = createContext<Capa | null>(null);
 
 let aperturas = 0;
 
+/** Para otras piezas que se pintan en la capa de los menús (PanelInferior). */
+export const useCapaMenus = () => useContext(CapaContext);
+/** Número único de apertura, compartido con los menús. */
+export const nuevaApertura = () => ++aperturas;
+
 /**
  * Capa sobre toda la app donde se pintan los menús abiertos. Va FUERA de la
  * parte que se desenfoca (AppDesenfocable, en App.tsx), así el menú queda

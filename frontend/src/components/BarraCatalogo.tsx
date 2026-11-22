@@ -1,7 +1,9 @@
 /**
  * Barra de Explorar, como la de Instagram: una píldora flotante abajo con los
- * tres catálogos (Productos, Servicios y Propiedades), solo con íconos. El
- * activo lleva una píldora suave detrás; tocar otro cambia el catálogo.
+ * tres catálogos (Productos, Servicios y Propiedades), solo con íconos, y al
+ * final "Mi perfil" (la inicial de la persona), que abre sus opciones en un
+ * panel que sube (PanelInferior). El activo lleva una píldora suave detrás;
+ * tocar otro catálogo lo cambia.
  *
  * Mientras la lista se desplaza la barra se encoge y se vuelve translúcida
  * (deja ver lo de atrás); al quedarse quieta vuelve a su tamaño. Las listas
@@ -12,11 +14,14 @@
  * teclado abierto (escribiendo en el buscador) se esconde.
  */
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { Animated, Keyboard, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Keyboard, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useAuth } from '../AuthContext';
 import { SeccionCatalogo } from '../navTypes';
-import { makeStyles, radius, useTheme } from '../theme';
+import { font, makeStyles, radius, useTheme } from '../theme';
 import { Objetivo } from '../tutorial/Objetivo';
+import { useOpcionesPerfil } from './HeaderPerfil';
 import Icon, { IconName } from './Icon';
+import { usePanelInferior } from './PanelInferior';
 
 export const SECCIONES: { valor: SeccionCatalogo; titulo: string; icono: IconName }[] = [
   { valor: 'productos', titulo: 'Productos', icono: 'bolsa' },
@@ -127,8 +132,32 @@ export default function BarraCatalogo({
             </Pressable>
           );
         })}
+        <PestanaPerfil />
       </Objetivo>
     </Animated.View>
+  );
+}
+
+/** "Mi perfil": la inicial de la persona; abre sus opciones en un panel que sube. */
+function PestanaPerfil() {
+  const styles = useStyles();
+  const { auth } = useAuth();
+  const opciones = useOpcionesPerfil();
+  const panel = usePanelInferior();
+  const inicial = auth?.user.name.trim().charAt(0).toUpperCase() || '?';
+  return (
+    <Pressable
+      style={styles.pestana}
+      accessibilityRole="button"
+      accessibilityLabel="Mi perfil"
+      accessibilityState={{ expanded: panel.abierto }}
+      onPress={() => panel.abrir(opciones, 'Mi perfil')}>
+      <Objetivo id="perfil.menu" style={[styles.marca, panel.abierto && styles.marcaActiva]}>
+        <View style={[styles.avatar, panel.abierto && styles.avatarActivo]}>
+          <Text style={styles.avatarTxt}>{inicial}</Text>
+        </View>
+      </Objetivo>
+    </Pressable>
   );
 }
 
@@ -174,11 +203,22 @@ const useStyles = makeStyles((c, shadow) => ({
   // Radio exacto (la mitad del alto): con radius.pill (999) algunos
   // teléfonos dibujan la píldora activa con esquinas rectas.
   marca: {
-    width: 84,
+    width: 72,
     height: 48,
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
   marcaActiva: { backgroundColor: c.surface2 },
+  avatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: c.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Abierto, un aro como el de la foto de perfil en Instagram.
+  avatarActivo: { borderWidth: 2, borderColor: c.textStrong },
+  avatarTxt: { color: c.onAccent, fontFamily: font.displayExtra, fontSize: 14 },
 }));
