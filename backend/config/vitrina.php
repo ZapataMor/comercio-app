@@ -14,6 +14,12 @@ return [
 
     'ciudad' => env('VITRINA_CIUDAD', 'Maicao, La Guajira, Colombia'),
 
+    // Dirección y teléfono del responsable. El Decreto 1377 de 2013 (art. 13)
+    // exige que la política de privacidad los muestre: llenarlos en producción.
+    // Vacíos, la política no muestra esas líneas.
+    'direccion' => env('VITRINA_DIRECCION', ''),
+    'telefono' => env('VITRINA_TELEFONO', ''),
+
     // Fotos de referencia (frente y calle a cada lado) al guardar una dirección
     // de entrega. Opcionales mientras se prueba; en producción poner true y
     // cambiar también FOTOS_OBLIGATORIAS en frontend/src/components/FotosDireccion.tsx.

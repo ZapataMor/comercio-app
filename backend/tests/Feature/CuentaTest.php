@@ -144,6 +144,24 @@ test('la política de privacidad es pública', function () {
     $this->get('/privacidad')->assertOk()->assertSee('Ley 1581 de 2012');
 });
 
+test('la política de privacidad muestra la dirección y el teléfono del responsable', function () {
+    config(['vitrina.direccion' => 'Calle 12 # 15-30, barrio Centro', 'vitrina.telefono' => '300 123 4567']);
+
+    $this->get('/privacidad')->assertOk()
+        ->assertSee('Calle 12 # 15-30, barrio Centro')
+        ->assertSee('300 123 4567')
+        ->assertSee('o llámanos al 300 123 4567');
+});
+
+test('sin dirección ni teléfono la política no muestra esas líneas', function () {
+    config(['vitrina.direccion' => '', 'vitrina.telefono' => '']);
+
+    $this->get('/privacidad')->assertOk()
+        ->assertDontSee('Dirección:</strong>', false)
+        ->assertDontSee('Teléfono:</strong>', false)
+        ->assertDontSee('o llámanos al');
+});
+
 // ---------------------------------------------------------------------------
 // Cuenta suspendida
 // ---------------------------------------------------------------------------

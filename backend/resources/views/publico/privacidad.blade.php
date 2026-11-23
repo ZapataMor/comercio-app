@@ -7,6 +7,8 @@
     $responsable = config('vitrina.responsable');
     $correo = config('vitrina.correo_contacto');
     $ciudad = config('vitrina.ciudad');
+    $direccion = config('vitrina.direccion');
+    $telefono = config('vitrina.telefono');
 @endphp
 <article class="bg-white rounded-2xl shadow p-6 space-y-4 text-sm leading-relaxed">
     <h1 class="text-xl font-bold">Política de tratamiento de datos personales de Vitrina</h1>
@@ -17,6 +19,18 @@
         <strong>Vitrina</strong>, recoge, usa y protege tus datos personales, de acuerdo con la Ley 1581 de 2012,
         el Decreto 1377 de 2013 y demás normas colombianas de protección de datos.
     </p>
+
+    <ul class="rounded-xl bg-slate-50 p-4 space-y-1">
+        <li><strong>Responsable:</strong> {{ $responsable }}</li>
+        <li><strong>Domicilio:</strong> {{ $ciudad }}</li>
+        @if (filled($direccion))
+            <li><strong>Dirección:</strong> {{ $direccion }}</li>
+        @endif
+        @if (filled($telefono))
+            <li><strong>Teléfono:</strong> {{ $telefono }}</li>
+        @endif
+        <li><strong>Correo:</strong> <a class="text-indigo-600 underline" href="mailto:{{ $correo }}">{{ $correo }}</a></li>
+    </ul>
 
     <h2 class="font-semibold text-base">1. Qué datos recogemos</h2>
     <ul class="list-disc pl-5 space-y-1">
@@ -63,7 +77,7 @@
         <li>Presentar quejas ante la Superintendencia de Industria y Comercio.</li>
     </ul>
     <p>
-        Escríbenos a <a class="text-indigo-600 underline" href="mailto:{{ $correo }}">{{ $correo }}</a>.
+        Escríbenos a <a class="text-indigo-600 underline" href="mailto:{{ $correo }}">{{ $correo }}</a>@if (filled($telefono)) o llámanos al {{ $telefono }}@endif.
         Respondemos consultas en máximo 10 días hábiles y reclamos en máximo 15 días hábiles.
     </p>
 

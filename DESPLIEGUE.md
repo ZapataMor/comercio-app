@@ -172,6 +172,10 @@ SENTRY_LARAVEL_DSN=...
 VITRINA_RESPONSABLE="Nombre de la persona o empresa responsable"
 VITRINA_CORREO_CONTACTO=soporte@tudominio.co
 VITRINA_CIUDAD="Maicao, La Guajira, Colombia"
+# Obligatorios: el Decreto 1377 de 2013 exige que la política muestre la dirección
+# y el teléfono del responsable. Vacíos, la política no los muestra.
+VITRINA_DIRECCION="Calle 00 # 00-00, barrio, Maicao"
+VITRINA_TELEFONO="300 000 0000"
 ```
 
 > En desarrollo `MAIL_MAILER=log`: el código de recuperación aparece en
