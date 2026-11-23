@@ -9,9 +9,11 @@ beforeEach(function () {
     }
 });
 
-test('la raíz redirige a quien no ha iniciado sesión', function () {
-    // '/' manda al panel del admin; sin sesión, ese flujo termina en /login.
-    $this->get('/')->assertRedirect();
+test('el sitio público se ve sin iniciar sesión', function () {
+    $this->get('/')->assertOk()->assertSee('Descargar en Google Play');
+    $this->get('/como-funciona')->assertOk()->assertSee('Domiciliarios');
+    $this->get('/planes')->assertOk()->assertSee('Elegir plan mensual');
+    $this->get('/cuenta/entrar')->assertOk()->assertSee('Iniciar sesión');
 });
 
 test('la web solo deja entrar a administradores', function () {
@@ -50,8 +52,7 @@ test('las sesiones existentes no conservan acceso a la web retirada', function (
     $cliente = User::factory()->create();
     $cliente->assignRole('usuario');
 
-    $this->actingAs($cliente)->get('/')->assertRedirect('/admin');
-    $this->get('/admin')->assertForbidden();
+    $this->actingAs($cliente)->get('/admin')->assertForbidden();
     $this->get('/pruebas')->assertNotFound();
     $this->getJson('/pruebas/api/sesion')->assertNotFound();
     $this->postJson('/pruebas/api/pedidos', [])->assertNotFound();

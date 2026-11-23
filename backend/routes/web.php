@@ -4,11 +4,18 @@ use App\Http\Controllers\Web\AdminController;
 use App\Http\Controllers\Web\AuthWebController;
 use App\Http\Controllers\Web\OperacionController;
 use App\Http\Controllers\Web\PublicoController;
+use App\Http\Controllers\Web\SitioController;
 use App\Http\Middleware\AdminWeb;
 use Illuminate\Support\Facades\Route;
 
-// La web es exclusiva del administrador.
-Route::redirect('/', '/admin');
+// --- Sitio público de Vitrina (sin sesión) ---
+Route::controller(SitioController::class)->name('sitio.')->group(function () {
+    Route::get('/', 'inicio')->name('inicio');
+    Route::get('/como-funciona', 'comoFunciona')->name('como-funciona');
+    Route::get('/planes', 'planes')->name('planes');
+    // Acceso de los negocios al pago de su membresía (aún sin funcionalidad).
+    Route::get('/cuenta/entrar', 'entrar')->name('entrar');
+});
 
 // --- Páginas públicas que exige Play Store (sin sesión) ---
 Route::get('/privacidad', [PublicoController::class, 'privacidad'])->name('privacidad');
