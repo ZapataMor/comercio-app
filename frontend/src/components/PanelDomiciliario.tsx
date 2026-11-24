@@ -327,7 +327,9 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
                       icono="casa"
                       etiqueta="Entregar a"
                       titulo={p.cliente?.name ?? 'Cliente'}
-                      detalle={p.direccion_entrega || undefined}
+                      detalle={p.direccion_entrega
+                        ? `${p.direccion_entrega}${p.entrega_indicaciones ? `\nIndicaciones: ${p.entrega_indicaciones}` : ''}`
+                        : undefined}
                       activa={!haciaNegocio}
                       hecha={p.estado === 'entregado'}
                     />
@@ -604,7 +606,11 @@ function resumenPago(p: Pedido, c: Colores): { titulo: string; texto: string; mo
     return { titulo: 'Devolución pendiente', texto: 'Devuelve el pedido al comercio y espera su confirmación para cerrar la entrega.', icono: 'caja', fg: c.info, bg: c.infoSoft };
   }
   if (p.cobrar > 0) {
-    return { titulo: 'Cobrar al cliente', texto: 'En efectivo, al entregar.', monto: cop(p.cobrar), icono: 'efectivo', fg: c.goldText, bg: c.accentSoft };
+    // Con qué billete dijo que paga: el cambio que hay que llevar.
+    const texto = p.paga_con != null && p.paga_con > p.cobrar
+      ? `En efectivo, al entregar. Paga con ${cop(p.paga_con)}: lleva ${cop(p.paga_con - p.cobrar)} de cambio.`
+      : 'En efectivo, al entregar. Dijo que paga con el valor exacto.';
+    return { titulo: 'Cobrar al cliente', texto, monto: cop(p.cobrar), icono: 'efectivo', fg: c.goldText, bg: c.accentSoft };
   }
   // Solo llega aquí con la transferencia ya confirmada por el negocio.
   const domicilio = p.domicilio_lo_entrega_negocio && p.costo_domicilio > 0

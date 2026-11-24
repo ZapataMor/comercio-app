@@ -88,7 +88,7 @@ export const useEstilosAcceso = makeStyles((c, _sombras, l) => ({
     marginBottom: 16,
   },
   recuadroTexto: { flex: 1 },
-  recuadroEtiqueta: { color: l.rotulo, opacity: 0.8, fontFamily: font.bold, fontSize: 11, letterSpacing: 1.1 },
+  recuadroEtiqueta: { color: l.rotulo, opacity: 0.85, fontFamily: font.semibold, fontSize: 13, letterSpacing: 0.2 },
   recuadroValor: { color: l.campoTexto, fontFamily: font.semibold, fontSize: 15, marginTop: 2 },
   recuadroAccion: { color: l.rotulo, fontFamily: font.bold, fontSize: 13, textDecorationLine: 'underline' },
   // Casilla de la política de privacidad.

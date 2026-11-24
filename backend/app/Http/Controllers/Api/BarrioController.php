@@ -4,7 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Barrio;
+use App\Models\Negocio;
+use App\Models\Propiedad;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class BarrioController extends Controller
 {
@@ -19,6 +22,33 @@ class BarrioController extends Controller
             ->get(['id', 'nombre']);
 
         return response()->json(['barrios' => $barrios]);
+    }
+
+    /**
+     * Más o menos dónde queda un barrio: el promedio de los negocios y las
+     * propiedades publicadas en él que tienen su punto en el mapa. Con eso el
+     * mapa para marcar la casa abre en el barrio y no en toda la ciudad. Solo
+     * se usan puntos públicos: nunca la casa de otro cliente.
+     */
+    public function centro(Request $request): JsonResponse
+    {
+        $nombre = mb_strtolower(trim((string) $request->validate([
+            'nombre' => ['required', 'string', 'max:120'],
+        ])['nombre']));
+
+        $puntos = Negocio::query()
+            ->whereNull('vetado_at')->whereNull('archivado_at')->whereNull('desactivado_at')
+            ->whereNotNull('lat')->whereNotNull('lng')
+            ->whereRaw('LOWER(barrio) = ?', [$nombre])
+            ->get(['lat', 'lng'])
+            ->concat(Propiedad::publicadas()->whereRaw('LOWER(barrio) = ?', [$nombre])->get(['lat', 'lng']))
+            ->map(fn ($p) => ['lat' => (float) $p->lat, 'lng' => (float) $p->lng])
+            ->filter(fn ($p) => $p['lat'] && $p['lng']);
+
+        return response()->json(['centro' => $puntos->isEmpty() ? null : [
+            'lat' => round($puntos->avg('lat'), 6),
+            'lng' => round($puntos->avg('lng'), 6),
+        ]]);
     }
 
     /**

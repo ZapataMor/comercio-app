@@ -27,6 +27,7 @@ import { PressableScale } from '../components/anim';
 import { useTecladoPropio } from '../components/EspacioTeclado';
 import Icon from '../components/Icon';
 import { FilaResultado, FiltroChip, metaNegocio, normalizar, SinResultados } from '../components/ResultadosBusqueda';
+import { messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
 import { precioDe } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
@@ -229,7 +230,7 @@ export default function BuscarScreen({ navigation, route }: Props) {
           setVista({ consulta: t, plan: r.plan });
         })
         .catch(e => {
-          if (turno === ultimaPeticion.current) setError(e.message);
+          if (turno === ultimaPeticion.current) setError(messageFromError(e));
         })
         .finally(() => {
           if (turno !== ultimaPeticion.current) return;
@@ -273,10 +274,11 @@ export default function BuscarScreen({ navigation, route }: Props) {
     setFiltroId(id);
   }
 
-  // «Negocios» y «Productos» se prenden y apagan: ninguno = buscar todo.
-  function elegirModo(nuevo: Exclude<Modo, 'todo'>) {
+  // «Todo», «Negocios» o «Productos»: siempre uno elegido, como un selector.
+  function elegirModo(nuevo: Modo) {
+    if (nuevo === modo) return;
     alCambiarFiltro();
-    setModo(actual => (actual === nuevo ? 'todo' : nuevo));
+    setModo(nuevo);
   }
 
   function elegirAbiertos(valor: boolean) {
@@ -386,33 +388,30 @@ export default function BuscarScreen({ navigation, route }: Props) {
         }
         ListHeaderComponent={
           <View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={styles.filaChips}>
-              {seccion === 'productos' && (
-                <>
-                  <FiltroChip
-                    texto="Negocios"
-                    icono="tienda"
-                    activo={modo === 'negocios'}
-                    ayuda="Solo negocios con ese nombre o parecido"
-                    onPress={() => elegirModo('negocios')}
-                  />
-                  <FiltroChip
-                    texto="Productos"
-                    icono="caja"
-                    activo={modo === 'productos'}
-                    ayuda="Solo productos"
-                    onPress={() => elegirModo('productos')}
-                  />
-                  <View style={styles.separadorChips} />
-                </>
-              )}
-              <FiltroChip texto="Abierto ahora" icono="reloj" activo={soloAbiertos} onPress={() => elegirAbiertos(true)} />
-              <FiltroChip texto="Todos" activo={!soloAbiertos} ayuda="Abiertos y cerrados" onPress={() => elegirAbiertos(false)} />
-            </ScrollView>
+            {/* Cada grupo en su fila, con su título: qué buscar y qué mostrar. */}
+            {seccion === 'productos' && (
+              <FilaFiltros titulo="Buscar">
+                <FiltroChip texto="Todo" activo={modo === 'todo'} ayuda="Negocios y productos" onPress={() => elegirModo('todo')} />
+                <FiltroChip
+                  texto="Negocios"
+                  icono="tienda"
+                  activo={modo === 'negocios'}
+                  ayuda="Solo negocios con ese nombre o parecido"
+                  onPress={() => elegirModo('negocios')}
+                />
+                <FiltroChip
+                  texto="Productos"
+                  icono="caja"
+                  activo={modo === 'productos'}
+                  ayuda="Solo productos"
+                  onPress={() => elegirModo('productos')}
+                />
+              </FilaFiltros>
+            )}
+            <FilaFiltros titulo="Mostrar">
+              <FiltroChip texto="Solo abiertos" icono="reloj" activo={soloAbiertos} ayuda="Solo los negocios abiertos ahora" onPress={() => elegirAbiertos(true)} />
+              <FiltroChip texto="Abiertos y cerrados" activo={!soloAbiertos} onPress={() => elegirAbiertos(false)} />
+            </FilaFiltros>
             {opciones.length > 0 && (
               <>
                 <Text style={styles.filtrosTitulo}>Categorías</Text>
@@ -458,7 +457,9 @@ export default function BuscarScreen({ navigation, route }: Props) {
                   icono="tienda"
                   nombre={item.negocio.nombre}
                   linea={metaNegocio(item.negocio, seccion === 'productos')}
-                  detalle={item.negocio.abierto ? null : item.negocio.estado_texto ?? 'Cerrado'}
+                  detalle={item.negocio.abierto
+                    ? null
+                    : [item.negocio.estado_texto ?? 'Cerrado', item.negocio.abre_texto].filter(Boolean).join(' · ')}
                   resenas={item.negocio.resenas}
                   index={index}
                   onPress={() => abrirNegocio(item.negocio)}
@@ -483,6 +484,23 @@ export default function BuscarScreen({ navigation, route }: Props) {
           }
         }}
       />
+    </View>
+  );
+}
+
+/** Un grupo de filtros en su fila: el título a la izquierda y las opciones al lado. */
+function FilaFiltros({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+  const styles = useStyles();
+  return (
+    <View style={styles.filaFiltros}>
+      <Text style={styles.filaTitulo}>{titulo}</Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.filaOpciones}>
+        {children}
+      </ScrollView>
     </View>
   );
 }
@@ -514,13 +532,15 @@ const useStyles = makeStyles(c => ({
   },
   lista: { flex: 1 },
   filaChips: { gap: 8, paddingHorizontal: 20, alignItems: 'center' },
-  separadorChips: { width: 1, height: 22, backgroundColor: c.border, marginHorizontal: 4 },
+  filaFiltros: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  filaTitulo: { width: 86, paddingLeft: 20, color: c.muted, fontFamily: font.semibold, fontSize: 14 },
+  filaOpciones: { gap: 8, paddingRight: 20, alignItems: 'center' },
   filtrosTitulo: {
     color: c.muted,
-    fontFamily: font.medium,
-    fontSize: 12,
+    fontFamily: font.semibold,
+    fontSize: 14,
     paddingHorizontal: 20,
-    marginTop: 12,
+    marginTop: 4,
     marginBottom: 8,
   },
   seccion: {

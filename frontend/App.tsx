@@ -16,7 +16,6 @@ import { PedidoPendienteProvider } from './src/PedidoPendienteContext';
 import VigilarCarrito from './src/components/VigilarCarrito';
 import EnvioPedidoAviso from './src/components/EnvioPedidoAviso';
 import AvisoPedidoNuevo from './src/components/AvisoPedidoNuevo';
-import AvisoCarritoPorVencer from './src/components/AvisoCarritoPorVencer';
 import AvisoCompletarInfo from './src/components/AvisoCompletarInfo';
 import BarraCliente from './src/components/BarraCliente';
 import { ConfirmacionProvider } from './src/components/Confirmacion';
@@ -481,7 +480,6 @@ function AppContenido() {
                   <Navegacion listo={!splashVisible} />
                   {!splashVisible && <EnvioPedidoAviso />}
                   {!splashVisible && <VigilarCarrito />}
-                  <AvisoCarritoPorVencer listo={!splashVisible} />
                   <BotonAyuda />
                   {splashVisible && <SplashVitrina onFin={ocultarSplash} />}
                 </RaizTutorial>

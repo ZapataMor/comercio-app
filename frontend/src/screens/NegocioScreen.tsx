@@ -34,11 +34,13 @@ import RecetasPreferidas from '../components/RecetasPreferidas';
 import { PuntajeResenas } from '../components/Resenas';
 import { avisarDesplazamiento } from '../encogerAlDesplazar';
 import { RootStackParamList } from '../navTypes';
-import { precioDe } from '../opcionesProducto';
+import { cop, precioDe, sePersonaliza } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
+import { messageFromError } from '../formErrors';
 import { Objetivo } from '../tutorial/Objetivo';
 import { useAgregarAlCarrito } from '../useAgregarAlCarrito';
+import { useTarifaDomicilio } from '../useTarifaDomicilio';
 import { REFRESCO_NEGOCIOS, temasDelNegocio, useEnVivo, usePolling } from '../usePolling';
 import { EspacioTecladoModal } from '../components/EspacioTeclado';
 
@@ -80,28 +82,51 @@ function construirCatalogo(productos: Producto[]): CatalogoFila[] {
 type TarjetaProps = {
   producto: Producto;
   destacado: boolean;
-  /** Abre la ficha: desde ahí se elige y se agrega al carrito. */
+  /** La tienda está abierta: si no, el botón dice `textoCerrado`. */
+  abierto: boolean;
+  /** «Cerrado» o «Almorzando». */
+  textoCerrado: string;
+  /** Abre la ficha: ahí se ve todo y se elige lo que tenga. */
   onVer: () => void;
+  /** «Agregar»: directo al carrito, o a la ficha si hay algo que elegir. */
+  onAgregar: (e: GestureResponderEvent) => void;
 };
 
-function TarjetaProducto({ producto, destacado, onVer }: TarjetaProps) {
+function TarjetaProducto({ producto, destacado, abierto, textoCerrado, onVer, onAgregar }: TarjetaProps) {
   const { c } = useTheme();
   const styles = useStyles();
   const uri = imagenUrl(producto.imagen);
 
   return (
-    <PressableScale style={styles.tarjeta} scaleTo={0.98} accessibilityRole="button" onPress={onVer}>
-      <View style={[styles.foto, destacado && styles.fotoDestacada]}>
-        {uri ? (
-          <Image source={{ uri }} style={styles.fotoImagen} resizeMode="cover" />
+    <View style={styles.tarjeta}>
+      <PressableScale scaleTo={0.98} accessibilityRole="button" accessibilityLabel={`Ver ${producto.nombre}`} onPress={onVer}>
+        <View style={[styles.foto, destacado && styles.fotoDestacada]}>
+          {uri ? (
+            <Image source={{ uri }} style={styles.fotoImagen} resizeMode="cover" />
+          ) : (
+            <Icon name="caja" size={30} color={c.mutedSoft} />
+          )}
+        </View>
+        <Text style={styles.nombre} numberOfLines={2}>{producto.nombre}</Text>
+        <Text style={styles.precio}>{precioDe(producto)}</Text>
+        <PuntajeResenas resenas={producto.resenas} size={12} style={styles.puntaje} />
+      </PressableScale>
+      <PressableScale
+        style={[styles.agregar, !abierto && styles.agregarCerrado]}
+        scaleTo={0.95}
+        accessibilityRole="button"
+        accessibilityLabel={abierto ? `Agregar ${producto.nombre} al carrito` : `${producto.nombre}: ${textoCerrado.toLowerCase()}`}
+        onPress={onAgregar}>
+        {abierto ? (
+          <>
+            <Icon name="mas" size={16} color={c.onAccent} strokeWidth={2.4} />
+            <Text style={styles.agregarTxt}>Agregar</Text>
+          </>
         ) : (
-          <Icon name="caja" size={30} color={c.mutedSoft} />
+          <Text style={styles.agregarCerradoTxt}>{textoCerrado}</Text>
         )}
-      </View>
-      <Text style={styles.nombre} numberOfLines={2}>{producto.nombre}</Text>
-      <Text style={styles.precio}>{precioDe(producto)}</Text>
-      <PuntajeResenas resenas={producto.resenas} size={12} style={styles.puntaje} />
-    </PressableScale>
+      </PressableScale>
+    </View>
   );
 }
 
@@ -114,6 +139,7 @@ export default function NegocioScreen({ navigation, route }: Props) {
   const token = auth!.token;
   const { id, nombre, productoId, seccion = 'productos' } = route.params;
   const agregar = useAgregarAlCarrito(id, nombre);
+  const domicilio = useTarifaDomicilio();
   const [negocio, setNegocio] = useState<Negocio | null>(null);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [servicios, setServicios] = useState<Servicio[]>([]);
@@ -163,7 +189,7 @@ export default function NegocioScreen({ navigation, route }: Props) {
 
   useLectura(() => {
     cargarCatalogo()
-      .catch(e => setError(e.message))
+      .catch(e => setError(messageFromError(e)))
       .finally(() => setCargando(false));
     cargarRecetas();
   }, [cargarCatalogo, cargarRecetas]);
@@ -210,13 +236,39 @@ export default function NegocioScreen({ navigation, route }: Props) {
     setFicha(p);
   }
 
+  /** Lo que se le dice al cliente si quiere pedir con la tienda cerrada. */
+  function avisarCerrado() {
+    toast.info(
+      negocio?.estado_texto === 'Almorzando' ? 'La tienda está almorzando' : 'La tienda está cerrada',
+      `${negocio?.abre_texto ? `${negocio.abre_texto}. ` : ''}Puedes mirar los productos, pero aún no puedes pedir.`,
+    );
+  }
+
+  /**
+   * «Agregar» desde la tarjeta: si el producto no tiene nada que elegir entra
+   * directo (con el paquetito que vuela al carrito); si tiene (talla, peso,
+   * ingredientes, extras), se abre su ficha para elegir.
+   */
+  function agregarDesdeTarjeta(p: Producto, e: GestureResponderEvent) {
+    if (!negocioAbierto) {
+      avisarCerrado();
+      return;
+    }
+    if (sePersonaliza(p)) {
+      setFicha(p);
+      return;
+    }
+    const desde = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
+    agregar(p, { alAgregar: () => volar(desde) });
+  }
+
   /**
    * Una receta preferida ya trae lo suyo elegido y entra directo al carrito.
    * Los productos del catálogo se agregan desde su ficha.
    */
   function agregarReceta(receta: RecetaPreferida, e: GestureResponderEvent) {
     if (!negocioAbierto) {
-      toast.info('Negocio cerrado', 'Puedes ver el catálogo, pero no hacer pedidos.');
+      avisarCerrado();
       return;
     }
     // Desde el punto del toque salta el paquetito que vuela hasta Carrito.
@@ -228,7 +280,7 @@ export default function NegocioScreen({ navigation, route }: Props) {
     return <ActivityIndicator size="large" color={c.accent} style={{ marginTop: 40 }} />;
   }
   if (error) {
-    return <ErrorCarga mensaje={error} />;
+    return <ErrorCarga titulo="No pudimos abrir la tienda" mensaje={error} />;
   }
 
   const portada = imagenUrl(negocio?.imagen);
@@ -272,6 +324,20 @@ export default function NegocioScreen({ navigation, route }: Props) {
                 <Icon name="tienda" size={44} color={c.mutedSoft} />
               )}
             </View>
+            {!negocio.activo && (
+              <View style={styles.cerrado} accessibilityRole="alert">
+                <View style={styles.cerradoIcono}>
+                  <Icon name="reloj" size={22} color={c.danger} />
+                </View>
+                <View style={styles.cerradoTextos}>
+                  <Text style={styles.cerradoTitulo}>
+                    {negocio.estado_texto === 'Almorzando' ? 'La tienda está almorzando' : 'Esta tienda está cerrada'}
+                  </Text>
+                  <Text style={styles.cerradoAbre}>{negocio.abre_texto ?? 'Vuelve a abrir más tarde'}</Text>
+                  <Text style={styles.cerradoTexto}>Puedes mirar los productos, pero aún no puedes pedir.</Text>
+                </View>
+              </View>
+            )}
             <View style={styles.cabecera}>
               {!!etiquetas && <Text style={styles.etiquetas} numberOfLines={1}>{etiquetas}</Text>}
               <Text style={styles.titulo} numberOfLines={2}>{negocio.nombre}</Text>
@@ -280,10 +346,23 @@ export default function NegocioScreen({ navigation, route }: Props) {
                 <Text style={[styles.estado, !negocio.activo && styles.estadoCerrado]}>
                   {negocio.estado_texto ?? (negocio.activo ? 'Abierto' : 'Cerrado')}
                 </Text>
-                {seccion === 'productos' && !!negocio.tiempo_preparacion && (
-                  <Text style={styles.dato}>· ~{negocio.tiempo_preparacion} min</Text>
-                )}
               </Objetivo>
+              {seccion === 'productos' && (!!negocio.tiempo_preparacion || domicilio != null) && (
+                <View style={styles.datosPedido}>
+                  {!!negocio.tiempo_preparacion && (
+                    <View style={styles.datoPedido}>
+                      <Icon name="reloj" size={16} color={c.goldText} />
+                      <Text style={styles.datoPedidoTxt}>Preparación: ~{negocio.tiempo_preparacion} min</Text>
+                    </View>
+                  )}
+                  {domicilio != null && (
+                    <View style={styles.datoPedido}>
+                      <Icon name="moto" size={16} color={c.goldText} />
+                      <Text style={styles.datoPedidoTxt}>Domicilio: {domicilio === 0 ? 'gratis' : cop(domicilio)}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
               <Objetivo id="negocio.resenas" style={styles.resenasMarca}>
               <PressableScale
                 style={styles.resenas}
@@ -346,7 +425,10 @@ export default function NegocioScreen({ navigation, route }: Props) {
                 key={p.id}
                 producto={p}
                 destacado={p.id === productoId}
+                abierto={negocioAbierto}
+                textoCerrado={negocio?.estado_texto === 'Almorzando' ? 'Almorzando' : 'Cerrado'}
                 onVer={() => verProducto(p)}
+                onAgregar={e => agregarDesdeTarjeta(p, e)}
               />
             ))}
             {/* Fila incompleta: el hueco conserva el ancho de la columna. */}
@@ -428,6 +510,42 @@ const useStyles = makeStyles(c => ({
   puntoCerrado: { backgroundColor: c.danger },
   estado: { color: c.success, fontSize: 13, fontFamily: font.semibold },
   estadoCerrado: { color: c.danger },
+  // Tienda cerrada: aviso grande arriba del catálogo.
+  cerrado: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginHorizontal: 16,
+    marginTop: 14,
+    padding: 14,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderColor: c.danger,
+    backgroundColor: c.dangerSoft,
+  },
+  cerradoIcono: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: c.surface,
+  },
+  cerradoTextos: { flex: 1 },
+  cerradoTitulo: { color: c.danger, fontFamily: font.bold, fontSize: 17, lineHeight: 22 },
+  cerradoAbre: { color: c.textStrong, fontFamily: font.bold, fontSize: 15, lineHeight: 21, marginTop: 2 },
+  cerradoTexto: { color: c.text, fontFamily: font.regular, fontSize: 14, lineHeight: 20, marginTop: 2 },
+  datosPedido: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6, marginBottom: 4 },
+  datoPedido: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: c.accentSoft,
+  },
+  datoPedidoTxt: { color: c.textStrong, fontFamily: font.semibold, fontSize: 14 },
   dato: { color: c.muted, fontSize: 13, lineHeight: 18, fontFamily: font.regular },
   resenasMarca: { alignSelf: 'flex-start' },
   resenas: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 2, paddingVertical: 3 },
@@ -457,6 +575,20 @@ const useStyles = makeStyles(c => ({
   nombre: { color: c.textStrong, fontSize: 14, lineHeight: 19, fontFamily: font.medium, marginTop: 10 },
   precio: { color: c.text, fontSize: 14, fontFamily: font.bold, marginTop: 3 },
   puntaje: { marginTop: 3 },
+  // «Agregar» de la tarjeta; cerrada, el mismo botón dice «Cerrado» (fondo siempre puesto).
+  agregar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 40,
+    marginTop: 8,
+    borderRadius: 20,
+    backgroundColor: c.accent,
+  },
+  agregarCerrado: { backgroundColor: c.surface2 },
+  agregarTxt: { color: c.onAccent, fontFamily: font.bold, fontSize: 15 },
+  agregarCerradoTxt: { color: c.muted, fontFamily: font.bold, fontSize: 14 },
   vacio: { textAlign: 'center', color: c.muted, marginTop: 40, fontFamily: font.regular },
   error: { color: c.danger, backgroundColor: c.dangerSoft, padding: 12, borderRadius: radius.sm, margin: 16, fontFamily: font.medium },
 }));

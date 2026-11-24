@@ -322,7 +322,7 @@ export default function LoginScreen({ navigation }: Props) {
         ) : null}
         <View style={[e.bloqueCampo, styles.separado]}>
           <CampoAcceso
-            rotulo="CÓDIGO DE WHATSAPP"
+            rotulo="Código de WhatsApp"
             icono="whatsapp"
             placeholder="000000"
             value={codigo}
@@ -369,7 +369,7 @@ export default function LoginScreen({ navigation }: Props) {
       {/* cuentas con la sesión abierta en este teléfono (y las recordadas): a un toque */}
       {cuentas.length > 0 || cerradas.length > 0 ? (
         <>
-          <Text style={styles.rotulo}>CONTINUAR COMO</Text>
+          <Text style={styles.rotulo}>Continuar como</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -392,25 +392,35 @@ export default function LoginScreen({ navigation }: Props) {
               </PressableScale>
             ))}
             {cerradas.map(({ user }) => (
-              <PressableScale
-                key={`recordada-${user.id}`}
-                style={styles.cuenta}
-                onPress={() => continuarCon(user)}
-                onLongPress={() => quitarRecordada(user)}
-                disabled={ocupado}
-                accessibilityRole="button"
-                accessibilityLabel={`Continuar como ${nombreCompleto(user)}${dispositivos[user.id] ? ' con tu clave' : ' con Google'}`}
-                accessibilityHint="Mantén presionado para quitarla de este teléfono">
-                <View style={styles.cuentaAvatar}>
-                  <Text style={styles.cuentaInicial}>{user.name.trim().charAt(0).toUpperCase() || '?'}</Text>
-                  <View style={styles.cuentaMarca}>
-                    {dispositivos[user.id] ? <Icon name="candado" size={9} color="#1F1F1F" /> : <LogoGoogle size={10} />}
+              <View key={`recordada-${user.id}`} style={styles.cuentaConQuitar}>
+                <PressableScale
+                  style={[styles.cuenta, styles.cuentaRecordada]}
+                  onPress={() => continuarCon(user)}
+                  onLongPress={() => quitarRecordada(user)}
+                  disabled={ocupado}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Continuar como ${nombreCompleto(user)}${dispositivos[user.id] ? ' con tu clave' : ' con Google'}`}>
+                  <View style={styles.cuentaAvatar}>
+                    <Text style={styles.cuentaInicial}>{user.name.trim().charAt(0).toUpperCase() || '?'}</Text>
+                    <View style={styles.cuentaMarca}>
+                      {dispositivos[user.id] ? <Icon name="candado" size={9} color="#1F1F1F" /> : <LogoGoogle size={10} />}
+                    </View>
                   </View>
-                </View>
-                <Text style={styles.cuentaNombre} numberOfLines={1}>
-                  {primerNombre(user)}
-                </Text>
-              </PressableScale>
+                  <Text style={styles.cuentaNombre} numberOfLines={1}>
+                    {primerNombre(user)}
+                  </Text>
+                </PressableScale>
+                {/* Quitarla de este teléfono, a la vista (antes solo con un toque largo). */}
+                <TouchableOpacity
+                  style={styles.cuentaQuitar}
+                  onPress={() => quitarRecordada(user)}
+                  disabled={ocupado}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Quitar a ${primerNombre(user)} de este teléfono`}>
+                  <Icon name="cerrar" size={14} color={l.campoTexto} strokeWidth={2.2} />
+                </TouchableOpacity>
+              </View>
             ))}
           </ScrollView>
           <SeparadorAcceso texto="o entra con otra cuenta" />
@@ -419,7 +429,7 @@ export default function LoginScreen({ navigation }: Props) {
 
       <View style={e.bloqueCampo}>
         <CampoAcceso
-          rotulo="CELULAR"
+          rotulo="Celular"
           icono="telefono"
           placeholder="300 123 4567"
           value={telefono}
@@ -438,7 +448,7 @@ export default function LoginScreen({ navigation }: Props) {
       </View>
       <FieldError mensaje={errores.telefono} />
 
-      <Text style={styles.rotulo}>CLAVE</Text>
+      <Text style={styles.rotulo}>Clave de 4 números</Text>
       <CampoPin
         ref={campoPin}
         vidrio
@@ -482,7 +492,7 @@ export default function LoginScreen({ navigation }: Props) {
 
 // `l`: colores propios del login (paletasLogin en theme.tsx), del mismo modo que `c`.
 const useStyles = makeStyles((_c, _sombras, l) => ({
-  rotulo: { color: l.rotulo, fontFamily: font.bold, fontSize: 11, letterSpacing: 1.3, marginBottom: 6 },
+  rotulo: { color: l.rotulo, fontFamily: font.semibold, fontSize: 14, letterSpacing: 0.2, marginBottom: 6 },
   olvide: { alignSelf: 'flex-end', minHeight: 44, justifyContent: 'center', marginTop: 2 },
   olvideTexto: { color: l.rotulo, fontFamily: font.semibold, fontSize: 13, textAlign: 'center' },
   fuerte: { fontFamily: font.bold, color: l.campoTexto },
@@ -527,4 +537,17 @@ const useStyles = makeStyles((_c, _sombras, l) => ({
     justifyContent: 'center',
   },
   cuentaNombre: { flexShrink: 1, color: l.campoTexto, fontFamily: font.semibold, fontSize: 14 },
+  // La X va dentro de la píldora, a la derecha del nombre.
+  cuentaConQuitar: { justifyContent: 'center' },
+  cuentaRecordada: { paddingRight: 44, maxWidth: 200 },
+  cuentaQuitar: {
+    position: 'absolute',
+    right: 6,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: l.campoHundido,
+  },
 }));

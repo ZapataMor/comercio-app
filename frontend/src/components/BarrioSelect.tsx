@@ -1,5 +1,5 @@
 import { useLectura } from '../useLectura';
-import { limpiarCampoDireccion } from '../direccion';
+import { limpiarBarrio } from '../direccion';
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { Barrio, getBarrios } from '../api';
+import { messageFromError } from '../formErrors';
 import Icon from './Icon';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { EspacioTecladoModal } from './EspacioTeclado';
@@ -57,7 +58,7 @@ export default function BarrioSelect({
     if (!abierto || barrios !== null) return;
     getBarrios()
       .then(setBarrios)
-      .catch(e => setErrorCarga(e.message ?? 'No se pudo cargar la lista de barrios.'));
+      .catch(e => setErrorCarga(messageFromError(e, 'No se pudo cargar la lista de barrios.')));
   }, [abierto, barrios]);
 
   const filtrados = useMemo(() => {
@@ -75,7 +76,8 @@ export default function BarrioSelect({
   );
 
   function elegir(nombre: string) {
-    onSeleccionar(limpiarCampoDireccion(nombre.replace(/\s+/g, '-')));
+    // Tal como se llama, con sus espacios («Santa Isabel»).
+    onSeleccionar(limpiarBarrio(nombre));
     setAbierto(false);
     setBusqueda('');
   }

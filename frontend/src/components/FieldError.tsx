@@ -12,8 +12,9 @@ const useStyles = makeStyles(c => ({
   text: {
     color: c.danger,
     fontFamily: font.medium,
-    fontSize: 12,
-    marginTop: -10,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: -8,
     marginBottom: 12,
   },
 }));

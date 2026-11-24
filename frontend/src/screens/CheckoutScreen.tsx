@@ -1,19 +1,21 @@
 import { useLectura, useLecturaEnFoco } from '../useLectura';
 import FotosDireccion, { FOTOS_OBLIGATORIAS, fotosCompletas } from '../components/FotosDireccion';
 import { FotosDireccion as Fotos } from '../api';
-import { campoDireccionValido, limpiarTextoDireccion } from '../direccion';
+import { barrioValido, limpiarIndicaciones, limpiarTextoDireccion, MAX_INDICACIONES } from '../direccion';
 import CamposDireccion from '../components/CamposDireccion';
 import { normalizarDireccion } from '../direccion';
 import { direccionValida, errorDireccion, telefonoValido, errorTelefono } from '../direccion';
 import EditarDireccion from '../components/EditarDireccion';
 import SelectorUbicacion from '../components/SelectorUbicacion';
 import { textoCantidad } from '../cantidades';
+import { billetesPara } from '../billetes';
 import { CommonActions } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useEnVivo } from '../usePolling';
 import {
   ActivityIndicator,
+  LayoutChangeEvent,
   ScrollView,
   Text,
   TextInput,
@@ -56,6 +58,9 @@ function textoUbicacion(ubicacion: Pick<ClienteDireccion, 'direccion' | 'barrio'
   return `${ubicacion.direccion} - Barrio ${ubicacion.barrio}`;
 }
 
+/** Orden en que se revisan los errores: el primero es al que se lleva al cliente. */
+const ORDEN_ERRORES = ['ubicacion', 'nuevaDireccion', 'nuevoBarrio', 'indicaciones', 'mapa', 'fotos', 'telefono', 'pago', 'paga_con'];
+
 export default function CheckoutScreen({ navigation }: Props) {
   const { c } = useTheme();
   const styles = useStyles();
@@ -72,6 +77,7 @@ export default function CheckoutScreen({ navigation }: Props) {
   const [nuevaDireccion, setNuevaDireccion] = useState('');
   const [nuevoBarrio, setNuevoBarrio] = useState('');
   const [nuevoNombre, setNuevoNombre] = useState('');
+  const [nuevasIndicaciones, setNuevasIndicaciones] = useState('');
   const [fotos, setFotos] = useState<Fotos>({});
   const [nuevoPunto, setNuevoPunto] = useState<Coordenadas | null>(null);
   const [editandoDireccion, setEditandoDireccion] = useState<ClienteDireccion | null>(null);
@@ -80,12 +86,22 @@ export default function CheckoutScreen({ navigation }: Props) {
   const [usarOtroTelefono, setUsarOtroTelefono] = useState(!telefonoGuardado);
   const [telefono, setTelefono] = useState('');
   const [pago, setPago] = useState('efectivo');
+  // Efectivo: con qué billete paga (null = el valor exacto); «Otro valor» se escribe.
+  const [pagaCon, setPagaCon] = useState<number | null>(null);
+  const [otroBillete, setOtroBillete] = useState(false);
+  const [textoBillete, setTextoBillete] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [errores, setErrores] = useState<FieldErrors>({});
   // Tarifa vigente del domicilio (la confirma el servidor al crear el pedido).
   const [domicilio, setDomicilio] = useState<number | null>(null);
   const [tarifaFallo, setTarifaFallo] = useState(false);
   const totalConDomicilio = cart.total + (domicilio ?? 0);
+  const billetes = domicilio == null ? [] : billetesPara(totalConDomicilio);
+  // Dónde queda cada parte del formulario, para llevar al cliente al primer error.
+  const posiciones = useRef<Record<string, { y: number; dentroDe?: string }>>({});
+  const anotar = (clave: string, dentroDe?: string) => (e: LayoutChangeEvent) => {
+    posiciones.current[clave] = { y: e.nativeEvent.layout.y, dentroDe };
+  };
   // Un mismo intento de compra conserva su clave aunque se reintente por un
   // corte de red: el servidor devuelve el pedido ya creado en vez de duplicarlo.
   const claveIntento = useRef(nuevaClaveIntento());
@@ -133,6 +149,20 @@ export default function CheckoutScreen({ navigation }: Props) {
       .catch(() => setAceptaTransferencia(null));
   }, [auth?.token, negocioCarrito]);
 
+  /**
+   * Marca los errores y lleva la pantalla hasta el primero, con un aviso: si
+   * el error queda arriba y fuera de la vista, parece que el botón no hizo nada.
+   */
+  function mostrarErrores(campos: FieldErrors) {
+    setErrores(campos);
+    const primero = ORDEN_ERRORES.find(k => campos[k]) ?? Object.keys(campos)[0];
+    if (!primero) return;
+    toast.error('Falta algo para pedir', campos[primero]);
+    const pos = posiciones.current[primero] ?? posiciones.current[primero === 'paga_con' ? 'pago' : 'ubicacion'];
+    const base = pos?.dentroDe ? posiciones.current[pos.dentroDe]?.y ?? 0 : 0;
+    tutorialScroll.scrollRef.current?.scrollTo({ y: Math.max(0, base + (pos?.y ?? 0) - 90), animated: true });
+  }
+
   function limpiarError(campo: string) {
     setErrores(prev => {
       const next = { ...prev };
@@ -155,7 +185,7 @@ export default function CheckoutScreen({ navigation }: Props) {
       } catch (e) {
         if (activo) {
           setSeleccion('nueva');
-          toast.error('Ubicaciones no disponibles', e instanceof Error ? e.message : 'Intenta de nuevo.');
+          toast.error('No pudimos cargar tus direcciones', messageFromError(e, 'Intenta de nuevo.'));
         }
       } finally {
         if (activo) setCargandoDirecciones(false);
@@ -178,8 +208,8 @@ export default function CheckoutScreen({ navigation }: Props) {
   async function confirmar() {
     if (enviando || envio.pendiente || envio.cargando) return;
     setErrores({});
-    if (!cart.items.length || (cart.venceEn != null && cart.venceEn <= Date.now())) {
-      toast.info('El carrito venció', 'Los productos permanecen una hora. Agrega de nuevo los que quieras pedir.');
+    if (!cart.items.length) {
+      toast.info('Tu carrito está vacío', 'Agrega los productos que quieras pedir.');
       navigation.navigate('Carrito');
       return;
     }
@@ -190,33 +220,28 @@ export default function CheckoutScreen({ navigation }: Props) {
       cargarTarifa();
       return;
     }
-    if (!telefonoValido(telefonoContacto)) {
-      setErrores({ telefono: errorTelefono });
-      return;
-    }
-
     let direccionEntrega = ubicacionSeleccionada?.direccion ?? '';
+    // Todo lo que falta de una vez, en el orden de la pantalla.
+    const faltan: FieldErrors = {};
 
     if (seleccion === 'nueva') {
-      const nuevosErrores: FieldErrors = {};
-      if (!direccionValida(nuevaDireccion)) nuevosErrores.nuevaDireccion = errorDireccion;
-      if (!campoDireccionValido(nuevoBarrio)) nuevosErrores.nuevoBarrio = 'El campo barrio es obligatorio.';
-      if (!nuevoPunto) nuevosErrores.ubicacion = 'Marca tu casa en el mapa.';
-      if (!fotosCompletas(fotos)) nuevosErrores.ubicacion = 'Añade las tres fotos de referencia.';
-      if (Object.keys(nuevosErrores).length > 0) {
-        setErrores(nuevosErrores);
-        return;
-      }
+      if (!direccionValida(nuevaDireccion)) faltan.nuevaDireccion = errorDireccion;
+      if (!barrioValido(nuevoBarrio)) faltan.nuevoBarrio = 'Elige tu barrio.';
+      if (!nuevoPunto) faltan.mapa = 'Marca tu casa en el mapa: toca «Marcar mi casa en el mapa».';
+      if (!fotosCompletas(fotos)) faltan.fotos = 'Añade las tres fotos de referencia.';
       direccionEntrega = normalizarDireccion(nuevaDireccion);
-    }
-
-    if (seleccion !== 'nueva' && ubicacionSeleccionada && (!direccionValida(ubicacionSeleccionada.direccion) || !campoDireccionValido(ubicacionSeleccionada.barrio) || ubicacionSeleccionada.lat == null || ubicacionSeleccionada.lng == null || !fotosCompletas(ubicacionSeleccionada.fotos))) {
+    } else if (ubicacionSeleccionada && (!direccionValida(ubicacionSeleccionada.direccion) || !barrioValido(ubicacionSeleccionada.barrio) || ubicacionSeleccionada.lat == null || ubicacionSeleccionada.lng == null || !fotosCompletas(ubicacionSeleccionada.fotos))) {
       setEditandoDireccion(ubicacionSeleccionada);
-      setErrores({ ubicacion: FOTOS_OBLIGATORIAS ? 'Completa la dirección, el mapa y las tres fotos antes de pedir.' : 'Completa la dirección y el mapa antes de pedir.' });
-      return;
+      faltan.ubicacion = FOTOS_OBLIGATORIAS ? 'Completa la dirección, el mapa y las tres fotos antes de pedir.' : 'Completa la dirección y el mapa antes de pedir.';
+    } else if (!direccionEntrega) {
+      faltan.ubicacion = 'Elige dónde te llevamos el pedido o agrega una dirección.';
     }
-    if (!direccionEntrega) {
-      setErrores({ ubicacion: 'Selecciona o agrega una ubicación de entrega.' });
+    if (!telefonoValido(telefonoContacto)) faltan.telefono = errorTelefono;
+    if (pago === 'efectivo' && pagaCon != null && pagaCon < totalConDomicilio) {
+      faltan.paga_con = `Ese valor no alcanza: el total es ${cop(totalConDomicilio)}. Elige otro billete o «Valor exacto».`;
+    }
+    if (Object.keys(faltan).length > 0) {
+      mostrarErrores(faltan);
       return;
     }
 
@@ -253,6 +278,7 @@ export default function CheckoutScreen({ navigation }: Props) {
           nombre: nuevoNombre.trim() || null,
           direccion: normalizarDireccion(nuevaDireccion),
           barrio: nuevoBarrio.trim(),
+          indicaciones: nuevasIndicaciones.trim() || null,
           fotos,
           lat: nuevoPunto?.lat ?? null,
           lng: nuevoPunto?.lng ?? null,
@@ -270,6 +296,7 @@ export default function CheckoutScreen({ navigation }: Props) {
         negocio_id: negocioId,
         items: cart.items.map(i => ({ producto_id: i.producto_id, cantidad: i.cantidad, precio_token: i.precio_token, ...i.opciones })),
         metodo_pago: pago,
+        paga_con: pago === 'efectivo' ? pagaCon : null,
         direccion_entrega: direccionEntrega,
         direccion_id: direccionId,
         telefono_contacto: telefonoContacto,
@@ -287,12 +314,18 @@ export default function CheckoutScreen({ navigation }: Props) {
       const campos = fieldErrorsFromError(e, {
         direccion: 'nuevaDireccion',
         barrio: 'nuevoBarrio',
+        lat: 'mapa',
+        lng: 'mapa',
+        foto_frente: 'fotos',
+        foto_izquierda: 'fotos',
+        foto_derecha: 'fotos',
         direccion_entrega: 'ubicacion',
+        direccion_id: 'ubicacion',
         telefono_contacto: 'telefono',
         metodo_pago: 'pago',
       });
       if (Object.keys(campos).length > 0) {
-        setErrores(campos);
+        mostrarErrores(campos);
       } else {
         toast.error('No se pudo confirmar', messageFromError(e, 'Error'));
       }
@@ -371,40 +404,51 @@ export default function CheckoutScreen({ navigation }: Props) {
       </FadeInView>
       </Objetivo>
 
-      <Text style={styles.label}>Ubicación de entrega</Text>
+      <View onLayout={anotar('ubicacion')}>
+      <Text style={styles.label}>¿Dónde te llevamos el pedido?</Text>
       {cargandoDirecciones ? (
         <View style={styles.cargandoUbicaciones}>
           <ActivityIndicator color={c.accent} />
         </View>
       ) : (
-        // Todas en un mismo contenedor, separadas; se editan manteniendo
-        // presionada la dirección (se abre la edición encima de la pantalla).
+        // Todas en un mismo contenedor, separadas; cada una con su botón
+        // «Editar» (se abre la edición encima de la pantalla).
         <Objetivo id="checkout.direccion" style={styles.direcciones}>
           {direcciones.map(d => {
             const activa = seleccion === d.id;
+            const titulo = d.nombre || (d.es_principal ? 'Dirección principal' : 'Otra ubicación');
             return (
-              <TouchableOpacity
-                key={d.id}
-                style={[styles.ubicacion, styles.direccion, activa && styles.ubicacionOn]}
-                onPress={() => {
-                  setSeleccion(d.id);
-                  limpiarError('ubicacion');
-                }}
-                onLongPress={() => setEditandoDireccion(d)}
-                delayLongPress={350}
-                accessibilityHint="Mantén presionado para editarla">
-                <View style={styles.ubicacionIcono}>
-                  <Icon name={activa ? 'check' : 'ubicacion'} size={18} color={activa ? c.onAccent : c.muted} />
-                </View>
-                <View style={styles.ubicacionTexto}>
-                  <Text style={[styles.ubicacionTitulo, activa && styles.ubicacionTituloOn]}>
-                    {d.nombre || (d.es_principal ? 'Dirección principal' : 'Otra ubicación')}
-                  </Text>
-                  <Text style={[styles.ubicacionDetalle, activa && styles.ubicacionDetalleOn]}>
-                    {textoUbicacion(d)}
-                  </Text>
-                </View>
-              </TouchableOpacity>
+              <View key={d.id} style={[styles.ubicacion, styles.direccion, styles.direccionFila, activa && styles.ubicacionOn]}>
+                <TouchableOpacity
+                  style={styles.direccionToque}
+                  onPress={() => {
+                    setSeleccion(d.id);
+                    limpiarError('ubicacion');
+                  }}
+                  onLongPress={() => setEditandoDireccion(d)}
+                  delayLongPress={350}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: activa }}>
+                  <View style={styles.ubicacionIcono}>
+                    <Icon name={activa ? 'check' : 'ubicacion'} size={18} color={activa ? c.onAccent : c.muted} />
+                  </View>
+                  <View style={styles.ubicacionTexto}>
+                    <Text style={[styles.ubicacionTitulo, activa && styles.ubicacionTituloOn]}>{titulo}</Text>
+                    <Text style={[styles.ubicacionDetalle, activa && styles.ubicacionDetalleOn]}>
+                      {textoUbicacion(d)}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.editar, activa && styles.editarOn]}
+                  hitSlop={6}
+                  onPress={() => setEditandoDireccion(d)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Editar ${titulo}`}>
+                  <Icon name="editar" size={15} color={activa ? c.onAccent : c.goldText} />
+                  <Text style={[styles.editarTxt, activa && styles.editarTxtOn]}>Editar</Text>
+                </TouchableOpacity>
+              </View>
             );
           })}
 
@@ -427,36 +471,67 @@ export default function CheckoutScreen({ navigation }: Props) {
             </View>
           </TouchableOpacity>
 
-          {direcciones.length > 0 && (
-            <Text style={styles.pistaEditar}>Mantén presionado para editar</Text>
-          )}
         </Objetivo>
       )}
       <FieldError mensaje={errores.ubicacion} />
+      </View>
 
       {seleccion === 'nueva' ? (
-        <View style={styles.nuevaBox}>
-          <TextInput style={styles.input} value={nuevoNombre} onChangeText={v => setNuevoNombre(limpiarTextoDireccion(v))} maxLength={80} placeholder="Nombre opcional: Mi casa, Trabajo…" placeholderTextColor={c.mutedSoft} />
-          <Text style={styles.lineaDetalle}>Solo tú verás este nombre.</Text>
-          <CamposDireccion value={nuevaDireccion} onChangeText={setNuevaDireccion} />
-          <FieldError mensaje={errores.nuevaDireccion} />
-          <BarrioSelect
-            valor={nuevoBarrio}
-            onSeleccionar={nombre => {
-              setNuevoBarrio(nombre);
-              limpiarError('nuevoBarrio');
-            }}
-            placeholder="Barrio"
-          />
-          <FieldError mensaje={errores.nuevoBarrio} />
-          <View style={styles.nuevoMapa}>
-            <SelectorUbicacion tipo="entrega" valor={nuevoPunto} onCambiar={setNuevoPunto} disabled={enviando} />
-            <FotosDireccion fotos={fotos} onChange={setFotos} token={auth!.token} disabled={enviando} />
-            <FieldError mensaje={errores.foto_frente ?? errores.foto_izquierda ?? errores.foto_derecha} />
+        <View style={styles.nuevaBox} onLayout={anotar('nueva')}>
+          <Text style={styles.nuevaTitulo}>Nueva dirección</Text>
+          <Text style={styles.label}>Nombre (opcional)</Text>
+          <TextInput style={styles.input} value={nuevoNombre} onChangeText={v => setNuevoNombre(limpiarTextoDireccion(v))} maxLength={80} placeholder="Mi casa, Trabajo…" placeholderTextColor={c.mutedSoft} />
+          <Text style={[styles.lineaDetalle, styles.ayudaCampo]}>Solo tú verás este nombre.</Text>
+          <View onLayout={anotar('nuevaDireccion', 'nueva')}>
+            <CamposDireccion value={nuevaDireccion} onChangeText={v => { setNuevaDireccion(v); limpiarError('nuevaDireccion'); }} />
+            <FieldError mensaje={errores.nuevaDireccion} />
+          </View>
+          <View onLayout={anotar('nuevoBarrio', 'nueva')}>
+            <Text style={styles.label}>Barrio *</Text>
+            <BarrioSelect
+              valor={nuevoBarrio}
+              onSeleccionar={nombre => {
+                setNuevoBarrio(nombre);
+                limpiarError('nuevoBarrio');
+              }}
+              placeholder="Elige tu barrio"
+            />
+            <FieldError mensaje={errores.nuevoBarrio} />
+          </View>
+          <View onLayout={anotar('indicaciones', 'nueva')}>
+            <Text style={styles.label}>Indicaciones para llegar (opcional)</Text>
+            <TextInput
+              style={[styles.input, styles.indicaciones]}
+              value={nuevasIndicaciones}
+              onChangeText={v => setNuevasIndicaciones(limpiarIndicaciones(v))}
+              maxLength={MAX_INDICACIONES}
+              multiline
+              placeholder="Ej.: frente a la tienda La 14, casa azul de rejas blancas"
+              placeholderTextColor={c.mutedSoft}
+            />
+            <Text style={[styles.lineaDetalle, styles.ayudaCampo]}>Lo verá el domiciliario. Sirve mucho si tu casa no tiene número.</Text>
+          </View>
+          <View style={styles.nuevoMapa} onLayout={anotar('mapa', 'nueva')}>
+            <SelectorUbicacion
+              tipo="entrega"
+              valor={nuevoPunto}
+              onCambiar={punto => {
+                setNuevoPunto(punto);
+                limpiarError('mapa');
+              }}
+              disabled={enviando}
+              barrio={nuevoBarrio}
+            />
+            <FieldError mensaje={errores.mapa} />
+          </View>
+          <View onLayout={anotar('fotos', 'nueva')}>
+            <FotosDireccion fotos={fotos} onChange={f => { setFotos(f); limpiarError('fotos'); }} token={auth!.token} disabled={enviando} />
+            <FieldError mensaje={errores.fotos} />
           </View>
         </View>
       ) : null}
 
+      <View onLayout={anotar('telefono')}>
       <Text style={styles.label}>Teléfono de contacto</Text>
       <Objetivo id="checkout.telefono" style={styles.ubicaciones}>
         {telefonoGuardado ? (
@@ -509,8 +584,10 @@ export default function CheckoutScreen({ navigation }: Props) {
         }} placeholder="3001234567" placeholderTextColor={c.mutedSoft} keyboardType="number-pad" maxLength={10} />
       ) : null}
       <FieldError mensaje={errores.telefono} />
+      </View>
 
-      <Text style={styles.label}>Forma de pago</Text>
+      <View onLayout={anotar('pago')}>
+      <Text style={styles.label}>¿Cómo vas a pagar?</Text>
       <Objetivo id="checkout.pago" style={styles.pagos}>
         {[
           { v: 'efectivo', t: 'Efectivo', icon: 'efectivo' as const },
@@ -534,9 +611,79 @@ export default function CheckoutScreen({ navigation }: Props) {
         <Text style={styles.pagoNota}>
           Cuando el negocio acepte tu pedido verás sus cuentas para pagar. Avísale en la app cuando transfieras: preparará tu pedido al confirmar que le llegó el dinero.
         </Text>
-      ) : aceptaTransferencia === false ? (
-        <Text style={styles.pagoNota}>Este negocio aún no recibe transferencias.</Text>
-      ) : null}
+      ) : (
+        <>
+          {aceptaTransferencia === false && (
+            <Text style={styles.pagoNota}>Este negocio aún no recibe transferencias.</Text>
+          )}
+          {domicilio != null && (
+            <View style={styles.billete} onLayout={anotar('paga_con', 'pago')}>
+              <Text style={styles.billeteTitulo}>¿Con qué billete vas a pagar?</Text>
+              <Text style={styles.billeteAyuda}>Así el domiciliario lleva el cambio.</Text>
+              <View style={styles.billetes}>
+                {[
+                  { valor: null as number | null, texto: 'Valor exacto' },
+                  ...billetes.map(b => ({ valor: b as number | null, texto: cop(b) })),
+                ].map(op => {
+                  const elegido = !otroBillete && pagaCon === op.valor;
+                  return (
+                    <TouchableOpacity
+                      key={op.texto}
+                      style={[styles.billeteOpcion, elegido && styles.billeteOpcionOn]}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: elegido }}
+                      onPress={() => {
+                        setOtroBillete(false);
+                        setPagaCon(op.valor);
+                        limpiarError('paga_con');
+                      }}>
+                      <Text style={[styles.billeteTxt, elegido && styles.billeteTxtOn]}>{op.texto}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+                <TouchableOpacity
+                  style={[styles.billeteOpcion, otroBillete && styles.billeteOpcionOn]}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: otroBillete }}
+                  onPress={() => {
+                    setOtroBillete(true);
+                    const n = Number(textoBillete);
+                    setPagaCon(n > 0 ? n : null);
+                    limpiarError('paga_con');
+                  }}>
+                  <Text style={[styles.billeteTxt, otroBillete && styles.billeteTxtOn]}>Otro valor</Text>
+                </TouchableOpacity>
+              </View>
+              {otroBillete && (
+                <TextInput
+                  style={[styles.input, styles.billeteInput]}
+                  value={textoBillete}
+                  onChangeText={v => {
+                    const limpio = v.replace(/[^0-9]/g, '').slice(0, 7);
+                    setTextoBillete(limpio);
+                    setPagaCon(Number(limpio) > 0 ? Number(limpio) : null);
+                    limpiarError('paga_con');
+                  }}
+                  keyboardType="number-pad"
+                  placeholder={`Con cuánto pagas, ej.: ${billetes[0] ?? 50000}`}
+                  placeholderTextColor={c.mutedSoft}
+                  accessibilityLabel="Con cuánto dinero vas a pagar"
+                />
+              )}
+              <FieldError mensaje={errores.paga_con} />
+              <View style={styles.tenListo}>
+                <Icon name="efectivo" size={18} color={c.success} />
+                <Text style={styles.tenListoTxt}>
+                  {pagaCon != null && pagaCon > totalConDomicilio
+                    ? `Pagas con ${cop(pagaCon)}: te devuelven ${cop(pagaCon - totalConDomicilio)} de cambio.`
+                    : `Ten listos ${cop(totalConDomicilio)} en efectivo para cuando llegue el domiciliario.`}
+                </Text>
+              </View>
+            </View>
+          )}
+        </>
+      )}
+      </View>
 
       <Objetivo id="checkout.confirmar">
       <PressableScale style={styles.btn} onPress={confirmar} disabled={enviando || cargandoDirecciones || domicilio == null || cart.items.length === 0 || !!cart.cambiosPrecio?.length}>
@@ -572,7 +719,7 @@ const useStyles = makeStyles((c, shadow) => ({
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: c.border },
   totalLabel: { fontFamily: font.bold, color: c.textStrong },
   totalValor: { fontFamily: font.extra, color: c.textStrong },
-  label: { fontSize: 13, fontFamily: font.semibold, color: c.text, marginBottom: 6, marginTop: 6 },
+  label: { fontSize: 15, fontFamily: font.bold, color: c.textStrong, marginBottom: 8, marginTop: 8 },
   input: { backgroundColor: c.surface, borderWidth: 1, borderColor: c.borderStrong, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12, color: c.textStrong, fontFamily: font.regular },
   cargandoUbicaciones: { backgroundColor: c.surface, borderRadius: radius.md, padding: 18, marginBottom: 12, alignItems: 'center' },
   ubicaciones: { gap: 10, marginBottom: 12 },
@@ -582,15 +729,60 @@ const useStyles = makeStyles((c, shadow) => ({
   ubicacionTexto: { flex: 1 },
   ubicacionTitulo: { color: c.textStrong, fontFamily: font.bold, fontSize: 14 },
   ubicacionTituloOn: { color: c.onAccent },
-  ubicacionDetalle: { color: c.muted, fontFamily: font.regular, fontSize: 12, marginTop: 2 },
+  ubicacionDetalle: { color: c.muted, fontFamily: font.regular, fontSize: 13, marginTop: 2 },
   ubicacionDetalleOn: { color: c.onAccent },
   direcciones: {
     gap: 8, marginBottom: 12, padding: 8, borderRadius: radius.lg,
     backgroundColor: c.surface, borderWidth: 1, borderColor: c.border,
   },
   direccion: { backgroundColor: c.bg, borderColor: c.border },
-  pistaEditar: { textAlign: 'center', color: c.muted, fontFamily: font.regular, fontSize: 12, paddingTop: 2, paddingBottom: 4 },
-  nuevaBox: { marginBottom: 2 },
+  direccionFila: { paddingVertical: 8, paddingRight: 8 },
+  direccionToque: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },
+  // Fondo y borde siempre puestos (solo cambia el color): Android dibuja sin
+  // esquinas un fondo que se le agrega a una vista ya montada.
+  editar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.surface,
+  },
+  editarOn: { borderColor: c.onAccent, backgroundColor: c.accent },
+  editarTxt: { color: c.goldText, fontFamily: font.semibold, fontSize: 14 },
+  editarTxtOn: { color: c.onAccent },
+  nuevaBox: {
+    marginBottom: 12, padding: 14, borderRadius: radius.lg,
+    backgroundColor: c.surface, borderWidth: 1, borderColor: c.border,
+  },
+  nuevaTitulo: { color: c.textStrong, fontFamily: font.bold, fontSize: 16, marginBottom: 4 },
+  ayudaCampo: { marginTop: -6, marginBottom: 10, fontSize: 13 },
+  indicaciones: { minHeight: 76, textAlignVertical: 'top' },
+  billete: { marginTop: -8, marginBottom: 20 },
+  billeteTitulo: { color: c.textStrong, fontFamily: font.bold, fontSize: 15 },
+  billeteAyuda: { color: c.muted, fontFamily: font.regular, fontSize: 13, marginTop: 2, marginBottom: 10 },
+  billetes: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  billeteOpcion: {
+    minHeight: 44,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.surface,
+  },
+  billeteOpcionOn: { borderColor: c.accent, backgroundColor: c.accent },
+  billeteTxt: { color: c.text, fontFamily: font.semibold, fontSize: 15 },
+  billeteTxtOn: { color: c.onAccent },
+  billeteInput: { marginTop: 10, marginBottom: 4, fontSize: 16 },
+  tenListo: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12, padding: 12,
+    borderRadius: radius.md, backgroundColor: c.successSoft,
+  },
+  tenListoTxt: { flex: 1, color: c.textStrong, fontFamily: font.semibold, fontSize: 15, lineHeight: 21 },
   nuevoMapa: { marginTop: 10 },
   pagos: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   pagoNo: { opacity: 0.45 },

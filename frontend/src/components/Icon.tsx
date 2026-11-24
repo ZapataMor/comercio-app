@@ -25,6 +25,7 @@ export type IconName =
   | 'tarjeta'
   | 'caja'
   | 'basura'
+  | 'editar'
   | 'carrito'
   | 'efectivo'
   | 'banco'
@@ -147,6 +148,12 @@ const GLYPHS: Record<IconName, React.ReactNode> = {
       <Path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
       <Polyline points="3.3 7 12 12 20.7 7" />
       <Path d="M12 22V12" />
+    </>
+  ),
+  editar: (
+    <>
+      <Path d="M4 20h4L19 9a2.1 2.1 0 0 0-4-4L4 16v4Z" />
+      <Path d="M13.5 6.5l4 4" />
     </>
   ),
   basura: (

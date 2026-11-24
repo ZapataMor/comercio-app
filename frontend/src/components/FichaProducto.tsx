@@ -7,14 +7,15 @@
  * encima de los botones Carrito y Mis pedidos, que siguen en su sitio. Así el
  * paquetito que vuela al carrito al agregar se ve pasar por ese hueco.
  *
- * Varias versiones del mismo plato: al tocar + con el producto ya modificado,
- * se pregunta si la siguiente unidad va igual. Si no, la actual queda guardada
- * (con sus cambios y su cantidad) en una pestaña numerada a la izquierda del
- * modal y se arma la nueva desde cero. Cada versión se agrega o se cancela por
- * separado; al agregarla, su pestaña desaparece. Con la última, el modal se
- * cierra.
+ * Varias versiones del mismo plato (APAGADO, ver VERSIONES_ACTIVAS): al tocar
+ * + con el producto ya modificado, se pregunta si la siguiente unidad va igual.
+ * Si no, la actual queda guardada (con sus cambios y su cantidad) en una
+ * pestaña numerada a la izquierda del modal y se arma la nueva desde cero.
+ * Cada versión se agrega o se cancela por separado; al agregarla, su pestaña
+ * desaparece. Con la última, el modal se cierra.
  */
-import React, { useEffect, useRef, useState } from 'react';
+import { HeaderHeightContext } from '@react-navigation/elements';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   BackHandler,
@@ -65,6 +66,12 @@ const ANCHO_PESTANA = 40;
 const MAX_UNIDADES = 99;
 /** Alto de la franja con el nombre que queda arriba al desplazar. */
 const ALTO_FRANJA = 58;
+/**
+ * Las versiones numeradas resultaban difíciles para quien no se maneja bien
+ * con el celular: están apagadas, no borradas. Apagadas, + suma otra unidad
+ * con los mismos cambios (para otra distinta, se agrega y se vuelve a abrir).
+ */
+export const VERSIONES_ACTIVAS = false;
 
 type Variante = {
   /** Número de la pestaña; también la identifica. */
@@ -88,9 +95,20 @@ type Props = {
   /** Se llama al terminar la animación de salida. */
   onCerrar: () => void;
   onVerResenas: () => void;
+  /** Versiones numeradas del mismo plato (por defecto, VERSIONES_ACTIVAS). */
+  conVersiones?: boolean;
 };
 
-export default function FichaProducto({ producto, retirado, abierto, negocioId, negocioNombre, onCerrar, onVerResenas }: Props) {
+export default function FichaProducto({
+  producto,
+  retirado,
+  abierto,
+  negocioId,
+  negocioNombre,
+  onCerrar,
+  onVerResenas,
+  conVersiones = VERSIONES_ACTIVAS,
+}: Props) {
   const { c } = useTheme();
   const styles = useStyles();
   const { volar } = useFlyToCart();
@@ -207,7 +225,7 @@ export default function FichaProducto({ producto, retirado, abierto, negocioId, 
   // --- Cantidad y versiones ---
   function sumar() {
     if (activa.cantidad >= MAX_UNIDADES) return;
-    if (estaModificado(opciones, producto)) {
+    if (conVersiones && estaModificado(opciones, producto)) {
       setPreguntaIgual(true);
       return;
     }
@@ -271,6 +289,9 @@ export default function FichaProducto({ producto, retirado, abierto, negocioId, 
   // navegación del sistema (contentStyle en App.tsx), justo donde la barra del
   // cliente empieza a contar su margen.
   const bottom = MARGEN_BARRA_CLIENTE + ALTO_PILA_CLIENTE + HUECO_BARRA;
+  // La capa llena toda la pantalla, también detrás de la barra superior: sin
+  // este espacio, la parte de arriba de la ficha (y su X) quedaba escondida.
+  const top = MARGEN + (useContext(HeaderHeightContext) ?? 0);
   const izquierda = conPestanas ? MARGEN + ANCHO_PESTANA : MARGEN;
   const translateY = entrada.interpolate({ inputRange: [0, 1], outputRange: [36, 0] });
   // Al pasar la foto aparece una franja con el nombre bajo la X: así la X
@@ -292,7 +313,7 @@ export default function FichaProducto({ producto, retirado, abierto, negocioId, 
 
       <Animated.View
         pointerEvents="box-none"
-        style={[styles.marco, { bottom, opacity: entrada, transform: [{ translateY }] }]}>
+        style={[styles.marco, { top, bottom, opacity: entrada, transform: [{ translateY }] }]}>
         {conPestanas && (
           <ScrollView style={styles.pestanas} contentContainerStyle={styles.pestanasContenido} showsVerticalScrollIndicator={false}>
             {variantes.map(v => {
@@ -399,13 +420,14 @@ export default function FichaProducto({ producto, retirado, abierto, negocioId, 
             <Text style={styles.franjaTitulo} numberOfLines={1}>{producto.nombre}</Text>
           </Animated.View>
 
+          {/* Oscura y con borde blanco: se ve sobre cualquier foto y sobre la franja. */}
           <PressableScale
             style={styles.cerrar}
-            hitSlop={8}
+            hitSlop={10}
             accessibilityRole="button"
             accessibilityLabel="Cerrar"
             onPress={intentarCerrar}>
-            <Icon name="cerrar" size={20} color={c.textStrong} strokeWidth={2.2} />
+            <Icon name="cerrar" size={22} color="#FFFFFF" strokeWidth={2.6} />
           </PressableScale>
 
           <View style={styles.pie}>
@@ -542,16 +564,19 @@ const useStyles = makeStyles((c, shadow) => ({
     borderBottomColor: c.border,
   },
   franjaTitulo: { color: c.textStrong, fontFamily: font.semibold, fontSize: 16 },
+  // Colores fijos: va encima de la foto del producto, que puede ser clara u oscura.
   cerrar: {
     position: 'absolute',
     top: 10,
     right: 10,
-    width: 38,
-    height: 38,
-    borderRadius: radius.pill,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: c.surface,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    backgroundColor: 'rgba(20,16,12,0.72)',
     ...shadow.soft,
   },
   cuerpo: { paddingHorizontal: 18, paddingTop: 16 },

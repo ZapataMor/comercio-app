@@ -54,10 +54,11 @@ const hamburguesa = {
 let raiz: ReactTestRenderer.ReactTestRenderer;
 const onCerrar = jest.fn();
 
-function abrir(producto: Producto = hamburguesa) {
+function abrir(producto: Producto = hamburguesa, conVersiones = true) {
   act(() => {
     raiz = ReactTestRenderer.create(
       <FichaProducto
+        conVersiones={conVersiones}
         producto={producto}
         retirado={false}
         abierto
@@ -114,7 +115,7 @@ test('muestra foto, nombre, ingredientes y extras en ese orden, y los fijos sin 
   const t = textos();
   expect(t.indexOf('Hamburguesa')).toBeLessThan(t.indexOf('Ingredientes'));
   expect(t.indexOf('Ingredientes')).toBeLessThan(t.indexOf('Extras'));
-  expect(t).toContain('Incluido');
+  expect(t).toContain('Siempre va');
   expect(conEtiqueta('Carne: Sin')).toHaveLength(0);
   expect(conEtiqueta('Tomate: Sin')).toHaveLength(1);
   expect(t).toContain('+ $3.000');
@@ -131,6 +132,24 @@ test('cada porción de un extra sube el precio en el modal', () => {
   expect(textos()).toContain('$21.000');
   expect(textos()).toContain('$15.000 + $6.000 de extras');
   expect(botonAgregar()).toBe('Agregar · $21.000');
+});
+
+test('con las versiones apagadas (así viene la app), + suma otra igual sin preguntar ni abrir pestañas', () => {
+  abrir(hamburguesa, false);
+  tocar('Cebolla: Sin');
+  tocar('Agregar una unidad');
+
+  expect(textos()).not.toContain('¿La siguiente igual?');
+  expect(pestanas()).toHaveLength(0);
+  expect(botonAgregar()).toBe('Agregar · $30.000');
+  tocarTexto('Agregar · ');
+  expect(mockAgregar).toHaveBeenLastCalledWith(
+    9,
+    'La Parrilla',
+    hamburguesa,
+    { talla: undefined, color: undefined, sin: ['Cebolla'], extras: [] },
+    2,
+  );
 });
 
 test('sin cambios, + suma una unidad sin preguntar', () => {

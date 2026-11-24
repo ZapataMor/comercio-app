@@ -38,7 +38,9 @@ class ClienteDireccionController extends Controller
         $data = $request->validate([
             'nombre' => ['nullable', 'string', 'max:80', 'regex:'.Direccion::TEXTO],
             'direccion' => ['required', 'string', 'max:255', new Direccion],
-            'barrio' => ['required', 'string', 'max:120', 'regex:/\A[\p{L}\p{N}-]+\z/u'],
+            'barrio' => ['required', 'string', 'max:120', 'regex:'.Direccion::BARRIO],
+            // Cómo llegar: «frente a la tienda La 14, casa azul de rejas blancas».
+            'indicaciones' => ['nullable', 'string', 'max:255'],
             ...self::REGLAS_PUNTO,
             ...$this->reglasFotos([]),
         ]);
@@ -52,6 +54,7 @@ class ClienteDireccionController extends Controller
                 'nombre' => $data['nombre'] ?? null,
                 'direccion' => $data['direccion'],
                 'barrio' => $data['barrio'],
+                'indicaciones' => $data['indicaciones'] ?? null,
                 'fotos' => $data['fotos'],
                 'lat' => $data['lat'] ?? null,
                 'lng' => $data['lng'] ?? null,
@@ -74,7 +77,9 @@ class ClienteDireccionController extends Controller
         $data = $request->validate([
             'nombre' => ['nullable', 'string', 'max:80', 'regex:'.Direccion::TEXTO],
             'direccion' => ['required', 'string', 'max:255', new Direccion],
-            'barrio' => ['required', 'string', 'max:120', 'regex:/\A[\p{L}\p{N}-]+\z/u'],
+            'barrio' => ['required', 'string', 'max:120', 'regex:'.Direccion::BARRIO],
+            // Cómo llegar: «frente a la tienda La 14, casa azul de rejas blancas».
+            'indicaciones' => ['nullable', 'string', 'max:255'],
             ...self::REGLAS_PUNTO,
             ...$this->reglasFotos($existente->fotos ?? []),
         ]);
@@ -165,6 +170,7 @@ class ClienteDireccionController extends Controller
             'nombre' => $direccion->nombre,
             'direccion' => $direccion->direccion,
             'barrio' => $direccion->barrio,
+            'indicaciones' => $direccion->indicaciones,
             'es_principal' => (bool) $direccion->es_principal,
             'lat' => $direccion->lat,
             'lng' => $direccion->lng,

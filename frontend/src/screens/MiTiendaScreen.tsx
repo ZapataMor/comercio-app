@@ -559,6 +559,7 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
               limpiarError('lat');
             }}
             disabled={guardando}
+            barrio={barrio}
           />
           <FieldError mensaje={errores.lat ?? errores.lng} />
 

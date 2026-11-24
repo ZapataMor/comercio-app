@@ -110,6 +110,7 @@ class EliminarCuenta
             // datos de contacto de la persona.
             $user->pedidos()->update([
                 'direccion_entrega' => 'Dirección eliminada',
+                'entrega_indicaciones' => null,
                 'telefono_contacto' => '',
             ]);
 

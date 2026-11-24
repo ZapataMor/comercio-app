@@ -11,7 +11,7 @@ import { FadeInView } from '../components/anim';
 import BotonesContacto from '../components/BotonesContacto';
 import CalificarPedido, { ResumenCalificacion } from '../components/CalificarPedido';
 import { VerCodigo } from '../components/CodigoPedido';
-import Icon from '../components/Icon';
+import Icon, { IconName } from '../components/Icon';
 import { haceCuanto, MapaSeguimiento, NotaEnVivo } from '../components/Mapa';
 import MotivoCancelacion from '../components/MotivoCancelacion';
 import ResenarPedido from '../components/ResenarPedido';
@@ -35,18 +35,54 @@ type Props = NativeStackScreenProps<RootStackParamList, 'PedidoDetalle'>;
  */
 const UBICACION_VIEJA_S = 60;
 
+/** Los pasos dichos desde el cliente, no desde la operación de la tienda. */
 const LABEL: Record<string, string> = {
-  pendiente: 'Pendiente',
+  pendiente: 'Esperando que la tienda acepte',
   // Solo por transferencia: pagar y que el negocio confirme que le llegó.
   pago: 'Pago por transferencia',
-  aceptado: 'En preparación',
-  listo: 'Listo para recoger',
-  tomado: 'Domiciliario asignado',
-  recogido: 'Recogido',
-  en_camino: 'En camino',
+  aceptado: 'La tienda prepara tu pedido',
+  listo: 'Listo, esperando al domiciliario',
+  tomado: 'Un domiciliario va por tu pedido',
+  recogido: 'El domiciliario ya lo tiene',
+  en_camino: 'Va en camino a tu casa',
   entregado: 'Entregado',
-  devolviendo: 'Devolviendo al comercio',
+  devolviendo: 'Regresando a la tienda',
 };
+
+/** Estados en los que el domiciliario ya lleva (o va por) el pedido. */
+const CON_DOMICILIARIO = ['tomado', 'recogido', 'en_camino'];
+
+/** Lo que pasa ahora, en una frase grande, y qué sigue. */
+function fraseDelEstado(p: SeguimientoPedido): { titulo: string; detalle: string; icono: IconName } {
+  switch (p.estado) {
+    case 'pendiente':
+      return { titulo: 'Esperando que la tienda acepte tu pedido', detalle: 'Te avisamos apenas lo acepte.', icono: 'reloj' };
+    case 'aceptado':
+      return p.metodo_pago === 'transferencia' && p.pago?.estado !== 'confirmado'
+        ? { titulo: 'La tienda aceptó: falta tu pago', detalle: 'Transfiere y avísale aquí abajo. Prepara tu pedido cuando le llegue el dinero.', icono: 'banco' }
+        : { titulo: 'La tienda está preparando tu pedido', detalle: 'Cuando esté listo, un domiciliario lo recoge y te lo lleva.', icono: 'tienda' };
+    case 'listo':
+      return { titulo: 'Tu pedido está listo', detalle: 'Estamos buscando un domiciliario que te lo lleve.', icono: 'caja' };
+    case 'tomado':
+      return {
+        titulo: 'Un domiciliario va por tu pedido',
+        detalle: p.minutos_recogida != null ? `Lo recoge en unos ${p.minutos_recogida} min y sale hacia tu casa.` : 'Lo recoge en la tienda y sale hacia tu casa.',
+        icono: 'moto',
+      };
+    case 'recogido':
+      return { titulo: 'El domiciliario ya tiene tu pedido', detalle: 'En un momento sale hacia tu casa.', icono: 'moto' };
+    case 'en_camino':
+      return {
+        titulo: p.minutos_estimados != null ? `Tu pedido llega en unos ${p.minutos_estimados} min` : 'Tu pedido va en camino',
+        detalle: p.minutos_estimados != null ? 'Es aproximado, según la distancia.' : 'Ve preparándote para recibirlo.',
+        icono: 'moto',
+      };
+    case 'entregado':
+      return { titulo: '¡Tu pedido fue entregado!', detalle: 'Gracias por pedir en Vitrina.', icono: 'check' };
+    default:
+      return { titulo: p.estado_label, detalle: '', icono: 'reloj' };
+  }
+}
 
 function cop(n: number) {
   return '$' + Math.round(n).toLocaleString('es-CO');
@@ -93,6 +129,117 @@ function Paso({ texto, hecho, actual }: { texto: string; hecho: boolean; actual:
         {actual ? '  · ahora' : ''}
       </Text>
     </View>
+  );
+}
+
+/**
+ * Lo primero que ve el cliente: qué pasa con su pedido en una frase grande y,
+ * según el momento, el mapa con el domiciliario, el código de entrega y el
+ * efectivo que debe tener listo.
+ */
+function TarjetaEstado({
+  pedido,
+  actualizando,
+  onRefrescar,
+}: {
+  pedido: SeguimientoPedido;
+  actualizando: boolean;
+  onRefrescar: () => void;
+}) {
+  const { c } = useTheme();
+  const styles = useStyles();
+  const frase = fraseDelEstado(pedido);
+  const enRuta = pedido.estado === 'recogido' || pedido.estado === 'en_camino';
+  const efectivo = pedido.metodo_pago === 'efectivo' && pedido.estado !== 'entregado';
+  const cambio = pedido.paga_con != null && pedido.paga_con > pedido.total ? pedido.paga_con - pedido.total : null;
+
+  return (
+    <FadeInView style={[styles.card, styles.estadoCard]}>
+      <View style={styles.estadoCabecera}>
+        <View style={[styles.estadoIcono, pedido.estado === 'entregado' && styles.estadoIconoListo]}>
+          <Icon name={frase.icono} size={24} color={c.onAccent} />
+        </View>
+        <View style={styles.estadoTextos}>
+          <Text style={styles.estadoTitulo}>{frase.titulo}</Text>
+          {!!frase.detalle && <Text style={styles.estadoDetalle}>{frase.detalle}</Text>}
+        </View>
+      </View>
+
+      {/* Con el pedido en la moto: dónde va, en vivo. */}
+      {enRuta && (
+        pedido.domiciliario_ubicacion ? (
+          <View style={styles.estadoMapa}>
+            <MapaSeguimiento
+              domiciliario={pedido.domiciliario_ubicacion}
+              entrega={pedido.entrega_ubicacion}
+              negocio={
+                pedido.negocio_ubicacion
+                  ? { punto: pedido.negocio_ubicacion, nombre: pedido.negocio ?? 'Negocio' }
+                  : null
+              }
+              onRefrescar={onRefrescar}
+            />
+            <NotaEnVivo
+              texto={`Ubicación del domiciliario ${haceCuanto(pedido.domiciliario_ubicacion.hace_segundos)}`}
+              vieja={pedido.domiciliario_ubicacion.hace_segundos > UBICACION_VIEJA_S}
+            />
+          </View>
+        ) : (
+          <View style={styles.estadoMapa}>
+            <View style={styles.fila}>
+              <Icon name="mapa" size={15} color={c.muted} />
+              <Text style={[styles.lineaTxt, { flex: 1 }]}>
+                Cuando el domiciliario comparta su ubicación, lo verás aquí en el mapa.
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={onRefrescar}
+              disabled={actualizando}
+              accessibilityRole="button"
+              accessibilityLabel="Actualizar ubicación del domiciliario"
+              style={styles.actualizar}>
+              {actualizando ? (
+                <ActivityIndicator size="small" color={c.accent} />
+              ) : (
+                <Icon name="refrescar" size={16} color={c.accent} />
+              )}
+              <Text style={styles.actualizarTxt}>Actualizar</Text>
+            </TouchableOpacity>
+          </View>
+        )
+      )}
+
+      {/* El código que confirma que el pedido llegó a la persona correcta. */}
+      {!!pedido.codigo_entrega && CON_DOMICILIARIO.includes(pedido.estado) && (
+        <VerCodigo
+          grande
+          titulo="Tu código de entrega"
+          codigo={pedido.codigo_entrega}
+          ayuda="Cuando recibas tu pedido, dile este número al domiciliario. Así sabemos que te llegó a ti. No se lo des antes de tener tu pedido en la mano."
+        />
+      )}
+
+      {efectivo && (
+        <View style={styles.tenListo}>
+          <Icon name="efectivo" size={20} color={c.success} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.tenListoTitulo}>Ten listos {cop(pedido.total)} en efectivo</Text>
+            <Text style={styles.tenListoTxt}>
+              {cambio != null
+                ? `Dijiste que pagas con ${cop(pedido.paga_con!)}: el domiciliario te lleva ${cop(cambio)} de cambio.`
+                : 'Dijiste que pagas con el valor exacto.'}
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* Mientras lo lleva: llamar o escribirle al domiciliario. */}
+      <BotonesContacto
+        telefono={pedido.domiciliario_telefono}
+        mensaje={`Hola, soy el cliente del pedido #${pedido.codigo} de Vitrina.`}
+        etiquetaLlamar="Llamar al domiciliario"
+      />
+    </FadeInView>
   );
 }
 
@@ -209,6 +356,11 @@ export default function PedidoDetalleScreen({ route }: Props) {
         <Text style={styles.sub}>{pedido.negocio}</Text>
       </View>
 
+      {/* Lo que pasa ahora, en grande: una frase, el mapa, el código y el efectivo. */}
+      {pedido.estado !== 'cancelado' && pedido.estado !== 'devolviendo' && (
+        <TarjetaEstado pedido={pedido} actualizando={actualizando} onRefrescar={refrescarUbicacion} />
+      )}
+
       {/* Transferencia: cuentas del negocio, «Ya pagué» y en qué va la revisión. */}
       {!!pedido.pago && ['pendiente', 'aceptado'].includes(pedido.estado) && (
         <PagarTransferencia
@@ -274,7 +426,7 @@ export default function PedidoDetalleScreen({ route }: Props) {
       ) : (
       <FadeInView style={styles.card}>
         <Objetivo id="pedido.estado">
-        <Text style={styles.cardTitulo}>Seguimiento</Text>
+        <Text style={styles.cardTitulo}>Así va tu pedido</Text>
         {pedido.estados.map((e, i) => (
           <Paso
             key={e}
@@ -284,30 +436,12 @@ export default function PedidoDetalleScreen({ route }: Props) {
           />
         ))}
         </Objetivo>
-        {pedido.estado === 'tomado' && pedido.minutos_recogida != null && (
-          <View style={[styles.nota, styles.fila]}>
-            <Icon name="moto" size={14} color={c.accent} />
-            <Text style={styles.nota}>El domiciliario recoge en ~{pedido.minutos_recogida} min.</Text>
-          </View>
-        )}
         {!!pedido.domiciliario && (
           <View style={[styles.fila, styles.domiFila]}>
+            <Icon name="moto" size={14} color={c.accent} />
             <Text style={[styles.nota, styles.notaInline]}>Domiciliario: {pedido.domiciliario}</Text>
           </View>
         )}
-        {!!pedido.codigo_entrega && (
-          <VerCodigo
-            titulo="Tu código de entrega"
-            codigo={pedido.codigo_entrega}
-            ayuda="Dáselo al domiciliario solo cuando recibas tu pedido."
-          />
-        )}
-        {/* Mientras lo lleva: llamar o escribirle al domiciliario. */}
-        <BotonesContacto
-          telefono={pedido.domiciliario_telefono}
-          mensaje={`Hola, soy el cliente del pedido #${pedido.codigo} de Vitrina.`}
-          etiquetaLlamar="Llamar al domiciliario"
-        />
         {!!pedido.novedad && pedido.estado !== 'entregado' && (
           <View style={styles.novedad}>
             <Icon name="alerta" size={15} color={c.warning} />
@@ -320,62 +454,6 @@ export default function PedidoDetalleScreen({ route }: Props) {
           </TouchableOpacity>
         )}
       </FadeInView>
-      )}
-
-      {/* En camino: dónde va el domiciliario, en vivo. */}
-      {enRuta && (
-        <FadeInView delay={20} style={styles.card}>
-          <Text style={styles.cardTitulo}>Tu pedido va en camino</Text>
-          {pedido.minutos_estimados != null && (
-            <View style={styles.llega}>
-              <Icon name="reloj" size={18} color={c.accent} />
-              <Text style={styles.llegaTxt}>
-                Llega en unos {pedido.minutos_estimados} min
-                <Text style={styles.llegaNota}>  · aprox., según la distancia</Text>
-              </Text>
-            </View>
-          )}
-          {pedido.domiciliario_ubicacion ? (
-            <>
-              <MapaSeguimiento
-                domiciliario={pedido.domiciliario_ubicacion}
-                entrega={pedido.entrega_ubicacion}
-                negocio={
-                  pedido.negocio_ubicacion
-                    ? { punto: pedido.negocio_ubicacion, nombre: pedido.negocio ?? 'Negocio' }
-                    : null
-                }
-                onRefrescar={refrescarUbicacion}
-              />
-              <NotaEnVivo
-                texto={`Ubicación del domiciliario ${haceCuanto(pedido.domiciliario_ubicacion.hace_segundos)}`}
-                vieja={pedido.domiciliario_ubicacion.hace_segundos > UBICACION_VIEJA_S}
-              />
-            </>
-          ) : (
-            <>
-              <View style={styles.fila}>
-                <Icon name="moto" size={15} color={c.muted} />
-                <Text style={[styles.lineaTxt, { flex: 1 }]}>
-                  En cuanto el domiciliario comparta su ubicación, lo verás aquí en el mapa.
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={refrescarUbicacion}
-                disabled={actualizando}
-                accessibilityRole="button"
-                accessibilityLabel="Actualizar ubicación del domiciliario"
-                style={styles.actualizar}>
-                {actualizando ? (
-                  <ActivityIndicator size="small" color={c.accent} />
-                ) : (
-                  <Icon name="refrescar" size={16} color={c.accent} />
-                )}
-                <Text style={styles.actualizarTxt}>Actualizar</Text>
-              </TouchableOpacity>
-            </>
-          )}
-        </FadeInView>
       )}
 
       {/* Contacto con el negocio (dudas sobre el pedido). */}
@@ -430,11 +508,16 @@ export default function PedidoDetalleScreen({ route }: Props) {
         <View style={[styles.info, styles.fila]}>
           <Icon name="tarjeta" size={13} color={c.muted} />
           <Text style={styles.info}>
-            {pedido.metodo_pago === 'transferencia' ? `Transferencia${pedido.pago?.estado === 'confirmado' ? ' (pago confirmado)' : ''}` : 'Efectivo'} ·
+            {pedido.metodo_pago === 'transferencia'
+              ? `Transferencia${pedido.pago?.estado === 'confirmado' ? ' (pago confirmado)' : ''}`
+              : pedido.paga_con != null ? `Efectivo, pagas con ${cop(pedido.paga_con)}` : 'Efectivo, valor exacto'} ·
           </Text>
           <Icon name="ubicacion" size={13} color={c.muted} />
           <Text style={[styles.info, { flex: 1 }]}>{pedido.direccion_entrega}</Text>
         </View>
+        {!!pedido.entrega_indicaciones && (
+          <Text style={styles.indicaciones}>Indicaciones: {pedido.entrega_indicaciones}</Text>
+        )}
       </FadeInView>
 
       {/* Al final, para cuando algo no salió bien. */}
@@ -467,6 +550,28 @@ const useStyles = makeStyles((c, shadow) => ({
   },
   actualizarTxt: { color: c.accent, fontFamily: font.semibold, fontSize: 13 },
   card: { backgroundColor: c.surface, borderRadius: radius.md, padding: 16, marginBottom: 14, ...shadow.soft },
+  estadoCard: { borderWidth: 1, borderColor: c.accent, padding: 18 },
+  estadoCabecera: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  estadoIcono: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: c.accent,
+  },
+  estadoIconoListo: { backgroundColor: c.success },
+  estadoTextos: { flex: 1 },
+  estadoTitulo: { color: c.textStrong, fontFamily: font.display, fontSize: 21, lineHeight: 27 },
+  estadoDetalle: { color: c.text, fontFamily: font.regular, fontSize: 15, lineHeight: 21, marginTop: 4 },
+  estadoMapa: { marginTop: 14 },
+  tenListo: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 14, padding: 12,
+    borderRadius: radius.md, backgroundColor: c.successSoft,
+  },
+  tenListoTitulo: { color: c.textStrong, fontFamily: font.bold, fontSize: 16 },
+  tenListoTxt: { color: c.text, fontFamily: font.regular, fontSize: 14, lineHeight: 20, marginTop: 2 },
+  indicaciones: { color: c.muted, fontSize: 13, lineHeight: 18, marginTop: 6, fontFamily: font.regular },
   cardTitulo: { fontFamily: font.bold, color: c.text, marginBottom: 12 },
   paso: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   bolita: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
@@ -475,7 +580,7 @@ const useStyles = makeStyles((c, shadow) => ({
   bolitaActual: { borderWidth: 3, borderColor: c.accentSoft },
   bolitaTxt: { color: c.onAccent, fontSize: 16, fontFamily: font.bold },
   bolitaTxtOff: { color: c.mutedSoft },
-  pasoTxt: { fontSize: 14, fontFamily: font.medium },
+  pasoTxt: { flex: 1, fontSize: 15, fontFamily: font.medium },
   pasoOn: { color: c.textStrong, fontFamily: font.semibold },
   pasoOff: { color: c.mutedSoft },
   nota: { color: c.goldText, fontSize: 13, marginTop: 6, fontFamily: font.medium },
@@ -488,9 +593,6 @@ const useStyles = makeStyles((c, shadow) => ({
   novedadTxt: { flex: 1, color: c.warning, fontSize: 13, fontFamily: font.medium },
   linea: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
   lineaTxt: { color: c.text, fontFamily: font.regular },
-  llega: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
-  llegaTxt: { flex: 1, color: c.textStrong, fontFamily: font.bold, fontSize: 16 },
-  llegaNota: { color: c.muted, fontFamily: font.regular, fontSize: 12 },
   lineaProducto: { flex: 1, marginRight: 12 },
   lineaDetalle: { color: c.muted, fontSize: 12, lineHeight: 17, marginTop: 1, fontFamily: font.regular },
   subtotalRow: {

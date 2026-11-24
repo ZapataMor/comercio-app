@@ -278,6 +278,12 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
             <Icon name="ubicacion" size={15} color={c.text} />
             <Text style={styles.linea}>{pedido.direccion_entrega}</Text>
           </View>
+          {!!pedido.entrega_indicaciones && (
+            <View style={styles.filaInfo}>
+              <Icon name="mapa" size={15} color={c.text} />
+              <Text style={styles.linea}>Indicaciones: {pedido.entrega_indicaciones}</Text>
+            </View>
+          )}
           {!!pedido.telefono_contacto && (
             <View style={styles.filaInfo}>
               <Icon name="telefono" size={15} color={c.text} />
@@ -293,7 +299,11 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
           )}
           <View style={styles.filaInfo}>
             <Icon name="tarjeta" size={15} color={c.text} />
-            <Text style={styles.linea}>Pago: {pedido.metodo_pago === 'transferencia' ? 'transferencia' : 'efectivo contra entrega'}</Text>
+            <Text style={styles.linea}>
+              Pago: {pedido.metodo_pago === 'transferencia'
+                ? 'transferencia'
+                : `efectivo contra entrega${pedido.paga_con != null ? `, paga con $${Math.round(pedido.paga_con).toLocaleString('es-CO')}` : ', valor exacto'}`}
+            </Text>
           </View>
           {!!pedido.domiciliario && (
             <View style={styles.filaInfo}>

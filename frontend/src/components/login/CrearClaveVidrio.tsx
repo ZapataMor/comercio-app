@@ -64,7 +64,7 @@ export default function CrearClaveVidrio({ textoBoton, cargando, onCrear, errorS
         (0000) ni seguidos (1234).
       </Text>
 
-      <Text style={styles.rotulo}>TU CLAVE</Text>
+      <Text style={styles.rotulo}>Tu clave de 4 números</Text>
       <CampoPin
         ref={primero}
         vidrio
@@ -81,7 +81,7 @@ export default function CrearClaveVidrio({ textoBoton, cargando, onCrear, errorS
       />
       <FieldError mensaje={errores.pin} />
 
-      <Text style={[styles.rotulo, styles.rotuloSegundo]}>ESCRÍBELA OTRA VEZ</Text>
+      <Text style={[styles.rotulo, styles.rotuloSegundo]}>Escríbela otra vez</Text>
       <CampoPin
         ref={segundo}
         vidrio
@@ -110,7 +110,7 @@ export default function CrearClaveVidrio({ textoBoton, cargando, onCrear, errorS
 }
 
 const useStyles = makeStyles((_c, _sombras, l) => ({
-  rotulo: { color: l.rotulo, fontFamily: font.bold, fontSize: 11, letterSpacing: 1.3, marginTop: 14, marginBottom: 8 },
+  rotulo: { color: l.rotulo, fontFamily: font.semibold, fontSize: 14, letterSpacing: 0.2, marginTop: 14, marginBottom: 8 },
   rotuloSegundo: { marginTop: 4 },
   boton: { marginTop: 8 },
 }));

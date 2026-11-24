@@ -3,7 +3,7 @@ import React from 'react';
 import { AppState } from 'react-native';
 import ReactTestRenderer, { act } from 'react-test-renderer';
 import { crearPedido, getPedido, NuevoPedido, Producto } from '../src/api';
-import { CartProvider, DURACION_CARRITO, useCart } from '../src/CartContext';
+import { CartProvider, useCart } from '../src/CartContext';
 import { PedidoPendienteProvider, usePedidoPendiente } from '../src/PedidoPendienteContext';
 
 jest.mock('../src/AuthContext', () => ({ useAuth: () => ({ auth: { token: 't', user: { id: 7 } } }) }));
@@ -32,19 +32,16 @@ beforeEach(async () => {
 });
 afterEach(() => { act(() => raiz?.unmount()); raiz = null; jest.useRealTimers(); });
 
-test('el carrito vence a la hora aunque se agreguen unidades y sigue vacío al reabrir', async () => {
+test('el carrito no vence: horas después sigue igual, también al reabrir la app', async () => {
   const api = await montar();
   await act(async () => { api.cart.agregar(3, 'Tienda', producto); });
-  const vence = api.cart.venceEn;
-  jest.setSystemTime(Date.now() + DURACION_CARRITO - 1000);
   await act(async () => { api.cart.agregar(3, 'Tienda', producto); });
-  expect(api.cart.venceEn).toBe(vence);
+  jest.setSystemTime(Date.now() + 5 * 60 * 60 * 1000);
+  await act(async () => { jest.advanceTimersByTime(60 * 60 * 1000); });
   expect(api.cart.count).toBe(2);
-  await act(async () => { jest.advanceTimersByTime(1000); });
-  expect(api.cart.count).toBe(0);
   act(() => raiz!.unmount());
   const reabierto = await montar();
-  expect(reabierto.cart.count).toBe(0);
+  expect(reabierto.cart.count).toBe(2);
 });
 
 test('un aumento pide una decisión y aplica el nuevo precio al aceptarlo', async () => {

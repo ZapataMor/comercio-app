@@ -100,7 +100,7 @@ export default function CompletarCuentaScreen() {
 
       {pideCorreo ? (
         <View style={styles.seccion}>
-          <Text style={styles.rotulo}>TU CORREO</Text>
+          <Text style={styles.rotulo}>Tu correo</Text>
           {correoListo ? (
             <Listo etiqueta={user.google ? 'GOOGLE CONECTADO' : 'CORREO GUARDADO'} valor={user.email ?? ''} />
           ) : (
@@ -114,7 +114,7 @@ export default function CompletarCuentaScreen() {
               ) : null}
               <View style={e.bloqueCampo}>
                 <CampoAcceso
-                  rotulo="CORREO"
+                  rotulo="Correo"
                   icono="sobre"
                   placeholder="nombre@correo.com"
                   value={correo}
@@ -141,7 +141,7 @@ export default function CompletarCuentaScreen() {
 
       {pideCelular ? (
         <View style={styles.seccion}>
-          <Text style={styles.rotulo}>TU CELULAR</Text>
+          <Text style={styles.rotulo}>Tu celular</Text>
           {celularListo ? (
             <Listo etiqueta="CELULAR CONFIRMADO" valor={`+57 ${formatoCelular(user.telefono ?? '')}`} />
           ) : (
@@ -193,7 +193,7 @@ function Listo({ etiqueta, valor }: { etiqueta: string; valor: string }) {
 
 const useStyles = makeStyles((_c, _sombras, l) => ({
   seccion: { marginTop: 8, marginBottom: 6 },
-  rotulo: { color: l.rotulo, fontFamily: font.bold, fontSize: 11, letterSpacing: 1.3, marginBottom: 8 },
+  rotulo: { color: l.rotulo, fontFamily: font.semibold, fontSize: 14, letterSpacing: 0.2, marginBottom: 8 },
   explica: { marginBottom: 12 },
   google: { marginTop: 4 },
   secundario: { marginTop: 4 },

@@ -1,6 +1,6 @@
 /**
- * Botones flotantes del CLIENTE: dos círculos solo con ícono abajo a la
- * derecha, uno sobre otro ("Carrito" arriba, "Mis pedidos" abajo), fijos en
+ * Botones flotantes del CLIENTE: dos píldoras con ícono y nombre abajo a la
+ * derecha, una sobre otra ("Carrito" arriba, "Mis pedidos" abajo), fijas en
  * todas las vistas del cliente. En Explorar van encima de la barra de
  * catálogos (BarraCatalogo). Mientras la lista se desplaza se encogen y se
  * aclaran un poco, como la barra (ver encogerAlDesplazar).
@@ -41,11 +41,12 @@ const RUTAS_CLIENTE = new Set([
   'PedidoDetalle',
 ]);
 
-/** Diámetro de los botones y su distancia al borde inferior (sobre el área segura). */
-export const ALTO_BARRA_CLIENTE = 54;
+/** Alto y ancho de los botones y su distancia al borde inferior (sobre el área segura). */
+export const ALTO_BARRA_CLIENTE = 50;
+export const ANCHO_BARRA_CLIENTE = 148;
 export const MARGEN_BARRA_CLIENTE = 14;
-/** Separación entre los dos círculos y alto de la pila completa. */
-const SEPARACION_BOTONES = 12;
+/** Separación entre los dos botones y alto de la pila completa. */
+const SEPARACION_BOTONES = 10;
 export const ALTO_PILA_CLIENTE = ALTO_BARRA_CLIENTE * 2 + SEPARACION_BOTONES;
 /** Al desplazar la lista: tamaño y opacidad de los botones. */
 const ESCALA_ENCOGIDA = 0.82;
@@ -167,7 +168,8 @@ function Barra({ ruta }: { ruta: string }) {
                 accessibilityRole="button"
                 accessibilityLabel={cart.count > 0 ? `Carrito, ${cart.count} en total` : 'Carrito'}
                 onPress={() => navigationRef.isReady() && navigationRef.navigate('Carrito')}>
-                <Icon name="carrito" size={24} color={c.onAccent} strokeWidth={2} />
+                <Icon name="carrito" size={22} color={c.onAccent} strokeWidth={2} />
+                <NombreBoton texto="Carrito" color={c.onAccent} />
               </PressableScale>
             </Objetivo>
             {cart.count > 0 && (
@@ -185,12 +187,29 @@ function Barra({ ruta }: { ruta: string }) {
               accessibilityRole="button"
               accessibilityLabel="Mis pedidos"
               onPress={() => navigationRef.isReady() && navigationRef.navigate('MisPedidos')}>
-              <Icon name="lista" size={24} color={c.onBrand} strokeWidth={2} />
+              <Icon name="lista" size={22} color={c.onBrand} strokeWidth={2} />
+              <NombreBoton texto="Mis pedidos" color={c.onBrand} />
             </PressableScale>
           </Objetivo>
         )}
       </Entrada>
     </Animated.View>
+  );
+}
+
+/** El nombre junto al ícono: quien no reconoce el ícono lee qué hace el botón. */
+function NombreBoton({ texto, color }: { texto: string; color: string }) {
+  const styles = useStyles();
+  return (
+    <Text
+      style={[styles.nombre, { color }]}
+      numberOfLines={1}
+      adjustsFontSizeToFit
+      minimumFontScale={0.8}
+      maxFontSizeMultiplier={1.2}
+      importantForAccessibility="no">
+      {texto}
+    </Text>
   );
 }
 
@@ -218,13 +237,17 @@ const useStyles = makeStyles((c, shadow) => ({
   zona: { position: 'absolute', right: 20, alignItems: 'flex-end' },
   esquina: { transformOrigin: 'right bottom' },
   fila: { flexDirection: 'column', gap: SEPARACION_BOTONES },
+  // Radio = mitad del alto: con radius.pill algunos teléfonos dibujan esquinas rectas.
   boton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    width: ALTO_BARRA_CLIENTE,
+    gap: 8,
+    width: ANCHO_BARRA_CLIENTE,
     height: ALTO_BARRA_CLIENTE,
-    borderRadius: radius.pill,
+    paddingHorizontal: 16,
+    borderRadius: ALTO_BARRA_CLIENTE / 2,
   },
+  nombre: { flexShrink: 1, fontFamily: font.bold, fontSize: 15 },
   botonCarrito: { backgroundColor: c.accent, ...shadow.gold },
   botonPedidos: { backgroundColor: c.brand, ...shadow.card },
   badge: {

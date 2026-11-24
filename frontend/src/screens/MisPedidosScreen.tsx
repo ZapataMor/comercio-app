@@ -10,6 +10,7 @@ import Icon from '../components/Icon';
 import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { Objetivo } from '../tutorial/Objetivo';
+import { messageFromError } from '../formErrors';
 import { usePolling } from '../usePolling';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MisPedidos'>;
@@ -46,7 +47,7 @@ export default function MisPedidosScreen({ navigation }: Props) {
           setHayMas(prev => (reiniciar ? p.pagina < p.ultima_pagina : prev || p.pagina < p.ultima_pagina));
           if (reiniciar) setPagina(1);
         })
-        .catch(e => setError(e.message ?? 'No pudimos cargar tus pedidos.'))
+        .catch(e => setError(messageFromError(e, 'No pudimos cargar tus pedidos.')))
         .finally(() => setCargando(false));
     },
     [auth],
@@ -61,7 +62,7 @@ export default function MisPedidosScreen({ navigation }: Props) {
       setPagina(p.pagina);
       setHayMas(p.pagina < p.ultima_pagina);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No pudimos cargar más pedidos.');
+      setError(messageFromError(e, 'No pudimos cargar más pedidos.'));
     } finally {
       setCargandoMas(false);
     }
@@ -95,7 +96,16 @@ export default function MisPedidosScreen({ navigation }: Props) {
         <RefreshControl refreshing={refrescando} onRefresh={refrescar} colors={[c.accent]} tintColor={c.accent} />
       }
       ListHeaderComponent={error ? <ErrorCarga mensaje={error} /> : null}
-      ListEmptyComponent={error ? null : <Text style={styles.vacio}>Aún no has hecho pedidos.</Text>}
+      ListEmptyComponent={error ? null : (
+        <View style={styles.vacioBox}>
+          <Icon name="lista" size={44} color={c.chevron} />
+          <Text style={styles.vacio}>Aún no has hecho pedidos.</Text>
+          <Text style={styles.vacioDetalle}>Cuando pidas algo, aquí verás en qué va.</Text>
+          <PressableScale style={styles.vacioBoton} onPress={() => navigation.navigate('Explorar')} accessibilityRole="button">
+            <Text style={styles.vacioBotonTxt}>Buscar qué pedir</Text>
+          </PressableScale>
+        </View>
+      )}
       onEndReached={cargarMas}
       onEndReachedThreshold={0.4}
       ListFooterComponent={cargandoMas ? <ActivityIndicator color={c.accent} style={{ marginVertical: 16 }} /> : null}
@@ -151,5 +161,9 @@ const useStyles = makeStyles((c, shadow) => ({
     paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill,
   },
   calificarTxt: { color: c.onAccent, fontSize: 11, fontFamily: font.bold },
-  vacio: { textAlign: 'center', color: c.muted, marginTop: 40, fontFamily: font.regular },
+  vacioBox: { alignItems: 'center', marginTop: 48, paddingHorizontal: 24 },
+  vacio: { textAlign: 'center', color: c.textStrong, marginTop: 12, fontFamily: font.bold, fontSize: 17 },
+  vacioDetalle: { textAlign: 'center', color: c.muted, marginTop: 4, fontFamily: font.regular, fontSize: 15 },
+  vacioBoton: { marginTop: 18, paddingHorizontal: 28, height: 50, borderRadius: radius.md, justifyContent: 'center', backgroundColor: c.accent },
+  vacioBotonTxt: { color: c.onAccent, fontFamily: font.bold, fontSize: 16 },
 }));

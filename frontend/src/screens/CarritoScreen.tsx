@@ -13,6 +13,7 @@ import { RootStackParamList } from '../navTypes';
 import { detalleOpciones, precioLinea } from '../opcionesProducto';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { Objetivo } from '../tutorial/Objetivo';
+import { useTarifaDomicilio } from '../useTarifaDomicilio';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Carrito'>;
 
@@ -88,12 +89,14 @@ function LineaCarrito({ item, onAjustar, onAgregarOtra }: LineaProps) {
         <View style={styles.itemCabecera}>
           <Text style={styles.nombre} numberOfLines={2}>{item.nombre}</Text>
           <TouchableOpacity
-            style={saliendo && styles.oculto}
+            style={[styles.quitar, saliendo && styles.oculto]}
             disabled={saliendo}
-            hitSlop={10}
+            hitSlop={8}
+            accessibilityRole="button"
             accessibilityLabel={`Quitar ${item.nombre}`}
             onPress={() => quitar(item.linea)}>
-            <Icon name="cerrar" size={15} color={c.mutedSoft} />
+            <Icon name="basura" size={15} color={c.danger} />
+            <Text style={styles.quitarTxt}>Quitar</Text>
           </TouchableOpacity>
         </View>
 
@@ -110,7 +113,7 @@ function LineaCarrito({ item, onAjustar, onAgregarOtra }: LineaProps) {
 
         <View style={styles.itemPie}>
           {saliendo ? (
-            <Text style={styles.deshacer} numberOfLines={2}>Toca + para conservarlo</Text>
+            <Text style={styles.deshacer} numberOfLines={2}>Toca + si quieres conservarlo</Text>
           ) : (
             <Text style={styles.precio}>{cop(precioLinea(item))}</Text>
           )}
@@ -144,7 +147,17 @@ export default function CarritoScreen({ navigation }: Props) {
   const { c } = useTheme();
   const styles = useStyles();
   const confirmar = useConfirmar();
-  const { items, lineas, negocioNombre, total, personalizar, sumarUnidad, vaciar } = useCart();
+  const { items, lineas, negocioId, negocioNombre, total, personalizar, sumarUnidad, vaciar } = useCart();
+  const domicilio = useTarifaDomicilio();
+
+  /** Vuelve a la tienda del carrito para agregar más; sin tienda, a Explorar. */
+  function seguirComprando() {
+    if (negocioId != null) {
+      navigation.navigate('Negocio', { id: negocioId, nombre: negocioNombre ?? '' });
+    } else {
+      navigation.navigate('Explorar');
+    }
+  }
   // Línea en la hoja de ajustes. Se guarda la clave y no la línea: así la hoja
   // se cierra sola si la línea sale mientras está abierta.
   const [hoja, setHoja] = useState<{ linea: string; modo: ModoHoja } | null>(null);
@@ -154,9 +167,9 @@ export default function CarritoScreen({ navigation }: Props) {
       <View style={styles.vacioBox}>
         <Icon name="carrito" size={48} color={c.chevron} />
         <Text style={styles.vacio}>Tu carrito está vacío.</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Explorar')}>
-          <Text style={styles.link}>Explorar negocios →</Text>
-        </TouchableOpacity>
+        <PressableScale style={styles.btnVacio} onPress={() => navigation.navigate('Explorar')}>
+          <Text style={styles.btnTxt}>Buscar qué pedir</Text>
+        </PressableScale>
       </View>
     );
   }
@@ -181,25 +194,36 @@ export default function CarritoScreen({ navigation }: Props) {
             </Objetivo>
           </FadeInView>
         ))}
-        <TouchableOpacity onPress={() => confirmar({ icono: 'basura', titulo: '¿Vaciar carrito?', texto: 'Se quitarán todos los productos de tu carrito.', textoBoton: 'Vaciar carrito', peligro: true, accion: vaciar })} style={{ marginTop: 8 }}>
+        <PressableScale style={styles.seguir} onPress={seguirComprando} accessibilityRole="button">
+          <Icon name="mas" size={16} color={c.textStrong} strokeWidth={2.4} />
+          <Text style={styles.seguirTxt}>Seguir comprando{negocioNombre ? ` en ${negocioNombre}` : ''}</Text>
+        </PressableScale>
+        <TouchableOpacity onPress={() => confirmar({ icono: 'basura', titulo: '¿Vaciar carrito?', texto: 'Se quitarán todos los productos de tu carrito.', textoBoton: 'Vaciar carrito', peligro: true, accion: vaciar })} style={styles.vaciarBoton}>
           <Text style={styles.vaciar}>Vaciar carrito</Text>
         </TouchableOpacity>
       </ScrollView>
 
       <View style={styles.footer}>
         <Objetivo id="carrito.total">
-        <View style={styles.totalRow}>
-          <Text style={styles.totalLabel}>Productos</Text>
-          <Text style={styles.totalValor}>{cop(total)}</Text>
+        <View style={styles.subRow}>
+          <Text style={styles.subLabel}>Productos</Text>
+          <Text style={styles.subValor}>{cop(total)}</Text>
         </View>
-        <Text style={styles.notaDomicilio}>El domicilio se suma en el siguiente paso.</Text>
+        <View style={styles.subRow}>
+          <Text style={styles.subLabel}>Domicilio</Text>
+          <Text style={styles.subValor}>{domicilio == null ? 'Se calcula al pedir' : domicilio === 0 ? 'Gratis' : cop(domicilio)}</Text>
+        </View>
+        <View style={styles.totalRow}>
+          <Text style={styles.totalLabel}>Total</Text>
+          <Text style={styles.totalValor}>{cop(total + (domicilio ?? 0))}</Text>
+        </View>
         </Objetivo>
         <Objetivo id="carrito.continuar">
         <PressableScale
           style={[styles.btn, items.length === 0 && styles.btnOff]}
           disabled={items.length === 0}
           onPress={() => navigation.navigate('Checkout')}>
-          <Text style={styles.btnTxt}>Continuar al pago →</Text>
+          <Text style={styles.btnTxt}>Revisar y pedir</Text>
         </PressableScale>
         </Objetivo>
       </View>
@@ -277,16 +301,42 @@ const useStyles = makeStyles((c, shadow) => ({
   },
   qtyBtnOff: { opacity: 0.35 },
   qty: { minWidth: 22, textAlign: 'center', fontFamily: font.bold, color: c.textStrong },
+  quitar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: c.dangerSoft,
+  },
+  quitarTxt: { color: c.danger, fontFamily: font.semibold, fontSize: 13 },
+  seguir: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 6,
+    height: 50,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.surface,
+  },
+  seguirTxt: { color: c.textStrong, fontFamily: font.bold, fontSize: 15, flexShrink: 1 },
+  vaciarBoton: { marginTop: 18, paddingVertical: 8 },
   vaciar: { color: c.danger, textAlign: 'center', fontFamily: font.semibold },
   footer: { padding: 16, backgroundColor: c.surface, borderTopWidth: 1, borderTopColor: c.border },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  notaDomicilio: { color: c.muted, fontSize: 12, fontFamily: font.regular, marginBottom: 12 },
-  totalLabel: { color: c.muted, fontSize: 16, fontFamily: font.medium },
+  subRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  subLabel: { color: c.text, fontSize: 15, fontFamily: font.regular },
+  subValor: { color: c.text, fontSize: 15, fontFamily: font.semibold },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 4, marginBottom: 12, paddingTop: 8, borderTopWidth: 1, borderTopColor: c.border },
+  totalLabel: { color: c.textStrong, fontSize: 17, fontFamily: font.bold },
   totalValor: { fontSize: 22, fontFamily: font.extra, color: c.textStrong },
   btn: { backgroundColor: c.accent, borderRadius: radius.md, paddingVertical: 15, alignItems: 'center', ...shadow.gold },
   btnOff: { opacity: 0.5 },
   btnTxt: { color: c.onAccent, fontFamily: font.bold, fontSize: 16 },
   vacioBox: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: c.bg },
   vacio: { color: c.muted, marginTop: 8, fontFamily: font.regular },
-  link: { color: c.goldText, marginTop: 12, fontFamily: font.semibold },
+  btnVacio: { backgroundColor: c.accent, borderRadius: radius.md, paddingVertical: 15, paddingHorizontal: 28, marginTop: 18, ...shadow.gold },
 }));

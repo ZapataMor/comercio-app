@@ -75,7 +75,7 @@ export default function CampoAcceso({ rotulo, icono, clave, onFocus, onBlur, ...
 }
 
 const useStyles = makeStyles((_c, _sombras, l) => ({
-  rotulo: { color: l.rotulo, fontFamily: font.bold, fontSize: 11, letterSpacing: 1.3, marginBottom: 6 },
+  rotulo: { color: l.rotulo, fontFamily: font.semibold, fontSize: 14, letterSpacing: 0.2, marginBottom: 6 },
   // Campo hundido: sombra interior arriba y filo de luz abajo.
   campo: {
     height: ALTO_CAMPO,

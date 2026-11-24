@@ -77,7 +77,7 @@ export default function EditorComida({ ingredientes = [], fijos = [], extras = [
     <View>
       <Text style={styles.label}>Ingredientes</Text>
       <Text style={styles.ayuda}>
-        Lo que trae el plato. Toca la etiqueta para elegir si el cliente puede pedirlo sin ese ingrediente o si va fijo.
+        Lo que trae el plato. Toca la etiqueta de cada uno: «Se puede quitar» deja que el cliente lo pida sin él; «Obligatorio» siempre va y no se puede quitar (como el pan o la carne de una hamburguesa).
       </Text>
       {lista.map(i => (
         <View key={i.id} style={styles.fila}>
@@ -96,10 +96,10 @@ export default function EditorComida({ ingredientes = [], fijos = [], extras = [
             disabled={disabled}
             accessibilityRole="switch"
             accessibilityState={{ checked: i.quitable }}
-            accessibilityLabel={`${i.nombre || 'Ingrediente'}: ${i.quitable ? 'se puede quitar' : 'fijo'}`}
+            accessibilityLabel={`${i.nombre || 'Ingrediente'}: ${i.quitable ? 'se puede quitar' : 'obligatorio'}`}
             onPress={() => cambiarLista(lista.map(x => (x.id === i.id ? { ...x, quitable: !x.quitable } : x)))}>
             <Text style={[styles.etiquetaTxt, i.quitable ? styles.etiquetaTxtQuitable : styles.etiquetaTxtFija]}>
-              {i.quitable ? 'Se puede quitar' : 'Fijo'}
+              {i.quitable ? 'Se puede quitar' : 'Obligatorio'}
             </Text>
           </Pressable>
           <TouchableOpacity

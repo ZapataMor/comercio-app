@@ -104,7 +104,7 @@ export default function RegistroGoogleScreen({ navigation, route }: Props) {
         <LogoGoogle size={16} />
       </View>
       <View style={e.recuadroTexto}>
-        <Text style={e.recuadroEtiqueta}>CUENTA DE GOOGLE</Text>
+        <Text style={e.recuadroEtiqueta}>Cuenta de Google</Text>
         <Text style={e.recuadroValor} numberOfLines={1}>
           {perfil.email}
         </Text>
@@ -132,7 +132,7 @@ export default function RegistroGoogleScreen({ navigation, route }: Props) {
         <>
           <View style={e.bloqueCampo}>
             <CampoAcceso
-              rotulo="NOMBRE(S)"
+              rotulo="Nombre(s)"
               icono="usuario"
               value={nombre}
               onChangeText={valor => {
@@ -150,7 +150,7 @@ export default function RegistroGoogleScreen({ navigation, route }: Props) {
 
           <View style={e.bloqueCampo}>
             <CampoAcceso
-              rotulo="APELLIDOS"
+              rotulo="Apellidos"
               icono="usuarios"
               value={apellidos}
               onChangeText={valor => {

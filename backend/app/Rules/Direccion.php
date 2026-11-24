@@ -11,6 +11,12 @@ class Direccion implements ValidationRule
     /** Palabras de letras, números o guiones separadas por un espacio. */
     public const TEXTO = '/\A[\p{L}\p{N}-]+(?: [\p{L}\p{N}-]+)*\z/u';
 
+    /**
+     * Barrio: palabras con espacios, guiones o puntos, como en el catálogo
+     * («Santa Isabel», «Urb. Villa Inés»).
+     */
+    public const BARRIO = '/\A[\p{L}\p{N}][\p{L}\p{N}. -]*\z/u';
+
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
         if (! is_string($value)

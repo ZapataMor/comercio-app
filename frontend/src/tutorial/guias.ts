@@ -187,7 +187,7 @@ export const TUTORIALES: Tutorial[] = [
       {
         objetivo: 'negocio.producto',
         titulo: 'Elige tus productos',
-        texto: 'Toca un producto para ver sus detalles, escoger la cantidad y agregarlo al carrito.',
+        texto: 'Toca «Agregar» para ponerlo en el carrito, o toca la foto para ver sus detalles.',
       },
       {
         objetivo: 'barra.carrito',
@@ -224,13 +224,13 @@ export const TUTORIALES: Tutorial[] = [
       },
       {
         objetivo: 'carrito.total',
-        titulo: 'Lo que vas pagando',
-        texto: 'Este es el valor de los productos. El domicilio se suma en el siguiente paso.',
+        titulo: 'Lo que vas a pagar',
+        texto: 'El valor de los productos, el domicilio y el total.',
       },
       {
         objetivo: 'carrito.continuar',
-        titulo: 'Sigue al pago',
-        texto: 'Toca aquí para elegir la dirección de entrega y la forma de pago.',
+        titulo: 'Revisa y pide',
+        texto: 'Toca aquí para elegir dónde te lo llevamos y cómo vas a pagar.',
       },
     ],
   },
@@ -246,7 +246,7 @@ export const TUTORIALES: Tutorial[] = [
       {
         objetivo: 'checkout.direccion',
         titulo: '¿A dónde lo llevamos?',
-        texto: 'Elige una de tus direcciones o agrega una nueva. Mantén presionada una dirección para editarla.',
+        texto: 'Elige una de tus direcciones o agrega una nueva. Toca «Editar» para cambiar una.',
       },
       {
         objetivo: 'checkout.telefono',
@@ -255,8 +255,8 @@ export const TUTORIALES: Tutorial[] = [
       },
       {
         objetivo: 'checkout.pago',
-        titulo: 'Forma de pago',
-        texto: 'Paga en efectivo al recibir o por transferencia al negocio.',
+        titulo: '¿Cómo vas a pagar?',
+        texto: 'En efectivo al recibir (dinos con qué billete pagas) o por transferencia al negocio.',
       },
       {
         objetivo: 'checkout.confirmar',
@@ -282,8 +282,8 @@ export const TUTORIALES: Tutorial[] = [
     pasos: [
       {
         objetivo: 'pedido.estado',
-        titulo: 'En qué va tu pedido',
-        texto: 'Esta línea avanza sola cuando el negocio lo acepta, cuando sale y cuando llega.',
+        titulo: 'Así va tu pedido',
+        texto: 'Arriba ves qué pasa ahora; esta lista avanza sola cuando la tienda lo acepta, cuando sale y cuando llega.',
       },
       {
         objetivo: 'pedido.contacto',

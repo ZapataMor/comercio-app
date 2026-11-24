@@ -10,6 +10,7 @@ import ReactTestRenderer, { act } from 'react-test-renderer';
 import { getCatalogo, getEstadoNegocio, getRecetasPreferidas, Negocio, Producto, registrarVisita } from '../src/api';
 import NegocioScreen from '../src/screens/NegocioScreen';
 
+jest.mock('../src/useTarifaDomicilio', () => ({ useTarifaDomicilio: () => 3000 }));
 jest.mock('../src/AuthContext', () => ({
   useAuth: () => ({ auth: { token: 't', user: { id: 7 } } }),
 }));

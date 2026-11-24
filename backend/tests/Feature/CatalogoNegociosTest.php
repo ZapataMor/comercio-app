@@ -37,7 +37,7 @@ test('el estado de un negocio trae si está abierto, sin el catálogo', function
 
     $this->getJson("/api/negocios/{$negocio->id}/estado")
         ->assertOk()
-        ->assertExactJson(['activo' => true, 'horario_hoy' => null, 'estado_texto' => 'Abierto', 'acepta_transferencia' => false]);
+        ->assertExactJson(['activo' => true, 'horario_hoy' => null, 'abre_texto' => null, 'estado_texto' => 'Abierto', 'acepta_transferencia' => false]);
 
     $negocio->forceFill(['activo' => false])->save();
 

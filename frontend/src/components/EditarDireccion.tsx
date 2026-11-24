@@ -1,6 +1,6 @@
 import FotosDireccion, { fotosCompletas } from './FotosDireccion';
 import { FotosDireccion as Fotos } from '../api';
-import { campoDireccionValido, limpiarCampoDireccion, limpiarTextoDireccion, textoDireccionValido } from '../direccion';
+import { barrioValido, limpiarBarrio, limpiarIndicaciones, limpiarTextoDireccion, MAX_INDICACIONES, textoDireccionValido } from '../direccion';
 import CamposDireccion from '../components/CamposDireccion';
 import { normalizarDireccion } from '../direccion';
 import { direccionValida, errorDireccion } from '../direccion';
@@ -28,6 +28,7 @@ export default function EditarDireccion({ direccion, onCerrar, onGuardada }: {
   const [nombre, setNombre] = useState(direccion?.nombre ?? '');
   const [calle, setCalle] = useState(direccion?.direccion ?? '');
   const [barrio, setBarrio] = useState(direccion?.barrio ?? '');
+  const [indicaciones, setIndicaciones] = useState(direccion?.indicaciones ?? '');
   const [punto, setPunto] = useState<Coordenadas | null>(
     direccion?.lat != null && direccion?.lng != null ? { lat: direccion.lat, lng: direccion.lng } : null,
   );
@@ -38,7 +39,7 @@ export default function EditarDireccion({ direccion, onCerrar, onGuardada }: {
     if (!auth || guardando) return;
     const campos: FieldErrors = {};
     if (!direccionValida(calle)) campos.direccion = errorDireccion;
-    if (!campoDireccionValido(barrio)) campos.barrio = 'Elige o escribe el barrio.';
+    if (!barrioValido(barrio)) campos.barrio = 'Elige o escribe el barrio.';
     if (nombre.trim() && !textoDireccionValido(nombre.trim())) campos.nombre = errorDireccion;
     if (!punto) campos.lat = 'Marca tu casa en el mapa o usa tu ubicación actual.';
     if (!fotosCompletas(fotos)) campos.fotos = 'Añade las tres fotos de referencia.';
@@ -48,6 +49,7 @@ export default function EditarDireccion({ direccion, onCerrar, onGuardada }: {
     try {
       const body = {
         nombre: nombre.trim() || null, direccion: normalizarDireccion(calle), barrio: barrio.trim(),
+        indicaciones: indicaciones.trim() || null,
         lat: punto?.lat ?? null, lng: punto?.lng ?? null, fotos,
       };
       const guardada = direccion ? await editarClienteDireccion(auth.token, direccion.id, body)
@@ -74,9 +76,22 @@ export default function EditarDireccion({ direccion, onCerrar, onGuardada }: {
       <Objetivo id="direccion.campos"><CamposDireccion value={calle} onChangeText={setCalle} editable={!guardando} /></Objetivo>
       <FieldError mensaje={errores.direccion} />
       <Text style={styles.label}>Barrio</Text>
-      <Objetivo id="direccion.barrio"><BarrioSelect disabled={guardando} valor={barrio} onSeleccionar={v => setBarrio(limpiarCampoDireccion(v))} /></Objetivo>
+      <Objetivo id="direccion.barrio"><BarrioSelect disabled={guardando} valor={barrio} onSeleccionar={v => setBarrio(limpiarBarrio(v))} /></Objetivo>
       <FieldError mensaje={errores.barrio} />
-      <Objetivo id="direccion.mapa" style={styles.mapa}><SelectorUbicacion tipo="entrega" valor={punto} onCambiar={setPunto} disabled={guardando} /></Objetivo>
+      <Text style={styles.label}>Indicaciones para llegar (opcional)</Text>
+      <TextInput
+        style={[styles.input, styles.indicaciones]}
+        value={indicaciones}
+        onChangeText={v => setIndicaciones(limpiarIndicaciones(v))}
+        maxLength={MAX_INDICACIONES}
+        multiline
+        placeholder="Ej.: frente a la tienda La 14, casa azul de rejas blancas"
+        placeholderTextColor={c.muted}
+        editable={!guardando}
+      />
+      <Text style={styles.ayuda}>Lo verá el domiciliario. Sirve mucho si tu casa no tiene número.</Text>
+      <FieldError mensaje={errores.indicaciones} />
+      <Objetivo id="direccion.mapa" style={styles.mapa}><SelectorUbicacion tipo="entrega" valor={punto} onCambiar={setPunto} disabled={guardando} barrio={barrio} /></Objetivo>
       <FieldError mensaje={errores.lat ?? errores.lng} />
       <Objetivo id="direccion.fotos"><FotosDireccion fotos={fotos} onChange={setFotos} token={auth!.token} disabled={guardando} /></Objetivo>
       <FieldError mensaje={errores.fotos ?? errores.foto_frente ?? errores.foto_izquierda ?? errores.foto_derecha} />
@@ -97,8 +112,9 @@ const useStyles = makeStyles(c => ({
   fondo: { flex: 1, backgroundColor: '#0008', justifyContent: 'center', padding: 24 },
   caja: { flexGrow: 0, maxHeight: '90%', borderRadius: radius.lg, backgroundColor: c.bg },
   contenido: { padding: 20, gap: 8 }, titulo: { color: c.textStrong, fontFamily: font.bold, fontSize: 22 },
-  label: { color: c.text, fontFamily: font.semibold, marginTop: 8 },
-  ayuda: { color: c.muted, fontFamily: font.regular, fontSize: 12 },
+  label: { color: c.text, fontFamily: font.semibold, fontSize: 14, marginTop: 8 },
+  ayuda: { color: c.muted, fontFamily: font.regular, fontSize: 13, lineHeight: 18 },
+  indicaciones: { minHeight: 72, textAlignVertical: 'top' },
   input: { color: c.textStrong, fontFamily: font.regular, borderWidth: 1, borderColor: c.borderStrong, borderRadius: radius.md, padding: 12 },
   boton: { backgroundColor: c.accent, borderRadius: radius.md, alignItems: 'center', padding: 14, marginTop: 12 },
   botonTexto: { color: c.onAccent, fontFamily: font.bold },

@@ -11,14 +11,14 @@ import { PressableScale } from './anim';
 import FieldError from './FieldError';
 import { useBloqueConTeclado } from './EspacioTeclado';
 
-/** Lo ve quien tiene que dictar el código. */
-export function VerCodigo({ titulo, codigo, ayuda }: { titulo: string; codigo: string; ayuda: string }) {
+/** Lo ve quien tiene que dictar el código. `grande`: para el cliente, más fácil de leer y dictar. */
+export function VerCodigo({ titulo, codigo, ayuda, grande }: { titulo: string; codigo: string; ayuda: string; grande?: boolean }) {
   const styles = useStyles();
   return (
-    <View style={styles.caja} accessible accessibilityLabel={`${titulo}: ${codigo.split('').join(' ')}. ${ayuda}`}>
-      <Text style={styles.titulo}>{titulo}</Text>
-      <Text style={styles.digitos}>{codigo}</Text>
-      <Text style={styles.ayuda}>{ayuda}</Text>
+    <View style={[styles.caja, grande && styles.cajaGrande]} accessible accessibilityLabel={`${titulo}: ${codigo.split('').join(' ')}. ${ayuda}`}>
+      <Text style={[styles.titulo, grande && styles.tituloGrande]}>{titulo}</Text>
+      <Text style={[styles.digitos, grande && styles.digitosGrandes]}>{codigo}</Text>
+      <Text style={[styles.ayuda, grande && styles.ayudaGrande]}>{ayuda}</Text>
     </View>
   );
 }
@@ -110,6 +110,10 @@ const useStyles = makeStyles(c => ({
   titulo: { color: c.goldText, fontFamily: font.bold, fontSize: 13 },
   digitos: { color: c.textStrong, fontFamily: font.extra, fontSize: 34, letterSpacing: 8, marginVertical: 4 },
   ayuda: { color: c.text, fontFamily: font.regular, fontSize: 13, lineHeight: 18 },
+  cajaGrande: { alignItems: 'center', padding: 16, marginTop: 14, borderWidth: 1, borderColor: c.accent },
+  tituloGrande: { fontSize: 15 },
+  digitosGrandes: { fontSize: 46, letterSpacing: 14, marginVertical: 6, paddingLeft: 14 },
+  ayudaGrande: { fontSize: 15, lineHeight: 21, textAlign: 'center' },
   input: {
     backgroundColor: c.surface,
     borderWidth: 1,

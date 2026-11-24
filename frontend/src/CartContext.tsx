@@ -1,6 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState } from 'react-native';
 import { ExtraProducto, Producto } from './api';
 import { cantidadValida, esPorPeso, redondearCantidad } from './cantidades';
 import { useAuth } from './AuthContext';
@@ -17,7 +16,6 @@ import {
 
 /** Tiempo que una línea sigue en el carrito después de quitarla (ms). */
 export const DURACION_RETIRO = 3000;
-export const DURACION_CARRITO = 60 * 60 * 1000;
 
 export type CartItem = {
   /** Identifica la línea: el mismo producto con otras opciones es otra línea. */
@@ -53,7 +51,6 @@ type CartContextType = {
   lineas: CartItem[];
   count: number;
   total: number;
-  venceEn: number | null;
   cambiosPrecio: CartItem[];
   revisarPrecios: (productos: Producto[]) => void;
   resolverCambioPrecio: (productoId: number, conservar: boolean) => void;
@@ -91,14 +88,16 @@ type CartContextType = {
   vaciar: () => void;
 };
 
-type CarritoGuardado = { negocioId: number | null; negocioNombre: string | null; items: CartItem[]; venceEn: number | null };
+type CarritoGuardado = { negocioId: number | null; negocioNombre: string | null; items: CartItem[] };
 
 const CartContext = createContext<CartContextType>({} as CartContextType);
 
 /**
  * El carrito se guarda en el teléfono, uno por cuenta: sobrevive a cerrar la
- * app y no se mezcla si otra persona inicia sesión en el mismo aparato. Las
- * cotizaciones vencen en una hora y el servidor verifica el precio al confirmar.
+ * app y no se mezcla si otra persona inicia sesión en el mismo aparato. No
+ * vence: se queda hasta que la persona pida o lo vacíe. El servidor cobra el
+ * precio vigente y, si cambió, se pregunta antes (VigilarCarrito y el total
+ * esperado al confirmar).
  */
 const claveCarrito = (userId: number) => `carrito:${userId}`;
 
@@ -167,7 +166,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [negocioId, setNegocioId] = useState<number | null>(null);
   const [negocioNombre, setNegocioNombre] = useState<string | null>(null);
   const [lineas, setLineas] = useState<CartItem[]>([]);
-  const [venceEn, setVenceEn] = useState<number | null>(null);
   const items = useMemo(() => lineas.filter(i => !i.saleEn), [lineas]);
   // No se guarda nada hasta haber leído el carrito de esta cuenta (si no, el
   // carrito vacío inicial borraría el guardado).
@@ -178,7 +176,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setLineas([]);
     setNegocioId(null);
     setNegocioNombre(null);
-    setVenceEn(null);
     if (userId == null) return;
 
     let vigente = true;
@@ -187,11 +184,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         if (!vigente || !raw) return;
         try {
           const guardado = JSON.parse(raw) as CarritoGuardado;
-          if (!guardado.venceEn || guardado.venceEn <= Date.now()) {
-            AsyncStorage.removeItem(claveCarrito(userId)).catch(() => {});
-            return;
-          }
-          setVenceEn(guardado.venceEn);
           setLineas(
             (guardado.items ?? []).map(i => ({
               ...i,
@@ -216,24 +208,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   // la cuenta regresiva, el cliente ya había decidido quitarlo.
   useEffect(() => {
     if (userId == null || cargadoPara.current !== userId) return;
-    const guardado: CarritoGuardado = { negocioId, negocioNombre, items, venceEn };
+    const guardado: CarritoGuardado = { negocioId, negocioNombre, items };
     AsyncStorage.setItem(claveCarrito(userId), JSON.stringify(guardado)).catch(() => {});
-  }, [userId, negocioId, negocioNombre, items, venceEn]);
-
-  useEffect(() => {
-    if (venceEn == null) return;
-    const vencer = () => {
-      if (venceEn != null && venceEn <= Date.now()) {
-        setLineas([]);
-        setNegocioId(null);
-        setNegocioNombre(null);
-        setVenceEn(null);
-      }
-    };
-    const timer = setInterval(vencer, 1000);
-    const sub = AppState.addEventListener('change', estado => { if (estado === 'active') vencer(); });
-    return () => { clearInterval(timer); sub.remove(); };
-  }, [venceEn]);
+  }, [userId, negocioId, negocioNombre, items]);
 
   const agregar = (
     nid: number,
@@ -247,8 +224,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
     setNegocioId(nid);
     setNegocioNombre(nombre);
-    const vencePrecio = p.precio_vence_at ? Date.parse(p.precio_vence_at) : Date.now() + DURACION_CARRITO;
-    setVenceEn(prev => Math.min(items.length && prev && negocioId === nid ? prev : Date.now() + DURACION_CARRITO, vencePrecio));
     // De otra tienda solo pueden quedar líneas saliendo: esas no se conservan.
     setLineas(prev => {
       const actuales = negocioId === nid ? prev : [];
@@ -279,7 +254,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   ) => {
     setNegocioId(nid);
     setNegocioNombre(nombre);
-    setVenceEn(Math.min(Date.now() + DURACION_CARRITO, p.precio_vence_at ? Date.parse(p.precio_vence_at) : Infinity));
     setLineas([crearLinea(p, opciones, cantidad)]);
   };
 
@@ -392,7 +366,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setLineas([]);
     setNegocioId(null);
     setNegocioNombre(null);
-    setVenceEn(null);
   };
 
   const count = items.reduce((s, i) => s + (esPorPeso(i) ? 1 : i.cantidad), 0);
@@ -407,7 +380,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         lineas,
         count,
         total,
-        venceEn,
         cambiosPrecio,
         revisarPrecios,
         resolverCambioPrecio,

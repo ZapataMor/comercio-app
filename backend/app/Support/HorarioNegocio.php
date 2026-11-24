@@ -373,6 +373,50 @@ class HorarioNegocio
         return self::textoHoy($negocio->horario, $ahora);
     }
 
+    /**
+     * Para el cliente de un negocio cerrado: cuándo vuelve a abrir según su
+     * horario. "Abre hoy a las 4:00 p. m." / "Abre mañana a las 6:30 a. m." /
+     * "Abre el lunes a las 7:00 a. m.". Null si está abierto o si no tiene
+     * horario (lo abre y cierra a mano).
+     */
+    public static function textoApertura(Negocio $negocio, CarbonInterface $ahora): ?string
+    {
+        $horario = self::normalizar($negocio->horario);
+        if ($negocio->activo || ! $horario) {
+            return null;
+        }
+
+        for ($adelante = 0; $adelante <= 7; $adelante++) {
+            $dia = Carbon::instance($ahora)->addDays($adelante)->startOfDay();
+            $h = $horario[self::claveDelDia($dia)] ?? null;
+            if (! $h) {
+                continue;
+            }
+            $abre = $dia->copy()->setTimeFromTimeString($h['abre']);
+            // Abre en la mañana y, si almuerza, otra vez al volver del almuerzo.
+            $aperturas = [$abre];
+            if (! empty($h['almuerzo'])) {
+                $aperturas[] = self::pausa($abre, $h['almuerzo'])[1];
+            }
+            foreach ($aperturas as $momento) {
+                if ($momento->lte($ahora)) {
+                    continue;
+                }
+                $cuando = match (true) {
+                    $momento->isSameDay($ahora) => 'hoy',
+                    $momento->isSameDay(Carbon::instance($ahora)->addDay()) => 'mañana',
+                    default => 'el '.self::NOMBRES_DIA[$momento->dayOfWeekIso - 1],
+                };
+
+                return "Abre {$cuando} a las ".self::hora($momento->format('H:i'));
+            }
+        }
+
+        return null;
+    }
+
+    private const NOMBRES_DIA = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
+
     /** "07:00" → "7:00 a. m."; "20:30" → "8:30 p. m." */
     public static function hora(string $hhmm): string
     {

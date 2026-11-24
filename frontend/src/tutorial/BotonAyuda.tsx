@@ -15,6 +15,7 @@ import AvisoTemporal from '../components/AvisoTemporal';
 import { ALTO_BARRA_CATALOGO, MARGEN_BARRA_CATALOGO } from '../components/BarraCatalogo';
 import {
   ALTO_BARRA_CLIENTE,
+  ANCHO_BARRA_CLIENTE,
   MARGEN_BARRA_CLIENTE,
   SEPARACION_LADO_CLIENTE,
   useHayBotonesCliente,
@@ -26,7 +27,7 @@ import { useTutorial } from './contexto';
 
 /** Cuánto se queda el aviso si nadie lo toca. */
 const DURACION_AVISO = 12000;
-/** Alto del aviso (ícono de 40 + relleno de 10 arriba y abajo + borde) y margen derecho de los botones redondos. */
+/** Alto del aviso (ícono de 40 + relleno de 10 arriba y abajo + borde) y margen derecho de los botones flotantes. */
 const ALTO_AVISO = 66;
 const MARGEN_DER_BOTONES = 20;
 
@@ -64,7 +65,7 @@ function AvisoAyuda() {
   const bottom =
     insets.bottom + MARGEN_BARRA_CLIENTE - (ALTO_AVISO - ALTO_BARRA_CLIENTE) / 2 +
     (enExplorar ? MARGEN_BARRA_CATALOGO + ALTO_BARRA_CATALOGO : 0);
-  const lado = conBotones ? { right: MARGEN_DER_BOTONES + ALTO_BARRA_CLIENTE + SEPARACION_LADO_CLIENTE } : null;
+  const lado = conBotones ? { right: MARGEN_DER_BOTONES + ANCHO_BARRA_CLIENTE + SEPARACION_LADO_CLIENTE } : null;
 
   return (
     <Animated.View

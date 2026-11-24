@@ -13,6 +13,7 @@ import BarraCatalogo, {
   useDesplazarCatalogo,
 } from '../components/BarraCatalogo';
 import { ALTO_PILA_CLIENTE, MARGEN_BARRA_CLIENTE } from '../components/BarraCliente';
+import ErrorCarga from '../components/ErrorCarga';
 import ExplorarPropiedades from '../components/ExplorarPropiedades';
 import Icon from '../components/Icon';
 import { PuntajeResenas } from '../components/Resenas';
@@ -22,6 +23,7 @@ import { RootStackParamList } from '../navTypes';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { REFRESCO_NEGOCIOS, usePolling } from '../usePolling';
 import { Objetivo } from '../tutorial/Objetivo';
+import { messageFromError } from '../formErrors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Explorar'>;
 
@@ -149,7 +151,7 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
           setUltimaPagina(p.ultimaPagina);
         })
         .catch(e => {
-          if (turno === ultimaPeticion.current) setError(e.message);
+          if (turno === ultimaPeticion.current) setError(messageFromError(e));
         })
         .finally(() => {
           if (turno !== ultimaPeticion.current) return;
@@ -177,7 +179,7 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
         setPagina(p.pagina);
         setUltimaPagina(p.ultimaPagina);
       })
-      .catch(e => setError(e.message))
+      .catch(e => setError(messageFromError(e)))
       .finally(() => {
         cargandoMasRef.current = false;
         setCargandoMas(false);
@@ -289,7 +291,7 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
           )}
 
           {cargando && filas.length === 0 && <NegociosFantasma />}
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error ? <ErrorCarga titulo="No pudimos cargar los negocios" mensaje={error} reintentar={() => cargar()} /> : null}
         </View>
       }
       onEndReached={cargarMas}
@@ -361,6 +363,15 @@ const CardNegocio = React.memo(function CardNegocio({
             <Image source={{ uri: img }} style={styles.portadaImagen} resizeMode="cover" />
           ) : (
             <Icon name="tienda" size={38} color={c.mutedSoft} />
+          )}
+          {/* Cerrado: se ve en la foto, sin tener que entrar a la tienda. */}
+          {!item.abierto && (
+            <View style={styles.cerrado}>
+              <Text style={styles.cerradoTitulo}>
+                {item.estado_texto === 'Almorzando' ? 'Almorzando' : 'Cerrado'}
+              </Text>
+              {!!item.abre_texto && <Text style={styles.cerradoAbre}>{item.abre_texto}</Text>}
+            </View>
           )}
         </View>
 
@@ -443,6 +454,18 @@ const useStyles = makeStyles(c => ({
     backgroundColor: c.surface2,
   },
   portadaImagen: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%' },
+  // Sobre la foto: colores fijos para que se lea sobre cualquier imagen.
+  cerrado: {
+    position: 'absolute',
+    left: 10,
+    bottom: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: radius.md,
+    backgroundColor: 'rgba(20,16,12,0.78)',
+  },
+  cerradoTitulo: { color: '#FFFFFF', fontFamily: font.bold, fontSize: 14 },
+  cerradoAbre: { color: '#FFFFFF', fontFamily: font.medium, fontSize: 13, marginTop: 1 },
   negocioCabecera: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },
   negocioNombre: { flex: 1, color: c.textStrong, fontFamily: font.displaySemi, fontSize: 16, lineHeight: 22 },
   puntaje: { marginTop: 3 },

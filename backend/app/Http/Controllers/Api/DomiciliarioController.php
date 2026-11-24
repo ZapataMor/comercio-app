@@ -454,6 +454,8 @@ class DomiciliarioController extends Controller
             'puede_avisar_ocupado' => $p->efectivoPendienteAlNegocio() && ! $p->efectivo_ocupado_at && (request()->user()->reputacion_domiciliario ?? config('reputacion.inicial')) >= 70,
             // Por transferencia, 0: solo llega a los domiciliarios con el pago ya confirmado.
             'cobrar' => $p->aCobrar(),
+            // Con qué billete paga el cliente (null = el valor exacto): el cambio que lleva.
+            'paga_con' => $p->metodo_pago === 'efectivo' && $p->paga_con !== null ? (float) $p->paga_con : null,
             // Por transferencia, el negocio le entrega el domicilio al recoger.
             'domicilio_lo_entrega_negocio' => $p->domicilioLoEntregaNegocio(),
             // Antes de salir dice si se lo dieron; si no, el negocio se lo debe.
@@ -465,6 +467,8 @@ class DomiciliarioController extends Controller
             'codigo_recogida' => $p->estado === 'tomado' ? $p->codigo_confirmacion : null,
             'fecha_entrega' => $p->entregado_at?->format('d/m/Y H:i'),
             'direccion_entrega' => $p->domiciliario_id === request()->user()->id && in_array($p->estado, ['tomado', 'recogido', 'en_camino'], true) ? $p->direccion_entrega : '',
+            // Cómo llegar, en palabras del cliente: solo para quien lleva el pedido.
+            'entrega_indicaciones' => $p->domiciliario_id === request()->user()->id && in_array($p->estado, ['tomado', 'recogido', 'en_camino'], true) ? $p->entrega_indicaciones : null,
             // Punto exacto de la entrega, solo para quien lleva el pedido.
             'entrega_ubicacion' => $p->domiciliario_id === request()->user()->id && in_array($p->estado, ['tomado', 'recogido', 'en_camino'], true) ? $p->puntoEntrega() : null,
             'entrega_fotos' => $p->domiciliario_id === request()->user()->id && in_array($p->estado, ['tomado', 'recogido', 'en_camino'], true)

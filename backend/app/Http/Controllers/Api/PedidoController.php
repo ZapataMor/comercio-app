@@ -60,6 +60,9 @@ class PedidoController extends Controller
             'items.*.extra' => ['nullable', 'array', 'max:30'],
             'items.*.extra.*' => ['string', 'max:100'],
             'metodo_pago' => ['required', Rule::in(Pedido::METODOS_PAGO)],
+            // Efectivo: con qué billete paga (null = el valor exacto), para que
+            // el domiciliario lleve el cambio.
+            'paga_con' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:10000000'],
             'direccion_entrega' => ['required', 'string', 'max:255', new Direccion],
             // Dirección guardada que eligió: de ahí sale el punto en el mapa.
             'direccion_id' => ['required', 'integer'],
@@ -139,6 +142,16 @@ class PedidoController extends Controller
             ], 409);
         }
 
+        // El billete solo cuenta en efectivo, y tiene que alcanzar para el total.
+        $datos['paga_con'] = $datos['metodo_pago'] === 'efectivo' && ! empty($datos['paga_con'])
+            ? (float) $datos['paga_con']
+            : null;
+        if ($datos['paga_con'] !== null && $datos['paga_con'] < $total) {
+            throw ValidationException::withMessages([
+                'paga_con' => 'Ese billete no alcanza: el total es $'.number_format($total, 0, ',', '.').'. Elige otro o el valor exacto.',
+            ]);
+        }
+
         try {
             $pedido = $this->crear($request, $negocio, $datos, $productos, $subtotal, $domicilio);
         } catch (UniqueConstraintViolationException $e) {
@@ -207,7 +220,7 @@ class PedidoController extends Controller
             }
             validator(['direccion' => $direccion->direccion, 'barrio' => $direccion->barrio], [
                 'direccion' => ['required', 'max:255', new Direccion],
-                'barrio' => ['required', 'regex:/\A[\p{L}\p{N}-]+\z/u'],
+                'barrio' => ['required', 'regex:'.Direccion::BARRIO],
             ])->validate();
             if ($datos['direccion_entrega'] !== $direccion->direccion) {
                 throw ValidationException::withMessages(['direccion_entrega' => 'La dirección no coincide con la ubicación seleccionada.']);
@@ -219,8 +232,10 @@ class PedidoController extends Controller
                 'metodo_pago' => $datos['metodo_pago'],
                 // Transferencia: el cliente paga cuando el negocio acepte.
                 'pago_estado' => $datos['metodo_pago'] === 'transferencia' ? 'por_pagar' : null,
+                'paga_con' => $datos['paga_con'],
                 'total' => 0,
                 'direccion_entrega' => $direccion->direccion.' - Barrio '.$direccion->barrio,
+                'entrega_indicaciones' => $direccion->indicaciones,
                 'entrega_fotos' => $direccion->fotos,
                 'entrega_lat' => $direccion?->lat,
                 'entrega_lng' => $direccion?->lng,
@@ -389,12 +404,15 @@ class PedidoController extends Controller
             'costo_domicilio' => (float) $pedido->costo_domicilio,
             'total' => (float) $pedido->total,
             'metodo_pago' => $pedido->metodo_pago,
+            // Efectivo: con qué billete dijo que paga (null = el valor exacto).
+            'paga_con' => $pedido->paga_con !== null ? (float) $pedido->paga_con : null,
             // Transferencia: cuentas del negocio, en qué va el pago y si puede avisar que pagó.
             'pago' => PagoTransferencia::paraCliente($pedido),
             'reembolso_solicitado' => $pedido->reembolso_solicitado_at !== null,
             // Devolución de la transferencia si se canceló: estado, a dónde, cuánto y comprobante.
             'reembolso' => Reembolso::datos($pedido),
             'direccion_entrega' => $pedido->direccion_entrega,
+            'entrega_indicaciones' => $pedido->entrega_indicaciones,
             'minutos_recogida' => $pedido->minutos_recogida,
             'fecha' => $pedido->created_at->format('d/m/Y H:i'),
             'negocio' => $pedido->nombreNegocio(),

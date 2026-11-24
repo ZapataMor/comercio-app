@@ -170,6 +170,8 @@ class AdminPedidoController extends Controller
             'total' => (float) $p->total,
             'metodo_pago' => $p->metodo_pago,
             'direccion_entrega' => $p->direccion_entrega,
+            'entrega_indicaciones' => $p->entrega_indicaciones,
+            'paga_con' => $p->paga_con !== null ? (float) $p->paga_con : null,
             'telefono_contacto' => $p->telefono_contacto,
             'negocio' => $p->nombreNegocio(),
             'negocio_telefono' => $p->negocio?->telefono,

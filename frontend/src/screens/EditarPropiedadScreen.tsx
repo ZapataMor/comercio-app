@@ -463,7 +463,7 @@ export default function EditarPropiedadScreen({ navigation, route }: Props) {
           <BarrioSelect valor={barrio} onSeleccionar={v => { setBarrio(v); limpiar('barrio'); }} placeholder="Elige el barrio" titulo="Barrio de la propiedad" disabled={guardando} />
           <FieldError mensaje={errores.barrio} />
           <View style={styles.separado} />
-          <SelectorUbicacion tipo="propiedad" valor={ubicacion} onCambiar={v => { setUbicacion(v); limpiar('lat'); }} disabled={guardando} />
+          <SelectorUbicacion tipo="propiedad" valor={ubicacion} onCambiar={v => { setUbicacion(v); limpiar('lat'); }} disabled={guardando} barrio={barrio} />
           <FieldError mensaje={errores.lat ?? errores.lng} />
         </View>
 

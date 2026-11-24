@@ -25,9 +25,9 @@ export default function VigilarCarrito() {
     if (firma === '[]' && !suscripcion.current.teniaProductos) return;
     suscripcion.current.teniaProductos = firma !== '[]';
     let activo = true;
-    const timer = setTimeout(() => { if (activo) sincronizarCarrito(token, JSON.parse(firma), cart.venceEn).catch(() => {}); }, 250);
+    const timer = setTimeout(() => { if (activo) sincronizarCarrito(token, JSON.parse(firma)).catch(() => {}); }, 250);
     return () => { activo = false; clearTimeout(timer); };
-  }, [token, firma, cart.venceEn]);
+  }, [token, firma]);
   useEffect(() => {
     if (!token || !cart.negocioId) return;
     let activo = true;
@@ -38,7 +38,7 @@ export default function VigilarCarrito() {
       try {
         const d = await getCatalogo(token, cart.negocioId!);
         if (activo) ultimo.current.revisarPrecios(d.productos);
-        if (activo) await sincronizarCarrito(token, JSON.parse(firma), ultimo.current.venceEn).catch(() => {});
+        if (activo) await sincronizarCarrito(token, JSON.parse(firma)).catch(() => {});
       } catch {} finally { consultando = false; }
     };
     consultar();

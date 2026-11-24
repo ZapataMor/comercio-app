@@ -236,7 +236,7 @@ describe('login', () => {
 
   test('sin cuentas guardadas no ofrece «Continuar como»', async () => {
     await montar(true);
-    expect(app!.root.findAll(n => n.props.children === 'CONTINUAR COMO')).toHaveLength(0);
+    expect(app!.root.findAll(n => n.props.children === 'Continuar como')).toHaveLength(0);
   });
 
   test('ofrece las cuentas guardadas a un toque', async () => {

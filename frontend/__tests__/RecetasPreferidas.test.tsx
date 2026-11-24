@@ -36,6 +36,7 @@ jest.mock('../src/Toast', () => ({ useToast: () => mockToast }));
 const mockVolar = jest.fn();
 jest.mock('../src/components/FlyToCart', () => ({ useFlyToCart: () => ({ volar: mockVolar }) }));
 jest.mock('../src/components/Confirmacion', () => ({ useConfirmar: () => jest.fn() }));
+jest.mock('../src/useTarifaDomicilio', () => ({ useTarifaDomicilio: () => 3000 }));
 jest.mock('../src/usePolling', () => ({
   ...jest.requireActual('../src/usePolling'),
   REFRESCO_NEGOCIOS: 1000,
@@ -126,23 +127,59 @@ test('con la tienda cerrada avisa y no agrega', async () => {
   await tocarReceta();
 
   expect(mockAgregar).not.toHaveBeenCalled();
-  expect(mockToast.info).toHaveBeenCalledWith('Negocio cerrado', expect.any(String));
+  expect(mockToast.info).toHaveBeenCalledWith('La tienda está cerrada', expect.any(String));
 });
 
-test('las tarjetas del catálogo no tienen botón +: se toca la tarjeta y abre la ficha', async () => {
+const tocarEtiqueta = (etiqueta: string) =>
+  act(async () => {
+    raiz.root
+      .findAll(h => typeof h.props.onPress === 'function' && h.props.accessibilityLabel === etiqueta)[0]
+      .props.onPress({ nativeEvent: { pageX: 10, pageY: 20 } });
+  });
+
+test('tocar la foto de un producto abre su ficha', async () => {
   await abrirTienda({ recetas: [] });
-
-  expect(raiz.root.findAll(h => h.props.accessibilityLabel === 'Agregar Hamburguesa')).toHaveLength(0);
-
-  const tarjeta = raiz.root.find(
-    h => typeof h.props.onPress === 'function' && h.props.accessibilityRole === 'button' && textosDe(h).includes('Hamburguesa'),
-  );
-  await act(async () => tarjeta.props.onPress());
+  await tocarEtiqueta('Ver Hamburguesa');
 
   expect(textos()).toContain('Personalízalo');
   expect(mockAgregar).not.toHaveBeenCalled();
 });
 
-function textosDe(nodo: ReactTestRenderer.ReactTestInstance) {
-  return nodo.findAllByType(Text).map(t => [t.props.children].flat(Infinity).join(''));
-}
+test('«Agregar» de un plato con algo que elegir abre la ficha en vez de agregarlo', async () => {
+  await abrirTienda({ recetas: [] });
+  await tocarEtiqueta('Agregar Hamburguesa al carrito');
+
+  expect(textos()).toContain('Personalízalo');
+  expect(mockAgregar).not.toHaveBeenCalled();
+});
+
+test('«Agregar» de un producto sin nada que elegir lo pone directo en el carrito', async () => {
+  const gaseosa = { id: 2, nombre: 'Gaseosa', precio: 3000 } as Producto;
+  mockCatalogo.mockResolvedValue({ negocio: { id: 9, nombre: 'La Parrilla', activo: true } as Negocio, productos: [gaseosa] });
+  mockRecetas.mockResolvedValue([]);
+  const props = { navigation: { navigate: jest.fn() }, route: { params: { id: 9, nombre: 'La Parrilla' } } };
+  await act(async () => {
+    raiz = ReactTestRenderer.create(<NegocioScreen {...(props as any)} />);
+  });
+  await tocarEtiqueta('Agregar Gaseosa al carrito');
+
+  expect(mockAgregar).toHaveBeenCalledWith(9, 'La Parrilla', gaseosa, undefined, 1);
+  expect(mockVolar).toHaveBeenCalledWith({ x: 10, y: 20 });
+});
+
+test('con la tienda cerrada, la tarjeta dice «Cerrado» y avisa cuándo abre', async () => {
+  mockCatalogo.mockResolvedValue({
+    negocio: { id: 9, nombre: 'La Parrilla', activo: false, abre_texto: 'Abre mañana a las 6:30 a. m.' } as Negocio,
+    productos: [hamburguesa],
+  });
+  mockRecetas.mockResolvedValue([]);
+  const props = { navigation: { navigate: jest.fn() }, route: { params: { id: 9, nombre: 'La Parrilla' } } };
+  await act(async () => {
+    raiz = ReactTestRenderer.create(<NegocioScreen {...(props as any)} />);
+  });
+
+  expect(textos()).toEqual(expect.arrayContaining(['Esta tienda está cerrada', 'Abre mañana a las 6:30 a. m.', 'Cerrado']));
+  await tocarEtiqueta('Hamburguesa: cerrado');
+  expect(mockAgregar).not.toHaveBeenCalled();
+  expect(mockToast.info).toHaveBeenCalledWith('La tienda está cerrada', expect.stringContaining('Abre mañana a las 6:30 a. m.'));
+});

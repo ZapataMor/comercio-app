@@ -180,10 +180,11 @@ test('un toque abre el catálogo, también si el negocio está cerrado', async (
   expect(navigation.navigate).toHaveBeenLastCalledWith('Negocio', { id: 2, nombre: 'La Fonda', seccion: 'productos' });
 });
 
-test('el descanso agrupa el negocio aparte y mantiene su tarjeta sin etiquetas', async () => {
+test('el descanso agrupa el negocio aparte y su tarjeta dice «Almorzando»', async () => {
   mockNegocios.mockResolvedValue(pagina([{ ...negocio(1, 'Salón', false), estado_texto: 'Almorzando' }]));
   const { textos, tocar, navigation } = await montar();
-  expect(textos()).not.toContain('Almorzando');
+  // La tarjeta lo dice sobre la foto, sin tener que entrar.
+  expect(textos()).toContain('Almorzando');
   expect(textos()).toContain('En descanso de almuerzo');
   expect(textos()).not.toContain('Cerrados por ahora');
   await tocar('Salón, almorzando');

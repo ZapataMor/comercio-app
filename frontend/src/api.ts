@@ -136,6 +136,8 @@ export type Negocio = {
   horario?: HorarioSemana | null;
   /** "Hoy de 7:00 a. m. a 8:00 p. m." / "Hoy no abre" (null sin horario). */
   horario_hoy?: string | null;
+  /** Cerrado: "Abre mañana a las 6:30 a. m." (null si está abierto o no tiene horario). */
+  abre_texto?: string | null;
   /** Lo que falta para que el horario lo cierre, solo si son 10 minutos o menos. */
   minutos_para_cerrar?: number | null;
   /** Hoy es festivo: rige el horario de festivos ('fes'). */
@@ -242,6 +244,8 @@ export type NegocioLista = {
   estado_texto?: string;
   /** "Hoy de 7:00 a. m. a 8:00 p. m." si el negocio tiene horario. */
   horario_hoy?: string | null;
+  /** Cerrado: "Abre mañana a las 6:30 a. m." (null si está abierto o no tiene horario). */
+  abre_texto?: string | null;
   tiempo_preparacion?: number;
   reputacion?: Reputacion;
   resenas?: ResumenResenas;
@@ -574,6 +578,25 @@ export async function getBarrios(): Promise<Barrio[]> {
   return (data.barrios ?? []) as Barrio[];
 }
 
+/**
+ * Más o menos dónde queda un barrio (promedio de sus negocios y propiedades
+ * públicos), para abrir ahí el mapa de la dirección. null si no se sabe; un
+ * fallo de red también da null: el mapa abre igual.
+ */
+export async function getCentroBarrio(nombre: string): Promise<Coordenadas | null> {
+  try {
+    const res = await solicitar(`${API_URL}/api/barrios/centro?nombre=${encodeURIComponent(nombre)}`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const c = data?.centro;
+    return c && Number.isFinite(c.lat) && Number.isFinite(c.lng) ? { lat: c.lat, lng: c.lng } : null;
+  } catch {
+    return null;
+  }
+}
+
 /** GET autenticado con el token Sanctum. Lanza ApiError con el código HTTP. */
 async function authGet(path: string, token: string): Promise<any> {
   let res: Response;
@@ -764,6 +787,8 @@ export type ClienteDireccion = {
   nombre?: string | null;
   direccion: string;
   barrio: string;
+  /** Cómo llegar, en palabras del cliente ("frente a la tienda La 14"). */
+  indicaciones?: string | null;
   es_principal: boolean;
   /** Las direcciones antiguas pueden carecer de punto; deben completarse antes de pedir. */
   lat?: number | null;
@@ -775,6 +800,7 @@ export type DatosDireccion = {
   fotos?: FotosDireccion;
   direccion: string;
   barrio: string;
+  indicaciones?: string | null;
   nombre?: string | null;
   lat?: number | null;
   lng?: number | null;
@@ -1114,6 +1140,9 @@ export type ComercioPedido = {
   /** El domiciliario dijo al salir que no le diste el domicilio. */
   debe_domicilio?: boolean;
   direccion_entrega: string;
+  entrega_indicaciones?: string | null;
+  /** Efectivo: con qué billete paga el cliente (null = el valor exacto). */
+  paga_con?: number | null;
   telefono_contacto: string | null;
   cliente: string | null;
   domiciliario: string | null;
@@ -1453,7 +1482,7 @@ export async function getCatalogo(
   return { negocio: data.negocio as Negocio, productos: (data.productos ?? []) as Producto[], servicios: data.servicios ?? [] };
 }
 
-export type EstadoNegocio = Pick<Negocio, 'activo' | 'horario_hoy' | 'estado_texto'> & {
+export type EstadoNegocio = Pick<Negocio, 'activo' | 'horario_hoy' | 'estado_texto' | 'abre_texto'> & {
   /** Tiene cuentas para recibir transferencias. */
   acepta_transferencia?: boolean;
 };
@@ -1803,6 +1832,8 @@ export type Pedido = {
   total: number;
   /** Lo que se le cobra al cliente al entregar (0 si pagó por transferencia). */
   cobrar: number;
+  /** Con qué billete paga el cliente (null = el valor exacto): el cambio que llevo. */
+  paga_con?: number | null;
   /** Pagado por transferencia: el negocio me entrega el domicilio al recoger. */
   domicilio_lo_entrega_negocio?: boolean;
   /** Antes de salir debo decir si el negocio me dio el domicilio. */
@@ -1817,6 +1848,8 @@ export type Pedido = {
   /** "dd/mm/aaaa hh:mm" en que lo entregué (solo los entregados). */
   fecha_entrega?: string | null;
   direccion_entrega: string;
+  /** Cómo llegar, en palabras del cliente (solo mientras lo llevo). */
+  entrega_indicaciones?: string | null;
   /** Punto exacto de la entrega, si el cliente lo fijó (solo mientras lo llevo). */
   entrega_ubicacion?: Coordenadas | null;
   entrega_fotos?: FotosDireccion | null;
@@ -2096,11 +2129,14 @@ export type SeguimientoPedido = {
   costo_domicilio: number;
   total: number;
   metodo_pago: string;
+  /** Efectivo: con qué billete dije que pago (null = el valor exacto). */
+  paga_con?: number | null;
   /** Solo transferencia: cuentas del negocio y en qué va mi pago. */
   pago?: PagoCliente | null;
   /** Cancelado por transferencia: la devolución de mi dinero. */
   reembolso?: ReembolsoPedido | null;
   direccion_entrega: string;
+  entrega_indicaciones?: string | null;
   minutos_recogida: number | null;
   fecha?: string;
   negocio: string | null;
@@ -2140,6 +2176,8 @@ export type NuevoPedido = {
   negocio_id: number;
   items: ({ producto_id: number; cantidad: number; precio_token?: string } & OpcionesLinea)[];
   metodo_pago: string;
+  /** Efectivo: con qué billete paga (null = el valor exacto). */
+  paga_con?: number | null;
   direccion_entrega: string;
   /** Dirección guardada elegida: el servidor copia de ahí el punto en el mapa. */
   direccion_id?: number | null;
@@ -2156,8 +2194,9 @@ export async function crearPedido(token: string, body: NuevoPedido): Promise<num
   return d.id as number;
 }
 
-export async function sincronizarCarrito(token: string, items: { producto_id: number; precio_token: string }[], venceAt: number | null): Promise<void> {
-  await authSend('PUT', '/api/carrito', token, { items, vence_at: venceAt == null ? null : Math.floor(venceAt / 1000) });
+/** Le cuenta al servidor qué hay en el carrito: así avisa si cambia el precio de algo. */
+export async function sincronizarCarrito(token: string, items: { producto_id: number; precio_token: string }[]): Promise<void> {
+  await authSend('PUT', '/api/carrito', token, { items });
 }
 
 export type ObjetivoReporte = 'cliente' | 'negocio' | 'domiciliario';

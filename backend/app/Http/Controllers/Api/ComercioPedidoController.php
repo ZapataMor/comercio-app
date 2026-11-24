@@ -193,6 +193,9 @@ class ComercioPedidoController extends Controller
             // Devolución de la transferencia si se canceló.
             'reembolso' => Reembolso::datos($p),
             'direccion_entrega' => $p->direccion_entrega,
+            'entrega_indicaciones' => $p->entrega_indicaciones,
+            // Efectivo: con qué billete paga el cliente (null = el valor exacto).
+            'paga_con' => $p->paga_con !== null ? (float) $p->paga_con : null,
             'telefono_contacto' => $p->telefono_contacto,
             'cliente' => $p->cliente?->nombre_completo,
             'domiciliario' => $p->domiciliario?->nombre_completo,

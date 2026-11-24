@@ -1,7 +1,8 @@
 /**
  * Personalización de un plato, en dos partes:
  *  - Ingredientes: los que trae. Cada uno que el negocio deja quitar va con
- *    «Sin / Con»; los fijos (la carne de la hamburguesa) solo se listan.
+ *    «Sin / Con»; los obligatorios (la carne de la hamburguesa) dicen «Siempre
+ *    va», con un candado.
  *  - Extras: lo que se pide aparte, con − cantidad + y lo que suma cada porción.
  * Se usa en la ficha del producto (antes de agregarlo al carrito) y en la hoja
  * para ajustar una línea que ya está en el carrito.
@@ -53,6 +54,11 @@ export default function PersonalizarComida({ ingredientes, fijos = [], extrasDis
       {ingredientes.length > 0 && (
         <View style={styles.grupo}>
           <Text style={styles.grupoTitulo}>Ingredientes</Text>
+          <Text style={styles.grupoAyuda}>
+            {fijos.length > 0
+              ? 'Elige «Sin» para pedirlo sin ese ingrediente. Los que dicen «Siempre va» no se pueden quitar.'
+              : 'Elige «Sin» para pedirlo sin ese ingrediente.'}
+          </Text>
           {ingredientes.map(ingrediente => {
             const fijo = fijos.includes(ingrediente);
             const quitado = !fijo && sin.includes(ingrediente);
@@ -62,7 +68,10 @@ export default function PersonalizarComida({ ingredientes, fijos = [], extrasDis
                   {ingrediente}
                 </Text>
                 {fijo ? (
-                  <Text style={styles.incluido}>Incluido</Text>
+                  <View style={styles.siempre} accessibilityLabel={`${ingrediente}: siempre va, no se puede quitar`}>
+                    <Icon name="candado" size={13} color={c.muted} />
+                    <Text style={styles.siempreTxt}>Siempre va</Text>
+                  </View>
                 ) : (
                   <View style={styles.segmento} accessibilityRole="radiogroup" accessibilityLabel={ingrediente}>
                     {[
@@ -70,17 +79,23 @@ export default function PersonalizarComida({ ingredientes, fijos = [], extrasDis
                       { valor: false, texto: 'Con' },
                     ].map(({ valor, texto }) => {
                       const activo = quitado === valor;
+                      // Sin: rojo con una X. Con: verde con un chulo. El fondo y el
+                      // borde siempre están puestos; solo cambia su opacidad o color.
+                      const tono = valor ? c.danger : c.success;
                       return (
                         <Pressable
                           key={texto}
-                          style={[styles.opcion, activo && styles.opcionOn, activo && valor && styles.opcionSin]}
+                          style={[styles.opcion, { borderColor: activo ? tono : 'transparent' }]}
                           accessibilityRole="radio"
                           accessibilityState={{ selected: activo }}
                           accessibilityLabel={`${ingrediente}: ${texto}`}
                           onPress={() => quitar(ingrediente, valor)}>
-                          <Text style={[styles.opcionTxt, activo && styles.opcionTxtOn, activo && valor && styles.opcionTxtSin]}>
-                            {texto}
-                          </Text>
+                          <View
+                            pointerEvents="none"
+                            style={[styles.opcionFondo, { backgroundColor: valor ? c.dangerSoft : c.successSoft, opacity: activo ? 1 : 0 }]}
+                          />
+                          <Icon name={valor ? 'cerrar' : 'check'} size={13} color={activo ? tono : c.mutedSoft} strokeWidth={2.6} />
+                          <Text style={[styles.opcionTxt, activo && { color: tono, fontFamily: font.bold }]}>{texto}</Text>
                         </Pressable>
                       );
                     })}
@@ -133,17 +148,10 @@ export default function PersonalizarComida({ ingredientes, fijos = [], extrasDis
   );
 }
 
-const useStyles = makeStyles((c, shadow) => ({
+const useStyles = makeStyles(c => ({
   grupo: { marginTop: 6, marginBottom: 6 },
-  grupoTitulo: {
-    color: c.muted,
-    fontFamily: font.semibold,
-    fontSize: 12,
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
-    marginTop: 8,
-    marginBottom: 2,
-  },
+  grupoTitulo: { color: c.textStrong, fontFamily: font.bold, fontSize: 15, marginTop: 8 },
+  grupoAyuda: { color: c.muted, fontFamily: font.regular, fontSize: 13, lineHeight: 18, marginTop: 2, marginBottom: 4 },
   fila: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -156,14 +164,29 @@ const useStyles = makeStyles((c, shadow) => ({
   nombre: { flex: 1, color: c.text, fontFamily: font.medium, fontSize: 15 },
   nombreQuitado: { color: c.mutedSoft, textDecorationLine: 'line-through' },
   nombreElegido: { color: c.textStrong, fontFamily: font.semibold },
-  incluido: { color: c.mutedSoft, fontFamily: font.medium, fontSize: 12, paddingHorizontal: 6 },
-  segmento: { flexDirection: 'row', padding: 3, borderRadius: radius.pill, backgroundColor: c.surface2 },
-  opcion: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: radius.pill },
-  opcionOn: { backgroundColor: c.surface, ...shadow.low },
-  opcionSin: { backgroundColor: c.dangerSoft },
-  opcionTxt: { color: c.muted, fontFamily: font.medium, fontSize: 12 },
-  opcionTxtOn: { color: c.textStrong, fontFamily: font.semibold },
-  opcionTxtSin: { color: c.danger },
+  siempre: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: c.surface2,
+  },
+  siempreTxt: { color: c.muted, fontFamily: font.semibold, fontSize: 13 },
+  segmento: { flexDirection: 'row', gap: 4, padding: 3, borderRadius: 22, backgroundColor: c.surface2 },
+  opcion: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    height: 38,
+    paddingHorizontal: 12,
+    borderRadius: 19,
+    borderWidth: 2,
+    overflow: 'hidden',
+  },
+  opcionFondo: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
+  opcionTxt: { color: c.muted, fontFamily: font.medium, fontSize: 14 },
   extraTexto: { flex: 1, gap: 1 },
   extraPrecio: { color: c.goldText, fontFamily: font.semibold, fontSize: 12 },
   contador: { flexDirection: 'row', alignItems: 'center', gap: 6 },

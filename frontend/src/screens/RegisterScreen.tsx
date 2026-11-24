@@ -196,7 +196,7 @@ export default function RegisterScreen({ navigation }: Props) {
           <View style={e.recuadro}>
             <Icon name="check" size={18} color={l.campoIcono} />
             <View style={e.recuadroTexto}>
-              <Text style={e.recuadroEtiqueta}>CELULAR CONFIRMADO</Text>
+              <Text style={e.recuadroEtiqueta}>Celular confirmado</Text>
               <Text style={e.recuadroValor}>+57 {formatoCelular(celular.telefono)}</Text>
             </View>
             <TouchableOpacity onPress={() => setCreandoClave(false)} disabled={cargando} hitSlop={8}>
@@ -210,7 +210,7 @@ export default function RegisterScreen({ navigation }: Props) {
           <View style={e.recuadro}>
             <Icon name="check" size={18} color={l.campoIcono} />
             <View style={e.recuadroTexto}>
-              <Text style={e.recuadroEtiqueta}>CELULAR CONFIRMADO</Text>
+              <Text style={e.recuadroEtiqueta}>Celular confirmado</Text>
               <Text style={e.recuadroValor}>+57 {formatoCelular(celular.telefono)}</Text>
             </View>
             <TouchableOpacity onPress={() => setCelular(null)} disabled={cargando} hitSlop={8}>
@@ -220,7 +220,7 @@ export default function RegisterScreen({ navigation }: Props) {
 
           <View style={e.bloqueCampo}>
             <CampoAcceso
-              rotulo="NOMBRE(S)"
+              rotulo="Nombre(s)"
               icono="usuario"
               value={nombre}
               onChangeText={valor => {
@@ -239,7 +239,7 @@ export default function RegisterScreen({ navigation }: Props) {
 
           <View style={e.bloqueCampo}>
             <CampoAcceso
-              rotulo="APELLIDOS"
+              rotulo="Apellidos"
               icono="usuarios"
               value={apellidos}
               onChangeText={valor => {

@@ -68,6 +68,8 @@ Route::post('/telefono/verificar', [TelefonoController::class, 'verificarRegistr
 
 // Barrios aprobados de Maicao. Pública: el registro la necesita sin token.
 Route::get('/barrios', [BarrioController::class, 'index'])->middleware('throttle:publico');
+// Más o menos dónde queda un barrio (para abrir ahí el mapa de la dirección).
+Route::get('/barrios/centro', [BarrioController::class, 'centro'])->middleware('throttle:publico');
 
 // Rutas que requieren un token Sanctum válido.
 Route::middleware(['auth:sanctum', 'throttle:api-usuario'])->group(function () {

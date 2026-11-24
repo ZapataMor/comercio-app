@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Middleware\CuentaActiva;
 use App\Models\Barrio;
+use App\Rules\Direccion;
 use App\Models\User;
 use App\Support\ClavePin;
 use App\Support\Telefono\CodigosTelefono;
@@ -41,7 +42,7 @@ class AuthController extends Controller
             'nombre_dispositivo' => ['nullable', 'string', 'max:80'],
             // Opcionales: la dirección se pide en el primer pedido (Mis direcciones).
             'direccion' => ['nullable', 'string', 'max:255', new \App\Rules\Direccion],
-            'barrio' => ['nullable', 'required_with:direccion', 'string', 'max:120', 'regex:/\A[\p{L}\p{N}-]+\z/u'],
+            'barrio' => ['nullable', 'required_with:direccion', 'string', 'max:120', 'regex:'.Direccion::BARRIO],
             'telefono' => ['required', 'string', new \App\Rules\Telefono],
             // Token de /telefono/verificar: el número se confirmó por WhatsApp.
             'verificacion' => ['required', 'string', 'max:100'],
@@ -280,7 +281,7 @@ class AuthController extends Controller
             // La dirección del cliente se maneja en "Mis direcciones"; aquí es
             // opcional (versiones anteriores de la app aún la mandan).
             'direccion' => ['sometimes', 'nullable', 'string', 'max:255', new \App\Rules\Direccion],
-            'barrio' => ['sometimes', 'nullable', 'required_with:direccion', 'string', 'max:120', 'regex:/\A[\p{L}\p{N}-]+\z/u'],
+            'barrio' => ['sometimes', 'nullable', 'required_with:direccion', 'string', 'max:120', 'regex:'.Direccion::BARRIO],
             'telefono' => [$esCliente ? 'required' : 'sometimes', 'nullable', 'string', new \App\Rules\Telefono],
         ]);
 

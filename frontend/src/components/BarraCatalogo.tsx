@@ -1,9 +1,9 @@
 /**
- * Barra de Explorar, como la de Instagram: una píldora flotante abajo con los
- * tres catálogos (Productos, Servicios y Propiedades), solo con íconos, y al
- * final "Mi perfil" (la inicial de la persona), que despliega hacia arriba
- * el mismo menú de la topbar (MenuDesplegable). El catálogo activo lleva una
- * píldora suave detrás que, al tocar otro, se desliza hasta él.
+ * Barra de Explorar: una píldora flotante abajo con los tres catálogos
+ * (Productos, Servicios y Propiedades), cada uno con su ícono y su nombre
+ * debajo, y al final "Mi perfil" (la inicial de la persona), que despliega
+ * hacia arriba el mismo menú de la topbar (MenuDesplegable). El catálogo
+ * activo lleva una píldora suave detrás que, al tocar otro, se desliza hasta él.
  *
  * Mientras la lista se desplaza la barra se encoge y se aclara un poco, y al
  * quedarse quieta vuelve a como estaba: ver encogerAlDesplazar. Las listas
@@ -31,16 +31,17 @@ export const SECCIONES: { valor: SeccionCatalogo; titulo: string; icono: IconNam
 ];
 
 /** Alto de la barra y su distancia al borde de abajo (sobre el área segura). */
-export const ALTO_BARRA_CATALOGO = 64;
+export const ALTO_BARRA_CATALOGO = 68;
 export const MARGEN_BARRA_CATALOGO = 10;
 
 /** Tamaño y opacidad de la barra encogida (al desplazarse) respecto de lo normal. */
 const ESCALA_ENCOGIDA = 0.84;
 const OPACIDAD_ENCOGIDA = 0.7;
-/** Relleno lateral de la barra, casillas (3 catálogos + perfil) y ancho de la píldora. */
-const RELLENO_BARRA = 8;
+/** Relleno lateral de la barra, casillas (3 catálogos + perfil) y ancho máximo y alto de la píldora. */
+const RELLENO_BARRA = 6;
 const CASILLAS = SECCIONES.length + 1;
-const ANCHO_PILDORA = 72;
+const ANCHO_PILDORA = 88;
+const ALTO_PILDORA = 56;
 
 type Desplazamiento = { alDesplazar: () => void; espacioAbajo: number };
 const DesplazamientoContexto = createContext<Desplazamiento>({ alDesplazar: avisarDesplazamiento, espacioAbajo: 0 });
@@ -79,7 +80,9 @@ export default function BarraCatalogo({
   if (teclado) return null;
 
   const casilla = (ancho - RELLENO_BARRA * 2) / CASILLAS;
-  const xPildora = (i: number) => RELLENO_BARRA + i * casilla + (casilla - ANCHO_PILDORA) / 2;
+  // La píldora no pasa del ancho de su casilla (teléfonos angostos).
+  const anchoPildora = Math.min(ANCHO_PILDORA, casilla);
+  const xPildora = (i: number) => RELLENO_BARRA + i * casilla + (casilla - anchoPildora) / 2;
   const deslizar = posicion.interpolate({
     inputRange: SECCIONES.map((_, i) => i),
     outputRange: SECCIONES.map((_, i) => xPildora(i)),
@@ -107,7 +110,10 @@ export default function BarraCatalogo({
         onLayout={e => setAncho(e.nativeEvent.layout.width)}>
         <View style={[StyleSheet.absoluteFill, styles.fondo]} />
         {ancho > 0 && (
-          <Animated.View pointerEvents="none" style={[styles.pildora, { transform: [{ translateX: deslizar }] }]} />
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.pildora, { width: anchoPildora, transform: [{ translateX: deslizar }] }]}
+          />
         )}
         {SECCIONES.map(s => {
           const activa = s.valor === seccion;
@@ -120,7 +126,8 @@ export default function BarraCatalogo({
               accessibilityState={{ selected: activa }}
               onPress={() => !activa && onCambiar(s.valor)}>
               <View style={styles.marca}>
-                <Icon name={s.icono} size={26} color={c.textStrong} strokeWidth={activa ? 2.4 : 1.9} />
+                <Icon name={s.icono} size={24} color={c.textStrong} strokeWidth={activa ? 2.4 : 1.9} />
+                <NombrePestana texto={s.titulo} activa={activa} />
               </View>
             </Pressable>
           );
@@ -170,8 +177,29 @@ function BotonPerfil({ abierto, onPress }: { abierto: boolean; onPress: () => vo
         <View style={[styles.avatar, { borderColor: abierto ? c.textStrong : 'transparent' }]}>
           <Text style={styles.avatarTxt}>{inicial}</Text>
         </View>
+        <NombrePestana texto="Mi perfil" activa={abierto} />
       </View>
     </Pressable>
+  );
+}
+
+/**
+ * El nombre debajo del ícono, para quien no reconoce los íconos solos. Una
+ * sola línea: en un teléfono angosto la letra se achica un poco antes de cortarse.
+ */
+function NombrePestana({ texto, activa }: { texto: string; activa: boolean }) {
+  const styles = useStyles();
+  return (
+    <Text
+      style={[styles.nombre, activa && styles.nombreActivo]}
+      numberOfLines={1}
+      adjustsFontSizeToFit
+      minimumFontScale={0.8}
+      maxFontSizeMultiplier={1.2}
+      // Ya lo dice la pestaña (accessibilityLabel): no se lee dos veces.
+      importantForAccessibility="no">
+      {texto}
+    </Text>
   );
 }
 
@@ -221,19 +249,24 @@ const useStyles = makeStyles((c, shadow) => ({
   pildora: {
     position: 'absolute',
     left: 0,
-    top: (ALTO_BARRA_CATALOGO - 48) / 2,
-    width: ANCHO_PILDORA,
-    height: 48,
-    borderRadius: 24,
+    top: (ALTO_BARRA_CATALOGO - ALTO_PILDORA) / 2,
+    height: ALTO_PILDORA,
+    borderRadius: ALTO_PILDORA / 2,
     backgroundColor: c.surface2,
   },
   pestanaPerfil: { flex: 1, height: '100%' },
+  // Ícono y nombre, del ancho de la píldora (o de la casilla si es más angosta).
   marca: {
-    width: ANCHO_PILDORA,
-    height: 48,
+    width: '100%',
+    maxWidth: ANCHO_PILDORA,
+    height: ALTO_PILDORA,
+    paddingHorizontal: 2,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 2,
   },
+  nombre: { color: c.text, fontFamily: font.medium, fontSize: 12, lineHeight: 15 },
+  nombreActivo: { color: c.textStrong, fontFamily: font.bold },
   // Radio exacto (la mitad del alto): con radius.pill (999) algunos
   // teléfonos dibujan la píldora con esquinas rectas.
   fondoActivo: {
@@ -242,13 +275,14 @@ const useStyles = makeStyles((c, shadow) => ({
     right: 0,
     bottom: 0,
     left: 0,
-    borderRadius: 24,
+    borderRadius: ALTO_PILDORA / 2,
     backgroundColor: c.surface2,
   },
+  // Del mismo alto que los íconos: así los cuatro nombres quedan a la misma altura.
   avatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     // Con el menú abierto el borde se pinta: un aro como el de la foto de
     // perfil en Instagram (el ancho va siempre, por lo mismo que FondoActivo).
     borderWidth: 2,
@@ -256,5 +290,5 @@ const useStyles = makeStyles((c, shadow) => ({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarTxt: { color: c.onAccent, fontFamily: font.displayExtra, fontSize: 14 },
+  avatarTxt: { color: c.onAccent, fontFamily: font.displayExtra, fontSize: 11, includeFontPadding: false },
 }));

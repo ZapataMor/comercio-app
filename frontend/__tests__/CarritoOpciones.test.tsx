@@ -14,6 +14,7 @@ import { CartProvider, DURACION_RETIRO, useCart } from '../src/CartContext';
 import { detalleOpciones } from '../src/opcionesProducto';
 import CarritoScreen from '../src/screens/CarritoScreen';
 
+jest.mock('../src/useTarifaDomicilio', () => ({ useTarifaDomicilio: () => 3000 }));
 jest.mock('../src/AuthContext', () => ({
   useAuth: () => ({ auth: { token: 't', user: { id: 7 } } }),
 }));
@@ -425,7 +426,7 @@ test('lo que está saliendo no se guarda en el teléfono', async () => {
   expect(guardado.items).toEqual([]);
 });
 
-test('un carrito antiguo sin fecha de vencimiento se descarta', async () => {
+test('un carrito guardado sin fecha de vencimiento se conserva (el carrito ya no vence)', async () => {
   await AsyncStorage.setItem(
     'carrito:7',
     JSON.stringify({
@@ -436,7 +437,7 @@ test('un carrito antiguo sin fecha de vencimiento se descarta', async () => {
   );
   const cart = await montar();
 
-  expect(cart.current.count).toBe(0);
+  expect(cart.current.count).toBe(2);
 });
 
 const conExtras: Producto = {

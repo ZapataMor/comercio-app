@@ -119,6 +119,7 @@ class CatalogoController extends Controller
             'abierto' => (bool) $n->activo,
             'estado_texto' => HorarioNegocio::estadoTexto($n),
             'horario_hoy' => HorarioNegocio::textoHoyDe($n, now()),
+            'abre_texto' => HorarioNegocio::textoApertura($n, now()),
             'tiempo_preparacion' => $n->tiempo_preparacion,
             'reputacion' => Reputacion::resumen(Reputacion::NEGOCIO, $n),
             'resenas' => Resenas::resumen($n),
@@ -367,6 +368,7 @@ class CatalogoController extends Controller
             'activo' => (bool) $negocio->activo,
             'estado_texto' => HorarioNegocio::estadoTexto($negocio),
             'horario_hoy' => HorarioNegocio::textoHoyDe($negocio, now()),
+            'abre_texto' => HorarioNegocio::textoApertura($negocio, now()),
             // El checkout ofrece transferencia solo si el negocio tiene dónde recibirla.
             'acepta_transferencia' => $negocio->aceptaTransferencia(),
         ]);
@@ -404,6 +406,7 @@ class CatalogoController extends Controller
                 // Horario semanal y el texto de hoy ("Hoy de 7:00 a. m. a 8:00 p. m.").
                 'horario' => HorarioNegocio::normalizar($negocio->horario),
                 'horario_hoy' => HorarioNegocio::textoHoyDe($negocio, now()),
+                'abre_texto' => HorarioNegocio::textoApertura($negocio, now()),
                 // Cierra pronto por horario: se le advierte al cliente antes de pedir.
                 'minutos_para_cerrar' => $negocio->activo
                     ? HorarioNegocio::minutosParaCerrar($negocio->horario, now(), HorarioNegocio::ajusteDe($negocio))

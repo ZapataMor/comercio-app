@@ -81,6 +81,29 @@ export function fieldErrorsFromError(error: unknown, aliases: Record<string, str
   }, {});
 }
 
-export function messageFromError(error: unknown, fallback = 'Error inesperado.') {
-  return error instanceof Error ? error.message : fallback;
+/** Lo que se dice cuando algo falló y no hay un mensaje claro para la persona. */
+export const MENSAJE_FALLO = 'Algo salió mal. Intenta de nuevo en un momento.';
+
+/**
+ * El mensaje de un error, dicho para la persona: los del servidor que ya
+ * vienen en español se muestran tal cual; los técnicos («Server Error»,
+ * «Unauthenticated.», un TypeError del código...) se cambian por uno claro.
+ */
+export function messageFromError(error: unknown, fallback = MENSAJE_FALLO) {
+  if (error instanceof ApiError) {
+    const texto = (error.message ?? '').trim();
+    if (error.status >= 500) return 'Tuvimos un problema de nuestro lado. Intenta de nuevo en un momento.';
+    if (error.status === 401) return 'Tu sesión se cerró. Vuelve a entrar con tu celular y tu clave.';
+    if (error.status === 403 && /unauthori[sz]ed|forbidden/i.test(texto)) return 'No tienes permiso para hacer esto.';
+    if (error.status === 404 && (/not found|no query results/i.test(texto) || !texto)) {
+      return 'No encontramos lo que buscabas. Puede que ya no exista.';
+    }
+    if (!texto || /^(error en la petición\.?|server error|unauthenticated\.?|too many attempts\.?)$/i.test(texto)) return fallback;
+    return texto;
+  }
+  // Fallos del propio código: nunca se muestran tal cual.
+  if (error instanceof TypeError || error instanceof SyntaxError || error instanceof ReferenceError || error instanceof RangeError) {
+    return fallback;
+  }
+  return error instanceof Error && error.message.trim() ? error.message : fallback;
 }

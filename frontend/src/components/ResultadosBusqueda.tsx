@@ -20,7 +20,7 @@ export const normalizar = (texto: string) =>
 
 /** Lo esencial de un negocio en una sola línea. */
 export function metaNegocio(n: NegocioLista, mostrarPreparacion = true) {
-  return [n.categoria, mostrarPreparacion && n.tiempo_preparacion ? `~${n.tiempo_preparacion} min` : null, n.barrio]
+  return [n.categoria, mostrarPreparacion && n.tiempo_preparacion ? `Preparación ~${n.tiempo_preparacion} min` : null, n.barrio]
     .filter(Boolean)
     .join(' · ');
 }

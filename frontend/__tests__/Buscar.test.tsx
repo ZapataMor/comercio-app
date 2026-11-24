@@ -245,7 +245,7 @@ test('«Abierto ahora» y una categoría se mandan a la búsqueda', async () => 
   mockNegocios.mockResolvedValue(pagina([negocio(1, 'El Rincón')]));
   mockCategorias.mockResolvedValue([{ id: 4, nombre: 'Comidas rápidas' }]);
   const pantalla = await montar();
-  await pantalla.tocar('Abierto ahora');
+  await pantalla.tocar('Solo abiertos: Solo los negocios abiertos ahora');
   await esperar();
   expect(mockNegocios).toHaveBeenLastCalledWith('t', undefined, 1, null, 'productos', { ...SIN_FILTROS, abierto: true });
 
@@ -256,8 +256,8 @@ test('«Abierto ahora» y una categoría se mandan a la búsqueda', async () => 
   // Con una categoría también salen sus productos.
   expect(mockProductos).toHaveBeenLastCalledWith('t', '', null, false, filtros);
 
-  // «Todos» vuelve a mostrar abiertos y cerrados.
-  await pantalla.tocar('Todos: Abiertos y cerrados');
+  // «Abiertos y cerrados» vuelve a mostrarlos todos.
+  await pantalla.tocar('Abiertos y cerrados');
   await esperar();
   expect(mockNegocios).toHaveBeenLastCalledWith('t', undefined, 1, null, 'productos', { ...filtros, abierto: false });
 });
@@ -265,7 +265,7 @@ test('«Abierto ahora» y una categoría se mandan a la búsqueda', async () => 
 test('sin resultados con filtros ofrece quitarlos', async () => {
   mockNegocios.mockResolvedValue(pagina([]));
   const pantalla = await montar();
-  await pantalla.tocar('Abierto ahora');
+  await pantalla.tocar('Solo abiertos: Solo los negocios abiertos ahora');
   await esperar();
 
   expect(pantalla.textos()).toEqual(expect.arrayContaining(['No hay negocios abiertos ahora', 'Quitar filtros']));
@@ -278,7 +278,7 @@ test('sin escribir ni filtrar muestra una pista y no pide nada', async () => {
   expect(mockNegocios).not.toHaveBeenCalled();
   expect(mockProductos).not.toHaveBeenCalled();
   expect(textos()).toEqual(
-    expect.arrayContaining(['¿Qué buscas?', 'Negocios', 'Productos', 'Abierto ahora', 'Todos', 'Categorías', 'Comidas rápidas']),
+    expect.arrayContaining(['¿Qué buscas?', 'Buscar', 'Todo', 'Negocios', 'Productos', 'Mostrar', 'Solo abiertos', 'Abiertos y cerrados', 'Categorías', 'Comidas rápidas']),
   );
 
   await tocar('Volver');

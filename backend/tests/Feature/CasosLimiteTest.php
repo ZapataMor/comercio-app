@@ -372,7 +372,7 @@ test('un faltante espera la elección del cliente sin cambiar los productos unil
     $this->putJson($ruta.'/listo')->assertOk();
 });
 
-test('la cotización vence en una hora y el aumento exige aceptar el total vigente', function () {
+test('la cotización no vence y el aumento exige aceptar el total vigente', function () {
     [, $negocio, $producto] = limNegocio();
     Ajuste::guardar(Ajuste::TARIFA_DOMICILIO, 0);
     $cliente = limPersona();
@@ -392,9 +392,10 @@ test('la cotización vence en una hora y el aumento exige aceptar el total vigen
     $id = $this->postJson('/api/pedidos', $cuerpo)->assertCreated()->json('id');
     expect(Pedido::find($id)->total)->toBe('198000.00');
     expect(Pedido::find($id)->items()->sole()->precio)->toBe('99000.00');
-    $this->travel(1)->hours();
-    $this->postJson('/api/pedidos', $cuerpo)->assertUnprocessable();
-    expect(Pedido::count())->toBe(1);
+    // El carrito ya no vence: días después la misma cotización sigue sirviendo.
+    $this->travel(3)->days();
+    $this->postJson('/api/pedidos', $cuerpo)->assertCreated();
+    expect(Pedido::count())->toBe(2);
 });
 
 test('el cliente recibe un aviso si cambia el precio de un producto de su carrito vigente', function () {
