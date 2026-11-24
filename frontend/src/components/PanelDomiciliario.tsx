@@ -29,6 +29,7 @@ import AvisoUbicacion from './AvisoUbicacion';
 import { navigationRef } from '../RootNavigation';
 import { Colores, font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
+import { messageFromError } from '../formErrors';
 import { usePolling } from '../usePolling';
 import { FadeInView, PressableScale } from './anim';
 import BotonesContacto from './BotonesContacto';
@@ -126,7 +127,7 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
     () =>
       traer()
         .then(aplicar)
-        .catch(err => toast.error('Error', err.message))
+        .catch(err => toast.error('No pudimos cargar tus pedidos', messageFromError(err)))
         .finally(() => setCargando(false)),
     [traer, aplicar, toast],
   );
@@ -160,7 +161,7 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
       await tomarPedido(token, pedido.id, minutos);
     } catch (e) {
       // Puede que otro lo haya tomado: se cierra y se refresca la lista.
-      toast.error('No se pudo tomar', e instanceof Error ? e.message : 'Error');
+      toast.error('No pudiste tomar el pedido', messageFromError(e, 'Puede que otro domiciliario lo haya tomado primero.'));
       setTomando(false);
       setPorTomar(null);
       cargar();
@@ -174,7 +175,7 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
     setTomando(false);
     setPorTomar(null);
     onTomado?.();
-    toast.exito('Pedido tomado', `Pasa a recogerlo en ${minutos} min.`);
+    toast.exito('Pedido tomado', `Ve por él a la tienda: dijiste que llegas en ${minutos} min.`);
   }
 
   async function onOcupado(id: number) {
@@ -182,9 +183,9 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
     try {
       await avisarOcupado(token, id);
       await actualizarAnimado();
-      toast.exito('Aviso enviado', 'El negocio sabe que estás ocupado y pronto llevarás el efectivo.');
+      toast.exito('Le avisamos a la tienda', 'Sabe que estás ocupado y que pronto le llevas el efectivo.');
     } catch (e) {
-      toast.error('No se pudo avisar', e instanceof Error ? e.message : 'Error');
+      toast.error('No pudimos avisarle a la tienda', messageFromError(e));
     } finally { setAvanzando(null); }
   }
 
@@ -194,7 +195,7 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
       await marcarEnCamino(token, id, domicilioRecibido);
       await actualizarAnimado();
     } catch (e) {
-      toast.error('No se pudo actualizar', e instanceof Error ? e.message : 'Error');
+      toast.error('No pudimos marcar que saliste', messageFromError(e));
     } finally {
       setAvanzando(null);
     }
@@ -218,16 +219,16 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
       texto: `Confirma solo si el negocio ya te dio los ${cop(pedido.costo_domicilio)}.`,
       textoBoton: 'Sí, ya me lo pagaron', textoCancelar: 'Todavía no',
       accion: async () => {
-        try { await confirmarDomicilioRecibido(token, pedido.id); await actualizarAnimado(); toast.info('Domicilio recibido', 'Quedó anotado que ya te lo pagaron.'); }
-        catch (e) { toast.error('No se pudo guardar', e instanceof Error ? e.message : 'Error'); }
+        try { await confirmarDomicilioRecibido(token, pedido.id); await actualizarAnimado(); toast.info('Domicilio pagado', 'Quedó anotado que la tienda ya te lo pagó.'); }
+        catch (e) { toast.error('No pudimos guardarlo', messageFromError(e)); }
       },
     });
   }
 
   async function onLlegada(id: number) {
     setAvanzando(id);
-    try { await registrarLlegada(token, id); await actualizarAnimado(); toast.info('Llegada registrada', 'Contacta al cliente. Después de 5 minutos podrás marcar Cliente no encontrado.'); }
-    catch (e) { toast.error('No se pudo registrar', e instanceof Error ? e.message : 'Error'); }
+    try { await registrarLlegada(token, id); await actualizarAnimado(); toast.info('Le avisamos al cliente que llegaste', 'Llámalo o escríbele. Si en 5 minutos no sale, podrás marcar «Cliente no encontrado».'); }
+    catch (e) { toast.error('No pudimos avisar que llegaste', messageFromError(e)); }
     finally { setAvanzando(null); }
   }
 
@@ -237,18 +238,24 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
       textoBoton: 'Cliente no encontrado', textoCancelar: 'Seguir intentando',
       accion: async () => {
         try { await clienteNoEncontrado(token, pedido.id); setEntregas(prev => prev.filter(p => p.id !== pedido.id)); await actualizarAnimado(); }
-        catch (e) { toast.error('No se pudo reportar', e instanceof Error ? e.message : 'Error'); }
+        catch (e) { toast.error('No pudimos reportarlo', messageFromError(e)); }
       },
     });
   }
 
   /** Si el código no es correcto, el error lo muestra el mismo campo. */
   async function onEntregar(id: number, codigo: string) {
+    const pedido = entregas.find(p => p.id === id);
     await confirmarEntrega(token, id, codigo);
     finalizados.current.add(id);
     setEntregas(prev => prev.map(p => p.id === id ? { ...p, estado: 'entregado', entrega_ubicacion: null, entrega_fotos: null, direccion_entrega: '' } : p));
     await actualizarAnimado();
-    toast.exito('¡Entrega completada!', 'Si hay efectivo pendiente, el pedido seguirá en curso hasta que el negocio confirme su recepción.');
+    // En efectivo, el pedido sigue abierto hasta que la tienda recibe su parte.
+    if (pedido?.metodo_pago === 'efectivo') {
+      toast.exito('¡Entregaste el pedido!', `Ahora lleva ${cop(pedido.subtotal)} a la tienda. Te quedas con el domicilio.`);
+    } else {
+      toast.exito('¡Entregaste el pedido!', 'Listo, ya terminaste esta entrega.');
+    }
   }
 
   /** Solo se puede antes de recogerlo: por eso se confirma. */
@@ -265,9 +272,9 @@ export default function PanelDomiciliario({ ref, onTomado }: Props) {
           await soltarPedido(token, pedido.id);
           setEntregas(prev => prev.filter(p => p.id !== pedido.id));
           await actualizarAnimado();
-          toast.info('Soltaste el pedido', 'Ya está disponible para otros domiciliarios.');
+          toast.info('Soltaste el pedido', 'Ya lo pueden tomar otros domiciliarios.');
         } catch (e) {
-          toast.error('No se pudo soltar', e instanceof Error ? e.message : 'Error');
+          toast.error('No pudiste soltar el pedido', messageFromError(e));
           cargar();
         }
       },
@@ -548,7 +555,7 @@ function Novedad({ pedido, onReportada }: { pedido: Pedido; onReportada: () => v
       setOtra('');
       onReportada();
     } catch (e) {
-      toast.error('No se pudo reportar', e instanceof Error ? e.message : 'Error');
+      toast.error('No pudimos reportar la novedad', messageFromError(e));
     }
   }
 

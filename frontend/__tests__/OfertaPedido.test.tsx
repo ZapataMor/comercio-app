@@ -162,7 +162,7 @@ describe('modal', () => {
       raiz.root.findByType(MinutosRecogida).props.onAceptar(8);
     });
 
-    expect(mockToast.error).toHaveBeenCalledWith('No se pudo tomar', 'Ya lo tomó otro.');
+    expect(mockToast.error).toHaveBeenCalledWith('No pudiste tomar el pedido', 'Ya lo tomó otro.');
     expect(abrirEntregas).not.toHaveBeenCalled();
   });
 

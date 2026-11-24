@@ -50,6 +50,15 @@ const ToastContext = createContext<ToastApi>({
 /** ms visible antes de cerrarse solo (lo que tarda en llenarse el borde). */
 export const DURACION_TOAST = 4000;
 
+/**
+ * Cuánto se queda un aviso: el mínimo para los cortos y más tiempo para los
+ * largos, para que alcance a leerse completo (unos 15 caracteres por segundo).
+ */
+export function duracionToast(titulo: string, mensaje?: string) {
+  const letras = titulo.length + (mensaje?.length ?? 0);
+  return Math.min(9000, Math.max(DURACION_TOAST, 1500 + letras * 65));
+}
+
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);
@@ -136,7 +145,7 @@ function Tarjeta({ item, onClose }: { item: ToastItem; onClose: (id: number) => 
   return (
     <Animated.View style={[styles.envoltura, { opacity: anim, transform: [{ translateY }] }]}>
      <AvisoTemporal
-      duracion={DURACION_TOAST}
+      duracion={duracionToast(item.titulo, item.mensaje)}
       onCerrar={cerrar}
       color={estilo.color}
       radio={radius.md}
@@ -147,11 +156,12 @@ function Tarjeta({ item, onClose }: { item: ToastItem; onClose: (id: number) => 
         <Text style={styles.icono}>{estilo.icono}</Text>
       </View>
       <View style={styles.texto}>
-        <Text style={styles.titulo} numberOfLines={1}>
+        {/* Sin cortar: el aviso crece hacia abajo hasta mostrar todo el texto. */}
+        <Text style={styles.titulo} numberOfLines={3}>
           {item.titulo}
         </Text>
         {!!item.mensaje && (
-          <Text style={styles.mensaje} numberOfLines={2}>
+          <Text style={styles.mensaje} numberOfLines={6}>
             {item.mensaje}
           </Text>
         )}
@@ -169,7 +179,9 @@ const useStyles = makeStyles((c, shadow) => ({
     zIndex: 1000,
     alignItems: 'flex-end',
   },
-  envoltura: { marginBottom: 10, maxWidth: 360, minWidth: 220 },
+  // Todo el ancho disponible (hasta 440 en tabletas): con un ancho fijo
+  // pequeño el texto quedaba cortado en «...».
+  envoltura: { marginBottom: 10, width: '100%', maxWidth: 440 },
   toast: {
     ...shadow.card,
     shadowRadius: 14,
@@ -192,6 +204,6 @@ const useStyles = makeStyles((c, shadow) => ({
   },
   icono: { color: c.onBrand, fontWeight: '900', fontSize: 14 },
   texto: { flex: 1 },
-  titulo: { color: c.textStrong, fontFamily: font.bold, fontSize: 14 },
-  mensaje: { color: c.muted, fontSize: 12, marginTop: 2, fontFamily: font.regular },
+  titulo: { color: c.textStrong, fontFamily: font.bold, fontSize: 15, lineHeight: 20 },
+  mensaje: { color: c.text, fontSize: 14, lineHeight: 19, marginTop: 2, fontFamily: font.regular },
 }));

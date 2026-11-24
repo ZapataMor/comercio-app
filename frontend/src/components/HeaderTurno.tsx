@@ -15,6 +15,7 @@ import React, { useEffect, useState } from 'react';
 import { cambiarTurno } from '../api';
 import { useAuth } from '../AuthContext';
 import { useToast } from '../Toast';
+import { messageFromError } from '../formErrors';
 import BotonMantener from './BotonMantener';
 import { Objetivo } from '../tutorial/Objetivo';
 
@@ -65,7 +66,7 @@ export function useTurno() {
       toast.info(valor ? 'En turno' : 'Fuera de turno', mensaje);
     } catch (e) {
       publicar(token, { enTurno: !valor, cambiando: false });
-      toast.error('No se pudo cambiar', e instanceof Error ? e.message : 'Error');
+      toast.error('No pudimos cambiar tu turno', messageFromError(e));
     }
   }
 

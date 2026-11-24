@@ -21,6 +21,7 @@ import { alAceptarOferta, ofertasRechazadas, quitarOferta, rechazarOferta } from
 import { abrirEntregas, navigationRef } from '../RootNavigation';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
+import { messageFromError } from '../formErrors';
 import { useCompartirUbicacion } from '../ubicacion';
 import { alCambiarEnVivo } from '../enVivo';
 import { alCambiarDesdePush, avisarCambioDesdePush } from '../usePolling';
@@ -111,7 +112,7 @@ export default function OfertaPedido() {
               toast.info('Ese pedido ya no está disponible', 'Otro domiciliario lo tomó primero.');
             }
           })
-          .catch(e => toast.error('No se pudo abrir el pedido', e instanceof Error ? e.message : 'Error'));
+          .catch(e => toast.error('No pudimos abrir el pedido', messageFromError(e)));
       }),
     [revisar, toast],
   );
@@ -137,10 +138,10 @@ export default function OfertaPedido() {
       await tomarPedido(token, porTomar.id, minutos);
       setDescartados(lista => [...lista, porTomar.id]);
       if (navigationRef.isReady()) abrirEntregas();
-      toast.exito('Pedido tomado', `Pasa a recogerlo en ${minutos} min.`);
+      toast.exito('Pedido tomado', `Ve por él a la tienda: dijiste que llegas en ${minutos} min.`);
     } catch (e) {
       // Puede que otro lo haya tomado.
-      toast.error('No se pudo tomar', e instanceof Error ? e.message : 'Error');
+      toast.error('No pudiste tomar el pedido', messageFromError(e, 'Puede que otro domiciliario lo haya tomado primero.'));
     } finally {
       setTomando(false);
       setPorTomar(null);
