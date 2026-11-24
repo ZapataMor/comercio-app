@@ -68,7 +68,8 @@ if defined DISPOSITIVO (
         goto fin
     )
     echo   [1/4] Emulador           -^> !AVD!
-    start "Emulador - !AVD!" "%EMULADOR%" -avd !AVD!
+    REM -timezone: el emulador no traduce la zona de Windows y sin esto arranca en GMT
+    start "Emulador - !AVD!" "%EMULADOR%" -avd !AVD! -timezone America/Bogota
 )
 
 REM ---- 2. API y 3. Metro ----
