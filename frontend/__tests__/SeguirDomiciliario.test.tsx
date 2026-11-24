@@ -161,3 +161,29 @@ it('sin domiciliario no hay botón de seguir', async () => {
   expect(botonSeguir()).toHaveLength(0);
   expect(raiz.root.findAllByType(View).length).toBeGreaterThan(0);
 });
+
+it('si movió el mapa (por ejemplo al desplazar la página), vuelve solo a la moto tras unos segundos sin tocarlo', async () => {
+  await abrir();
+  await act(async () => {
+    jest.advanceTimersByTime(1500);
+  });
+  await arrastrar();
+  await act(async () => raiz.update(<Mapa lat={11.378} />));
+  expect(botonSeguir().length).toBeGreaterThan(0);
+
+  // Mientras lo sigue moviendo, la espera se reinicia.
+  await act(async () => {
+    jest.advanceTimersByTime(5000);
+  });
+  await arrastrar();
+  await act(async () => {
+    jest.advanceTimersByTime(5000);
+  });
+  expect(botonSeguir().length).toBeGreaterThan(0);
+
+  await act(async () => {
+    jest.advanceTimersByTime(1000);
+  });
+  expect(botonSeguir()).toHaveLength(0);
+  expect(ultimoEaseTo()).toMatchObject({ center: [-72.2395, 11.378], duration: 600 });
+});

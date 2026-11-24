@@ -356,6 +356,12 @@ const SALTO_MAX_M = 1000;
 const ZOOM_SEGUIR = ZOOM.barrio;
 /** Al abrir, se ve todo (moto, negocio y destino) este rato antes de acercarse a la moto. */
 const VER_TODO_MS = 1500;
+/**
+ * Tras mover el mapa con el dedo, vuelve solo a la moto pasado este rato sin
+ * tocarlo. Al desplazar la página con el dedo encima del mapa, el mapa se
+ * mueve sin querer y la moto quedaba fuera de la vista hasta tocar «Seguir».
+ */
+export const VOLVER_A_SEGUIR_MS = 6000;
 
 /**
  * Posición que se va deslizando hacia `destino` (en línea recta, a velocidad
@@ -454,9 +460,11 @@ export function MapaSeguimiento({
   const camaraEn = useRef<Coordenadas | null>(null);
   const yaSeAcerco = useRef(false);
   const montado = useRef(true);
+  const volverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
     () => () => {
       montado.current = false;
+      if (volverTimer.current) clearTimeout(volverTimer.current);
     },
     [],
   );
@@ -501,6 +509,10 @@ export function MapaSeguimiento({
 
   /** Vuelve a seguir a la moto (o, sin moto, encuadra lo que haya). */
   const volverASeguir = () => {
+    if (volverTimer.current) {
+      clearTimeout(volverTimer.current);
+      volverTimer.current = null;
+    }
     setSiguiendo(true);
     siguiendoRef.current = true;
     if (moto.current) irTrasLaMoto(true);
@@ -534,6 +546,12 @@ export function MapaSeguimiento({
         onArrastrar={() => {
           siguiendoRef.current = false;
           setSiguiendo(false);
+          // Cada toque nuevo reinicia la espera: mientras lo mueve, no se lo quita.
+          if (volverTimer.current) clearTimeout(volverTimer.current);
+          volverTimer.current = setTimeout(() => {
+            volverTimer.current = null;
+            if (montado.current && moto.current) volverASeguir();
+          }, VOLVER_A_SEGUIR_MS);
         }}>
         {!!negocio && <PinNegocio punto={negocio.punto} nombre={negocio.nombre} imagen={negocio.imagen} />}
         {!!entrega && <PinEntrega punto={entrega} />}
