@@ -11,9 +11,10 @@
  */
 import { StackActions } from '@react-navigation/native';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, ScrollView, Text, View } from 'react-native';
 import { detenerAlarma, PedidoEnEspera } from '../alarmaPedidos';
-import { aceptarPedido, cancelarPedidoNegocio, getPedidoNegocio } from '../api';
+import { aceptarPedido, cancelarPedidoNegocio, ComercioPedido, getPedidoNegocio } from '../api';
+import { textoCantidad } from '../cantidades';
 import { useAuth } from '../AuthContext';
 import { navigationRef } from '../RootNavigation';
 import { font, makeStyles, radius, useTheme } from '../theme';
@@ -47,10 +48,27 @@ export default function AvisoPedidoNuevo({ pedidos }: { pedidos: PedidoEnEspera[
   const [error, setError] = useState<string | null>(null);
   const [rechazo, setRechazo] = useState<{ id: number; motivos: string[] } | null>(null);
   const [enviandoRechazo, setEnviandoRechazo] = useState(false);
+  // Lo que pidieron y a dónde va: se trae al aparecer cada pedido.
+  const [detalle, setDetalle] = useState<ComercioPedido | null>(null);
 
   const vigentes = pedidos.filter(p => p.vence > ahora && !atendidos.includes(p.id));
   const pedido = vigentes[0] ?? null;
   const pedidoId = pedido?.id ?? null;
+
+  const negocioDelPedido = pedido?.negocio_id ?? null;
+  const token = auth?.token;
+  useEffect(() => {
+    setDetalle(null);
+    if (pedidoId == null || negocioDelPedido == null || !token) return;
+    let vigente = true;
+    getPedidoNegocio(token, negocioDelPedido, pedidoId)
+      .then(d => vigente && setDetalle(d))
+      // Sin el detalle igual se puede aceptar: se ve en el pedido después.
+      .catch(() => {});
+    return () => {
+      vigente = false;
+    };
+  }, [pedidoId, negocioDelPedido, token]);
 
   useEffect(() => {
     if (pedidoId == null) return;
@@ -134,6 +152,45 @@ export default function AvisoPedidoNuevo({ pedidos }: { pedidos: PedidoEnEspera[
               Pedido #{pedido.codigo}{pedido.negocio ? ` · ${pedido.negocio}` : ''}
             </Text>
             <Text style={styles.total}>{cop(pedido.total)}</Text>
+
+            {/* Qué pidieron y a dónde va, para decidir sin abrir el pedido. */}
+            {detalle ? (
+              <View style={styles.resumen}>
+                <ScrollView style={styles.items} nestedScrollEnabled>
+                  {(detalle.items ?? []).map((it, idx) => (
+                    <View key={idx} style={styles.item}>
+                      <Text style={styles.itemCant}>{textoCantidad(it)}</Text>
+                      <View style={styles.itemTexto}>
+                        <Text style={styles.itemNombre}>{it.nombre}</Text>
+                        {!!it.detalle && <Text style={styles.itemDetalle}>{it.detalle}</Text>}
+                      </View>
+                    </View>
+                  ))}
+                </ScrollView>
+                {!!detalle.direccion_entrega && (
+                  <View style={styles.direccion}>
+                    <Icon name="ubicacion" size={15} color={c.text} />
+                    <Text style={styles.direccionTxt}>{detalle.direccion_entrega}</Text>
+                  </View>
+                )}
+                {detalle.metodo_pago === 'efectivo' ? (
+                  <View style={styles.direccion}>
+                    <Icon name="efectivo" size={15} color={c.text} />
+                    <Text style={styles.direccionTxt}>
+                      Efectivo{detalle.paga_con ? `, paga con ${cop(detalle.paga_con)}` : ', valor exacto'}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.direccion}>
+                    <Icon name="banco" size={15} color={c.text} />
+                    <Text style={styles.direccionTxt}>Transferencia</Text>
+                  </View>
+                )}
+              </View>
+            ) : (
+              <ActivityIndicator style={styles.cargando} color={c.accent} accessibilityLabel="Cargando lo que pidieron" />
+            )}
+
             <Text style={styles.vence}>
               Vence en {tiempo(Math.ceil((pedido.vence - ahora) / 1000))}
             </Text>
@@ -191,6 +248,23 @@ const useStyles = makeStyles((c, shadow) => ({
   titulo: { color: c.textStrong, fontFamily: font.display, fontSize: 22, lineHeight: 28 },
   detalle: { color: c.text, fontFamily: font.medium, fontSize: 14, lineHeight: 20, marginTop: 6, textAlign: 'center' },
   total: { color: c.goldText, fontFamily: font.extra, fontSize: 26, marginTop: 10 },
+  resumen: {
+    alignSelf: 'stretch',
+    marginTop: 12,
+    padding: 12,
+    borderRadius: radius.md,
+    backgroundColor: c.bg,
+    gap: 8,
+  },
+  items: { maxHeight: 190 },
+  item: { flexDirection: 'row', gap: 8, paddingVertical: 3 },
+  itemCant: { color: c.goldText, fontFamily: font.bold, fontSize: 15, minWidth: 30 },
+  itemTexto: { flex: 1 },
+  itemNombre: { color: c.textStrong, fontFamily: font.semibold, fontSize: 15 },
+  itemDetalle: { color: c.muted, fontFamily: font.regular, fontSize: 13 },
+  direccion: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  direccionTxt: { flex: 1, color: c.text, fontFamily: font.regular, fontSize: 14, lineHeight: 19 },
+  cargando: { marginTop: 14 },
   vence: { color: c.muted, fontFamily: font.regular, fontSize: 13, marginTop: 6 },
   otros: { color: c.text, fontFamily: font.semibold, fontSize: 13, marginTop: 8 },
   error: { color: c.danger, fontFamily: font.medium, fontSize: 13, lineHeight: 18, marginTop: 10, textAlign: 'center' },

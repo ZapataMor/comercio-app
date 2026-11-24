@@ -66,3 +66,12 @@ test('el pedido disponible dice el barrio y el cambio que hay que llevar', () =>
   expect(textoCobro({ cobrar: 43000, paga_con: 50000 })).toBe('Cobrar $43.000 en efectivo. Paga con $50.000: lleva $7.000 de cambio.');
   expect(textoCobro({ cobrar: 43000, paga_con: null })).toBe('Cobrar $43.000 en efectivo (paga con el valor exacto).');
 });
+
+test('la cantidad dice la unidad en plural cuando son varias', () => {
+  const { textoCantidad } = require('../src/cantidades');
+  expect(textoCantidad({ cantidad: 2, unidad_medida: 'porción' })).toBe('2 porciones');
+  expect(textoCantidad({ cantidad: 1, unidad_medida: 'porción' })).toBe('1 porción');
+  expect(textoCantidad({ cantidad: 3, unidad_medida: 'libra' })).toBe('3 libras');
+  expect(textoCantidad({ cantidad: 1.5, unidad_medida: 'kg' })).toBe('1,5 kg');
+  expect(textoCantidad({ cantidad: 2, unidad_medida: 'unidad' })).toBe('2×');
+});

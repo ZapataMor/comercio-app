@@ -331,7 +331,7 @@ export default function HomeScreen({ navigation }: Props) {
   async function entregarAlDomiciliario(pedido: ComercioPedido, codigo: string) {
     if (!negocioId) return;
     await confirmarRecogida(token, negocioId, pedido.id, codigo);
-    toast.exito('Pedido entregado', 'El domiciliario ya lo lleva.');
+    toast.exito('El domiciliario recogió el pedido', 'Ya va en camino donde el cliente.');
     cargarPedidos();
   }
 
@@ -353,8 +353,9 @@ export default function HomeScreen({ navigation }: Props) {
 
   const enEspera = pedidos.filter(p => p.estado === 'pendiente');
   const enPreparacion = pedidos.filter(p => p.estado === 'aceptado');
-  // Ya tiene domiciliario: viene por él y el negocio le pide su código.
-  const porRecoger = pedidos.filter(p => p.estado === 'tomado');
+  // Listo: esperando que un domiciliario lo tome, o ya viene por él (entonces
+  // el negocio le pide su código). No desaparece del Inicio al marcarlo listo.
+  const porRecoger = pedidos.filter(p => p.estado === 'listo' || p.estado === 'tomado');
   // Efectivo: falta decir si el domiciliario entregó el dinero.
   const porConfirmar = pedidos.filter(p => p.puede_confirmar_dinero);
 
@@ -479,21 +480,27 @@ export default function HomeScreen({ navigation }: Props) {
 
               {porRecoger.length > 0 && (
                 <>
-                  <Text style={styles.seccion}>Por entregar al domiciliario ({porRecoger.length})</Text>
+                  <Text style={styles.seccion}>Listos para el domiciliario ({porRecoger.length})</Text>
                   {porRecoger.map((p, i) => (
                     <FadeInView key={p.id} delay={i * 60}>
                       <TarjetaPedido
                         pedido={p}
                         icono="moto"
-                        nombre={p.domiciliario ?? 'Domiciliario'}
+                        nombre={p.estado === 'listo' ? 'Buscando domiciliario…' : `${p.domiciliario ?? 'El domiciliario'} viene por él`}
                         pie="Ver pedido ›"
                         onPress={() => navigation.navigate('ComercioPedidoDetalle', { pedido: p })}>
+                        {p.estado === 'listo' ? (
+                          <Text style={styles.domicilioNota}>
+                            Cuando un domiciliario lo tome, aquí escribes su código para entregárselo.
+                          </Text>
+                        ) : (
                         <PedirCodigo
                           compacto
                           titulo="Código del domiciliario"
                           textoBoton="Confirmar"
                           onConfirmar={codigo => entregarAlDomiciliario(p, codigo)}
                         />
+                        )}
                         {p.domicilio_lo_entrega_negocio && (
                           <Text style={styles.domicilioNota}>
                             Pagado por transferencia: entrégale {cop(p.costo_domicilio ?? 0)} del domicilio.
@@ -531,10 +538,22 @@ export default function HomeScreen({ navigation }: Props) {
                         pedido={p}
                         icono="moto"
                         nombre={p.domiciliario ?? 'Domiciliario'}
-                        pie="¿Te entregó el dinero? ›"
+                        pie={`¿Te entregó los ${cop(p.subtotal ?? p.total)}? ›`}
                         destacada
-                        onPress={() => navigation.navigate('ComercioPedidoDetalle', { pedido: p })}
-                      />
+                        onPress={() => navigation.navigate('ComercioPedidoDetalle', { pedido: p })}>
+                        {/* Lo que cobró se divide: la tienda recibe los productos y el
+                            domiciliario se queda con el domicilio. */}
+                        <View style={styles.reparto}>
+                          <View style={styles.repartoFila}>
+                            <Text style={styles.repartoTxt}>Para la tienda (productos)</Text>
+                            <Text style={styles.repartoValor}>{cop(p.subtotal ?? p.total)}</Text>
+                          </View>
+                          <View style={styles.repartoFila}>
+                            <Text style={styles.repartoTxt}>Para el domiciliario (domicilio)</Text>
+                            <Text style={styles.repartoTxt}>{cop(p.costo_domicilio ?? 0)}</Text>
+                          </View>
+                        </View>
+                      </TarjetaPedido>
                     </FadeInView>
                   ))}
                 </>
@@ -602,6 +621,10 @@ const useStyles = makeStyles((c, shadow) => ({
   // otra no se parte en dos líneas, y el zoom crece hacia la izquierda sin
   // montarse sobre el botón.
   capa: { position: 'absolute', top: 0, right: 0, left: -40, textAlign: 'right', transformOrigin: 'right center' },
+  reparto: { marginTop: 8, gap: 4 },
+  repartoFila: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
+  repartoTxt: { color: c.text, fontFamily: font.regular, fontSize: 14 },
+  repartoValor: { color: c.textStrong, fontFamily: font.bold, fontSize: 15 },
   // Pedidos en espera
   seccion: { fontSize: 16, fontFamily: font.displaySemi, color: c.textStrong, marginTop: 14, marginBottom: 10 },
   domicilioNota: { color: c.goldText, fontFamily: font.semibold, fontSize: 13, lineHeight: 18, marginTop: 8 },

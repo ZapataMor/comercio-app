@@ -201,3 +201,27 @@ test('al acabarse el tiempo sale sin esperar al servidor', async () => {
     jest.useRealTimers();
   }
 });
+
+test('antes de aceptar muestra qué pidieron, a dónde va y cómo paga', async () => {
+  mockPedido.mockResolvedValue({
+    items: [
+      { nombre: 'Almuerzo ejecutivo', cantidad: 2, unidad_medida: 'unidad', detalle: 'Sin fríjoles' },
+      { nombre: 'Torta tres leches', cantidad: 1, unidad_medida: 'unidad' },
+    ],
+    direccion_entrega: 'Calle 20 #19-41 - Barrio Santa Isabel',
+    metodo_pago: 'efectivo',
+    paga_con: 50000,
+    motivos_cancelacion: [],
+  });
+  await montar([pedido(1)]);
+
+  expect(textos()).toEqual(
+    expect.arrayContaining([
+      'Almuerzo ejecutivo',
+      'Sin fríjoles',
+      'Torta tres leches',
+      'Calle 20 #19-41 - Barrio Santa Isabel',
+      'Efectivo, paga con $50.000',
+    ]),
+  );
+});

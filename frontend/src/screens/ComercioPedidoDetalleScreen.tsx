@@ -154,7 +154,7 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
     }
     await confirmarRecogida(token, negocioId, pedido.id, codigo);
     await recargar();
-    toast.exito('Pedido entregado', 'El domiciliario ya lo lleva.');
+    toast.exito('El domiciliario recogió el pedido', 'Ya va en camino donde el cliente.');
   }
 
   async function onListo() {
@@ -164,10 +164,13 @@ export default function ComercioPedidoDetalleScreen({ route, navigation }: Props
     setEnviando(true);
     try {
       await marcarPedidoListo(token, negocioId, pedido.id);
-      toast.exito('Pedido listo', 'Los domiciliarios ya pueden recogerlo.');
-      navigation.goBack();
+      // Se queda en el pedido: cuando llegue el domiciliario, aquí mismo se
+      // escribe su código (y también sale en el Inicio).
+      await recargar();
+      toast.exito('Pedido listo', 'Cuando llegue el domiciliario, pídele su código y escríbelo aquí.');
     } catch (e) {
-      toast.error('No se pudo', e instanceof Error ? e.message : 'Error');
+      toast.error('No se pudo marcar listo', e instanceof Error ? e.message : 'Error');
+    } finally {
       setEnviando(false);
     }
   }
@@ -531,7 +534,8 @@ const useStyles = makeStyles((c, shadow) => ({
   filaNota: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 16 },
   notaInline: { marginTop: 0 },
   itemRow: { flexDirection: 'row', marginTop: 4 },
-  itemCant: { fontFamily: font.bold, color: c.goldText, width: 36 },
+  // Ancho mínimo y no fijo: «2 porciones» no se parte en «por/ción».
+  itemCant: { fontFamily: font.bold, color: c.goldText, minWidth: 36, marginRight: 8 },
   itemTexto: { flex: 1 },
   itemNombre: { color: c.text, fontSize: 15, fontFamily: font.regular },
   // Lo que el negocio debe preparar distinto: que no se pase por alto.
