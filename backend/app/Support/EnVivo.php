@@ -271,6 +271,9 @@ class EnVivo
             Api\CarritoController::class.'@actualizar' => null,
             // «Cómo llegar»: solo calcula la ruta (va por POST para no dejar la posición en los logs).
             Api\RutaController::class => null,
+            // Visita a la tienda: «Mi tienda» pide el conteo al abrirse; avisar con
+            // cada cliente que entra solo haría ruido en el canal del negocio.
+            Api\VisitaNegocioController::class.'@registrar' => null,
             Web\AuthWebController::class.'@login' => null,
             Web\AuthWebController::class.'@logout' => null,
 
