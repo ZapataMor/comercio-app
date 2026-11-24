@@ -192,7 +192,7 @@ a{color:inherit}
 
 /* Pie */
 .sitio-pie{background:var(--surface);border-top:1px solid var(--line);padding:56px 0 28px;margin-top:0}
-.sitio-pie-rejilla{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:32px}
+.sitio-pie-rejilla{display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr 1fr;gap:28px}
 .sitio-pie p{color:var(--muted);font-size:14px;margin-top:14px;max-width:260px}
 .sitio-pie h2{font:600 13px SitioInter,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
 .sitio-pie a,.sitio-pie span{display:block;font-size:14px;text-decoration:none;color:var(--text);margin-bottom:9px;overflow-wrap:anywhere}
@@ -231,3 +231,66 @@ a{color:inherit}
     .sitio-pie-rejilla{grid-template-columns:1fr}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+/* Páginas legales y de texto largo */
+.doc-portada .portada-sola{padding:56px 24px 60px}
+.doc-portada .portada-sola h1{font-size:clamp(28px,3.8vw,42px)}
+.doc-vigencia{margin-top:14px!important;font-size:14px;color:var(--onhero-muted)}
+.doc-cuerpo{display:grid;grid-template-columns:240px minmax(0,1fr);gap:48px;align-items:start;padding:56px 24px 88px}
+.doc-indice{position:sticky;top:92px;font-size:14px}
+.doc-indice h2{font:600 12px SitioInter,sans-serif!important;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)!important;margin-bottom:12px!important}
+.doc-indice a{display:block;padding:6px 10px;border-radius:9px;text-decoration:none;color:var(--muted);line-height:1.35}
+.doc-indice a:hover{background:var(--surface2);color:var(--strong)}
+.doc{max-width:760px;font-size:16px}
+.doc > * + *{margin-top:16px}
+.doc h2{font-size:22px;margin-top:44px;scroll-margin-top:92px}
+.doc h2:first-child{margin-top:0}
+.doc h3{font-size:17px;margin-top:28px}
+.doc ul,.doc ol{padding-left:22px;display:grid;gap:8px;margin-bottom:0}
+.doc li::marker{color:var(--gold)}
+.doc a{color:var(--gold);text-decoration:underline;text-underline-offset:3px}
+.doc strong{color:var(--strong)}
+.doc-ficha{list-style:none;padding:20px 22px!important;background:var(--surface);border:1px solid var(--line);border-radius:18px;gap:6px!important}
+.doc-nota{padding:16px 18px;border-radius:16px;background:var(--accent-soft);color:var(--strong);font-size:15px}
+.doc-otras{margin-top:48px!important;padding-top:24px;border-top:1px solid var(--line);font-size:14px;color:var(--muted)}
+.doc-otras a{color:var(--gold)}
+.doc-tabla{width:100%;border-collapse:collapse;font-size:15px}
+.doc-tabla th,.doc-tabla td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+.doc-tabla th{color:var(--strong);font-weight:600}
+
+/* Formulario de eliminar cuenta */
+.caja-doc{max-width:460px;margin:0 auto;background:var(--surface);border:1px solid var(--line);border-radius:24px;padding:30px}
+.caja-doc .boton-ancho{margin-top:24px}
+.boton-peligro{background:#C2361B;color:#fff}
+.alerta{padding:14px 16px;border-radius:14px;font-size:15px;margin-bottom:8px}
+.alerta-error{background:#FBE1DA;color:#8A2410}
+.alerta-ok{background:var(--success-soft);color:var(--success)}
+:root[data-mode="noche"] .alerta-error{background:#4A2433;color:#FFB7A3}
+
+/* Páginas de error */
+.error-pagina{text-align:center;padding:96px 24px 120px;max-width:620px;margin:0 auto}
+.error-codigo{font:700 clamp(64px,12vw,120px)/1 SitioSora,sans-serif;color:var(--accent);letter-spacing:-.05em}
+.error-pagina h1{font-size:clamp(24px,3vw,32px);margin-top:12px}
+.error-pagina p{color:var(--muted);margin-top:12px}
+.error-pagina .acciones{justify-content:center}
+
+/* Contacto */
+.canales{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.canales .tarjeta{padding:22px}
+.canales .tarjeta a{color:var(--gold);font-weight:600;overflow-wrap:anywhere}
+.sitio-pie-sic{display:inline!important;color:var(--gold)!important}
+
+@media (max-width:960px){
+    .doc-cuerpo{grid-template-columns:1fr;gap:28px;padding-top:40px}
+    .doc-indice{position:static;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px}
+    .canales{grid-template-columns:1fr}
+}
+@media (max-width:640px){
+    .doc-cuerpo{padding:32px 16px 64px}
+    .doc-portada .portada-sola{padding:44px 16px 48px}
+    .caja-doc{padding:22px}
+}
+.doc-cuerpo.sin-indice{grid-template-columns:minmax(0,760px);justify-content:center}
+.caja-legal{margin-top:16px;font-size:13px;color:var(--muted)}
+.caja-legal a{color:var(--gold)}
+.doc-tabla td,.doc-tabla th{overflow-wrap:anywhere}
+@media (max-width:640px){.doc-tabla th,.doc-tabla td{padding:10px 8px}}

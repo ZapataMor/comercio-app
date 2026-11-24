@@ -14,6 +14,41 @@ test('el sitio público se ve sin iniciar sesión', function () {
     $this->get('/como-funciona')->assertOk()->assertSee('Domiciliarios');
     $this->get('/planes')->assertOk()->assertSee('Elegir plan mensual');
     $this->get('/cuenta/entrar')->assertOk()->assertSee('Iniciar sesión');
+    $this->get('/preguntas-frecuentes')->assertOk()->assertSee('¿Vitrina cobra comisión por pedido?');
+    $this->get('/contacto')->assertOk()->assertSee('Plazos de respuesta');
+});
+
+test('las páginas legales son públicas y están enlazadas en el pie', function () {
+    $this->get('/terminos')->assertOk()->assertSee('no crea una relación laboral')->assertSee('Ley 1480 de 2011');
+    $this->get('/condiciones-de-membresia')->assertOk()->assertSee('5 días hábiles')->assertSee('no es automática');
+    $this->get('/aviso-de-privacidad')->assertOk()->assertSee('Decreto 1377 de 2013');
+    $this->get('/cookies')->assertOk()->assertSee('XSRF-TOKEN');
+
+    $pie = $this->get('/')->assertOk();
+    foreach (['/terminos', '/condiciones-de-membresia', '/privacidad', '/aviso-de-privacidad', '/cookies', '/cancelaciones', '/eliminar-cuenta', '/contacto'] as $ruta) {
+        $pie->assertSee(url($ruta), false);
+    }
+});
+
+test('el documento del responsable aparece solo si está configurado', function () {
+    config(['vitrina.documento' => '']);
+    $this->get('/terminos')->assertOk()->assertDontSee('Identificación:');
+
+    config(['vitrina.documento' => 'C.C. 1.234.567.890']);
+    $this->get('/privacidad')->assertOk()->assertSee('C.C. 1.234.567.890');
+    $this->get('/contacto')->assertOk()->assertSee('C.C. 1.234.567.890');
+});
+
+test('robots, sitemap y security.txt', function () {
+    $this->get('/robots.txt')->assertOk()->assertSee('Disallow: /admin')->assertSee('Sitemap: '.url('/sitemap.xml'));
+    $this->get('/sitemap.xml')->assertOk()->assertHeader('Content-Type', 'application/xml; charset=UTF-8')
+        ->assertSee(url('/terminos'), false)->assertDontSee('/admin', false);
+    $this->get('/.well-known/security.txt')->assertOk()
+        ->assertSee('Contact: mailto:'.config('vitrina.correo_contacto'))->assertSee('Expires: ');
+});
+
+test('una página que no existe muestra el error con el diseño del sitio', function () {
+    $this->get('/no-existe-esta-pagina')->assertNotFound()->assertSee('No encontramos esta página')->assertSee('Ir al inicio');
 });
 
 test('la web solo deja entrar a administradores', function () {

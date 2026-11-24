@@ -1,48 +1,46 @@
-@extends('layouts.app')
+@extends('layouts.documento')
 
 @section('titulo', 'Eliminar mi cuenta')
+@section('descripcion', 'Elimina tu cuenta de Vitrina y tus datos personales, aunque ya no tengas la app.')
+@section('etiqueta', 'Ayuda')
+@section('encabezado', 'Eliminar mi cuenta de Vitrina')
 
-@section('contenido')
-<div class="max-w-md mx-auto bg-white rounded-2xl shadow p-6 space-y-4 text-sm">
-    <h1 class="text-xl font-bold">Eliminar mi cuenta de Vitrina</h1>
+@section('documento')
+<p>
+    La forma más rápida es desde la app: <strong>Mi perfil → Eliminar mi cuenta</strong>.
+    Si ya no tienes la app instalada, puedes hacerlo aquí con tu celular (o correo) y tu clave.
+</p>
+<p>
+    Se borran tu nombre, correo, teléfono, direcciones y sesiones. Los pedidos ya hechos se conservan sin tus
+    datos de contacto. Si eres el único dueño de un negocio, el negocio se cierra y deja de aparecer en la app.
+    <strong>Esto no se puede deshacer.</strong> Más detalles en la
+    <a href="{{ route('privacidad') }}">política de privacidad</a>.
+</p>
 
-    <p>
-        La forma más rápida es desde la app: <strong>Mi perfil → Eliminar mi cuenta</strong>.
-        Si ya no tienes la app instalada, puedes hacerlo aquí con tu celular (o correo) y tu clave.
-    </p>
-    <p class="text-slate-600">
-        Se borran tu nombre, correo, teléfono, direcciones y sesiones. Los pedidos ya hechos se conservan sin tus
-        datos de contacto. Si eres el único dueño de un negocio, el negocio se cierra y deja de aparecer en la app.
-        Esto no se puede deshacer. Más detalles en la
-        <a class="text-indigo-600 underline" href="{{ route('privacidad') }}">política de privacidad</a>.
-    </p>
-
+<div class="caja-doc">
     @if ($errors->any())
-        <div class="rounded-lg bg-red-100 text-red-800 px-4 py-2">{{ $errors->first() }}</div>
+        <div class="alerta alerta-error" role="alert">{{ $errors->first() }}</div>
+    @endif
+    @if (session('ok'))
+        <div class="alerta alerta-ok" role="status">{{ session('ok') }}</div>
     @endif
 
     @unless (session('ok'))
-        <form method="POST" action="{{ route('eliminar-cuenta') }}" class="space-y-3"
+        <form method="POST" action="{{ route('eliminar-cuenta') }}"
               onsubmit="return confirm('¿Seguro? Tu cuenta se eliminará y no se puede deshacer.');">
             @csrf
-            <div>
-                <label class="block font-medium mb-1">Celular o correo</label>
-                <input type="text" name="usuario" value="{{ old('usuario') }}" required autocomplete="username"
-                       class="w-full rounded-lg border-slate-300 border px-3 py-2">
-            </div>
-            <div>
-                <label class="block font-medium mb-1">Clave de 4 números</label>
-                <input type="password" name="clave" required inputmode="numeric" maxlength="4" autocomplete="current-password"
-                       class="w-full rounded-lg border-slate-300 border px-3 py-2">
-            </div>
-            <button class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg py-2.5">
-                Eliminar mi cuenta
-            </button>
+            <label class="campo">
+                <span>Celular o correo</span>
+                <input type="text" name="usuario" value="{{ old('usuario') }}" required autocomplete="username">
+            </label>
+            <label class="campo">
+                <span>Clave de 4 números</span>
+                <input class="clave" type="password" name="clave" required inputmode="numeric" maxlength="4" autocomplete="current-password">
+            </label>
+            <button class="boton boton-peligro boton-ancho">Eliminar mi cuenta</button>
         </form>
     @endunless
-
-    <p class="text-slate-500">
-        ¿Problemas? Escríbenos a {{ config('vitrina.correo_contacto') }}.
-    </p>
 </div>
+
+<p>¿Olvidaste tu clave o tienes problemas? Escríbenos a <a href="mailto:{{ config('vitrina.correo_contacto') }}">{{ config('vitrina.correo_contacto') }}</a> desde el correo de tu cuenta o con tu celular, y la eliminamos por ti.</p>
 @endsection

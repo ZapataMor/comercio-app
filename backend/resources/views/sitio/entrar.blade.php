@@ -50,6 +50,11 @@
             </div>
 
             <p class="aviso">Los pagos de membresía estarán disponibles muy pronto.</p>
+            <p class="caja-legal">
+                Al entrar aceptas los <a href="{{ route('terminos') }}">términos</a>, las
+                <a href="{{ route('membresia') }}">condiciones de la membresía</a> y la
+                <a href="{{ route('privacidad') }}">política de privacidad</a>.
+            </p>
         </form>
     </div>
 </section>

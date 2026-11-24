@@ -14,14 +14,38 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Páginas públicas que exige Play Store: política de privacidad y una forma
- * de eliminar la cuenta sin entrar a la app.
+ * Páginas legales del sitio: privacidad, términos, membresía, cookies,
+ * cancelaciones y una forma de eliminar la cuenta sin entrar a la app (las
+ * dos últimas, junto con la privacidad, las exige Play Store).
  */
 class PublicoController extends Controller
 {
     public function privacidad(): View
     {
         return view('publico.privacidad');
+    }
+
+    /** Versión corta que exige el Decreto 1377 de 2013 (art. 14 y 15). */
+    public function avisoPrivacidad(): View
+    {
+        return view('publico.aviso-privacidad');
+    }
+
+    /** Términos y condiciones de uso para clientes, negocios y domiciliarios. */
+    public function terminos(): View
+    {
+        return view('publico.terminos');
+    }
+
+    /** Condiciones de los planes que pagan los negocios en la web. */
+    public function membresia(): View
+    {
+        return view('publico.membresia');
+    }
+
+    public function cookies(): View
+    {
+        return view('publico.cookies');
     }
 
     /** Reglas de cancelación y devolución, en palabras para el cliente. */

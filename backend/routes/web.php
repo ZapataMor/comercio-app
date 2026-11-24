@@ -13,15 +13,26 @@ Route::controller(SitioController::class)->name('sitio.')->group(function () {
     Route::get('/', 'inicio')->name('inicio');
     Route::get('/como-funciona', 'comoFunciona')->name('como-funciona');
     Route::get('/planes', 'planes')->name('planes');
+    Route::get('/preguntas-frecuentes', 'preguntas')->name('preguntas');
+    Route::get('/contacto', 'contacto')->name('contacto');
     // Acceso de los negocios al pago de su membresía (aún sin funcionalidad).
     Route::get('/cuenta/entrar', 'entrar')->name('entrar');
 });
 
-// --- Páginas públicas que exige Play Store (sin sesión) ---
+// --- Páginas legales (sin sesión). Play Store enlaza /privacidad y /eliminar-cuenta: no cambiarlas. ---
 Route::get('/privacidad', [PublicoController::class, 'privacidad'])->name('privacidad');
+Route::get('/aviso-de-privacidad', [PublicoController::class, 'avisoPrivacidad'])->name('aviso-privacidad');
+Route::get('/terminos', [PublicoController::class, 'terminos'])->name('terminos');
+Route::get('/condiciones-de-membresia', [PublicoController::class, 'membresia'])->name('membresia');
+Route::get('/cookies', [PublicoController::class, 'cookies'])->name('cookies');
 Route::get('/cancelaciones', [PublicoController::class, 'cancelaciones'])->name('cancelaciones');
 Route::get('/eliminar-cuenta', [PublicoController::class, 'eliminarCuentaForm'])->name('eliminar-cuenta');
 Route::post('/eliminar-cuenta', [PublicoController::class, 'eliminarCuenta'])->middleware('throttle:eliminar-cuenta');
+
+// --- Archivos para buscadores e investigadores de seguridad ---
+Route::get('/robots.txt', [SitioController::class, 'robots']);
+Route::get('/sitemap.xml', [SitioController::class, 'sitemap']);
+Route::get('/.well-known/security.txt', [SitioController::class, 'seguridad']);
 
 // --- Login web (sesión con cookies) ---
 Route::get('/login', [AuthWebController::class, 'showLogin'])->name('login');

@@ -170,6 +170,7 @@ SENTRY_LARAVEL_DSN=...
 
 # Datos que salen en la política de privacidad y en los correos
 VITRINA_RESPONSABLE="Nombre de la persona o empresa responsable"
+VITRINA_DOCUMENTO="C.C. o NIT como aparece en el RUT"
 VITRINA_CORREO_CONTACTO=soporte@tudominio.co
 VITRINA_CIUDAD="Maicao, La Guajira, Colombia"
 # Obligatorios: el Decreto 1377 de 2013 exige que la política muestre la dirección
@@ -231,7 +232,7 @@ sube `versionCode` (y `versionName`) en `android/app/build.gradle`.
 ## 5. Antes del piloto
 
 - [ ] Elegir hosting y dominio; montar el servidor (§2) y el `.env` (§3).
-- [ ] Revisar con un asesor el texto de `/privacidad` (Ley 1581 de 2012) y llenar `VITRINA_*`.
+- [ ] Revisar con un asesor los textos legales (`/privacidad`, `/aviso-de-privacidad`, `/terminos`, `/condiciones-de-membresia`, `/cookies`, `/cancelaciones`) y llenar `VITRINA_*`.
 - [ ] Decidir el `applicationId` definitivo antes de la primera subida a Play Store. Si cambia,
       hay que registrar la app de nuevo en Firebase y reemplazar `android/app/google-services.json`.
 - [ ] Crear la llave de subida (§4.2) y la cuenta de desarrollador de Google Play.

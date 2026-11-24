@@ -9,6 +9,11 @@ return [
     // Persona o empresa responsable del tratamiento de datos (Ley 1581 de 2012).
     'responsable' => env('VITRINA_RESPONSABLE', 'Vitrina'),
 
+    // Cédula o NIT del responsable, como aparece en su RUT. La Ley 1480 de
+    // 2011 (art. 50) pide identificar a quien vende por internet (aquí, las
+    // membresías). Vacío, las páginas no muestran esa línea.
+    'documento' => env('VITRINA_DOCUMENTO', ''),
+
     // Correo donde la gente ejerce sus derechos (consultas, reclamos, borrado).
     'correo_contacto' => env('VITRINA_CORREO_CONTACTO', 'soporte@vitrina.example'),
 
