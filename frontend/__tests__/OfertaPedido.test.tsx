@@ -108,7 +108,7 @@ describe('modal', () => {
         'Domicilio $4.000',
         'Recoger: Arepas Ana — Calle 9',
         'Entregar: Calle 5 # 1-2',
-        'Cobrar $24.000 en efectivo',
+        'Cobrar $24.000 en efectivo (paga con el valor exacto).',
       ]),
     );
   });

@@ -22,6 +22,7 @@ import { abrirEntregas, navigationRef } from '../RootNavigation';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 import { messageFromError } from '../formErrors';
+import { textoCobro, textoEntrega } from '../ofertaTextos';
 import { useCompartirUbicacion } from '../ubicacion';
 import { alCambiarEnVivo } from '../enVivo';
 import { alCambiarDesdePush, avisarCambioDesdePush } from '../usePolling';
@@ -174,13 +175,13 @@ export default function OfertaPedido() {
               </View>
               <View style={styles.fila}>
                 <Icon name="casa" size={15} color={c.text} />
-                <Text style={styles.linea}>Entregar: {pedido.direccion_entrega}</Text>
+                <Text style={styles.linea}>{textoEntrega(pedido)}</Text>
               </View>
               <View style={styles.fila}>
                 <Icon name="tarjeta" size={15} color={c.text} />
                 <Text style={styles.linea}>
                   {pedido.cobrar > 0
-                    ? `Cobrar ${cop(pedido.cobrar)} en efectivo`
+                    ? textoCobro(pedido)
                     : pedido.domicilio_lo_entrega_negocio && pedido.costo_domicilio > 0
                       ? `Pagado por transferencia: no cobres nada. El negocio te entrega ${cop(pedido.costo_domicilio)} del domicilio al recoger.`
                       : 'Pagado: no cobres nada'}

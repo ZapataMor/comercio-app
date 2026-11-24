@@ -467,6 +467,8 @@ class DomiciliarioController extends Controller
             'codigo_recogida' => $p->estado === 'tomado' ? $p->codigo_confirmacion : null,
             'fecha_entrega' => $p->entregado_at?->format('d/m/Y H:i'),
             'direccion_entrega' => $p->domiciliario_id === request()->user()->id && in_array($p->estado, ['tomado', 'recogido', 'en_camino'], true) ? $p->direccion_entrega : '',
+            // Antes de tomarlo solo ve el barrio: sabe hacia dónde va sin la dirección exacta.
+            'barrio_entrega' => $p->barrioEntrega(),
             // Cómo llegar, en palabras del cliente: solo para quien lleva el pedido.
             'entrega_indicaciones' => $p->domiciliario_id === request()->user()->id && in_array($p->estado, ['tomado', 'recogido', 'en_camino'], true) ? $p->entrega_indicaciones : null,
             // Punto exacto de la entrega, solo para quien lleva el pedido.

@@ -1,3 +1,4 @@
+import AvisoPedidoEnCurso from '../components/AvisoPedidoEnCurso';
 import { useLecturaEnFoco } from '../useLectura';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -390,6 +391,9 @@ export default function HomeScreen({ navigation }: Props) {
       // Con el teclado abierto, el primer toque debe llegar a "Confirmar".
       keyboardShouldPersistTaps="handled">
       <Saludo />
+
+      {/* Un pedido propio que aún no llega: se ve antes que todo lo demás. */}
+      <AvisoPedidoEnCurso />
 
       {cargandoPanel && <ActivityIndicator size="large" color={c.accent} accessibilityLabel="Cargando tu negocio" />}
 

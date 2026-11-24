@@ -1848,6 +1848,8 @@ export type Pedido = {
   /** "dd/mm/aaaa hh:mm" en que lo entregué (solo los entregados). */
   fecha_entrega?: string | null;
   direccion_entrega: string;
+  /** El barrio de la entrega: lo ve antes de tomar el pedido (la dirección exacta, después). */
+  barrio_entrega?: string | null;
   /** Cómo llegar, en palabras del cliente (solo mientras lo llevo). */
   entrega_indicaciones?: string | null;
   /** Punto exacto de la entrega, si el cliente lo fijó (solo mientras lo llevo). */

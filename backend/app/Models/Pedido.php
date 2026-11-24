@@ -145,6 +145,22 @@ class Pedido extends Model
             : null;
     }
 
+    /**
+     * El barrio de la entrega (lo que va tras « - Barrio » en la dirección):
+     * se le muestra al domiciliario antes de tomar el pedido, sin la
+     * dirección exacta, para que sepa hacia dónde queda.
+     */
+    public function barrioEntrega(): ?string
+    {
+        $pos = strrpos((string) $this->direccion_entrega, ' - Barrio ');
+        if ($pos === false) {
+            return null;
+        }
+        $barrio = trim(substr($this->direccion_entrega, $pos + strlen(' - Barrio ')));
+
+        return $barrio === '' ? null : $barrio;
+    }
+
     /** Lo que el negocio dice del dinero de un pedido en efectivo. */
     public const DINERO_ESTADOS = ['recibido', 'incompleto', 'no_recibido'];
 

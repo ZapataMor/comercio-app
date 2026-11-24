@@ -12,6 +12,8 @@ import ExplorarScreen from '../src/screens/ExplorarScreen';
 
 // Objeto fijo, como en la app: si cambiara en cada render, la pantalla recargaría sin parar.
 const mockSesion = { auth: { token: 't', user: { id: 7, name: 'Ana María', roles: ['usuario'] } } };
+// El atajo al pedido en curso tiene su propia prueba (PedidoEnCurso).
+jest.mock('../src/components/AvisoPedidoEnCurso', () => () => null);
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 // La barra de catálogos (Productos / Servicios / Propiedades) tiene su propia prueba.
 jest.mock('../src/components/BarraCatalogo', () => ({

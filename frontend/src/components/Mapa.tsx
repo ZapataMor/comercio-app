@@ -348,6 +348,8 @@ const REFRESCO_MIN_MS = 600;
  * avanzar seguida en vez de a saltos.
  */
 const DESLIZAR_MS = 2000;
+/** Cada cuánto se repinta la moto mientras se desliza. */
+const PINTAR_CADA_MS = 100;
 /** Un salto mayor (o la primera posición) se pone de una: deslizarlo engañaría. */
 const SALTO_MAX_M = 1000;
 /** Zoom al ir detrás del domiciliario: unas cuadras alrededor. */
@@ -386,8 +388,10 @@ export function usePuntoSuave(destino: Coordenadas | null | undefined, duracionM
       const t = Math.min(1, (Date.now() - inicio) / duracionMs);
       const punto = { lat: desde.lat + (hasta.lat - desde.lat) * t, lng: desde.lng + (hasta.lng - desde.lng) * t };
       actual.current = punto;
-      // ~30 cuadros por segundo bastan y no recargan el mapa.
-      if (t === 1 || Date.now() - pintado >= 33) {
+      // ~10 cuadros por segundo: se ve avanzar y el mapa nativo no redibuja sin
+      // parar (con 30 por segundo y la cámara moviéndose, MapLibre llegó a
+      // cerrar la app en Android: SIGSEGV en onDidFinishRenderingFrame).
+      if (t === 1 || Date.now() - pintado >= PINTAR_CADA_MS) {
         pintado = Date.now();
         setVisible(punto);
       }

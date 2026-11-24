@@ -20,6 +20,8 @@ const mockContexto: { negocio: unknown; negocios: unknown[]; recargar: jest.Mock
 };
 let refrescar: () => void;
 
+// El atajo al pedido en curso tiene su propia prueba (PedidoEnCurso).
+jest.mock('../src/components/AvisoPedidoEnCurso', () => () => null);
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
   useFocusEffect: (callback: () => void) => { require('react').useEffect(callback, [callback]); },

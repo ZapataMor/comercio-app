@@ -1,3 +1,4 @@
+import AvisoPedidoEnCurso from '../components/AvisoPedidoEnCurso';
 import { useLectura } from '../useLectura';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -271,6 +272,11 @@ function ExplorarNegocios({ navigation, seccion }: { navigation: Props['navigati
               </PressableScale>
               </Objetivo>
             </View>
+
+            {/* Si tiene un pedido que aún no llega, lo ve aquí y vuelve a él de un toque. */}
+            <View style={styles.pedidoEnCurso}>
+              <AvisoPedidoEnCurso />
+            </View>
           </View>
 
           {opciones.length > 0 && (
@@ -405,6 +411,7 @@ const useStyles = makeStyles(c => ({
   cabecera: { paddingHorizontal: 20, paddingTop: 22 },
   saludo: { color: c.muted, fontFamily: font.medium, fontSize: 14, marginBottom: 2 },
   titular: { color: c.textStrong, fontFamily: font.display, fontSize: 26, lineHeight: 33 },
+  pedidoEnCurso: { marginTop: 16, marginBottom: -16 },
   buscadorFila: { flexDirection: 'row', gap: 10, marginTop: 16 },
   buscadorObjetivo: { flex: 1 },
   buscador: {

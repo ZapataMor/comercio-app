@@ -1,3 +1,4 @@
+import { PASO_CLIENTE } from '../pasosPedido';
 import { useLecturaEnFoco } from '../useLectura';
 import ErrorCarga from '../components/ErrorCarga';
 import { textoCantidad } from '../cantidades';
@@ -36,18 +37,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'PedidoDetalle'>;
 const UBICACION_VIEJA_S = 60;
 
 /** Los pasos dichos desde el cliente, no desde la operación de la tienda. */
-const LABEL: Record<string, string> = {
-  pendiente: 'Esperando que la tienda acepte',
-  // Solo por transferencia: pagar y que el negocio confirme que le llegó.
-  pago: 'Pago por transferencia',
-  aceptado: 'La tienda prepara tu pedido',
-  listo: 'Listo, esperando al domiciliario',
-  tomado: 'Un domiciliario va por tu pedido',
-  recogido: 'El domiciliario ya lo tiene',
-  en_camino: 'Va en camino a tu casa',
-  entregado: 'Entregado',
-  devolviendo: 'Regresando a la tienda',
-};
+const LABEL = PASO_CLIENTE;
 
 /** Estados en los que el domiciliario ya lleva (o va por) el pedido. */
 const CON_DOMICILIARIO = ['tomado', 'recogido', 'en_camino'];
@@ -150,6 +140,13 @@ function TarjetaEstado({
   const styles = useStyles();
   const frase = fraseDelEstado(pedido);
   const enRuta = pedido.estado === 'recogido' || pedido.estado === 'en_camino';
+  // La última posición conocida: si una respuesta llega sin ella (vieja o un
+  // fallo de red), el mapa sigue montado con la anterior. Quitar y volver a
+  // poner el mapa nativo mientras dibuja puede cerrar la app en Android.
+  const ultimaUbicacion = useRef(pedido.domiciliario_ubicacion ?? null);
+  if (!enRuta) ultimaUbicacion.current = null;
+  else if (pedido.domiciliario_ubicacion) ultimaUbicacion.current = pedido.domiciliario_ubicacion;
+  const ubicacion = ultimaUbicacion.current;
   const efectivo = pedido.metodo_pago === 'efectivo' && pedido.estado !== 'entregado';
   const cambio = pedido.paga_con != null && pedido.paga_con > pedido.total ? pedido.paga_con - pedido.total : null;
 
@@ -167,10 +164,10 @@ function TarjetaEstado({
 
       {/* Con el pedido en la moto: dónde va, en vivo. */}
       {enRuta && (
-        pedido.domiciliario_ubicacion ? (
+        ubicacion ? (
           <View style={styles.estadoMapa}>
             <MapaSeguimiento
-              domiciliario={pedido.domiciliario_ubicacion}
+              domiciliario={ubicacion}
               entrega={pedido.entrega_ubicacion}
               negocio={
                 pedido.negocio_ubicacion
@@ -180,8 +177,8 @@ function TarjetaEstado({
               onRefrescar={onRefrescar}
             />
             <NotaEnVivo
-              texto={`Ubicación del domiciliario ${haceCuanto(pedido.domiciliario_ubicacion.hace_segundos)}`}
-              vieja={pedido.domiciliario_ubicacion.hace_segundos > UBICACION_VIEJA_S}
+              texto={`Ubicación del domiciliario ${haceCuanto(ubicacion.hace_segundos)}`}
+              vieja={!pedido.domiciliario_ubicacion || ubicacion.hace_segundos > UBICACION_VIEJA_S}
             />
           </View>
         ) : (

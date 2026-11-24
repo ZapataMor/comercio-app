@@ -30,6 +30,7 @@ import { navigationRef } from '../RootNavigation';
 import { Colores, font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 import { messageFromError } from '../formErrors';
+import { textoCobro, textoEntrega } from '../ofertaTextos';
 import { usePolling } from '../usePolling';
 import { FadeInView, PressableScale } from './anim';
 import BotonesContacto from './BotonesContacto';
@@ -724,9 +725,13 @@ function DisponibleCard({ pedido, onTomar }: { pedido: Pedido; onTomar: () => vo
         <Icon name="ubicacion" size={13} color={c.mutedSoft} />
         <Text style={[styles.lineaSub, { flex: 1 }]}>{pedido.negocio?.direccion ?? 'Sin dirección'}</Text>
       </View>
+      <View style={[styles.linea, styles.fila]}>
+        <Icon name="casa" size={14} color={c.text} />
+        <Text style={[styles.linea, { flex: 1 }]}>{textoEntrega(pedido)}</Text>
+      </View>
       <Text style={styles.lineaSub}>
         {pedido.items.reduce((s, i) => s + (i.unidad_medida && i.unidad_medida !== 'unidad' ? 1 : i.cantidad), 0)} producto(s) · Domicilio {cop(pedido.costo_domicilio ?? 0)} ·{' '}
-        {pedido.metodo_pago === 'efectivo' ? `cobras ${cop(pedido.cobrar)}` : 'ya pagado'}
+        {pedido.metodo_pago === 'efectivo' ? textoCobro(pedido) : 'ya pagado'}
       </Text>
       {/* Abre el modal para elegir en cuántos minutos lo recojo. */}
       <PressableScale style={[styles.tomarBtn, styles.btnFila]} onPress={onTomar}>

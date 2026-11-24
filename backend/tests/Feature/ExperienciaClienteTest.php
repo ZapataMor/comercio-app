@@ -162,3 +162,16 @@ test('el carrito no vence: una cotización de hace días sigue sirviendo', funct
     pedirArepa(['items' => [['producto_id' => $this->producto->id, 'cantidad' => 1, 'precio_token' => $token]]])
         ->assertCreated();
 });
+
+test('antes de tomar un pedido el domiciliario ve el barrio, no la dirección exacta', function () {
+    $id = pedirArepa(['paga_con' => 50000])->assertCreated()->json('id');
+    $this->negocio->pedidos()->findOrFail($id)->update(['estado' => 'listo', 'listo_at' => now()]);
+
+    $domiciliario = User::factory()->create();
+    $domiciliario->assignRole('domiciliario');
+    Sanctum::actingAs($domiciliario);
+    $this->getJson('/api/domiciliario/disponibles')->assertOk()
+        ->assertJsonPath('pedidos.0.barrio_entrega', 'Santa Isabel')
+        ->assertJsonPath('pedidos.0.direccion_entrega', '')
+        ->assertJsonPath('pedidos.0.paga_con', 50000);
+});
