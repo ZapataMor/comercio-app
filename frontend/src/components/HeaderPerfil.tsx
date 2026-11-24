@@ -88,7 +88,8 @@ function modulosPara(roles: string[], enNegocio: boolean, serDomiciliario: () =>
     modulos.push({ titulo: 'Mis entregas', icono: 'moto', abrir: abrirEntregas });
   }
   modulos.push({ titulo: 'Mis citas', icono: 'calendario', abrir: () => navigationRef.navigate('MisCitas') });
-  // Política de privacidad: página pública del servidor.
+  // Términos y política de privacidad: páginas públicas del servidor.
+  modulos.push({ titulo: 'Términos y condiciones', icono: 'lista', abrir: () => Linking.openURL(`${WEB_URL}/terminos`) });
   modulos.push({ titulo: 'Privacidad', icono: 'escudo', abrir: () => Linking.openURL(`${WEB_URL}/privacidad`) });
   // Cuándo se puede cancelar y cómo se devuelve una transferencia.
   modulos.push({ titulo: 'Cancelaciones y devoluciones', icono: 'refrescar', abrir: () => Linking.openURL(`${WEB_URL}/cancelaciones`) });

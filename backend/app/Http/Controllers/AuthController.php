@@ -46,10 +46,10 @@ class AuthController extends Controller
             'telefono' => ['required', 'string', new \App\Rules\Telefono],
             // Token de /telefono/verificar: el número se confirmó por WhatsApp.
             'verificacion' => ['required', 'string', 'max:100'],
-            // Autorización previa del tratamiento de datos (Ley 1581 de 2012).
+            // Acepta los términos y autoriza el tratamiento de datos (Ley 1581 de 2012).
             'acepta_terminos' => ['accepted'],
         ], [
-            'acepta_terminos.accepted' => 'Debes aceptar la política de privacidad para crear la cuenta.',
+            'acepta_terminos.accepted' => 'Debes aceptar los términos y la política de privacidad para crear la cuenta.',
             'verificacion.required' => 'Confirma tu número de celular con el código de WhatsApp.',
             'pin.required' => 'Crea tu clave de 4 números.',
             'pin.confirmed' => 'Las dos claves no coinciden.',

@@ -25,9 +25,9 @@ solo en local.
       `SENTRY_DSN` (vacío).
 - [ ] **Servidor de producción** con dominio, HTTPS, cola, cron y Reverb
       (DESPLIEGUE.md §2–3).
-- [ ] **Aceptar los términos en el registro**: la página `/terminos` ya existe
-      (23 de noviembre de 2026); falta que el registro de la app los haga aceptar
-      junto con la política de privacidad.
+- [x] **Aceptar los términos en el registro** (resuelto el 23 de noviembre de
+      2026): la casilla del registro (celular y Google) enlaza `/terminos` y
+      `/privacidad`; `terminos_aceptados_at` guarda cuándo se aceptó.
 
 ### Google Play
 - [ ] **Prueba cerrada obligatoria**: las cuentas personales nuevas necesitan

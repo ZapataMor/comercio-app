@@ -207,16 +207,20 @@ export function CasillaPolitica({
         disabled={deshabilitada}
         hitSlop={8}
         accessibilityRole="checkbox"
-        accessibilityLabel="Acepto la política de privacidad"
+        accessibilityLabel="Acepto los términos y la política de privacidad"
         accessibilityState={{ checked: marcada }}>
         {marcada && <Icon name="check" size={14} color={l.botonTexto} />}
       </TouchableOpacity>
       <Text style={[e.texto, e.terminosTexto]}>
-        Acepto la{' '}
+        Acepto los{' '}
+        <Text style={e.enlace} onPress={() => Linking.openURL(`${WEB_URL}/terminos`)}>
+          términos y condiciones
+        </Text>{' '}
+        y la{' '}
         <Text style={e.enlace} onPress={() => Linking.openURL(`${WEB_URL}/privacidad`)}>
           política de privacidad
-        </Text>{' '}
-        y autorizo el tratamiento de mis datos para gestionar mis pedidos.
+        </Text>
+        , y autorizo el tratamiento de mis datos para gestionar mis pedidos.
       </Text>
     </View>
   );

@@ -195,9 +195,9 @@ describe('último paso del registro', () => {
 
     await tocarTexto('Continuar');
     expect(entrarMock).not.toHaveBeenCalled();
-    expect(textos()).toContain('Debes aceptar la política de privacidad');
+    expect(textos()).toContain('Debes aceptar los términos y la política de privacidad');
 
-    await tocarEtiqueta('Acepto la política de privacidad');
+    await tocarEtiqueta('Acepto los términos y la política de privacidad');
     await tocarTexto('Continuar');
     expect(textos()).toContain('Último paso: crea tu clave');
 
@@ -228,7 +228,7 @@ describe('último paso del registro', () => {
     );
     await montar(<RegistroGoogleScreen {...({ navigation, route } as any)} />);
 
-    await tocarEtiqueta('Acepto la política de privacidad');
+    await tocarEtiqueta('Acepto los términos y la política de privacidad');
     await tocarTexto('Continuar');
     await escribir('Tu clave de 4 números', '2468');
     await escribir('Confirma tu clave', '2468');

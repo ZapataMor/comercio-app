@@ -79,7 +79,7 @@ export default function RegisterScreen({ navigation }: Props) {
     if (!nombre.trim()) nuevosErrores.name = 'El campo nombre es obligatorio.';
     if (!apellidos.trim()) nuevosErrores.apellidos = 'El campo apellidos es obligatorio.';
     if (!aceptaTerminos) {
-      nuevosErrores.acepta_terminos = 'Debes aceptar la política de privacidad para crear la cuenta.';
+      nuevosErrores.acepta_terminos = 'Debes aceptar los términos y la política de privacidad para crear la cuenta.';
     }
     if (Object.keys(nuevosErrores).length > 0) {
       setErrores(nuevosErrores);
