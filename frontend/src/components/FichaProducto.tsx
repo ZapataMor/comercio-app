@@ -14,6 +14,7 @@
  * Cada versión se agrega o se cancela por separado; al agregarla, su pestaña
  * desaparece. Con la última, el modal se cierra.
  */
+import { EdgeInsets, SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { HeaderHeightContext } from '@react-navigation/elements';
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import {
@@ -61,6 +62,8 @@ import { PuntajeResenas, ResenasDeProducto } from './Resenas';
 const MARGEN = 12;
 /** Hueco entre el borde inferior del modal y los botones Carrito / Mis pedidos. */
 const HUECO_BARRA = 12;
+/** Los márgenes seguros; en Jest el módulo está simulado sin contexto (entonces, 0). */
+const CONTEXTO_INSETS: React.Context<EdgeInsets | null> = SafeAreaInsetsContext ?? React.createContext<EdgeInsets | null>(null);
 /** Ancho de las pestañas numeradas, que quedan fuera del borde izquierdo. */
 const ANCHO_PESTANA = 40;
 const MAX_UNIDADES = 99;
@@ -285,10 +288,13 @@ export default function FichaProducto({
     Animated.event([{ nativeEvent: { contentOffset: { y: desplazamiento } } }], { useNativeDriver: true }),
   ).current;
 
-  // Sin insets.bottom: la pantalla ya termina encima de la barra de
-  // navegación del sistema (contentStyle en App.tsx), justo donde la barra del
-  // cliente empieza a contar su margen.
-  const bottom = MARGEN_BARRA_CLIENTE + ALTO_PILA_CLIENTE + HUECO_BARRA;
+  // Termina encima de los botones «Carrito» y «Mis pedidos». La pantalla llega
+  // hasta el borde de abajo (detrás de la barra de navegación del sistema), y
+  // los botones cuentan su margen desde encima de esa barra: hay que sumar el
+  // mismo insets.bottom, o los botones tapan el «Agregar» de la ficha.
+  // Con el contexto y no useSafeAreaInsets(): en Jest la ficha se monta sin proveedor.
+  const insetAbajo = useContext(CONTEXTO_INSETS)?.bottom ?? 0;
+  const bottom = insetAbajo + MARGEN_BARRA_CLIENTE + ALTO_PILA_CLIENTE + HUECO_BARRA;
   // La capa llena toda la pantalla, también detrás de la barra superior: sin
   // este espacio, la parte de arriba de la ficha (y su X) quedaba escondida.
   const top = MARGEN + (useContext(HeaderHeightContext) ?? 0);
