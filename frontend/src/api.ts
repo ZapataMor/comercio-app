@@ -2163,6 +2163,8 @@ export type SeguimientoPedido = {
   entrega_fotos?: FotosDireccion | null;
   /** En cuánto llega el domiciliario (aprox., por distancia); solo en camino. */
   minutos_estimados?: number | null;
+  /** El domiciliario avisó que llegó a la puerta (solo en camino). */
+  llegada_at?: string | null;
   /** Justificación del domiciliario si se está demorando. */
   novedad?: string | null;
   items: (PedidoItem & { precio: number; producto_id?: number | null; opciones?: OpcionesLinea })[];

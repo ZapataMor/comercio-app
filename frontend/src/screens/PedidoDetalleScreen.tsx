@@ -43,7 +43,7 @@ const LABEL = PASO_CLIENTE;
 const CON_DOMICILIARIO = ['tomado', 'recogido', 'en_camino'];
 
 /** Lo que pasa ahora, en una frase grande, y qué sigue. */
-function fraseDelEstado(p: SeguimientoPedido): { titulo: string; detalle: string; icono: IconName } {
+export function fraseDelEstado(p: SeguimientoPedido): { titulo: string; detalle: string; icono: IconName } {
   switch (p.estado) {
     case 'pendiente':
       return { titulo: 'Esperando que la tienda acepte tu pedido', detalle: 'Te avisamos apenas lo acepte.', icono: 'reloj' };
@@ -62,6 +62,14 @@ function fraseDelEstado(p: SeguimientoPedido): { titulo: string; detalle: string
     case 'recogido':
       return { titulo: 'El domiciliario ya tiene tu pedido', detalle: 'En un momento sale hacia tu casa.', icono: 'moto' };
     case 'en_camino':
+      // El domiciliario avisó que está en la puerta: ya no tiene sentido «llega en 2 min».
+      if (p.llegada_at) {
+        return {
+          titulo: '¡Tu pedido ya llegó!',
+          detalle: 'El domiciliario está en tu puerta. Sal a recibirlo y dile tu código de entrega.',
+          icono: 'casa',
+        };
+      }
       return {
         titulo: p.minutos_estimados != null ? `Tu pedido llega en unos ${p.minutos_estimados} min` : 'Tu pedido va en camino',
         detalle: p.minutos_estimados != null ? 'Es aproximado, según la distancia.' : 'Ve preparándote para recibirlo.',

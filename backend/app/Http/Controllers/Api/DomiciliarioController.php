@@ -316,7 +316,12 @@ class DomiciliarioController extends Controller
     {
         $pedido = $this->pedidoMio($request, $id, 'en_camino');
         abort_unless($pedido, 409, 'Solo puedes registrar la llegada de una entrega tuya en camino.');
-        Pedido::whereKey($id)->where('estado', 'en_camino')->whereNull('llegada_at')->update(['llegada_at' => now()]);
+        $marcada = Pedido::whereKey($id)->where('estado', 'en_camino')->whereNull('llegada_at')->update(['llegada_at' => now()]);
+
+        // La primera vez, el cliente se entera aunque no tenga la app abierta.
+        if ($marcada && $pedido->cliente) {
+            Push::enviar($pedido->cliente, new EstadoPedidoActualizado($pedido->refresh(), ['Tu pedido ya llegó 🛵', 'El domiciliario está en tu puerta. Sal a recibirlo.']));
+        }
 
         return response()->json(['message' => 'Llegada registrada. Contacta al cliente y espera 5 minutos antes de reportarlo como no encontrado.']);
     }

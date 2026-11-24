@@ -414,6 +414,8 @@ class PedidoController extends Controller
             'direccion_entrega' => $pedido->direccion_entrega,
             'entrega_indicaciones' => $pedido->entrega_indicaciones,
             'minutos_recogida' => $pedido->minutos_recogida,
+            // El domiciliario avisó que está en la puerta (solo mientras sigue en camino).
+            'llegada_at' => $pedido->estado === 'en_camino' ? $pedido->llegada_at?->toIso8601String() : null,
             'fecha' => $pedido->created_at->format('d/m/Y H:i'),
             'negocio' => $pedido->nombreNegocio(),
             'negocio_id' => $pedido->negocio_id,

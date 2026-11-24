@@ -175,3 +175,20 @@ test('antes de tomar un pedido el domiciliario ve el barrio, no la dirección ex
         ->assertJsonPath('pedidos.0.direccion_entrega', '')
         ->assertJsonPath('pedidos.0.paga_con', 50000);
 });
+
+test('cuando el domiciliario llega, el seguimiento del cliente lo sabe y le llega un aviso una sola vez', function () {
+    config(['firebase.projects.app.credentials' => 'fake.json']);
+    $id = pedirArepa()->assertCreated()->json('id');
+    $this->getJson("/api/pedidos/{$id}")->assertOk()->assertJsonPath('llegada_at', null);
+
+    $domiciliario = User::factory()->create();
+    $domiciliario->assignRole('domiciliario');
+    $this->negocio->pedidos()->findOrFail($id)->update(['estado' => 'en_camino', 'domiciliario_id' => $domiciliario->id, 'en_camino_at' => now()]);
+    Sanctum::actingAs($domiciliario);
+    $this->putJson("/api/domiciliario/pedidos/{$id}/llegada")->assertOk();
+    $this->putJson("/api/domiciliario/pedidos/{$id}/llegada")->assertOk();
+
+    Notification::assertSentToTimes($this->cliente, \App\Notifications\EstadoPedidoActualizado::class, 1);
+    Sanctum::actingAs($this->cliente);
+    expect($this->getJson("/api/pedidos/{$id}")->assertOk()->json('llegada_at'))->not->toBeNull();
+});
