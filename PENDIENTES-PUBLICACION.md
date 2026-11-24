@@ -25,9 +25,9 @@ solo en local.
       `SENTRY_DSN` (vacío).
 - [ ] **Servidor de producción** con dominio, HTTPS, cola, cron y Reverb
       (DESPLIEGUE.md §2–3).
-- [ ] **Términos y condiciones**: hoy solo hay política de privacidad. Hace
-      falta una página de términos (responsabilidades de negocio, domiciliario y
-      cliente; cancelaciones) y que el registro los haga aceptar.
+- [ ] **Aceptar los términos en el registro**: la página `/terminos` ya existe
+      (23 de noviembre de 2026); falta que el registro de la app los haga aceptar
+      junto con la política de privacidad.
 
 ### Google Play
 - [ ] **Prueba cerrada obligatoria**: las cuentas personales nuevas necesitan
