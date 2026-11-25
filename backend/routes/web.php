@@ -1,11 +1,15 @@
 <?php
 
+use App\Http\Controllers\Web\AccesoWebController;
 use App\Http\Controllers\Web\AdminController;
 use App\Http\Controllers\Web\AuthWebController;
+use App\Http\Controllers\Web\GestionAdminController;
 use App\Http\Controllers\Web\OperacionController;
+use App\Http\Controllers\Web\PanelNegocioController;
 use App\Http\Controllers\Web\PublicoController;
 use App\Http\Controllers\Web\SitioController;
 use App\Http\Middleware\AdminWeb;
+use App\Http\Middleware\NegocioWeb;
 use Illuminate\Support\Facades\Route;
 
 // --- Sitio público de Vitrina (sin sesión) ---
@@ -64,5 +68,45 @@ Route::middleware(['auth', 'auth.session', 'role:administrador', AdminWeb::class
         Route::get('/reputacion/{tipo}/{id}', 'reputacionDetalle')->whereIn('tipo', ['negocio', 'domiciliario'])->whereNumber('id')->name('reputacion-detalle');
         Route::get('/auditoria', 'auditoria')->name('auditoria');
         Route::post('/acciones/{accion}/{id?}', 'accion')->whereNumber('id')->name('accion');
+    });
+
+    // --- Vitrina Gestión: configuración del super administrador (ADR-005) ---
+    Route::controller(GestionAdminController::class)->prefix('gestion')->name('gestion')->group(function () {
+        Route::get('/', 'index');
+        Route::get('/negocios/{negocio}', 'negocio')->whereNumber('negocio')->name('.negocio');
+        Route::post('/negocios/{negocio}/panel', 'panel')->whereNumber('negocio')->name('.panel');
+        Route::post('/negocios/{negocio}/modulos', 'modulos')->whereNumber('negocio')->name('.modulos');
+        Route::post('/negocios/{negocio}/plantilla', 'plantilla')->whereNumber('negocio')->name('.aplicar-plantilla');
+        Route::post('/negocios/{negocio}/accesos/{acceso}/cerrar', 'cerrarAcceso')->whereNumber(['negocio', 'acceso'])->name('.cerrar-acceso');
+        Route::get('/plantillas/nueva', 'nuevaPlantilla')->name('.plantilla-nueva');
+        Route::post('/plantillas', 'guardarPlantilla')->name('.plantilla-crear');
+        Route::get('/plantillas/{plantilla}', 'verPlantilla')->whereNumber('plantilla')->name('.plantilla');
+        Route::put('/plantillas/{plantilla}', 'guardarPlantilla')->whereNumber('plantilla')->name('.plantilla-guardar');
+    });
+});
+
+// --- Vitrina Gestión: panel web del negocio (ADR-005) ---
+// Se entra con un código que se aprueba desde la app; no hay contraseña.
+Route::prefix('negocio')->name('negocio.')->group(function () {
+    Route::controller(AccesoWebController::class)->group(function () {
+        Route::get('/entrar', 'entrar')->middleware('throttle:20,1')->name('entrar');
+        Route::get('/entrar/estado', 'estado')->middleware('throttle:90,1')->name('entrar.estado');
+        Route::post('/salir', 'salir')->name('salir');
+    });
+    Route::middleware(NegocioWeb::class)->controller(PanelNegocioController::class)->group(function () {
+        Route::get('/elegir', 'elegir')->name('elegir');
+        Route::post('/elegir', 'cambiar')->name('cambiar');
+        Route::get('/', 'inicio')->name('inicio');
+        Route::get('/tienda', 'tienda')->name('tienda');
+        Route::get('/catalogo', 'catalogo')->name('catalogo');
+        Route::get('/pedidos', 'pedidos')->name('pedidos');
+        Route::get('/equipo', 'equipo')->name('equipo');
+        Route::put('/equipo/{miembro}/permisos', 'permisos')->whereNumber('miembro')->name('permisos');
+        Route::get('/agenda', 'agenda')->name('agenda');
+        Route::get('/resenas', 'resenas')->name('resenas');
+        Route::get('/sedes', 'sedes')->name('sedes');
+        Route::post('/sedes', 'guardarSede')->name('sedes.crear');
+        Route::put('/sedes/{sede}', 'guardarSede')->whereNumber('sede')->name('sedes.guardar');
+        Route::get('/modulos/{modulo}', 'modulo')->name('modulo');
     });
 });

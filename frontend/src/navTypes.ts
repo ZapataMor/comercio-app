@@ -30,6 +30,8 @@ export type RootStackParamList = {
   // Negocios (cualquier usuario puede tener o trabajar en varios).
   // Lista de mis negocios + invitaciones recibidas + crear otro.
   MisNegocios: undefined;
+  // Aprobar con un código la entrada al panel web del negocio y cerrar sesiones web.
+  EntrarWeb: undefined;
   // Datos del negocio activo; `nuevo` abre directo el formulario de creación.
   MiTienda: { nuevo?: boolean } | undefined;
   // Catálogo del negocio activo: lista de productos + "Añadir producto".

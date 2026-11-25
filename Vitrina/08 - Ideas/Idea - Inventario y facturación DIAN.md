@@ -4,7 +4,7 @@ tags: [idea, estrategia, planes]
 estado: semilla
 impacto: alto
 esfuerzo: alto
-actualizado: 2026-11-19
+actualizado: 2026-11-25
 ---
 
 # 💡 Inventario, facturación DIAN y acceso web
@@ -88,5 +88,11 @@ Si al menos la mitad dice que sí a la 2 y a la 4, se construye la fase 1.
 - **Impacto**: alto — sube el precio del plan, retiene negocios y diferencia a Vitrina.
 - **Esfuerzo**: alto — fase 1 mediano, fase 2 mediano, fase 3 alto (integración y normas).
 
+> [!info] Primer negocio que lo pide (2026-11-25)
+> Grumar, una latonería con 3 sedes y 25 a 30 empleados, necesita justo esto y más (personal,
+> materiales, proveedores, cuentas). Ver [[Reunión con Grumar]] y la idea más amplia
+> [[Idea - Vitrina Gestión]].
+
 ## 🔗 Relacionado
 - [[_MOC Ideas]] · [[_MOC Estrategia]] · [[Planes de membresía]] · [[Tipos de Venta]] · [[Modelo de Negocio]]
+- [[Idea - Vitrina Gestión]] · [[Reunión con Grumar]]

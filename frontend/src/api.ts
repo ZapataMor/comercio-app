@@ -1381,6 +1381,37 @@ export async function rechazarInvitacion(token: string, id: number): Promise<voi
   await authSend('PUT', `/api/invitaciones/${id}/rechazar`, token);
 }
 
+// ---------- Vitrina Gestión: entrar al panel web del negocio (ADR-005) ----------
+
+export type AccesoWebDisponible = { disponible: boolean; negocios: { id: number; nombre: string }[]; url: string };
+export type ConsultaAccesoWeb = { codigo: string; navegador: string; creado_hace_segundos: number };
+export type SesionWeb = { id: number; navegador: string; ip: string | null; desde: string | null; ultimo_uso: string | null };
+
+/** ¿Alguno de mis negocios tiene el panel web encendido? */
+export async function getAccesoWeb(token: string): Promise<AccesoWebDisponible> {
+  return (await authGet('/api/acceso-web', token)) as AccesoWebDisponible;
+}
+
+/** Paso 1: desde qué navegador se quiere entrar con este código. */
+export async function consultarAccesoWeb(token: string, codigo: string): Promise<ConsultaAccesoWeb> {
+  return (await authSend('POST', '/api/acceso-web/consultar', token, { codigo })) as ConsultaAccesoWeb;
+}
+
+/** Paso 2: aprobar; el navegador entra solo. Devuelve el mensaje para mostrar. */
+export async function aprobarAccesoWeb(token: string, codigo: string): Promise<string> {
+  const d = await authSend('POST', '/api/acceso-web/aprobar', token, { codigo });
+  return d.mensaje as string;
+}
+
+export async function getSesionesWeb(token: string): Promise<SesionWeb[]> {
+  const d = await authGet('/api/acceso-web/sesiones', token);
+  return (d.data ?? []) as SesionWeb[];
+}
+
+export async function cerrarSesionWeb(token: string, id: number): Promise<void> {
+  await authSend('DELETE', `/api/acceso-web/sesiones/${id}`, token);
+}
+
 // ---------- Cliente: explorar negocios y ver catálogo ----------
 
 /** Página del listado de negocios (50 por página). */

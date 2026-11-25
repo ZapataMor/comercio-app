@@ -61,6 +61,8 @@ class Negocio extends Model
             'desactivado_at' => 'datetime',
             'lat' => 'float',
             'lng' => 'float',
+            'gestion_activa' => 'boolean',
+            'gestion_activada_at' => 'datetime',
         ];
     }
 
@@ -102,8 +104,26 @@ class Negocio extends Model
     public function miembros(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'negocio_user')
-            ->withPivot(['rol', 'activo', ...self::PERMISOS])
+            ->withPivot(['rol', 'activo', 'permisos_gestion', ...self::PERMISOS])
             ->withTimestamps();
+    }
+
+    /** Sedes del negocio (Vitrina Gestión). */
+    public function sedes(): HasMany
+    {
+        return $this->hasMany(Sede::class);
+    }
+
+    /** Módulos opcionales de Vitrina Gestión (encendidos o apagados). */
+    public function modulosGestion(): HasMany
+    {
+        return $this->hasMany(NegocioModulo::class);
+    }
+
+    /** Plantilla de Vitrina Gestión que se le aplicó. */
+    public function plantillaGestion(): BelongsTo
+    {
+        return $this->belongsTo(PlantillaGestion::class, 'plantilla_gestion_id');
     }
 
     /** Solo miembros activos (los que reciben pedidos y administran). */

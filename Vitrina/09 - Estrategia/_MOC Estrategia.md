@@ -2,7 +2,7 @@
 title: _MOC Estrategia
 tags: [moc, estrategia]
 estado: en-progreso
-actualizado: 2026-11-19
+actualizado: 2026-11-25
 ---
 
 # 🧭 MOC — Estrategia
@@ -21,6 +21,7 @@ actualizado: 2026-11-19
 | 🎬 Video | [[Guion del video de lanzamiento]] | idea | Grabar una prueba de 45 s y mostrársela a 5 personas |
 | 💳 Planes | [[Planes de membresía]] | idea | Entrevistar a 10 comerciantes sobre cuánto pagarían |
 | 📦 Inventario + DIAN | [[Idea - Inventario y facturación DIAN]] | semilla | Validar la necesidad con esos mismos 10 comerciantes |
+| 🔧 Grumar | [[Reunión con Grumar]] · [[Idea - Vitrina Gestión]] | en-progreso | Llevarle al señor Ismael cómo funcionaría (con parte visual) y la propuesta de precio |
 
 ## 🗓️ Orden sugerido
 1. **Proteger** — software, marca y reglamento de la universidad. Antes de hablar en público o con
@@ -45,6 +46,9 @@ actualizado: 2026-11-19
 - 2026-11-19 — Pedir apoyo al rector (préstamo de una Mac) → [[Reunión con el rector]]
 - 2026-11-19 — Inventario dentro de la app, facturación electrónica DIAN y acceso web, en un plan más caro → [[Idea - Inventario y facturación DIAN]] · [[Planes de membresía]]
 - 2026-11-19 — Para la publicidad: enlace compartible y código QR de cada vitrina, y referidos → [[Plan de publicidad#Funciones de la app que ayudan a vender la app]]
+- 2026-11-25 — Grumar (latonería, 3 sedes, 25 a 30 empleados) quiere controlar todo su negocio; extender Vitrina con módulos y plantillas por tipo de negocio en vez de hacerle una web aparte → [[Reunión con Grumar]] · [[Idea - Vitrina Gestión]]
+- 2026-11-25 — Transportistas en Vitrina para carga grande y viajes a otros municipios → [[Idea - Vitrina Gestión#Ideas que salen de Grumar y sirven a muchos]]
+- 2026-11-25 — Energía eólica con el señor Ismael y el profesor Andrés Vides, ensayo en enero → [[Reunión con Grumar#🌬️ Energía renovable (aparte)]]
 
 ## Conecta con
 - [[🏠 Home]] · [[_MOC Negocio]] · [[Modelo de Negocio]] · [[Pitch]] · [[_MOC Ideas]]

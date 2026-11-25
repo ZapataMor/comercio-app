@@ -13,7 +13,7 @@ import { useEnVivo } from '../usePolling';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, Share, Text, TouchableOpacity, View } from 'react-native';
-import { aceptarInvitacion, getInvitaciones, InvitacionRecibida, rechazarInvitacion } from '../api';
+import { aceptarInvitacion, getAccesoWeb, getInvitaciones, InvitacionRecibida, rechazarInvitacion } from '../api';
 import { useAuth } from '../AuthContext';
 import { FadeInView, PressableScale } from '../components/anim';
 import Icon from '../components/Icon';
@@ -37,6 +37,8 @@ export default function MisNegociosScreen({ navigation }: Props) {
   const [refrescando, setRefrescando] = useState(false);
   // Id de la invitación que se está respondiendo (deshabilita sus botones).
   const [respondiendo, setRespondiendo] = useState<number | null>(null);
+  // Vitrina Gestión: si algún negocio tiene el panel web, se ofrece entrar a la web.
+  const [conWeb, setConWeb] = useState(false);
 
   const cargarInvitaciones = useCallback(
     () =>
@@ -51,7 +53,10 @@ export default function MisNegociosScreen({ navigation }: Props) {
     useCallback(() => {
       recargar();
       cargarInvitaciones();
-    }, [recargar, cargarInvitaciones]),
+      getAccesoWeb(token)
+        .then(d => setConWeb(d.disponible))
+        .catch(() => {});
+    }, [recargar, cargarInvitaciones, token]),
   );
 
   // En vivo: una invitación nueva (o cancelada) aparece sin refrescar. Los
@@ -169,6 +174,16 @@ export default function MisNegociosScreen({ navigation }: Props) {
         })
       )}
 
+      {conWeb && (
+        <PressableScale style={styles.webBtn} onPress={() => navigation.navigate('EntrarWeb')}>
+          <Icon name="tienda" size={20} color={c.accent} />
+          <View style={styles.itemTexto}>
+            <Text style={styles.itemTitulo}>Entrar a la web</Text>
+            <Text style={styles.itemSub}>Maneja tu negocio desde el computador</Text>
+          </View>
+        </PressableScale>
+      )}
+
       <PressableScale style={styles.crearBtn} onPress={() => navigation.navigate('MiTienda', { nuevo: true })}>
         <Text style={styles.crearTxt}>+ Crear un negocio</Text>
       </PressableScale>
@@ -228,6 +243,10 @@ const useStyles = makeStyles((c, shadow) => ({
     alignItems: 'center', marginTop: 6, ...shadow.soft,
   },
   crearTxt: { color: c.onBrand, fontFamily: font.bold, fontSize: 15 },
+  webBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: c.surface,
+    borderRadius: radius.lg, padding: 16, marginBottom: 12, ...shadow.soft,
+  },
   // Código público
   codigoCard: { backgroundColor: c.surface, borderRadius: radius.lg, padding: 18, marginTop: 24, alignItems: 'center', ...shadow.soft },
   codigoLabel: { color: c.muted, fontSize: 13, fontFamily: font.semibold },

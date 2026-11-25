@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AccesoWebController;
 use App\Http\Controllers\Api\AdminCategoriaController;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\AdminPedidoController;
@@ -99,6 +100,14 @@ Route::middleware(['auth:sanctum', 'throttle:api-usuario'])->group(function () {
     // Panel adaptativo: responde distinto según el rol del usuario logueado.
     // El frontend llama siempre aquí y pinta lo que reciba.
     Route::get('/dashboard', [DashboardController::class, 'index']);
+
+    // --- Vitrina Gestión: entrar al panel web del negocio desde la app (ADR-005) ---
+    Route::get('/acceso-web', [AccesoWebController::class, 'disponible']);
+    Route::post('/acceso-web/consultar', [AccesoWebController::class, 'consultar'])->middleware('throttle:20,1');
+    Route::post('/acceso-web/aprobar', [AccesoWebController::class, 'aprobar'])->middleware('throttle:20,1');
+    Route::get('/acceso-web/sesiones', [AccesoWebController::class, 'sesiones']);
+    Route::delete('/acceso-web/sesiones', [AccesoWebController::class, 'cerrarTodas']);
+    Route::delete('/acceso-web/sesiones/{acceso}', [AccesoWebController::class, 'cerrar'])->whereNumber('acceso');
 
     // --- Cambios en vivo (WebSockets): canales que esta sesión debe escuchar ---
     Route::get('/en-vivo/canales', [EnVivoController::class, 'canales']);

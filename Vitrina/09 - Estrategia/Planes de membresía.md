@@ -2,7 +2,7 @@
 title: Planes de membresía
 tags: [estrategia, planes]
 estado: idea
-actualizado: 2026-11-19
+actualizado: 2026-11-25
 ---
 
 # 💳 Planes de membresía
@@ -35,6 +35,11 @@ actualizado: 2026-11-19
 | Varias sedes | — | — | ✅ |
 
 Detalle de las funciones nuevas en [[Idea - Inventario y facturación DIAN]].
+
+> [!info] Módulos de gestión (2026-11-25)
+> Para negocios más grandes, como [[Reunión con Grumar|Grumar]], se suma la idea de cobrar **módulos**
+> aparte (personal, producción, proveedores, clientes preferenciales, cuentas) y un pago de
+> implementación. Ver [[Idea - Vitrina Gestión#Cómo cobrarlo]].
 
 ## Precios: cómo decidirlos
 1. **Preguntar antes de cobrar**: entrevistar a 10 comerciantes del piloto. No preguntar "¿cuánto

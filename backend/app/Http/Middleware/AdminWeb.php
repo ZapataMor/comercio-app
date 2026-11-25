@@ -29,7 +29,7 @@ class AdminWeb
                     'admin_id' => $request->user()->id,
                     'accion' => $request->route()->getName(),
                     'recurso' => $request->path(),
-                    'detalle' => json_encode($request->only(['motivo', 'resolucion', 'rol', 'username', 'resultado', 'tarifa_domicilio']), JSON_UNESCAPED_UNICODE),
+                    'detalle' => json_encode($request->only(['motivo', 'resolucion', 'rol', 'username', 'resultado', 'tarifa_domicilio', 'activa', 'modulos', 'plantilla_gestion_id', 'nombre']), JSON_UNESCAPED_UNICODE),
                     'created_at' => now(),
                 ]);
             }

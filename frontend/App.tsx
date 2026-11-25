@@ -51,6 +51,7 @@ import CompletarCuentaScreen from './src/screens/CompletarCuentaScreen';
 import MiTiendaScreen from './src/screens/MiTiendaScreen';
 import ResenasScreen from './src/screens/ResenasScreen';
 import MisNegociosScreen from './src/screens/MisNegociosScreen';
+import EntrarWebScreen from './src/screens/EntrarWebScreen';
 import MisProductosScreen from './src/screens/MisProductosScreen';
 import MisServiciosScreen from './src/screens/MisServiciosScreen';
 import EquipoScreen from './src/screens/EquipoScreen';
@@ -273,6 +274,7 @@ function Navegacion({ listo }: { listo: boolean }) {
             {/* Negocios: cualquier usuario puede crear los suyos o trabajar en
                 otros (el acceso lo decide la membresía, no un rol global). */}
             <Stack.Screen name="MisNegocios" component={MisNegociosScreen} options={{ title: 'Mis negocios' }} />
+            <Stack.Screen name="EntrarWeb" component={EntrarWebScreen} options={{ title: 'Entrar a la web' }} />
             <Stack.Screen name="MiTienda" component={MiTiendaScreen} options={{ title: 'Mi Tienda' }} />
             {/* Las lee el cliente y también el dueño, desde Mi Tienda. */}
             <Stack.Screen name="Resenas" component={ResenasScreen} options={{ title: 'Reseñas' }} />
