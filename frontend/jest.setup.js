@@ -32,6 +32,13 @@ jest.mock('@react-native-community/blur/src/fabric/BlurViewNativeComponentAndroi
   return { __esModule: true, default: View };
 });
 
+// Cámara del escáner de QR (EscanerQR): en los tests, una vista común que guarda
+// sus props para poder simular la lectura de un código con onReadCode.
+jest.mock('react-native-camera-kit', () => {
+  const { View } = require('react-native');
+  return { __esModule: true, Camera: View };
+});
+
 jest.mock('@notifee/react-native', () => ({
   __esModule: true,
   default: {

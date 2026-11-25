@@ -2,11 +2,13 @@ import React from 'react';
 import { Text, TextInput } from 'react-native';
 import ReactTestRenderer, { act } from 'react-test-renderer';
 import { aprobarAccesoWeb, cerrarSesionWeb, consultarAccesoWeb, getAccesoWeb, getSesionesWeb } from '../src/api';
+import { codigoDeQrWeb } from '../src/components/EscanerQR';
 import EntrarWebScreen, { formatearCodigoWeb } from '../src/screens/EntrarWebScreen';
 
 const mockToast = { exito: jest.fn(), error: jest.fn() };
 jest.mock('../src/AuthContext', () => ({ useAuth: () => ({ auth: { token: 'token', user: { id: 1 } } }) }));
 jest.mock('../src/Toast', () => ({ useToast: () => mockToast }));
+jest.mock('react-native-safe-area-context', () => ({ ...jest.requireActual('react-native-safe-area-context'), useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 jest.mock('../src/useLectura', () => ({ useLecturaEnFoco: (cb: () => void) => { require('react').useEffect(cb, [cb]); } }));
 jest.mock('../src/api', () => ({
   ...jest.requireActual('../src/api'),
@@ -50,6 +52,26 @@ test('muestra el navegador antes de aprobar y aprueba el código', async () => {
   await pulsar('Sí, entrar');
   expect(aprobarAccesoWeb).toHaveBeenCalledWith('token', 'ABCD-EFGH');
   expect(mockToast.exito).toHaveBeenCalledWith('Listo', 'Listo. El panel web se abrirá en Edge en Windows.');
+});
+
+test('solo acepta QR del panel web de Vitrina', () => {
+  expect(codigoDeQrWeb('vitrina-web:abcdefgh')).toBe('ABCDEFGH');
+  expect(codigoDeQrWeb(' VITRINA-WEB:ABCD2345 ')).toBe('ABCD2345');
+  expect(codigoDeQrWeb('https://otra-cosa.com')).toBeNull();
+  expect(codigoDeQrWeb('vitrina-web:ABC')).toBeNull();
+});
+
+test('escanear el QR pone el código y lo consulta de una vez', async () => {
+  await montar();
+  await pulsar('Escanear el código');
+  const camara = () => raiz.root.findAll(n => typeof n.props.onReadCode === 'function')[0];
+  await act(async () => { camara().props.onReadCode({ nativeEvent: { codeStringValue: 'https://otra-cosa.com' } }); });
+  expect(textos()).toContain('Ese código no es del panel web de Vitrina.');
+  expect(consultarAccesoWeb).not.toHaveBeenCalled();
+  await act(async () => { camara().props.onReadCode({ nativeEvent: { codeStringValue: 'vitrina-web:WXYZ2345' } }); });
+  expect(consultarAccesoWeb).toHaveBeenCalledWith('token', 'WXYZ-2345');
+  expect(raiz.root.findByType(TextInput).props.value).toBe('WXYZ-2345');
+  expect(textos().some(t => t.includes('Edge en Windows'))).toBe(true);
 });
 
 test('cierra una sesión web abierta', async () => {

@@ -7,8 +7,7 @@
  * También lista las sesiones web abiertas para cerrarlas (por ejemplo, si
  * quedó abierta en un computador ajeno).
  *
- * Por ahora el código se escribe; escanear el QR necesita una librería de
- * cámara y queda para después.
+ * El código se escanea con la cámara (EscanerQR) o se escribe a mano.
  */
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -25,6 +24,7 @@ import {
 } from '../api';
 import { useAuth } from '../AuthContext';
 import { PressableScale } from '../components/anim';
+import EscanerQR from '../components/EscanerQR';
 import { BloqueTeclado, ScrollTeclado } from '../components/EspacioTeclado';
 import { messageFromError } from '../formErrors';
 import { RootStackParamList } from '../navTypes';
@@ -59,6 +59,7 @@ export default function EntrarWebScreen(_: Props) {
   const [consulta, setConsulta] = useState<ConsultaAccesoWeb | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  const [escaneando, setEscaneando] = useState(false);
 
   const cargar = useCallback(() => {
     getAccesoWeb(token).then(setInfo).catch(e => setError(messageFromError(e)));
@@ -70,11 +71,11 @@ export default function EntrarWebScreen(_: Props) {
 
   const listo = codigo.replace('-', '').length === 8;
 
-  async function revisar() {
+  async function revisar(cual = codigo) {
     setOcupado(true);
     setError(null);
     try {
-      setConsulta(await consultarAccesoWeb(token, codigo));
+      setConsulta(await consultarAccesoWeb(token, cual));
     } catch (e) {
       setError(messageFromError(e));
     } finally {
@@ -98,6 +99,15 @@ export default function EntrarWebScreen(_: Props) {
     } finally {
       setOcupado(false);
     }
+  }
+
+  /** El QR trae el código: se pone en el campo y se consulta de una vez. */
+  function alEscanear(leido: string) {
+    setEscaneando(false);
+    const visible = formatearCodigoWeb(leido);
+    setCodigo(visible);
+    setConsulta(null);
+    revisar(visible);
   }
 
   async function cerrar(id: number) {
@@ -132,9 +142,14 @@ export default function EntrarWebScreen(_: Props) {
         <View style={styles.card}>
           <Text style={styles.titulo}>Entrar a la web</Text>
           <Text style={styles.texto}>
-            En el computador abre <Text style={styles.url}>{info.url}</Text> y escribe aquí el código que aparece.
+            En el computador abre <Text style={styles.url}>{info.url}</Text> y escanea el código que aparece, o
+            escribe sus letras.
           </Text>
           <Text style={styles.negocios}>Negocios con panel: {info.negocios.map(n => n.nombre).join(', ')}</Text>
+          <PressableScale style={[styles.boton, styles.botonSi]} onPress={() => setEscaneando(true)} disabled={ocupado}>
+            <Text style={styles.botonSiTxt}>Escanear el código</Text>
+          </PressableScale>
+          <Text style={styles.o}>o escríbelo</Text>
           <BloqueTeclado>
             {campo => (
               <>
@@ -173,8 +188,8 @@ export default function EntrarWebScreen(_: Props) {
                     </View>
                   </View>
                 ) : (
-                  <PressableScale style={[styles.boton, styles.botonSi, !listo && styles.apagado]} onPress={revisar} disabled={!listo || ocupado}>
-                    <Text style={styles.botonSiTxt}>{ocupado ? 'Revisando…' : 'Continuar'}</Text>
+                  <PressableScale style={[styles.boton, styles.botonNo, !listo && styles.apagado]} onPress={() => revisar()} disabled={!listo || ocupado}>
+                    <Text style={styles.botonNoTxt}>{ocupado ? 'Revisando…' : 'Continuar'}</Text>
                   </PressableScale>
                 )}
               </>
@@ -199,6 +214,7 @@ export default function EntrarWebScreen(_: Props) {
           ))}
         </View>
       )}
+      <EscanerQR visible={escaneando} onCodigo={alEscanear} onCerrar={() => setEscaneando(false)} />
     </ScrollTeclado>
   );
 }
@@ -212,6 +228,7 @@ const useStyles = makeStyles((c, shadow) => ({
   texto: { color: c.text, fontSize: 14, fontFamily: font.regular, lineHeight: 20 },
   url: { fontFamily: font.bold, color: c.goldText },
   negocios: { color: c.muted, fontSize: 12, fontFamily: font.regular, marginTop: 8 },
+  o: { color: c.muted, fontSize: 13, fontFamily: font.regular, textAlign: 'center', marginTop: 12 },
   fuerte: { fontFamily: font.bold, color: c.textStrong },
   input: {
     borderWidth: 1.5, borderColor: c.borderStrong, borderRadius: radius.md, marginTop: 14, paddingVertical: 12,
