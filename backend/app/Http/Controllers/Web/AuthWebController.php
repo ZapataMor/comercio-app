@@ -2,12 +2,13 @@
 
 namespace App\Http\Controllers\Web;
 
+use App\Gestion\AccesosWeb;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\CuentaActiva;
+use App\Models\AccesoWeb;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\View\View;
 
 /**
  * Login/Logout para la interfaz WEB (Blade), usando sesión con cookies.
@@ -15,12 +16,6 @@ use Illuminate\View\View;
  */
 class AuthWebController extends Controller
 {
-    /** Muestra el formulario de login. */
-    public function showLogin(): View
-    {
-        return view('auth.login');
-    }
-
     /** Procesa el login web. */
     public function login(Request $request): RedirectResponse
     {
@@ -64,6 +59,10 @@ class AuthWebController extends Controller
     /** Cierra la sesión web. */
     public function logout(Request $request): RedirectResponse
     {
+        // Si entró con QR, WhatsApp o Google, también se cierra su sesión web.
+        if (($id = $request->session()->get('acceso_web_id')) && ($acceso = AccesoWeb::find($id))) {
+            AccesosWeb::cerrar($acceso);
+        }
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();

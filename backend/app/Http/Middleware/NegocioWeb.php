@@ -26,7 +26,7 @@ class NegocioWeb
     {
         $user = $request->user();
         if (! $user) {
-            return redirect()->route('negocio.entrar');
+            return redirect()->route('login');
         }
 
         $idAcceso = $request->session()->get('acceso_web_id');
@@ -35,7 +35,7 @@ class NegocioWeb
             // Sin sesión de la web del negocio (por ejemplo, el super administrador
             // que entró con contraseña): se pide el código sin cerrar su sesión.
             if (! $idAcceso) {
-                return redirect()->route('negocio.entrar');
+                return redirect()->route('login');
             }
 
             return $this->sacar($request, 'Tu sesión en la web se cerró. Vuelve a entrar con el código.');
@@ -48,6 +48,9 @@ class NegocioWeb
 
         $negocios = Gestion::negociosConWeb($user);
         if ($negocios->isEmpty()) {
+            if ($user->hasRole('administrador')) {
+                return redirect()->route('admin.panel')->with('error', 'Tu cuenta no es de ningún negocio con panel web.');
+            }
             AccesosWeb::cerrar($acceso);
 
             return $this->sacar($request, 'Ninguno de tus negocios tiene el panel web activo.');
@@ -84,6 +87,6 @@ class NegocioWeb
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('negocio.entrar')->with('error', $mensaje);
+        return redirect()->route('login')->with('error', $mensaje);
     }
 }

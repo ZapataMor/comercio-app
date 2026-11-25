@@ -9,7 +9,7 @@
 <section class="card">
     <h2>Panel web</h2>
     @if($negocio->gestion_activa)
-        <p><span class="badge">Encendido</span> desde {{ $negocio->gestion_activada_at?->format('d/m/Y') }}. Los miembros entran en <code>{{ route('negocio.entrar') }}</code> con un código que aprueban desde la app.</p>
+        <p><span class="badge">Encendido</span> desde {{ $negocio->gestion_activada_at?->format('d/m/Y') }}. Los miembros entran en <code>{{ route('login') }}</code> con el QR desde la app, con WhatsApp o con Google.</p>
     @else
         <p>Apagado. Al encenderlo se crea la sede principal con la dirección del negocio.</p>
     @endif

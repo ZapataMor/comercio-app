@@ -6,6 +6,7 @@ use App\Models\AccesoWeb;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -29,7 +30,7 @@ final class AccesosWeb
     /** Sin letras ni números que se confunden (0/O, 1/I/L). */
     private const ALFABETO = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
-    public static function crear(Request $request): AccesoWeb
+    private static function codigoNuevo(): string
     {
         do {
             $codigo = '';
@@ -38,8 +39,13 @@ final class AccesosWeb
             }
         } while (AccesoWeb::where('codigo', $codigo)->exists());
 
+        return $codigo;
+    }
+
+    public static function crear(Request $request): AccesoWeb
+    {
         return AccesoWeb::create([
-            'codigo' => $codigo,
+            'codigo' => self::codigoNuevo(),
             'estado' => 'pendiente',
             'ip' => $request->ip(),
             'navegador' => mb_substr((string) $request->userAgent(), 0, 255),
@@ -86,7 +92,7 @@ final class AccesosWeb
     public static function aprobar(string $codigo, User $user): AccesoWeb
     {
         $acceso = self::pendiente($codigo);
-        if (Gestion::negociosConWeb($user)->isEmpty()) {
+        if (! self::puedeEntrar($user)) {
             throw ValidationException::withMessages(['codigo' => 'Ninguno de tus negocios tiene el panel web activo. Pídeselo a Vitrina.']);
         }
         $acceso->update(['estado' => 'aprobado', 'user_id' => $user->id, 'aprobado_at' => now()]);
@@ -103,6 +109,45 @@ final class AccesosWeb
         $acceso->update(['estado' => 'usado', 'usado_at' => now(), 'ultimo_uso_at' => now()]);
 
         return $acceso->user;
+    }
+
+    /** ¿Puede usar la web? El administrador de Vitrina, o quien es de un negocio con panel web. */
+    public static function puedeEntrar(User $user): bool
+    {
+        return $user->suspendido_at === null
+            && ($user->hasRole('administrador') || Gestion::negociosConWeb($user)->isNotEmpty());
+    }
+
+    /** Adónde va al entrar: el administrador a su panel; los demás al del negocio. */
+    public static function destino(User $user): string
+    {
+        return $user->hasRole('administrador') ? route('admin.panel') : route('negocio.inicio');
+    }
+
+    /** Sesión web abierta por WhatsApp o Google (sin código que aprobar en la app). */
+    public static function crearUsado(Request $request, User $user, string $metodo): AccesoWeb
+    {
+        return AccesoWeb::create([
+            'codigo' => self::codigoNuevo(),
+            'estado' => 'usado',
+            'metodo' => $metodo,
+            'user_id' => $user->id,
+            'ip' => $request->ip(),
+            'navegador' => mb_substr((string) $request->userAgent(), 0, 255),
+            'expira_at' => now(),
+            'aprobado_at' => now(),
+            'usado_at' => now(),
+            'ultimo_uso_at' => now(),
+        ]);
+    }
+
+    /** Deja al navegador con sesión de esta persona, atada a la fila de la sesión web. */
+    public static function iniciarSesion(Request $request, AccesoWeb $acceso): void
+    {
+        Auth::guard('web')->login($acceso->user);
+        $request->session()->regenerate();
+        $request->session()->forget(['acceso_web_pendiente', 'negocio_web_id', 'login_celular', 'login_google']);
+        $request->session()->put('acceso_web_id', $acceso->id);
     }
 
     /** ¿La sesión web sigue valiendo? (no se cerró desde la app y no pasó el máximo de horas) */
@@ -161,6 +206,7 @@ final class AccesosWeb
         return [
             'id' => $acceso->id,
             'navegador' => self::describirNavegador($acceso->navegador),
+            'metodo' => $acceso->metodo,
             'ip' => $acceso->ip,
             'desde' => $acceso->usado_at?->toIso8601String(),
             'ultimo_uso' => ($acceso->ultimo_uso_at ?? $acceso->usado_at)?->toIso8601String(),

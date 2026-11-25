@@ -279,6 +279,11 @@ class EnVivo
             // Vitrina Gestión (ADR-005): la app todavía no muestra nada de esto en
             // vivo; la opción «Entrar a la web» se consulta al abrir la pantalla.
             Web\AccesoWebController::class.'@salir' => null,
+            Web\AccesoWebController::class.'@celular' => null,
+            Web\AccesoWebController::class.'@codigoCelular' => null,
+            Web\AccesoWebController::class.'@google' => null,
+            Web\AccesoWebController::class.'@claveGoogle' => null,
+            Web\AccesoWebController::class.'@cancelar' => null,
             Api\AccesoWebController::class.'@consultar' => null,
             Api\AccesoWebController::class.'@aprobar' => null,
             Api\AccesoWebController::class.'@cerrar' => null,

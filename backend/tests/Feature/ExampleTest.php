@@ -96,7 +96,7 @@ test('las sesiones existentes no conservan acceso a la web retirada', function (
 
 test('el registro publico ya no esta disponible aunque siga activa la variable antigua', function () {
     config(['vitrina.web_pruebas' => true]);
-    $this->get('/login')->assertOk()->assertSee('Panel del administrador')->assertDontSee('Crear cuenta');
+    $this->get('/login')->assertOk()->assertSee('Entrar a Vitrina en la web')->assertSee('Administrador de Vitrina con usuario y contraseña')->assertDontSee('Crear cuenta');
     $this->get('/registro')->assertNotFound();
     $this->post('/registro', ['username' => 'nuevo', 'password' => 'password123', 'password_confirmation' => 'password123'])
         ->assertNotFound();

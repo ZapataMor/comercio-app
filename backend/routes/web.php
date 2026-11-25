@@ -39,7 +39,18 @@ Route::get('/sitemap.xml', [SitioController::class, 'sitemap']);
 Route::get('/.well-known/security.txt', [SitioController::class, 'seguridad']);
 
 // --- Login web (sesión con cookies) ---
-Route::get('/login', [AuthWebController::class, 'showLogin'])->name('login');
+// Una sola puerta para el panel del negocio y el del administrador: QR desde
+// la app, celular + clave + código por WhatsApp, o Google + clave. El
+// administrador también puede entrar con usuario y contraseña (POST /login).
+Route::controller(AccesoWebController::class)->prefix('login')->name('login')->group(function () {
+    Route::get('/', 'entrar')->middleware('throttle:30,1');
+    Route::get('/estado', 'estado')->middleware('throttle:90,1')->name('.estado');
+    Route::post('/celular', 'celular')->middleware('throttle:acceso')->name('.celular');
+    Route::post('/celular/codigo', 'codigoCelular')->middleware('throttle:acceso')->name('.celular.codigo');
+    Route::post('/google', 'google')->middleware('throttle:acceso')->name('.google');
+    Route::post('/google/clave', 'claveGoogle')->middleware('throttle:acceso')->name('.google.clave');
+    Route::post('/cancelar', 'cancelar')->name('.cancelar');
+});
 Route::post('/login', [AuthWebController::class, 'login'])->middleware('throttle:acceso');
 Route::post('/logout', [AuthWebController::class, 'logout'])->name('logout');
 
@@ -86,13 +97,11 @@ Route::middleware(['auth', 'auth.session', 'role:administrador', AdminWeb::class
 });
 
 // --- Vitrina Gestión: panel web del negocio (ADR-005) ---
-// Se entra con un código que se aprueba desde la app; no hay contraseña.
+// Se entra por /login (QR, WhatsApp o Google). /negocio/entrar queda por las
+// apps que ya mostraban esa dirección.
 Route::prefix('negocio')->name('negocio.')->group(function () {
-    Route::controller(AccesoWebController::class)->group(function () {
-        Route::get('/entrar', 'entrar')->middleware('throttle:20,1')->name('entrar');
-        Route::get('/entrar/estado', 'estado')->middleware('throttle:90,1')->name('entrar.estado');
-        Route::post('/salir', 'salir')->name('salir');
-    });
+    Route::redirect('/entrar', '/login')->name('entrar');
+    Route::post('/salir', [AccesoWebController::class, 'salir'])->name('salir');
     Route::middleware(NegocioWeb::class)->controller(PanelNegocioController::class)->group(function () {
         Route::get('/elegir', 'elegir')->name('elegir');
         Route::post('/elegir', 'cambiar')->name('cambiar');

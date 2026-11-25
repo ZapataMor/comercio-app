@@ -18,12 +18,17 @@ class AccesoWebController extends Controller
     /** ¿Esta persona puede usar la web? (para mostrar o no la opción en la app) */
     public function disponible(Request $request): JsonResponse
     {
-        $negocios = Gestion::negociosConWeb($request->user());
+        $user = $request->user();
+        $negocios = Gestion::negociosConWeb($user)->map(fn ($n) => ['id' => $n->id, 'nombre' => $n->nombre])->values();
+        if ($user->hasRole('administrador')) {
+            // El administrador de Vitrina también entra a su panel con el QR.
+            $negocios->prepend(['id' => 0, 'nombre' => 'Administración de Vitrina']);
+        }
 
         return response()->json([
-            'disponible' => $negocios->isNotEmpty(),
-            'negocios' => $negocios->map(fn ($n) => ['id' => $n->id, 'nombre' => $n->nombre])->values(),
-            'url' => route('negocio.entrar'),
+            'disponible' => AccesosWeb::puedeEntrar($user),
+            'negocios' => $negocios->values(),
+            'url' => route('login'),
         ]);
     }
 

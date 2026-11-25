@@ -62,6 +62,10 @@ return [
     // Guía: Vitrina/00 - Inicio/Configurar acceso con Google.md
     'google' => [
         'client_ids' => array_values(array_filter(array_map('trim', explode(',', (string) env('GOOGLE_CLIENT_IDS', ''))))),
+        // Botón «Entrar con Google» del login web: el mismo cliente «Aplicación
+        // web». En Google Cloud debe tener como orígenes de JavaScript autorizados
+        // el dominio del servidor (y http://localhost:8000 para desarrollo).
+        'web_client_id' => env('GOOGLE_WEB_CLIENT_ID', '801366967290-eoe61014gikuhileb0a4rq7pnsgv9217.apps.googleusercontent.com'),
     ],
 
     'slack' => [

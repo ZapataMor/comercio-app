@@ -7,6 +7,9 @@ use App\Models\AccesoWeb;
 use App\Models\Negocio;
 use App\Models\PlantillaGestion;
 use App\Models\User;
+use App\Support\GoogleIdToken;
+use App\Support\Telefono\EnviadorCodigos;
+use App\Support\Telefono\EnviadorLog;
 use Illuminate\Support\Facades\Notification;
 use Spatie\Permission\Models\Role;
 
@@ -31,10 +34,10 @@ function comoNavegador($test): void
 /** Entra al panel del negocio como lo haría el navegador con la app. */
 function entrarAlPanel($test, User $user): void
 {
-    $test->get('/negocio/entrar')->assertOk();
+    $test->get('/login')->assertOk();
     $acceso = AccesoWeb::latest('id')->first();
     AccesosWeb::aprobar($acceso->codigo, $user);
-    $test->getJson('/negocio/entrar/estado')->assertJsonPath('estado', 'listo');
+    $test->getJson('/login/estado')->assertJsonPath('estado', 'listo');
 }
 
 test('el catálogo de módulos resuelve dependencias y dependientes', function () {
@@ -129,10 +132,10 @@ test('el super administrador crea plantillas con ficha técnica', function () {
 
 test('se entra a la web con el código aprobado desde la app', function () {
     Gestion::activar($this->negocio);
-    $this->get('/negocio')->assertRedirect('/negocio/entrar');
-    $this->get('/negocio/entrar')->assertOk()->assertSee('Panel web del negocio');
+    $this->get('/negocio')->assertRedirect('/login');
+    $this->get('/login')->assertOk()->assertSee('Entrar a Vitrina en la web');
     $acceso = AccesoWeb::latest('id')->first();
-    $this->getJson('/negocio/entrar/estado')->assertJsonPath('estado', 'pendiente');
+    $this->getJson('/login/estado')->assertJsonPath('estado', 'pendiente');
 
     // La app: consulta y aprueba (con guion y minúsculas también sirve).
     $codigo = strtolower($acceso->codigoVisible());
@@ -141,7 +144,7 @@ test('se entra a la web con el código aprobado desde la app', function () {
     $this->postJson('/api/acceso-web/aprobar', ['codigo' => $codigo])->assertUnprocessable();
     comoNavegador($this);
 
-    $this->getJson('/negocio/entrar/estado')->assertJsonPath('estado', 'listo');
+    $this->getJson('/login/estado')->assertJsonPath('estado', 'listo');
     $this->get('/negocio')->assertOk()->assertSee('Inicio')->assertSee('Latonería');
     expect(auth()->id())->toBe($this->dueno->id);
     foreach (['tienda', 'catalogo', 'pedidos', 'equipo', 'agenda', 'resenas', 'sedes'] as $ruta) {
@@ -150,7 +153,7 @@ test('se entra a la web con el código aprobado desde la app', function () {
 });
 
 test('no aprueba códigos vencidos ni de quien no tiene panel web', function () {
-    $this->get('/negocio/entrar');
+    $this->get('/login');
     $acceso = AccesoWeb::latest('id')->first();
     $this->actingAs($this->dueno)->postJson('/api/acceso-web/aprobar', ['codigo' => $acceso->codigo])
         ->assertUnprocessable()->assertJsonPath('errors.codigo.0', fn ($m) => str_contains($m, 'panel web'));
@@ -172,7 +175,7 @@ test('cerrar la sesión desde la app saca al navegador', function () {
     $this->actingAs($this->dueno)->deleteJson('/api/acceso-web/sesiones/'.$acceso->id)->assertOk();
     comoNavegador($this);
 
-    $this->get('/negocio')->assertRedirect('/negocio/entrar');
+    $this->get('/negocio')->assertRedirect('/login');
     $this->assertGuest();
 });
 
@@ -180,16 +183,16 @@ test('la sesión web vence a las 12 horas y si se apaga el panel', function () {
     Gestion::activar($this->negocio);
     entrarAlPanel($this, $this->dueno);
     $this->travel(AccesosWeb::HORAS_SESION + 1)->hours();
-    $this->get('/negocio')->assertRedirect('/negocio/entrar');
+    $this->get('/negocio')->assertRedirect('/login');
     $this->travelBack();
 
     entrarAlPanel($this, $this->dueno);
     Gestion::desactivar($this->negocio);
-    $this->get('/negocio')->assertRedirect('/negocio/entrar')->assertSessionHas('error');
+    $this->get('/negocio')->assertRedirect('/login')->assertSessionHas('error');
 });
 
 test('el super administrador con contraseña no pierde su sesión al visitar el panel del negocio', function () {
-    $this->actingAs($this->super)->get('/negocio')->assertRedirect('/negocio/entrar');
+    $this->actingAs($this->super)->get('/negocio')->assertRedirect('/login');
     $this->assertAuthenticatedAs($this->super);
 });
 
@@ -263,4 +266,88 @@ test('quien es de dos negocios con panel elige con cuál trabajar', function () 
     $this->post('/negocio/elegir', ['negocio_id' => 999999])->assertForbidden();
     $this->post('/negocio/elegir', ['negocio_id' => $otro->id])->assertRedirect('/negocio');
     $this->get('/negocio')->assertOk()->assertSee('Segundo');
+});
+
+// ------------------------------------------------ Login web con 3 opciones
+
+/** El dueño con celular verificado y clave 2468. */
+function duenoConCelular(User $dueno, string $telefono = '3005550101'): User
+{
+    $dueno->forceFill(['telefono' => $telefono, 'telefono_verificado_at' => now(), 'pin' => '2468', 'pin_fallidos' => 0, 'pin_bloqueado_at' => null])->save();
+
+    return $dueno;
+}
+
+test('el login web tiene QR, WhatsApp, Google y el acceso del administrador', function () {
+    $this->get('/login')->assertOk()
+        ->assertSee('Código QR')->assertSee('WhatsApp')->assertSee('Google')
+        ->assertSee('Administrador de Vitrina con usuario y contraseña');
+    $this->get('/negocio/entrar')->assertRedirect('/login');
+});
+
+test('se entra con celular, clave y código de WhatsApp', function () {
+    app()->instance(EnviadorCodigos::class, new EnviadorLog);
+    Gestion::activar($this->negocio);
+    duenoConCelular($this->dueno);
+
+    $this->post('/login/celular', ['telefono' => '300 555 0101', 'pin' => '1111'])->assertRedirect('/login')->assertSessionHasErrors('pin');
+    $this->post('/login/celular', ['telefono' => '3005550101', 'pin' => '2468'])->assertRedirect('/login')->assertSessionHas('ok');
+    $paso = session('login_celular');
+    expect($paso['codigo_prueba'])->toMatch('/^\d{6}$/');
+    $this->get('/login')->assertSee('Modo de pruebas')->assertSee($paso['codigo_prueba']);
+
+    $this->post('/login/celular/codigo', ['codigo' => $paso['codigo_prueba'] === '000000' ? '111111' : '000000'])->assertSessionHasErrors();
+    $this->post('/login/celular/codigo', ['codigo' => $paso['codigo_prueba']])->assertRedirect('/negocio');
+    $this->assertAuthenticatedAs($this->dueno);
+    expect(AccesoWeb::where('user_id', $this->dueno->id)->where('estado', 'usado')->value('metodo'))->toBe('whatsapp');
+    $this->get('/negocio')->assertOk();
+});
+
+test('sin panel web no se envía el código por WhatsApp', function () {
+    duenoConCelular($this->dueno);
+    $this->post('/login/celular', ['telefono' => '3005550101', 'pin' => '2468'])
+        ->assertSessionHasErrors(['telefono' => 'Tu cuenta no tiene panel web: ninguno de tus negocios lo tiene activo. Pídeselo a Vitrina.']);
+    expect(session('login_celular'))->toBeNull();
+});
+
+test('se entra con Google y la clave', function () {
+    Gestion::activar($this->negocio);
+    duenoConCelular($this->dueno)->forceFill(['google_id' => 'g-123'])->save();
+    $this->mock(GoogleIdToken::class, fn ($m) => $m->shouldReceive('verificar')->andReturn(['sub' => 'g-123', 'email' => 'ismael@gmail.com']));
+
+    $this->post('/login/google', ['credential' => 'token-de-google'])->assertRedirect('/login');
+    $this->get('/login')->assertSee('Hola, <strong>Ismael</strong>', false);
+    $this->post('/login/google/clave', ['pin' => '9999'])->assertSessionHasErrors('pin');
+    $this->post('/login/google/clave', ['pin' => '2468'])->assertRedirect('/negocio');
+    $this->assertAuthenticatedAs($this->dueno);
+    expect(AccesoWeb::where('user_id', $this->dueno->id)->where('estado', 'usado')->value('metodo'))->toBe('google');
+});
+
+test('una cuenta de Google sin conectar no entra', function () {
+    $this->mock(GoogleIdToken::class, fn ($m) => $m->shouldReceive('verificar')->andReturn(['sub' => 'otro', 'email' => 'x@gmail.com']));
+    $this->post('/login/google', ['credential' => 'token'])->assertSessionHasErrors('google');
+    $this->post('/login/google/clave', ['pin' => '2468'])->assertSessionHasErrors('google');
+    $this->assertGuest();
+});
+
+test('el administrador de Vitrina entra con el QR a su panel', function () {
+    $this->get('/login');
+    $acceso = AccesoWeb::latest('id')->first();
+    $this->actingAs($this->super)->getJson('/api/acceso-web')->assertJsonPath('disponible', true)->assertJsonPath('negocios.0.nombre', 'Administración de Vitrina');
+    AccesosWeb::aprobar($acceso->codigo, $this->super);
+    comoNavegador($this);
+    auth()->guard('web')->logout();
+    $this->getJson('/login/estado')->assertJsonPath('estado', 'listo')->assertJsonPath('url', route('admin.panel'));
+    $this->get('/admin')->assertOk();
+    $this->get('/negocio')->assertRedirect(route('admin.panel'));
+    $this->assertAuthenticatedAs($this->super);
+    $this->post('/logout');
+    expect($acceso->fresh()->cerrado_at)->not->toBeNull();
+});
+
+test('la clave bloqueada en la web vuelve al login con el aviso', function () {
+    Gestion::activar($this->negocio);
+    duenoConCelular($this->dueno)->forceFill(['pin_bloqueado_at' => now()])->save();
+    $this->post('/login/celular', ['telefono' => '3005550101', 'pin' => '2468'])
+        ->assertRedirect('/login')->assertSessionHasErrors('pin');
 });
