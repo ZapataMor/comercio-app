@@ -1,0 +1,161 @@
+/* Panel web del negocio (Vitrina Gestión). Usa los colores, letras y botones
+   de sitio.css, así sigue el modo día/noche de web-theme.js como la app. */
+
+body.panel{min-height:100vh;font-size:15px}
+.panel h1{font-size:30px}
+.panel h2{font-size:17px;letter-spacing:-.02em}
+.panel ul{margin:0;padding:0;list-style:none}
+.panel .apagado{color:var(--muted)}
+
+/* Estructura: menú lateral oscuro + contenido */
+.panel-marco{display:grid;grid-template-columns:272px minmax(0,1fr);min-height:100vh}
+.panel-lateral{position:sticky;top:0;height:100vh;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#ffffff26 transparent;display:flex;flex-direction:column;gap:22px;padding:24px 18px;background:var(--hero);color:var(--onhero)}
+.panel-lateral .vitrina-logo text{fill:var(--onhero)}
+.panel-lateral-cabeza{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.panel-menu-boton{display:none;align-items:center;gap:8px;min-height:40px;padding:8px 14px;border-radius:12px;border:1px solid #ffffff2e;background:transparent;color:var(--onhero);font:600 14px SitioInter,system-ui,sans-serif;cursor:pointer}
+.panel-negocio{display:flex;align-items:center;gap:12px;padding:12px;border-radius:16px;background:#ffffff0d;border:1px solid #ffffff14}
+.panel-inicial{display:grid;place-items:center;flex-shrink:0;width:42px;height:42px;border-radius:13px;background:var(--accent);color:#1F1B16;font:700 18px SitioSora,system-ui,sans-serif}
+:root[data-mode="noche"] .panel-inicial{color:#fff}
+.panel-negocio-nombre{font-weight:600;color:var(--onhero);line-height:1.3;overflow-wrap:anywhere}
+.panel-negocio-usuario{font-size:13px;color:var(--onhero-muted)}
+.panel-negocio-cambiar{display:inline-block;margin-top:2px;font-size:13px;color:var(--accent);text-decoration:none}
+.panel-negocio-cambiar:hover{text-decoration:underline}
+.panel-nav{display:flex;flex-direction:column;gap:18px;flex:1}
+.panel-nav-grupo p{margin:0 0 6px 10px;font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--onhero-muted);opacity:.8}
+.panel-nav a{position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;border-radius:11px;color:var(--onhero-muted);text-decoration:none;font-size:14px;transition:background .15s,color .15s}
+.panel-nav a:hover{background:#ffffff0f;color:var(--onhero)}
+.panel-nav a.activo{background:color-mix(in srgb,var(--accent) 20%,transparent);color:var(--onhero);font-weight:600}
+.panel-nav a.activo::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:3px;background:var(--accent)}
+.panel-pronto{font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:#ffffff14;color:var(--onhero-muted)}
+.panel-salir{width:100%;min-height:42px;border-radius:12px;border:1px solid #ffffff24;background:transparent;color:var(--onhero-muted);font:600 14px SitioInter,system-ui,sans-serif;cursor:pointer;transition:background .15s,color .15s}
+.panel-salir:hover{background:#ffffff0f;color:#FFB7A3}
+
+.panel-contenido{width:100%;max-width:1120px;padding:40px 44px 64px}
+.panel-solo{max-width:560px;margin:0 auto;padding:56px 20px}
+.panel-solo .vitrina-logo{margin:0 auto 28px}
+.panel-solo .vitrina-logo text{fill:var(--strong)}
+
+/* Encabezado de cada página */
+.panel-encabezado{margin-bottom:28px}
+.panel-encabezado p{margin-top:8px;max-width:68ch;color:var(--muted)}
+.panel-ceja{display:block;margin-bottom:6px;font-size:12px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--gold)}
+
+/* Tarjetas y rejillas */
+.bloque{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:22px 24px;box-shadow:0 1px 2px #2620190a}
+.bloque + .bloque{margin-top:16px}
+.bloque h2{margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.bloque-nota{margin-top:14px;font-size:13px;color:var(--muted)}
+.bloque-cuenta{font:600 12px SitioInter,system-ui,sans-serif;padding:2px 9px;border-radius:999px;background:var(--surface2);color:var(--muted);letter-spacing:0}
+.rejilla{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+.rejilla .bloque + .bloque{margin-top:0}
+.rejilla + .bloque,.bloque + .rejilla{margin-top:16px}
+
+/* Cifras del inicio */
+.indicadores{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:16px}
+.indicador{position:relative;overflow:hidden;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:20px 22px}
+.indicador::after{content:"";position:absolute;right:-26px;top:-26px;width:84px;height:84px;border-radius:50%;background:var(--accent-soft)}
+.indicador p{position:relative;z-index:1;font-size:13px;color:var(--muted)}
+.indicador strong{position:relative;z-index:1;display:block;margin-top:6px;font:700 34px/1 SitioSora,system-ui,sans-serif;color:var(--strong);letter-spacing:-.03em}
+.indicador:first-child{background:var(--hero);border-color:transparent}
+.indicador:first-child::after{background:color-mix(in srgb,var(--accent) 30%,transparent)}
+.indicador:first-child p{color:var(--onhero-muted)}
+.indicador:first-child strong{color:var(--onhero)}
+
+/* Listas */
+.filas li{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;padding:11px 0;border-top:1px solid var(--line)}
+.filas li:first-child{border-top:0;padding-top:0}
+.filas li:last-child{padding-bottom:0}
+.puntos li{position:relative;padding:5px 0 5px 18px}
+.puntos li::before{content:"";position:absolute;left:2px;top:14px;width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.filas-dos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 20px}
+.filas-dos li:nth-child(2){border-top:0;padding-top:0}
+.permiso{display:flex;align-items:center;gap:10px;padding:6px 0}
+.permiso-marca{display:grid;place-items:center;width:22px;height:22px;border-radius:7px;background:var(--surface2);color:var(--muted);font-size:12px;font-weight:700;flex-shrink:0}
+.permiso-marca.si{background:var(--success-soft);color:var(--success)}
+
+/* Etiquetas */
+.chip{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600;line-height:1.5;background:var(--surface2);color:var(--muted);white-space:nowrap}
+.chip-acento{background:var(--accent-soft);color:var(--gold)}
+.chip-exito{background:var(--success-soft);color:var(--success)}
+
+/* Tablas */
+.tabla-scroll{overflow-x:auto;margin:0 -24px;padding:0 24px}
+.tabla{width:100%;border-collapse:collapse;font-size:14px}
+.tabla th{padding:0 12px 12px;text-align:left;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.tabla td{padding:13px 12px;border-top:1px solid var(--line);vertical-align:middle}
+.tabla th:first-child,.tabla td:first-child{padding-left:0}
+.tabla th:last-child,.tabla td:last-child{padding-right:0}
+.tabla tbody tr:hover td{background:color-mix(in srgb,var(--surface2) 55%,transparent)}
+.tabla .fuerte{font-weight:600;color:var(--strong)}
+.tabla .numero{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tabla .vacia{padding:28px 0;text-align:center;color:var(--muted)}
+.tabla .vacia:hover,.tabla tr:has(.vacia):hover td{background:none}
+
+/* Datos (Mi tienda) */
+.datos{display:grid;grid-template-columns:180px minmax(0,1fr);margin:0}
+.datos dt,.datos dd{margin:0;padding:12px 0;border-top:1px solid var(--line)}
+.datos dt{color:var(--muted);font-size:14px}
+.datos dd{color:var(--strong)}
+.datos dt:first-of-type,.datos dd:first-of-type{border-top:0;padding-top:0}
+
+/* Reseñas */
+.estrellas{color:var(--accent);letter-spacing:2px;font-size:16px}
+.resena{display:block!important}
+.resena p{margin-top:4px}
+
+/* Avisos */
+.aviso{margin:0 0 20px;padding:14px 18px;border-radius:14px;font-size:14px;border:1px solid transparent}
+.aviso ul{margin:6px 0 0 18px!important;list-style:disc!important}
+.aviso-ok{background:var(--success-soft);color:var(--success)}
+.aviso-error{background:#FDE4DC;color:#9B2F12}
+:root[data-mode="noche"] .aviso-error{background:#4A2433;color:#FFB7A3}
+.aviso-info{background:var(--accent-soft);color:var(--gold)}
+
+/* Formularios */
+.formulario{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.formulario .ancho{grid-column:1/-1}
+.campo-panel{display:flex;flex-direction:column;gap:7px;font-size:13px;font-weight:600;color:var(--strong)}
+.campo-panel input,.campo-panel select{min-height:46px;padding:10px 14px;border-radius:12px;border:1px solid var(--input-line);background:var(--surface);color:var(--strong);font:15px SitioInter,system-ui,sans-serif}
+.campo-panel input:focus,.campo-panel select:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+.casillas{display:flex;flex-direction:column;justify-content:flex-end;gap:10px}
+.casilla{display:flex;align-items:flex-start;gap:10px;font-size:14px;cursor:pointer}
+.casilla input{width:18px;height:18px;margin:2px 0 0;accent-color:var(--accent);flex-shrink:0}
+.casillas-dos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 20px}
+.botonera{display:flex;align-items:center;gap:16px;margin-top:4px}
+.panel .enlace{color:var(--gold);font-weight:600;text-decoration:none}
+.panel .enlace:hover{text-decoration:underline}
+
+/* Equipo */
+.miembro-cabeza{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+.miembro-cabeza h2{margin:0}
+.miembro-cabeza .panel-inicial{width:40px;height:40px;font-size:16px;background:var(--surface2);color:var(--strong)}
+.miembro-vitrina{font-size:13px;color:var(--muted)}
+
+/* Elegir negocio */
+.opcion{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;margin-top:10px;padding:16px 18px;border-radius:16px;border:1px solid var(--line);background:var(--surface);color:var(--strong);font:600 15px SitioInter,system-ui,sans-serif;text-align:left;cursor:pointer;transition:border-color .15s,transform .15s}
+.opcion:hover{border-color:var(--accent);transform:translateY(-1px)}
+
+/* Paginación */
+.paginas{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line);font-size:14px;color:var(--muted)}
+.paginas div{display:flex;gap:8px}
+.paginas a,.paginas span.boton-pagina{display:inline-flex;align-items:center;min-height:36px;padding:6px 14px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--strong);text-decoration:none;font-weight:600}
+.paginas a:hover{border-color:var(--accent)}
+.paginas span.boton-pagina{opacity:.45}
+
+@media (max-width:1100px){.indicadores{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:900px){
+    .panel-marco{grid-template-columns:1fr}
+    .panel-lateral{position:static;height:auto;gap:16px;padding:16px}
+    .panel-menu-boton{display:inline-flex}
+    .panel-lateral:not(.abierto) .panel-nav,.panel-lateral:not(.abierto) .panel-salir{display:none}
+    .panel-contenido{padding:28px 16px 48px}
+    .panel h1{font-size:25px}
+    .rejilla,.formulario,.filas-dos,.casillas-dos{grid-template-columns:1fr}
+    .filas-dos li:nth-child(2){border-top:1px solid var(--line);padding-top:11px}
+    .bloque{padding:18px 16px}
+    .tabla-scroll{margin:0 -16px;padding:0 16px}
+    .datos{grid-template-columns:1fr}
+    .datos dd{border-top:0;padding-top:0}
+    .datos dd:first-of-type{padding-top:0}
+}
+@media (max-width:420px){.indicadores{gap:10px}.indicador{padding:16px}.indicador::after{width:60px;height:60px;right:-22px;top:-22px}.indicador strong{font-size:28px}}

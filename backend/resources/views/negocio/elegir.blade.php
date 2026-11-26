@@ -1,12 +1,13 @@
 @extends('layouts.negocio')
 @section('titulo', 'Elegir negocio')
 @section('contenido')
-<div class="bg-white rounded-lg border p-6">
-    <h1 class="text-xl font-semibold mb-4">¿Qué negocio vas a manejar?</h1>
+<div class="bloque">
+    <h1 style="font-size:24px;margin-bottom:6px">¿Qué negocio vas a manejar?</h1>
+    <p class="apagado">Puedes cambiar de negocio cuando quieras desde el menú.</p>
     @foreach($negocios as $n)
-        <form method="POST" action="{{ route('negocio.cambiar') }}" class="mb-2">@csrf
+        <form method="POST" action="{{ route('negocio.cambiar') }}">@csrf
             <input type="hidden" name="negocio_id" value="{{ $n->id }}">
-            <button class="w-full text-left border rounded px-4 py-3 hover:bg-slate-50">{{ $n->nombre }} <span class="text-xs text-slate-500">· {{ $n->pivot->rol === 'propietario' ? 'Dueño' : 'Equipo' }}</span></button>
+            <button class="opcion"><span>{{ $n->nombre }}</span> <span @class(['chip', 'chip-acento' => $n->pivot->rol === 'propietario'])>{{ $n->pivot->rol === 'propietario' ? 'Dueño' : 'Equipo' }}</span></button>
         </form>
     @endforeach
 </div>
