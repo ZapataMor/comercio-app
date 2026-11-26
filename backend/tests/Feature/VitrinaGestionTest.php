@@ -251,7 +251,7 @@ test('el dueño crea, edita, agota y elimina productos desde el catálogo web', 
     $global = CategoriaCatalogo::firstOrFail();
     $seccion = $this->negocio->categorias()->create(['nombre' => 'Repuestos']);
     entrarAlPanel($this, $this->dueno);
-    $this->get('/negocio/catalogo')->assertOk()->assertSee('Nuevo producto');
+    $this->get('/negocio/catalogo')->assertOk()->assertSee('+ Añadir producto');
 
     $this->from('/negocio/catalogo')->post('/negocio/catalogo/productos', [
         '_producto' => 'nuevo', 'nombre' => 'Arepa rellena', 'descripcion' => 'Con queso', 'precio' => '3.500',
@@ -307,7 +307,7 @@ test('sin permiso de catálogo solo se ven los productos, sin editarlos', functi
     $ajeno = $otro->productos()->create(['nombre' => 'Ajeno', 'precio' => 1000]);
     entrarAlPanel($this, $this->trabajador);
 
-    $this->get('/negocio/catalogo')->assertOk()->assertSee('Bomper')->assertDontSee('Nuevo producto')->assertDontSee('data-editar', false);
+    $this->get('/negocio/catalogo')->assertOk()->assertSee('Bomper')->assertDontSee('Añadir producto')->assertDontSee('Añadir servicio')->assertDontSee('data-editar', false);
     $this->put('/negocio/catalogo/productos/'.$p->id, ['nombre' => 'X'])->assertForbidden();
     $this->patch('/negocio/catalogo/productos/'.$p->id.'/disponible')->assertForbidden();
     $this->delete('/negocio/catalogo/productos/'.$p->id)->assertForbidden();
@@ -628,4 +628,34 @@ test('editar desde la web avisa en vivo a la app y a las demás pestañas', func
         ->assertSessionHas('ok');
     EnVivo::enviar();
     Event::assertDispatched(CambioEnVivo::class, fn ($e) => $e->tema === 'negocio' && in_array('catalogo', $e->canales, true));
+});
+
+test('en la pestaña Servicios el botón añade un servicio, con las mismas reglas que la app', function () {
+    Storage::fake('public');
+    Event::fake([CambioEnVivo::class]);
+    Gestion::activar($this->negocio);
+    $this->negocio->productos()->create(['nombre' => 'Bomper', 'precio' => 350000]);
+    entrarAlPanel($this, $this->dueno);
+
+    // En Productos se ve «Añadir producto»; en Servicios, «Añadir servicio».
+    $this->get('/negocio/catalogo')->assertSee('data-abrir="producto-nuevo" data-solo-pestana="productos" >', false)
+        ->assertSee('data-abrir="servicio-nuevo" data-solo-pestana="servicios"  hidden', false);
+    $this->get('/negocio/catalogo?pestana=servicios')->assertSee('data-abrir="producto-nuevo" data-solo-pestana="productos"  hidden', false)
+        ->assertSee('data-abrir="servicio-nuevo" data-solo-pestana="servicios" >', false);
+
+    $this->from('/negocio/catalogo?pestana=servicios')->post('/negocio/catalogo/servicios', ['_servicio' => 'nuevo', 'nombre' => 'Pintura', 'descripcion' => ''])
+        ->assertRedirect('/negocio/catalogo?pestana=servicios')->assertSessionHasErrors('descripcion')->assertSessionHasInput('_servicio', 'nuevo');
+
+    $this->post('/negocio/catalogo/servicios', [
+        '_servicio' => 'nuevo', 'nombre' => 'Pintura de puerta', 'descripcion' => 'Con pintura electrostática',
+        'precio' => '90.000', 'duracion_minutos' => 120, 'permite_citas' => '1',
+        'imagenes' => [UploadedFile::fake()->image('puerta.jpg', 800, 600)],
+    ])->assertRedirect('/negocio/catalogo?pestana=servicios')->assertSessionHas('ok');
+
+    $s = $this->negocio->servicios()->firstOrFail();
+    expect($s->only(['nombre', 'precio', 'duracion_minutos', 'permite_citas', 'disponible']))
+        ->toBe(['nombre' => 'Pintura de puerta', 'precio' => 90000, 'duracion_minutos' => 120, 'permite_citas' => true, 'disponible' => false])
+        ->and($s->galeria)->toHaveCount(1);
+    EnVivo::enviar();
+    Event::assertDispatched(CambioEnVivo::class, fn ($e) => $e->tema === 'catalogo' && in_array('negocio.'.$this->negocio->id, $e->canales, true));
 });

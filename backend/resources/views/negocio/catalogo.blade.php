@@ -8,7 +8,9 @@
         <p>Lo que se muestra en Vitrina. Toca un producto para ver toda su información{{ $puedeEditar ? ', editarlo o eliminarlo' : '' }}. Los cambios se ven al instante en la app.</p>
     </div>
     @if($puedeEditar)
-        <button type="button" class="boton boton-acento" data-abrir="producto-nuevo">+ Nuevo producto</button>
+        {{-- Cambia con la pestaña: en Servicios se añade un servicio. --}}
+        <button type="button" class="boton boton-acento" data-abrir="producto-nuevo" data-solo-pestana="productos" @if($pestana !== 'productos') hidden @endif>+ Añadir producto</button>
+        <button type="button" class="boton boton-acento" data-abrir="servicio-nuevo" data-solo-pestana="servicios" @if($pestana !== 'servicios') hidden @endif>+ Añadir servicio</button>
     @endif
 </header>
 
@@ -76,7 +78,7 @@
 
     <div role="tabpanel" id="panel-servicios" aria-labelledby="pestana-servicios" @if($pestana !== 'servicios') hidden @endif>
         @if($servicios->isEmpty())
-            <p class="apagado catalogo-vacio">Este negocio no ofrece servicios. Se agregan desde la app.</p>
+            <p class="apagado catalogo-vacio">Este negocio no ofrece servicios todavía.{{ $puedeEditar ? ' Añade el primero con «+ Añadir servicio».' : '' }}</p>
         @else
             <ul class="servicios">
                 @foreach($servicios as $s)
@@ -201,6 +203,35 @@
         </div>
         <div class="modal-edicion">@include('negocio._producto_form', ['p' => null])</div>
     </dialog>
+
+    @php $sOld = old('_servicio') === 'nuevo'; @endphp
+    <dialog class="modal modal-solo-edicion modal-mediano" id="servicio-nuevo" aria-labelledby="servicio-nuevo-titulo">
+        <div class="modal-cabeza">
+            <h2 id="servicio-nuevo-titulo">Nuevo servicio</h2>
+            <button type="button" class="modal-cerrar" data-cerrar aria-label="Cerrar">✕</button>
+        </div>
+        <div class="modal-edicion">
+            <form method="POST" enctype="multipart/form-data" class="formulario producto-form" action="{{ route('negocio.servicios.crear') }}">
+                @csrf
+                <input type="hidden" name="_servicio" value="nuevo">
+                <label class="campo-panel ancho">Nombre<input name="nombre" required maxlength="150" value="{{ $sOld ? old('nombre') : '' }}" placeholder="Pintura de puerta"></label>
+                <label class="campo-panel ancho">Descripción<textarea name="descripcion" rows="3" required maxlength="5000" placeholder="Qué incluye el servicio">{{ $sOld ? old('descripcion') : '' }}</textarea></label>
+                <label class="campo-panel">Precio (pesos)<input name="precio" inputmode="numeric" value="{{ $sOld ? old('precio') : '' }}" placeholder="Vacío = a convenir"></label>
+                <label class="campo-panel">Duración (minutos)<input name="duracion_minutos" type="number" min="5" max="480" step="5" required value="{{ $sOld ? old('duracion_minutos', 30) : 30 }}"></label>
+                <label class="campo-panel ancho">Fotos <span class="ayuda">Hasta {{ \App\Support\EditorServicio::MAX_FOTOS }}, JPG o PNG de hasta 4 MB cada una.</span>
+                    <input type="file" name="imagenes[]" accept="image/*" multiple>
+                </label>
+                <div class="ancho casillas-dos">
+                    <label class="casilla"><input type="checkbox" name="permite_citas" value="1" @checked(! $sOld || old('permite_citas'))> Los clientes pueden agendar cita</label>
+                    <label class="casilla"><input type="checkbox" name="disponible" value="1" @checked(! $sOld || old('disponible'))> Disponible</label>
+                </div>
+                <div class="ancho botonera producto-form-acciones">
+                    <button class="boton boton-oscuro boton-chico">Añadir servicio</button>
+                    <button type="button" class="enlace-boton" data-cerrar>Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </dialog>
 @endif
 
 <section class="bloque catalogo-extra">
@@ -236,5 +267,8 @@
 @if($errors->any() && old('_producto'))
     {{-- Volvió con errores: reabrir el formulario de ese producto. --}}
     <script>window.panelCatalogo && window.panelCatalogo.abrir('producto-{{ preg_replace('/[^0-9a-z]/', '', old('_producto')) }}', true);</script>
+@endif
+@if(($errors->any() || session('error')) && old('_servicio') === 'nuevo')
+    <script>window.panelCatalogo && window.panelCatalogo.abrir('servicio-nuevo', true);</script>
 @endif
 @endpush

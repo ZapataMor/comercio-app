@@ -303,6 +303,7 @@ class EnVivo
             Web\PanelNegocioController::class.'@guardarProducto' => ['despues' => fn (Request $r) => self::catalogo($r->attributes->get('negocio_web')?->id)],
             Web\PanelNegocioController::class.'@disponibilidadProducto' => ['despues' => fn (Request $r) => self::catalogo($r->attributes->get('negocio_web')?->id)],
             Web\PanelNegocioController::class.'@eliminarProducto' => ['despues' => fn (Request $r) => self::catalogo($r->attributes->get('negocio_web')?->id)],
+            Web\PanelNegocioController::class.'@crearServicio' => ['despues' => fn (Request $r) => self::catalogo($r->attributes->get('negocio_web')?->id)],
 
             // --- Cuenta y perfil ---
             AuthController::class.'@register' => ['despues' => fn () => self::avisar(self::ADMIN, 'usuarios')],

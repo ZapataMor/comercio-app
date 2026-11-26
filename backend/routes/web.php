@@ -117,6 +117,7 @@ Route::prefix('negocio')->name('negocio.')->group(function () {
         Route::put('/catalogo/productos/{producto}', 'guardarProducto')->whereNumber('producto')->name('productos.guardar');
         Route::patch('/catalogo/productos/{producto}/disponible', 'disponibilidadProducto')->whereNumber('producto')->name('productos.disponible');
         Route::delete('/catalogo/productos/{producto}', 'eliminarProducto')->whereNumber('producto')->name('productos.eliminar');
+        Route::post('/catalogo/servicios', 'crearServicio')->name('servicios.crear');
         Route::get('/pedidos', 'pedidos')->name('pedidos');
         Route::get('/equipo', 'equipo')->name('equipo');
         Route::put('/equipo/{miembro}/permisos', 'permisos')->whereNumber('miembro')->name('permisos');

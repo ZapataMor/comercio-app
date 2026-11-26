@@ -20,6 +20,7 @@ use App\Support\Busqueda;
 use App\Support\ClavePin;
 use App\Support\EditorCuentaPago;
 use App\Support\EditorProducto;
+use App\Support\EditorServicio;
 use App\Support\FotoOptimizada;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
@@ -233,6 +234,23 @@ class PanelNegocioController extends Controller
         }
 
         return redirect()->to(url()->previous())->with('ok', 'Se guardó «'.$modelo->nombre.'».');
+    }
+
+    /** Añadir un servicio desde la pestaña Servicios del catálogo (mismas reglas que la app). */
+    public function crearServicio(Request $request): RedirectResponse
+    {
+        $negocio = $this->negocio($request);
+        abort_unless($negocio->puede($request->user(), 'modificar_inventario'), 403, 'No tienes permiso para cambiar el catálogo.');
+
+        $precio = preg_replace('/\D/', '', (string) $request->input('precio', ''));
+        $request->merge([
+            'precio' => $precio === '' ? null : (int) $precio,
+            'disponible' => $request->boolean('disponible'),
+            'permite_citas' => $request->boolean('permite_citas'),
+        ]);
+        $servicio = EditorServicio::guardar($request, $negocio);
+
+        return redirect()->route('negocio.catalogo', ['pestana' => 'servicios'])->with('ok', 'Se añadió el servicio «'.$servicio->nombre.'».');
     }
 
     /**

@@ -212,7 +212,7 @@ body.panel{min-height:100vh;font-size:15px}
 .pestana[aria-selected="true"]{background:var(--surface);color:var(--strong);box-shadow:0 1px 3px #0000001f}
 .pestana[aria-selected="true"] .bloque-cuenta{background:var(--accent-soft);color:var(--gold)}
 .pestana:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.catalogo-filtros[hidden],[role="tabpanel"][hidden]{display:none}
+.catalogo-filtros[hidden],[role="tabpanel"][hidden],[data-solo-pestana][hidden]{display:none!important}
 
 /* Servicios */
 .servicios{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
