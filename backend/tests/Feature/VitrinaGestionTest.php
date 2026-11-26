@@ -351,3 +351,20 @@ test('la clave bloqueada en la web vuelve al login con el aviso', function () {
     $this->post('/login/celular', ['telefono' => '3005550101', 'pin' => '2468'])
         ->assertRedirect('/login')->assertSessionHasErrors('pin');
 });
+
+test('el comando de pruebas enciende el panel y todos los módulos a todos los negocios', function () {
+    $otro = User::factory()->create()->negocio()->create(['nombre' => 'Otro']);
+    $archivado = User::factory()->create()->negocio()->create(['nombre' => 'Archivado']);
+    $archivado->forceFill(['archivado_at' => now()])->save();
+    Gestion::activar($this->negocio);
+    Gestion::definirModulos($this->negocio, ['personal']);
+
+    $this->artisan('vitrina:gestion-para-todos', ['--force' => true])->assertSuccessful();
+
+    foreach ([$this->negocio, $otro] as $n) {
+        expect($n->fresh()->gestion_activa)->toBeTrue()
+            ->and(Gestion::opcionalesEncendidos($n))->toEqualCanonicalizing(Modulos::opcionales())
+            ->and($n->sedes()->count())->toBe(1);
+    }
+    expect($archivado->fresh()->gestion_activa)->toBeFalse();
+});
