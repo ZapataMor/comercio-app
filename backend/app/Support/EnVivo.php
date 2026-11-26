@@ -294,7 +294,26 @@ class EnVivo
             Web\GestionAdminController::class.'@cerrarAcceso' => null,
             Web\GestionAdminController::class.'@guardarPlantilla' => null,
             Web\PanelNegocioController::class.'@cambiar' => null,
-            Web\PanelNegocioController::class.'@permisos' => null,
+            Web\TrabajadoresController::class.'@resolverCodigo' => null,
+            Web\TrabajadoresController::class.'@invitar' => ['despues' => function (Request $r) {
+                $negocioId = $r->attributes->get('negocio_web')?->id;
+                self::equipo($negocioId);
+                self::avisar(self::usuario(InvitacionTrabajo::where('negocio_id', $negocioId)->latest('id')->value('user_id')), 'invitaciones');
+            }],
+            Web\TrabajadoresController::class.'@cancelarInvitacion' => [
+                'antes' => fn (Request $r) => InvitacionTrabajo::whereKey((int) $r->route('invitacion'))->value('user_id'),
+                'despues' => function (Request $r, Response $res, ?int $invitado) {
+                    self::equipo($r->attributes->get('negocio_web')?->id);
+                    self::avisar(self::usuario($invitado), 'invitaciones');
+                },
+            ],
+            Web\TrabajadoresController::class.'@guardar' => ['despues' => fn (Request $r) => self::equipo($r->attributes->get('negocio_web')?->id, [(int) $r->route('miembro')])],
+            Web\TrabajadoresController::class.'@quitar' => ['despues' => fn (Request $r) => self::equipo($r->attributes->get('negocio_web')?->id, [(int) $r->route('miembro')])],
+            // Las tareas todavía no se ven en la app (ver «Mis tareas» en Modulos).
+            Web\TrabajadoresController::class.'@crearTarea' => null,
+            Web\TrabajadoresController::class.'@guardarTarea' => null,
+            Web\TrabajadoresController::class.'@estadoTarea' => null,
+            Web\TrabajadoresController::class.'@eliminarTarea' => null,
             Web\PanelNegocioController::class.'@guardarSede' => null,
             // Lo que se cambia en el panel web lo ven al instante la app y las demás pestañas.
             Web\PanelNegocioController::class.'@guardarTienda' => ['despues' => fn (Request $r) => self::datosNegocio($r->attributes->get('negocio_web')?->id)],

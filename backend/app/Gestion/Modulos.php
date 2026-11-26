@@ -65,12 +65,14 @@ final class Modulos
                 'en_app' => ['Atender con alarma, aceptar y cambiar estado (ya existe)'],
                 'estado' => 'disponible',
             ],
+            // La clave sigue siendo «equipo»; en la web se llama Trabajadores.
             'equipo' => [
-                'grupo' => 'nucleo', 'nombre' => 'Equipo',
-                'descripcion' => 'Personas del negocio y sus permisos, incluidos los de cada módulo.',
-                'depende_de' => [], 'permisos' => [],
-                'secciones' => ['Miembros', 'Permisos de Vitrina', 'Permisos de módulos'],
-                'en_app' => ['Invitar y cambiar permisos (ya existe)'],
+                'grupo' => 'nucleo', 'nombre' => 'Trabajadores',
+                'descripcion' => 'Personas del negocio: se asocian con su código, con su sede, días de trabajo, permisos y tareas.',
+                'depende_de' => [],
+                'permisos' => ['equipo.tareas' => 'Asignar tareas y pedidos a los trabajadores'],
+                'secciones' => ['Trabajadores', 'Asociar con el código', 'Sede y días de trabajo', 'Permisos', 'Tareas y pedidos asignados'],
+                'en_app' => ['Invitar y cambiar permisos (ya existe)', 'Mis tareas (ver y marcar hecha)'],
                 'estado' => 'disponible',
             ],
             'agenda' => [
@@ -160,11 +162,11 @@ final class Modulos
             // --------------------------------------------------------- Personal
             'personal' => [
                 'grupo' => 'personal', 'nombre' => 'Personal',
-                'descripcion' => 'Tareas por semana y por día, llegadas y días trabajados.',
+                'descripcion' => 'Llegadas y días trabajados de cada trabajador (las tareas están en Trabajadores).',
                 'depende_de' => [],
-                'permisos' => ['personal.tareas' => 'Asignar tareas', 'personal.llegadas' => 'Ver llegadas y días trabajados'],
-                'secciones' => ['Trabajadores', 'Tareas', 'Llegadas', 'Pantalla de la sede'],
-                'en_app' => ['Mis tareas (ver y marcar hecha)', 'Marcar llegada'],
+                'permisos' => ['personal.llegadas' => 'Ver llegadas y días trabajados'],
+                'secciones' => ['Llegadas', 'Días trabajados', 'Pantalla de la sede'],
+                'en_app' => ['Marcar llegada'],
                 'estado' => 'en_construccion',
             ],
             'nomina' => [

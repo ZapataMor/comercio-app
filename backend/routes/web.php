@@ -8,6 +8,7 @@ use App\Http\Controllers\Web\OperacionController;
 use App\Http\Controllers\Web\PanelNegocioController;
 use App\Http\Controllers\Web\PublicoController;
 use App\Http\Controllers\Web\SitioController;
+use App\Http\Controllers\Web\TrabajadoresController;
 use App\Http\Middleware\AdminWeb;
 use App\Http\Middleware\NegocioWeb;
 use Illuminate\Support\Facades\Route;
@@ -119,13 +120,26 @@ Route::prefix('negocio')->name('negocio.')->group(function () {
         Route::delete('/catalogo/productos/{producto}', 'eliminarProducto')->whereNumber('producto')->name('productos.eliminar');
         Route::post('/catalogo/servicios', 'crearServicio')->name('servicios.crear');
         Route::get('/pedidos', 'pedidos')->name('pedidos');
-        Route::get('/equipo', 'equipo')->name('equipo');
-        Route::put('/equipo/{miembro}/permisos', 'permisos')->whereNumber('miembro')->name('permisos');
         Route::get('/agenda', 'agenda')->name('agenda');
         Route::get('/resenas', 'resenas')->name('resenas');
         Route::get('/sedes', 'sedes')->name('sedes');
         Route::post('/sedes', 'guardarSede')->name('sedes.crear');
         Route::put('/sedes/{sede}', 'guardarSede')->whereNumber('sede')->name('sedes.guardar');
         Route::get('/modulos/{modulo}', 'modulo')->name('modulo');
+    });
+    // Trabajadores (módulo «equipo» del núcleo): asociar con el código, sede,
+    // días y horas, permisos y tareas. /equipo queda por los enlaces viejos.
+    Route::middleware(NegocioWeb::class)->controller(TrabajadoresController::class)->group(function () {
+        Route::redirect('/equipo', '/negocio/trabajadores');
+        Route::get('/trabajadores', 'index')->name('equipo');
+        Route::post('/trabajadores/codigo', 'resolverCodigo')->name('equipo.codigo');
+        Route::post('/trabajadores/invitar', 'invitar')->name('equipo.invitar');
+        Route::delete('/trabajadores/invitaciones/{invitacion}', 'cancelarInvitacion')->whereNumber('invitacion')->name('equipo.invitacion.cancelar');
+        Route::post('/trabajadores/tareas', 'crearTarea')->name('equipo.tareas.crear');
+        Route::put('/trabajadores/tareas/{tarea}', 'guardarTarea')->whereNumber('tarea')->name('equipo.tareas.guardar');
+        Route::patch('/trabajadores/tareas/{tarea}/estado', 'estadoTarea')->whereNumber('tarea')->name('equipo.tareas.estado');
+        Route::delete('/trabajadores/tareas/{tarea}', 'eliminarTarea')->whereNumber('tarea')->name('equipo.tareas.eliminar');
+        Route::put('/trabajadores/{miembro}', 'guardar')->whereNumber('miembro')->name('equipo.guardar');
+        Route::delete('/trabajadores/{miembro}', 'quitar')->whereNumber('miembro')->name('equipo.quitar');
     });
 });

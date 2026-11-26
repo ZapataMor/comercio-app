@@ -13,7 +13,6 @@ use App\Models\Pedido;
 use App\Models\Resena;
 use App\Models\Sede;
 use App\Models\TipoProducto;
-use App\Models\User;
 use App\Rules\Direccion;
 use App\Rules\Telefono;
 use App\Support\Busqueda;
@@ -38,7 +37,7 @@ use Illuminate\View\View;
  * - el núcleo muestra los datos que ya existen en la app y la edición se trae
  *   módulo por módulo (Catálogo y Mi tienda ya se editan aquí),
  * - «Varias sedes» funciona completo,
- * - Equipo permite dar los permisos de cada módulo,
+ * - Trabajadores vive en TrabajadoresController,
  * - los módulos en construcción muestran cómo van a estar constituidos.
  */
 class PanelNegocioController extends Controller
@@ -353,8 +352,12 @@ class PanelNegocioController extends Controller
                 ->orWhereHas('cliente', fn ($c) => $c->where('name', 'like', '%'.$buscar.'%')));
         }
 
+        $pedidos = $query->paginate(30)->withQueryString();
+
         return view('negocio.pedidos', [
-            'pedidos' => $query->paginate(30)->withQueryString(),
+            'pedidos' => $pedidos,
+            // A quién se le asignó cada pedido desde Trabajadores.
+            'asignados' => $negocio->tareas()->whereIn('pedido_id', $pedidos->pluck('id'))->with('trabajador')->get()->groupBy('pedido_id'),
             'estado' => in_array($estado, ['en_curso', 'entregados', 'cancelados'], true) ? $estado : null,
             'dia' => $dia,
             'buscar' => $buscar,
@@ -363,30 +366,6 @@ class PanelNegocioController extends Controller
                 ->selectRaw('DATE(created_at) as dia, COUNT(*) as total')->groupBy('dia')->pluck('total', 'dia')
                 ->mapWithKeys(fn ($total, $d) => [substr((string) $d, 0, 10) => (int) $total]),
         ]);
-    }
-
-    public function equipo(Request $request): View
-    {
-        $negocio = $this->negocio($request);
-
-        return view('negocio.equipo', [
-            'miembros' => $negocio->miembrosActivos()->orderBy('name')->get(),
-            'asignables' => Gestion::permisosAsignables($negocio),
-            'puedeEditar' => $negocio->administra($request->user()),
-        ]);
-    }
-
-    public function permisos(Request $request, User $miembro): RedirectResponse
-    {
-        $negocio = $this->negocio($request);
-        abort_unless($negocio->administra($request->user()), 403, 'Solo el dueño o el administrador del negocio cambia permisos.');
-        if ($negocio->administra($miembro)) {
-            return back()->with('error', 'El dueño y el administrador del negocio ya tienen todos los permisos.');
-        }
-        $datos = $request->validate(['permisos' => ['array'], 'permisos.*' => ['string']]);
-        Gestion::guardarPermisos($negocio, $miembro, $datos['permisos'] ?? []);
-
-        return back()->with('ok', 'Permisos de '.$miembro->name.' guardados.');
     }
 
     public function agenda(Request $request): View

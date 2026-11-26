@@ -47,6 +47,11 @@ class InvitacionController extends Controller
             $negocio->miembros()->attach($request->user()->id, [
                 'rol' => Negocio::ROL_TRABAJADOR, 'activo' => true,
                 ...$invitacion->only(Negocio::PERMISOS),
+                // Lo que el negocio definió en el panel web al invitar.
+                'sede_id' => $invitacion->sede_id && $negocio->sedes()->whereKey($invitacion->sede_id)->exists() ? $invitacion->sede_id : null,
+                'cargo' => $invitacion->cargo,
+                'horario' => $invitacion->horario !== null ? json_encode($invitacion->horario) : null,
+                'permisos_gestion' => $invitacion->permisos_gestion !== null ? json_encode($invitacion->permisos_gestion) : null,
             ]);
             $invitacion->update(['estado' => InvitacionTrabajo::ACEPTADA]);
 

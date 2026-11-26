@@ -104,6 +104,7 @@
                                 <span class="pedido-total">{{ $dinero($p->total) }}</span>
                                 <span class="chip">{{ $p->metodo_pago === 'transferencia' ? 'Transferencia' : 'Efectivo' }}</span>
                                 @if($p->domiciliario)<span class="pedido-domi" title="Domiciliario">🛵 {{ $p->domiciliario->name }}</span>@endif
+                                @foreach($asignados->get($p->id, collect()) as $t)<span class="pedido-domi" title="Asignado a">👤 {{ $t->trabajador?->name }}</span>@endforeach
                             </span>
                         </button>
                     </li>
@@ -199,6 +200,17 @@
                             @if($p->puntoEntrega())<dt>Mapa</dt><dd><a class="enlace" href="https://www.openstreetmap.org/?mlat={{ $p->entrega_lat }}&mlon={{ $p->entrega_lng }}#map=18/{{ $p->entrega_lat }}/{{ $p->entrega_lng }}" target="_blank" rel="noopener">Ver el punto de entrega</a></dd>@endif
                         </dl>
                     </section>
+                    @php $tareasPedido = $asignados->get($p->id, collect()); @endphp
+                    @if($tareasPedido->isNotEmpty())
+                        <section class="pedido-caja">
+                            <h3>Asignado a</h3>
+                            <dl class="pedido-datos">
+                                @foreach($tareasPedido as $t)
+                                    <dt>{{ $t->trabajador?->name ?? 'Trabajador' }}</dt><dd>{{ $t->estadoTexto() }}@if($t->titulo !== 'Atender el pedido '.$p->codigo)<span class="apagado"> · {{ $t->titulo }}</span>@endif</dd>
+                                @endforeach
+                            </dl>
+                        </section>
+                    @endif
                     <section class="pedido-caja">
                         <h3>Domiciliario</h3>
                         @if($p->domiciliario)

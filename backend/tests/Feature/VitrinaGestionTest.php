@@ -3,15 +3,19 @@
 use App\Events\CambioEnVivo;
 use App\Gestion\AccesosWeb;
 use App\Gestion\Gestion;
+use App\Gestion\Horario;
 use App\Gestion\Modulos;
 use App\Models\AccesoWeb;
 use App\Models\CategoriaCatalogo;
+use App\Models\InvitacionTrabajo;
 use App\Models\Negocio;
 use App\Models\Pedido;
 use App\Models\PlantillaGestion;
 use App\Models\Producto;
+use App\Models\TareaTrabajo;
 use App\Models\TipoProducto;
 use App\Models\User;
+use App\Notifications\InvitacionTrabajoRecibida;
 use App\Support\EnVivo;
 use App\Support\GoogleIdToken;
 use App\Support\Telefono\EnviadorCodigos;
@@ -21,6 +25,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Role;
 
 beforeEach(function () {
@@ -157,7 +162,7 @@ test('se entra a la web con el código aprobado desde la app', function () {
     $this->getJson('/login/estado')->assertJsonPath('estado', 'listo');
     $this->get('/negocio')->assertOk()->assertSee('Inicio')->assertSee('Latonería');
     expect(auth()->id())->toBe($this->dueno->id);
-    foreach (['tienda', 'catalogo', 'pedidos', 'equipo', 'agenda', 'resenas', 'sedes'] as $ruta) {
+    foreach (['tienda', 'catalogo', 'pedidos', 'trabajadores', 'agenda', 'resenas', 'sedes'] as $ruta) {
         $this->get('/negocio/'.$ruta)->assertOk();
     }
 });
@@ -215,7 +220,7 @@ test('el menú y los módulos dependen de lo encendido y de los permisos', funct
     $this->get('/negocio/modulos/caja')->assertForbidden();
     $this->get('/negocio/modulos/facturacion')->assertForbidden();
     $this->get('/negocio/pedidos')->assertForbidden();
-    $this->put('/negocio/equipo/'.$this->trabajador->id.'/permisos', ['permisos' => ['caja.vender']])->assertForbidden();
+    $this->put('/negocio/trabajadores/'.$this->trabajador->id, ['modulos' => ['caja.vender']])->assertForbidden();
 
     Gestion::guardarPermisos($this->negocio, $this->trabajador, ['caja.vender']);
     $this->get('/negocio')->assertSee('/negocio/modulos/caja');
@@ -227,9 +232,9 @@ test('el menú y los módulos dependen de lo encendido y de los permisos', funct
     // Si se apaga el módulo, el permiso se conserva pero deja de valer.
     Gestion::definirModulos($this->negocio, ['personal']);
     expect(Gestion::puede($this->trabajador, $this->negocio, 'caja.vender'))->toBeFalse();
-    Gestion::guardarPermisos($this->negocio, $this->trabajador, ['personal.tareas']);
+    Gestion::guardarPermisos($this->negocio, $this->trabajador, ['personal.llegadas']);
     Gestion::definirModulos($this->negocio, ['personal', 'caja']);
-    expect(Gestion::permisosDe($this->trabajador, $this->negocio))->toEqualCanonicalizing(['caja.vender', 'personal.tareas']);
+    expect(Gestion::permisosDe($this->trabajador, $this->negocio))->toEqualCanonicalizing(['caja.vender', 'personal.llegadas']);
 });
 
 test('el catálogo muestra los productos en tarjetas con su imagen', function () {
@@ -329,16 +334,6 @@ test('el catálogo web busca y filtra por disponibilidad', function () {
 
     $this->get('/negocio/catalogo?buscar=bomper')->assertSee('Bomper delantero')->assertDontSee('Espejo lateral');
     $this->get('/negocio/catalogo?estado=agotados')->assertSee('Espejo lateral')->assertDontSee('Bomper delantero');
-});
-
-test('el dueño da permisos de módulos desde Equipo', function () {
-    Gestion::activar($this->negocio);
-    Gestion::definirModulos($this->negocio, ['personal']);
-    entrarAlPanel($this, $this->dueno);
-    $this->get('/negocio/equipo')->assertOk()->assertSee('Asignar tareas');
-    $this->put('/negocio/equipo/'.$this->trabajador->id.'/permisos', ['permisos' => ['personal.tareas']])->assertSessionHas('ok');
-    $this->put('/negocio/equipo/'.$this->trabajador->id.'/permisos', ['permisos' => ['caja.vender']])->assertSessionHasErrors('permisos');
-    expect(Gestion::permisosDe($this->trabajador, $this->negocio))->toBe(['personal.tareas']);
 });
 
 test('las sedes: una sola sin el módulo, varias con él y siempre una principal', function () {
@@ -709,4 +704,146 @@ test('los pedidos salen en tarjetas por día, con filtro, calendario y el detall
     $this->get('/negocio/pedidos?estado=cancelados')->assertSee($cancelado->codigo)->assertDontSee($entregado->codigo);
     $this->get('/negocio/pedidos?buscar='.$entregado->codigo)->assertSee($entregado->codigo)->assertDontSee($cancelado->codigo);
     $this->get('/negocio/pedidos?dia=no-es-fecha')->assertOk()->assertSee($cancelado->codigo);
+});
+
+// ------------------------------------------------------------ Trabajadores
+
+test('Trabajadores reemplaza a Equipo en el menú y /negocio/equipo lleva allá', function () {
+    Gestion::activar($this->negocio);
+    entrarAlPanel($this, $this->dueno);
+    $this->get('/negocio/equipo')->assertRedirect('/negocio/trabajadores');
+    $this->get('/negocio')->assertSee('Trabajadores')->assertSee('/negocio/trabajadores');
+    $this->get('/negocio/trabajadores')->assertOk()->assertSee('Ayudante')->assertSee('+ Asociar trabajador')->assertSee('+ Asignar tarea');
+});
+
+test('el horario se lee, se resume y valida las horas', function () {
+    $h = Horario::desdeFormulario(['dias' => ['1', '2', '3', '4', '5'], 'entrada' => [1 => '08:00'], 'salida' => [1 => '17:00']]);
+    expect($h['1'])->toBe(['entrada' => '08:00', 'salida' => '17:00'])
+        ->and($h['2'])->toBe(['entrada' => null, 'salida' => null])
+        ->and(Horario::resumen(Horario::leer(json_encode($h))))->toBe('Lunes a viernes')
+        ->and(Horario::resumen(Horario::leer(['6' => [], '7' => []])))->toBe('Fines de semana')
+        ->and(Horario::resumen(Horario::leer(['1' => [], '3' => [], '5' => []])))->toBe('Lunes, miércoles y viernes')
+        ->and(Horario::resumen(Horario::leer(['2' => [], '3' => [], '4' => [], '5' => [], '6' => []])))->toBe('Martes a sábado')
+        ->and(Horario::resumen(null))->toBe('Días sin definir')
+        ->and(Horario::desdeFormulario(['dias' => []]))->toBeNull()
+        ->and(Horario::horasDelDia(Horario::leer($h), 1))->toBe('8:00 a. m. – 5:00 p. m.');
+    expect(fn () => Horario::desdeFormulario(['dias' => [6], 'entrada' => [6 => '08:00']]))->toThrow(ValidationException::class);
+});
+
+test('el dueño asocia con el código: la invitación lleva sede, cargo, días y permisos y la membresía nace así', function () {
+    Gestion::activar($this->negocio);
+    Gestion::definirModulos($this->negocio, ['sedes', 'personal']);
+    $norte = $this->negocio->sedes()->create(['nombre' => 'Norte']);
+    $nuevo = User::factory()->create(['name' => 'Soldador', 'codigo_publico' => 'UABC23']);
+    entrarAlPanel($this, $this->dueno);
+
+    $this->postJson('/negocio/trabajadores/codigo', ['codigo' => '#uabc23'])->assertOk()->assertJsonPath('nombre', $nuevo->nombre_completo)->assertJsonPath('aviso', null);
+    $this->postJson('/negocio/trabajadores/codigo', ['codigo' => 'UNOEXI'])->assertNotFound();
+    $this->postJson('/negocio/trabajadores/codigo', ['codigo' => $this->trabajador->codigo_publico])->assertJsonPath('aviso', 'Ya hace parte del negocio.');
+
+    $this->post('/negocio/trabajadores/invitar', [
+        'codigo' => 'uabc23', 'cargo' => 'Soldador', 'sede_id' => $norte->id,
+        'dias' => [6, 7], 'entrada' => [6 => '07:00', 7 => '07:00'], 'salida' => [6 => '13:00', 7 => '12:00'],
+        'vitrina' => ['gestionar_pedidos'], 'modulos' => ['personal.llegadas', 'equipo.tareas'],
+    ])->assertRedirect('/negocio/trabajadores')->assertSessionHas('ok');
+    Notification::assertSentTo($nuevo, InvitacionTrabajoRecibida::class);
+    $this->get('/negocio/trabajadores')->assertSee('Invitaciones sin aceptar')->assertSee('Fines de semana');
+
+    // Repetir la invitación no se puede.
+    $this->post('/negocio/trabajadores/invitar', ['codigo' => 'UABC23'])->assertSessionHas('error');
+
+    $invitacion = InvitacionTrabajo::where('user_id', $nuevo->id)->firstOrFail();
+    $this->actingAs($nuevo)->putJson('/api/invitaciones/'.$invitacion->id.'/aceptar')->assertOk();
+    $fila = $this->negocio->miembros()->whereKey($nuevo->id)->first()->pivot;
+    expect($fila->cargo)->toBe('Soldador')
+        ->and((int) $fila->sede_id)->toBe($norte->id)
+        ->and(Horario::leer($fila->horario))->toBe([6 => ['entrada' => '07:00', 'salida' => '13:00'], 7 => ['entrada' => '07:00', 'salida' => '12:00']])
+        ->and((bool) $fila->gestionar_pedidos)->toBeTrue()
+        ->and((bool) $fila->modificar_inventario)->toBeFalse()
+        ->and(Gestion::permisosDe($nuevo, $this->negocio))->toEqualCanonicalizing(['personal.llegadas', 'equipo.tareas']);
+});
+
+test('el dueño cambia sede, días y permisos de un trabajador y lo quita del negocio', function () {
+    Gestion::activar($this->negocio);
+    Gestion::definirModulos($this->negocio, ['sedes', 'caja']);
+    $norte = $this->negocio->sedes()->create(['nombre' => 'Norte']);
+    entrarAlPanel($this, $this->dueno);
+
+    $this->put('/negocio/trabajadores/'.$this->trabajador->id, [
+        'cargo' => 'Cajero', 'sede_id' => $norte->id, 'dias' => [1, 3, 5],
+        'vitrina' => ['modificar_inventario', 'cambiar_estado'], 'modulos' => ['caja.vender'],
+    ])->assertRedirect('/negocio/trabajadores')->assertSessionHas('ok');
+    $permisos = $this->negocio->permisosPara($this->trabajador);
+    expect($permisos['modificar_inventario'])->toBeTrue()->and($permisos['gestionar_pedidos'])->toBeFalse()->and($permisos['cambiar_estado'])->toBeTrue()
+        ->and(Gestion::permisosDe($this->trabajador, $this->negocio))->toBe(['caja.vender']);
+    $this->get('/negocio/trabajadores')->assertSee('Cajero')->assertSee('Lunes, miércoles y viernes')->assertSee('Norte');
+    $this->get('/negocio/trabajadores?sede='.$this->negocio->sedes()->where('principal', true)->value('id'))->assertDontSee('Lunes, miércoles y viernes');
+
+    // Una sede de otro negocio o un permiso apagado no se aceptan.
+    $otro = User::factory()->create()->negocio()->create(['nombre' => 'Otro', 'direccion' => 'Calle 1', 'barrio' => 'Centro']);
+    $ajena = $otro->sedes()->create(['nombre' => 'Ajena']);
+    $this->put('/negocio/trabajadores/'.$this->trabajador->id, ['sede_id' => $ajena->id])->assertSessionHasErrors('sede_id');
+    $this->put('/negocio/trabajadores/'.$this->trabajador->id, ['modulos' => ['facturacion.emitir']])->assertSessionHasErrors('modulos.0');
+    $this->put('/negocio/trabajadores/'.$this->trabajador->id, ['dias' => [2], 'entrada' => [2 => '08:00']])->assertSessionHasErrors('horario');
+
+    // Al dueño no se le tocan los permisos.
+    $this->put('/negocio/trabajadores/'.$this->dueno->id, ['cargo' => 'Gerente', 'vitrina' => []])->assertSessionHas('ok');
+    expect($this->negocio->administra($this->dueno))->toBeTrue();
+
+    $tarea = $this->negocio->tareas()->create(['user_id' => $this->trabajador->id, 'titulo' => 'Barrer']);
+    $this->delete('/negocio/trabajadores/'.$this->dueno->id)->assertSessionHas('error');
+    $this->delete('/negocio/trabajadores/'.$this->trabajador->id)->assertSessionHas('ok');
+    expect($this->negocio->miembros()->whereKey($this->trabajador->id)->exists())->toBeFalse()
+        ->and(TareaTrabajo::find($tarea->id))->toBeNull();
+});
+
+test('un trabajador ve Trabajadores sin editar y solo marca sus propias tareas', function () {
+    Gestion::activar($this->negocio);
+    $suya = $this->negocio->tareas()->create(['user_id' => $this->trabajador->id, 'titulo' => 'Ordenar la bodega']);
+    $ajena = $this->negocio->tareas()->create(['user_id' => $this->dueno->id, 'titulo' => 'Pagar el arriendo']);
+    entrarAlPanel($this, $this->trabajador);
+
+    $this->get('/negocio/trabajadores?pestana=tareas')->assertOk()->assertSee('Ordenar la bodega')->assertDontSee('+ Asociar trabajador')->assertDontSee('+ Asignar tarea');
+    $this->put('/negocio/trabajadores/'.$this->trabajador->id, ['cargo' => 'Jefe'])->assertForbidden();
+    $this->post('/negocio/trabajadores/invitar', ['codigo' => 'UABC23'])->assertForbidden();
+    $this->post('/negocio/trabajadores/tareas', ['user_id' => $this->trabajador->id, 'titulo' => 'Algo'])->assertForbidden();
+    $this->patch('/negocio/trabajadores/tareas/'.$ajena->id.'/estado', ['estado' => 'hecha'])->assertForbidden();
+    $this->patch('/negocio/trabajadores/tareas/'.$suya->id.'/estado', ['estado' => 'hecha'])->assertSessionHas('ok');
+    expect($suya->fresh()->estado)->toBe('hecha')->and($suya->fresh()->hecha_at)->not->toBeNull();
+
+    // Con el permiso «Asignar tareas» ya asigna.
+    Gestion::guardarPermisos($this->negocio, $this->trabajador, ['equipo.tareas']);
+    $this->post('/negocio/trabajadores/tareas', ['user_id' => $this->dueno->id, 'tipo' => 'tarea', 'titulo' => 'Llamar al proveedor'])->assertSessionHas('ok');
+});
+
+test('se asignan tareas y pedidos en curso, se cambian de estado y salen en Pedidos', function () {
+    Gestion::activar($this->negocio);
+    $cliente = User::factory()->create(['name' => 'Ana Cliente']);
+    $enCurso = panelPedido($this->negocio, $cliente, 'aceptado', now());
+    $entregado = panelPedido($this->negocio, $cliente, 'entregado', now()->subDay());
+    entrarAlPanel($this, $this->dueno);
+
+    $this->post('/negocio/trabajadores/tareas', [
+        'user_id' => $this->trabajador->id, 'tipo' => 'tarea', 'titulo' => 'Pintar la reja', 'descripcion' => 'Color negro',
+        'fecha' => today()->format('Y-m-d'), 'urgente' => 1,
+    ])->assertRedirect('/negocio/trabajadores?pestana=tareas')->assertSessionHas('ok');
+    $this->post('/negocio/trabajadores/tareas', ['user_id' => $this->trabajador->id, 'tipo' => 'pedido', 'pedido_id' => $enCurso->id])->assertSessionHas('ok');
+    $this->post('/negocio/trabajadores/tareas', ['user_id' => $this->trabajador->id, 'tipo' => 'pedido', 'pedido_id' => $entregado->id])->assertSessionHasErrors('pedido_id');
+    $this->post('/negocio/trabajadores/tareas', ['user_id' => $this->trabajador->id, 'tipo' => 'tarea'])->assertSessionHasErrors('titulo');
+    $this->post('/negocio/trabajadores/tareas', ['user_id' => $this->trabajador->id, 'tipo' => 'tarea', 'titulo' => 'Ayer', 'fecha' => today()->subDay()->format('Y-m-d')])->assertSessionHasErrors('fecha');
+    $this->post('/negocio/trabajadores/tareas', ['user_id' => User::factory()->create()->id, 'tipo' => 'tarea', 'titulo' => 'X'])->assertSessionHasErrors('user_id');
+
+    $delPedido = $this->negocio->tareas()->whereNotNull('pedido_id')->firstOrFail();
+    expect($delPedido->titulo)->toBe('Atender el pedido '.$enCurso->codigo)->and($delPedido->creada_por)->toBe($this->dueno->id);
+    $this->get('/negocio/trabajadores?pestana=tareas')->assertSee('Pintar la reja')->assertSee('Urgente')->assertSee($enCurso->codigo)->assertSee('Hoy');
+    $this->get('/negocio/pedidos')->assertSee('👤 Ayudante')->assertSee('Asignado a');
+
+    $tarea = $this->negocio->tareas()->where('titulo', 'Pintar la reja')->firstOrFail();
+    $this->put('/negocio/trabajadores/tareas/'.$tarea->id, ['user_id' => $this->dueno->id, 'tipo' => 'tarea', 'titulo' => 'Pintar la reja de negro'])->assertSessionHas('ok');
+    expect($tarea->fresh()->user_id)->toBe($this->dueno->id)->and($tarea->fresh()->urgente)->toBeFalse();
+    $this->patch('/negocio/trabajadores/tareas/'.$tarea->id.'/estado', ['estado' => 'hecha'])->assertSessionHas('ok');
+    $this->get('/negocio/trabajadores?pestana=tareas')->assertDontSee('tarea-titulo">Pintar la reja de negro', false);
+    $this->get('/negocio/trabajadores?pestana=tareas&estado=hechas')->assertSee('Pintar la reja de negro');
+    $this->delete('/negocio/trabajadores/tareas/'.$tarea->id)->assertSessionHas('ok');
+    expect(TareaTrabajo::find($tarea->id))->toBeNull();
 });

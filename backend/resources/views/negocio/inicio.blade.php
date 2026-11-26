@@ -31,7 +31,7 @@
         @else
             <p class="apagado">Solo el núcleo. Vitrina enciende los demás módulos según el plan.</p>
         @endif
-        <p class="bloque-nota">Equipo activo: {{ $equipo }} personas.</p>
+        <p class="bloque-nota">Trabajadores activos: {{ $equipo }}.</p>
     </section>
 </div>
 @endsection

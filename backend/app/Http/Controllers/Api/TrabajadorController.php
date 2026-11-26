@@ -3,16 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Cita;
 use App\Models\InvitacionTrabajo;
 use App\Models\Negocio;
 use App\Models\User;
-use App\Notifications\InvitacionTrabajoRecibida;
-use App\Support\Push;
+use App\Support\EquipoNegocio;
+use App\Support\ErrorEquipo;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 /**
  * Equipo de un negocio: miembros e invitaciones de trabajo.
@@ -38,7 +36,7 @@ class TrabajadorController extends Controller
 
         $data = $request->validate(['codigo' => ['required', 'string', 'max:12']] + $this->reglasPermisos());
 
-        $usuario = $this->porCodigo($data['codigo']);
+        $usuario = EquipoNegocio::porCodigo($data['codigo']);
 
         if (! $usuario) {
             return response()->json(['message' => 'No existe nadie con ese código.'], 404);
@@ -95,38 +93,12 @@ class TrabajadorController extends Controller
 
         $data = $request->validate(['codigo' => ['required', 'string', 'max:12']] + $this->reglasPermisos());
 
-        $usuario = $this->porCodigo($data['codigo']);
-
-        if (! $usuario) {
-            return response()->json(['message' => 'No existe nadie con ese código.'], 404);
+        try {
+            $invitacion = EquipoNegocio::invitar($negocio, $request->user(), $data['codigo'], $this->datosPermisos($data));
+        } catch (ErrorEquipo $e) {
+            return response()->json(['message' => $e->getMessage()], $e->estado);
         }
-
-        if ($usuario->id === $request->user()->id) {
-            return response()->json(['message' => 'Ese es tu propio código.'], 422);
-        }
-
-        if ($negocio->miembros()->whereKey($usuario->id)->exists()) {
-            return response()->json(['message' => "{$usuario->nombre_completo} ya hace parte del negocio."], 409);
-        }
-
-        $yaInvitado = $negocio->invitaciones()
-            ->where('user_id', $usuario->id)
-            ->where('estado', InvitacionTrabajo::PENDIENTE)
-            ->exists();
-
-        if ($yaInvitado) {
-            return response()->json(['message' => "{$usuario->nombre_completo} ya tiene una invitación pendiente."], 409);
-        }
-
-        $invitacion = $negocio->invitaciones()->create([
-            'user_id' => $usuario->id,
-            'invitado_por' => $request->user()->id,
-            'estado' => InvitacionTrabajo::PENDIENTE,
-            ...$this->datosPermisos($data),
-        ]);
-
-        // El invitado decide: la invitación no lo vincula hasta que acepte.
-        Push::enviar($usuario, new InvitacionTrabajoRecibida($invitacion));
+        $usuario = $invitacion->invitado;
 
         return response()->json([
             'message' => "Invitación enviada a {$usuario->nombre_completo}. Debe aceptarla desde su app.",
@@ -164,21 +136,11 @@ class TrabajadorController extends Controller
 
         $miembro = $negocio->miembros()->whereKey($userId)->first();
 
-        if (! $miembro) {
-            return response()->json(['message' => 'Ese usuario no es miembro del negocio.'], 404);
+        try {
+            EquipoNegocio::quitar($negocio, $userId, $request->user());
+        } catch (ErrorEquipo $e) {
+            return response()->json(['message' => $e->getMessage()], $e->estado);
         }
-
-        if ($miembro->pivot->rol === Negocio::ROL_PROPIETARIO) {
-            return response()->json(['message' => 'No puedes quitar a un propietario.'], 422);
-        }
-
-        DB::transaction(function () use ($negocio, $request, $userId) {
-            $negocio = Negocio::lockForUpdate()->findOrFail($negocio->id);
-            abort_unless($negocio->administra($request->user()), 403);
-            abort_if($negocio->miembros()->whereKey($userId)->first()?->pivot->rol === Negocio::ROL_PROPIETARIO, 422, 'No puedes quitar a un propietario.');
-            $this->exigirSinCitas($negocio, $userId);
-            $negocio->miembros()->detach($userId);
-        });
 
         return response()->json(['message' => "{$miembro->nombre_completo} ya no hace parte del negocio."]);
     }
@@ -199,8 +161,13 @@ class TrabajadorController extends Controller
 
         DB::transaction(function () use ($negocio, $user) {
             $negocio = Negocio::lockForUpdate()->findOrFail($negocio->id);
-            $this->exigirSinCitas($negocio, $user->id);
+            try {
+                EquipoNegocio::exigirSinCitas($negocio, $user->id);
+            } catch (ErrorEquipo $e) {
+                abort(409, $e->getMessage());
+            }
             $negocio->miembros()->detach($user->id);
+            $negocio->tareas()->where('user_id', $user->id)->where('estado', '!=', 'hecha')->delete();
         });
 
         return response()->json(['message' => 'Saliste del negocio.']);
@@ -233,25 +200,6 @@ class TrabajadorController extends Controller
     }
 
     // ---------- Helpers privados ----------
-
-    private function exigirSinCitas(Negocio $negocio, int $userId): void
-    {
-        abort_if(Cita::where('negocio_id', $negocio->id)->where('profesional_id', $userId)
-            ->whereIn('estado', ['pendiente', 'confirmada'])->where('fin', '>', now())->exists(),
-            409, 'Antes de quitar al trabajador, reasigna sus citas pendientes y confirmadas a otro trabajador desde la agenda. El cliente recibirá una notificación.');
-    }
-
-    /** Busca por código EXACTO (acepta con o sin '#', en cualquier caja). */
-    private function porCodigo(string $codigo): ?User
-    {
-        $limpio = Str::of($codigo)->trim()->ltrim('#')->upper()->toString();
-
-        if ($limpio === '') {
-            return null;
-        }
-
-        return User::where('codigo_publico', $limpio)->first();
-    }
 
     private function sinAcceso(string $mensaje = 'No tienes acceso a este negocio.'): JsonResponse
     {

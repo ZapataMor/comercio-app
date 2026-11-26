@@ -104,7 +104,7 @@ class Negocio extends Model
     public function miembros(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'negocio_user')
-            ->withPivot(['rol', 'activo', 'permisos_gestion', ...self::PERMISOS])
+            ->withPivot(['rol', 'activo', 'permisos_gestion', 'sede_id', 'cargo', 'horario', ...self::PERMISOS])
             ->withTimestamps();
     }
 
@@ -167,6 +167,12 @@ class Negocio extends Model
     public function administra(User $user): bool
     {
         return $this->puede($user, 'administrador');
+    }
+
+    /** Tareas asignadas a sus trabajadores desde el panel web. */
+    public function tareas(): HasMany
+    {
+        return $this->hasMany(TareaTrabajo::class);
     }
 
     /** Invitaciones de trabajo enviadas por este negocio. */

@@ -103,7 +103,9 @@
         });
         document.querySelectorAll('[data-solo-pestana]').forEach((el) => { el.hidden = el.dataset.soloPestana !== nombre; });
         const url = new URL(location.href);
-        if (nombre === 'servicios') url.searchParams.set('pestana', 'servicios'); else url.searchParams.delete('pestana');
+        // La primera pestaña es la de siempre; las demás quedan en la dirección.
+        const primera = (document.querySelector('[data-pestana]') || {}).dataset?.pestana;
+        if (nombre !== primera) url.searchParams.set('pestana', nombre); else url.searchParams.delete('pestana');
         history.replaceState(null, '', url);
     };
     document.addEventListener('keydown', (e) => {
