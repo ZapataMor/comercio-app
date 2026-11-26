@@ -222,6 +222,20 @@ test('el menú y los módulos dependen de lo encendido y de los permisos', funct
     expect(Gestion::permisosDe($this->trabajador, $this->negocio))->toEqualCanonicalizing(['caja.vender', 'personal.tareas']);
 });
 
+test('el catálogo muestra los productos en tarjetas con su imagen', function () {
+    Gestion::activar($this->negocio);
+    $con = $this->negocio->productos()->create(['nombre' => 'Bomper delantero', 'descripcion' => 'Para camioneta', 'precio' => 350000, 'atributos' => ['Acero', 'Negro']]);
+    $con->forceFill(['imagen' => 'productos/bomper.jpg'])->save();
+    $this->negocio->productos()->create(['nombre' => 'Espejo lateral', 'precio' => 80000, 'disponible' => false]);
+    entrarAlPanel($this, $this->dueno);
+
+    $this->get('/negocio/catalogo')->assertOk()
+        ->assertSee('class="producto"', false)
+        ->assertSee('src="'.asset('storage/productos/bomper.jpg').'"', false)
+        ->assertSee('Bomper delantero')->assertSee('Para camioneta')->assertSee('Acero')->assertSee('$ 350.000')
+        ->assertSee('Sin imagen de Espejo lateral')->assertSee('Agotado');
+});
+
 test('el dueño da permisos de módulos desde Equipo', function () {
     Gestion::activar($this->negocio);
     Gestion::definirModulos($this->negocio, ['personal']);

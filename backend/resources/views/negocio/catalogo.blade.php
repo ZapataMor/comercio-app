@@ -22,23 +22,40 @@
 </section>
 <section class="bloque">
     <h2>Productos <span class="bloque-cuenta">{{ $productos->total() }}</span></h2>
-    <div class="tabla-scroll">
-        <table class="tabla">
-            <thead><tr><th>Producto</th><th>Categoría</th><th class="numero">Precio</th><th>Disponible</th></tr></thead>
-            <tbody>
-            @forelse($productos as $p)
-                <tr>
-                    <td class="fuerte">{{ $p->nombre }}</td>
-                    <td>{{ $p->categoria?->nombre ?? '—' }}</td>
-                    <td class="numero">$ {{ number_format((float) $p->precio, 0, ',', '.') }}</td>
-                    <td><span @class(['chip', 'chip-exito' => $p->disponible])>{{ $p->disponible ? 'Sí' : 'Agotado' }}</span></td>
-                </tr>
-            @empty
-                <tr><td colspan="4" class="vacia">Sin productos.</td></tr>
-            @endforelse
-            </tbody>
-        </table>
-    </div>
+    @if($productos->isEmpty())
+        <p class="apagado">Sin productos.</p>
+    @else
+        <ul class="productos">
+            @foreach($productos as $p)
+                @php
+                    $foto = $p->imagen ? asset('storage/'.ltrim(preg_replace('#^/?storage/#', '', $p->imagen), '/')) : null;
+                    $atributos = array_values(array_filter((array) ($p->atributos ?? []), 'is_string'));
+                @endphp
+                <li @class(['producto', 'agotado' => ! $p->disponible])>
+                    <div class="producto-foto">
+                        @if($foto)
+                            <img src="{{ $foto }}" alt="{{ $p->nombre }}" loading="lazy">
+                        @else
+                            <span class="producto-sin-foto" role="img" aria-label="Sin imagen de {{ $p->nombre }}">{{ mb_strtoupper(mb_substr($p->nombre, 0, 1)) }}</span>
+                        @endif
+                        <span @class(['chip', 'producto-estado', 'chip-exito' => $p->disponible])>{{ $p->disponible ? 'Disponible' : 'Agotado' }}</span>
+                    </div>
+                    <div class="producto-cuerpo">
+                        <p class="producto-categoria">{{ $p->categoria?->nombre ?? 'Sin categoría' }}</p>
+                        <h3>{{ $p->nombre }}</h3>
+                        @if($p->descripcion)<p class="producto-descripcion">{{ $p->descripcion }}</p>@endif
+                        @if($atributos)
+                            <ul class="producto-atributos">
+                                @foreach(array_slice($atributos, 0, 4) as $a)<li class="chip">{{ $a }}</li>@endforeach
+                                @if(count($atributos) > 4)<li class="chip">+{{ count($atributos) - 4 }}</li>@endif
+                            </ul>
+                        @endif
+                        <p class="producto-precio">$ {{ number_format((float) $p->precio, 0, ',', '.') }}@if($p->unidad_medida && $p->unidad_medida !== 'unidad')<span> / {{ $p->unidad_medida }}</span>@endif</p>
+                    </div>
+                </li>
+            @endforeach
+        </ul>
+    @endif
     {{ $productos->links('negocio._paginas') }}
 </section>
 <section class="bloque">

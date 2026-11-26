@@ -135,6 +135,25 @@ body.panel{min-height:100vh;font-size:15px}
 .opcion{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;margin-top:10px;padding:16px 18px;border-radius:16px;border:1px solid var(--line);background:var(--surface);color:var(--strong);font:600 15px SitioInter,system-ui,sans-serif;text-align:left;cursor:pointer;transition:border-color .15s,transform .15s}
 .opcion:hover{border-color:var(--accent);transform:translateY(-1px)}
 
+/* Catálogo: productos en tarjetas */
+.productos{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+.producto{display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--line);border-radius:18px;background:var(--surface);transition:transform .15s,box-shadow .15s,border-color .15s}
+.producto:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--accent) 45%,var(--line));box-shadow:var(--sombra)}
+.producto-foto{position:relative;aspect-ratio:4/3;background:var(--surface2)}
+.producto-foto img{display:block;width:100%;height:100%;object-fit:cover}
+.producto-sin-foto{display:grid;place-items:center;width:100%;height:100%;font:700 42px SitioSora,system-ui,sans-serif;color:var(--muted);opacity:.6}
+.producto-estado{position:absolute;top:10px;right:10px;box-shadow:0 2px 8px #0000002e}
+.producto-estado:not(.chip-exito){background:#1F1B16cc;color:#fff}
+.producto.agotado .producto-foto img{filter:grayscale(.85);opacity:.7}
+.producto-cuerpo{display:flex;flex-direction:column;gap:6px;flex:1;padding:14px 16px 16px}
+.producto-categoria{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--gold)}
+.producto h3{font-size:16px;letter-spacing:-.02em}
+.producto-descripcion{font-size:13px;line-height:1.5;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.producto-atributos{display:flex;flex-wrap:wrap;gap:5px;margin-top:2px!important}
+.producto-atributos .chip{font-size:11px;padding:2px 8px}
+.producto-precio{margin-top:auto;padding-top:8px;font:700 19px SitioSora,system-ui,sans-serif;color:var(--strong);letter-spacing:-.02em}
+.producto-precio span{font:400 13px SitioInter,system-ui,sans-serif;color:var(--muted)}
+
 /* Paginación */
 .paginas{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line);font-size:14px;color:var(--muted)}
 .paginas div{display:flex;gap:8px}
@@ -158,4 +177,4 @@ body.panel{min-height:100vh;font-size:15px}
     .datos dd{border-top:0;padding-top:0}
     .datos dd:first-of-type{padding-top:0}
 }
-@media (max-width:420px){.indicadores{gap:10px}.indicador{padding:16px}.indicador::after{width:60px;height:60px;right:-22px;top:-22px}.indicador strong{font-size:28px}}
+@media (max-width:420px){.productos{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.producto-cuerpo{padding:10px 12px 12px}.producto-precio{font-size:16px}.indicadores{gap:10px}.indicador{padding:16px}.indicador::after{width:60px;height:60px;right:-22px;top:-22px}.indicador strong{font-size:28px}}
