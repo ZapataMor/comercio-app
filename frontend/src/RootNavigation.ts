@@ -14,17 +14,17 @@ export function esComerciante(user: Usuario): boolean {
 
 /**
  * Pantalla con la que arranca cada quien al abrir la app o iniciar sesión: el
- * domiciliario en "Mis entregas" (aunque también sea comerciante), el
- * comerciante en la administración de su negocio (el Inicio, con el primero
- * que creó; ver NegocioContext), el cliente en Explorar y los demás en el
- * Inicio.
+ * domiciliario en "Mis entregas" (aunque también sea comerciante), quien es
+ * dueño o trabajador de un negocio en el Inicio de ese negocio (con sus
+ * permisos y sus tareas; ver NegocioContext), el cliente en Explorar y los
+ * demás en el Inicio.
  */
 export function rutaInicio(user: Usuario): 'Entregas' | 'Explorar' | 'Home' {
   const roles = user.roles ?? [];
   if (roles.includes('domiciliario')) {
     return 'Entregas';
   }
-  if (esComerciante(user)) {
+  if (esComerciante(user) || (user.negocios?.length ?? 0) > 0) {
     return 'Home';
   }
   return roles.includes('usuario') ? 'Explorar' : 'Home';
@@ -84,6 +84,13 @@ function navigateFromData(data: PushData, user: Usuario) {
       pedidoId,
       negocioId: Number.isFinite(negocioId) ? negocioId : undefined,
     });
+    return;
+  }
+
+  // Me asignaron una tarea: el Inicio de ese negocio, donde está la lista.
+  if (data.tipo === 'tarea_asignada') {
+    const negocioId = Number(data.negocio_id);
+    navigationRef.navigate('Home', Number.isInteger(negocioId) && negocioId > 0 ? { negocioId } : undefined, { pop: true });
     return;
   }
 

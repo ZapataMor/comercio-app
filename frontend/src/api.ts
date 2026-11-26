@@ -630,7 +630,7 @@ export async function getCanalesEnVivo(
 }
 
 /** POST/PUT autenticado con cuerpo JSON. */
-async function authSend(method: 'POST' | 'PUT' | 'DELETE', path: string, token: string, body?: any): Promise<any> {
+async function authSend(method: 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, token: string, body?: any): Promise<any> {
   let res: Response;
   try {
     res = await solicitar(`${API_URL}${path}`, {
@@ -2371,6 +2371,30 @@ export async function calificarPedido(token: string, id: number, body: NuevaCali
 }
 
 export type Servicio = { id: number; nombre: string; descripcion: string; disponible?: boolean; duracion_minutos?: number; precio?: number | null; permite_citas?: boolean; galeria?: string[] | null };
+/** Tarea que el negocio me asignó desde el panel web (Inicio de la app). */
+export type TareaAsignada = {
+  id: number;
+  titulo: string;
+  descripcion: string | null;
+  /** AAAA-MM-DD o null si no tiene fecha. */
+  fecha: string | null;
+  urgente: boolean;
+  estado: 'pendiente' | 'en_curso' | 'hecha';
+  atrasada: boolean;
+  hecha_at: string | null;
+  asignada_por: string | null;
+  pedido: { id: number; codigo: string; estado: string } | null;
+};
+
+/** Mis tareas por hacer en este negocio y las que hice hoy. */
+export async function getMisTareas(token: string, negocioId: number): Promise<TareaAsignada[]> {
+  return (await authGet(`/api/negocios/${negocioId}/mis-tareas`, token)).tareas ?? [];
+}
+
+export async function cambiarEstadoTarea(token: string, negocioId: number, id: number, estado: TareaAsignada['estado']): Promise<TareaAsignada> {
+  return (await authSend('PATCH', `/api/negocios/${negocioId}/mis-tareas/${id}`, token, { estado })).tarea;
+}
+
 export async function getServicios(token: string, negocioId: number): Promise<Servicio[]> {
   return (await authGet(`/api/negocios/${negocioId}/servicios`, token)).servicios;
 }

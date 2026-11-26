@@ -17,6 +17,7 @@ use App\Models\Pedido;
 use App\Models\PedidoReporte;
 use App\Models\ReputacionEvento;
 use App\Models\Resena;
+use App\Models\TareaTrabajo;
 use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
@@ -196,6 +197,15 @@ class EnVivo
         }
     }
 
+    /** Tareas asignadas: le llega a cada trabajador (su Inicio) y al equipo. */
+    public static function tareas(?int $negocioId, array $usuarios = []): void
+    {
+        self::avisar(self::negocio($negocioId), 'tareas', ['negocio_id' => $negocioId]);
+        foreach (array_unique(array_filter($usuarios)) as $id) {
+            self::avisar(self::usuario($id), 'tareas', ['negocio_id' => $negocioId]);
+        }
+    }
+
     public static function resenas(?int $negocioId): void
     {
         self::avisar([self::CATALOGO, self::negocio($negocioId), self::ADMIN], 'resenas', ['negocio_id' => $negocioId]);
@@ -309,11 +319,19 @@ class EnVivo
             ],
             Web\TrabajadoresController::class.'@guardar' => ['despues' => fn (Request $r) => self::equipo($r->attributes->get('negocio_web')?->id, [(int) $r->route('miembro')])],
             Web\TrabajadoresController::class.'@quitar' => ['despues' => fn (Request $r) => self::equipo($r->attributes->get('negocio_web')?->id, [(int) $r->route('miembro')])],
-            // Las tareas todavía no se ven en la app (ver «Mis tareas» en Modulos).
-            Web\TrabajadoresController::class.'@crearTarea' => null,
-            Web\TrabajadoresController::class.'@guardarTarea' => null,
-            Web\TrabajadoresController::class.'@estadoTarea' => null,
-            Web\TrabajadoresController::class.'@eliminarTarea' => null,
+            // «Mis tareas» del Inicio de la app: al trabajador (y al anterior, si se reasignó).
+            Web\TrabajadoresController::class.'@crearTarea' => ['despues' => fn (Request $r) => self::tareas($r->attributes->get('negocio_web')?->id, [(int) $r->input('user_id')])],
+            Web\TrabajadoresController::class.'@guardarTarea' => [
+                'antes' => fn (Request $r) => TareaTrabajo::whereKey((int) $r->route('tarea'))->value('user_id'),
+                'despues' => fn (Request $r, Response $res, ?int $antes) => self::tareas($r->attributes->get('negocio_web')?->id, [$antes, (int) $r->input('user_id')]),
+            ],
+            Web\TrabajadoresController::class.'@estadoTarea' => ['despues' => fn (Request $r) => self::tareas($r->attributes->get('negocio_web')?->id, [TareaTrabajo::whereKey((int) $r->route('tarea'))->value('user_id')])],
+            Web\TrabajadoresController::class.'@eliminarTarea' => [
+                'antes' => fn (Request $r) => TareaTrabajo::whereKey((int) $r->route('tarea'))->value('user_id'),
+                'despues' => fn (Request $r, Response $res, ?int $antes) => self::tareas($r->attributes->get('negocio_web')?->id, [$antes]),
+            ],
+            Api\TareaController::class.'@index' => null,
+            Api\TareaController::class.'@estado' => ['despues' => fn (Request $r) => self::tareas($negocioRuta($r), [$yo($r)])],
             Web\PanelNegocioController::class.'@guardarSede' => null,
             // Lo que se cambia en el panel web lo ven al instante la app y las demás pestañas.
             Web\PanelNegocioController::class.'@guardarTienda' => ['despues' => fn (Request $r) => self::datosNegocio($r->attributes->get('negocio_web')?->id)],

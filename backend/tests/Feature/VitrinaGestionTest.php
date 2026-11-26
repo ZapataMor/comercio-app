@@ -16,6 +16,7 @@ use App\Models\TareaTrabajo;
 use App\Models\TipoProducto;
 use App\Models\User;
 use App\Notifications\InvitacionTrabajoRecibida;
+use App\Notifications\TareaAsignada;
 use App\Support\EnVivo;
 use App\Support\GoogleIdToken;
 use App\Support\Telefono\EnviadorCodigos;
@@ -846,4 +847,39 @@ test('se asignan tareas y pedidos en curso, se cambian de estado y salen en Pedi
     $this->get('/negocio/trabajadores?pestana=tareas&estado=hechas')->assertSee('Pintar la reja de negro');
     $this->delete('/negocio/trabajadores/tareas/'.$tarea->id)->assertSessionHas('ok');
     expect(TareaTrabajo::find($tarea->id))->toBeNull();
+});
+
+test('al asignar una tarea le llega un aviso al trabajador y la ve en la app, donde la marca hecha', function () {
+    Gestion::activar($this->negocio);
+    entrarAlPanel($this, $this->dueno);
+    $this->post('/negocio/trabajadores/tareas', [
+        'user_id' => $this->trabajador->id, 'tipo' => 'tarea', 'titulo' => 'Soldar la reja', 'fecha' => today()->format('Y-m-d'), 'urgente' => 1,
+    ])->assertSessionHas('ok');
+    Notification::assertSentTo($this->trabajador, TareaAsignada::class, function ($n) {
+        $fcm = $n->toFcm($this->trabajador);
+
+        return $fcm->data['tipo'] === 'tarea_asignada' && $fcm->data['negocio_id'] === (string) $this->negocio->id
+            && str_contains($fcm->notification->title, 'urgente') && str_contains($fcm->notification->body, 'Para hoy');
+    });
+    // Asignársela a uno mismo no avisa.
+    $this->post('/negocio/trabajadores/tareas', ['user_id' => $this->dueno->id, 'tipo' => 'tarea', 'titulo' => 'Mía'])->assertSessionHas('ok');
+    Notification::assertNotSentTo($this->dueno, TareaAsignada::class);
+
+    comoNavegador($this);
+    $tarea = $this->negocio->tareas()->where('titulo', 'Soldar la reja')->firstOrFail();
+    $vieja = $this->negocio->tareas()->create(['user_id' => $this->trabajador->id, 'titulo' => 'De ayer', 'estado' => 'hecha', 'hecha_at' => now()->subDay()]);
+    $this->actingAs($this->trabajador, 'sanctum')->getJson('/api/negocios/'.$this->negocio->id.'/mis-tareas')
+        ->assertOk()->assertJsonCount(1, 'tareas')->assertJsonPath('tareas.0.titulo', 'Soldar la reja')->assertJsonPath('tareas.0.urgente', true);
+
+    $this->actingAs($this->trabajador, 'sanctum')->patchJson('/api/negocios/'.$this->negocio->id.'/mis-tareas/'.$tarea->id, ['estado' => 'hecha'])
+        ->assertOk()->assertJsonPath('tarea.estado', 'hecha');
+    expect($tarea->fresh()->hecha_at)->not->toBeNull();
+    // La hecha hoy sigue en la lista (tachada); la de ayer no.
+    $this->actingAs($this->trabajador, 'sanctum')->getJson('/api/negocios/'.$this->negocio->id.'/mis-tareas')->assertJsonCount(1, 'tareas')->assertJsonPath('tareas.0.estado', 'hecha');
+    expect($vieja->id)->not->toBe($tarea->id);
+
+    // La del dueño no la toca el trabajador, y un extraño no ve nada.
+    $delDueno = $this->negocio->tareas()->where('titulo', 'Mía')->firstOrFail();
+    $this->actingAs($this->trabajador, 'sanctum')->patchJson('/api/negocios/'.$this->negocio->id.'/mis-tareas/'.$delDueno->id, ['estado' => 'hecha'])->assertNotFound();
+    $this->actingAs(User::factory()->create(), 'sanctum')->getJson('/api/negocios/'.$this->negocio->id.'/mis-tareas')->assertForbidden();
 });

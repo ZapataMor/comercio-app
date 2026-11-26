@@ -104,8 +104,9 @@ test('si la sesión ya los recuerda, no la vuelve a guardar', async () => {
   expect(mockActualizarUsuario).not.toHaveBeenCalled();
 });
 
-test('el trabajador sin negocios propios arranca como cliente', () => {
-  expect(rutaInicio(usuario([{ id: 1, nombre: 'Ferretería', rol: 'trabajador' }]))).toBe('Explorar');
+test('el trabajador sin negocios propios arranca en el Inicio del negocio donde trabaja', () => {
+  expect(rutaInicio(usuario([{ id: 1, nombre: 'Ferretería', rol: 'trabajador' }]))).toBe('Home');
+  expect(rutaInicio(usuario([]))).toBe('Explorar');
 });
 
 test('el domiciliario arranca en sus entregas, aunque también sea comerciante', () => {

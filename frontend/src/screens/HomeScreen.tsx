@@ -20,6 +20,7 @@ import { useToast } from '../Toast';
 import { temasDelNegocio, usePolling } from '../usePolling';
 import { ScrollTeclado } from '../components/EspacioTeclado';
 import { DesplazableTutorial, Objetivo, useDesplazableTutorial } from '../tutorial/Objetivo';
+import MisTareas from '../components/MisTareas';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -231,7 +232,7 @@ function TarjetaPedido({
   );
 }
 
-export default function HomeScreen({ navigation }: Props) {
+export default function HomeScreen({ navigation, route }: Props) {
   const { c } = useTheme();
   const styles = useStyles();
   const { auth } = useAuth();
@@ -243,7 +244,21 @@ export default function HomeScreen({ navigation }: Props) {
   // El tutorial baja hasta los pedidos en espera.
   const tutorialScroll = useDesplazableTutorial();
 
-  const { negocio, negocios, recargar } = useNegocio();
+  const { negocio, negocios, recargar, seleccionar } = useNegocio();
+  // Desde el aviso de una tarea: se gestiona el negocio de esa tarea.
+  // Si aún no está en mi lista (me acaban de asociar), se recarga una vez.
+  const negocioPedido = route?.params?.negocioId;
+  const recargadoPara = useRef<number | null>(null);
+  useEffect(() => {
+    if (!negocioPedido) return;
+    if (negocios.some(n => n.id === negocioPedido)) {
+      seleccionar(negocioPedido);
+      navigation.setParams({ negocioId: undefined });
+    } else if (recargadoPara.current !== negocioPedido) {
+      recargadoPara.current = negocioPedido;
+      recargar();
+    }
+  }, [negocioPedido, negocios, seleccionar, navigation, recargar]);
   const negocioId = negocio?.id ?? null;
   // Panel de negocio: quien es miembro de algún negocio (no hay rol global
   // de "comerciante"; los negocios se crean desde Mis negocios).
@@ -400,6 +415,8 @@ export default function HomeScreen({ navigation }: Props) {
 
       {tienePanel && (
         <>
+          {/* Lo primero que ve el trabajador al abrir la app: lo que le toca hacer. */}
+          {!!negocio && <MisTareas token={token} negocioId={negocio.id} siempre={negocio.rol !== 'propietario'} />}
           <CuadrosAcceso accesos={accesos} />
           {!!negocio && tieneServicios && citasPendientes > 0 && <PressableScale style={styles.pedidoCard} onPress={() => navigation.navigate('AgendaNegocio', { negocioId: negocio.id })}>
             <Text style={styles.pedidoId}>{citasPendientes}{citasPendientes === 30 ? '+' : ''} solicitud(es) de cita por confirmar</Text>

@@ -34,8 +34,9 @@ jest.mock('../src/Toast', () => ({ useToast: () => ({ exito: jest.fn(), error: j
 jest.mock('../src/usePolling', () => ({
   ...jest.requireActual('../src/usePolling'),
   useEnVivo: jest.fn(),
-  usePolling: (cargar: () => void) => {
-    refrescar = cargar;
+  // El Inicio y su lista de tareas tienen cada uno su refresco.
+  usePolling: (cargar: () => void, _ms?: number, filtro?: (a: { tema: string }) => boolean) => {
+    if (!filtro?.({ tema: 'tareas' })) refrescar = cargar;
   },
 }));
 jest.mock('../src/api', () => ({
@@ -43,6 +44,7 @@ jest.mock('../src/api', () => ({
   getPedidosComercio: jest.fn(async () => []),
   getServicios: jest.fn(async () => []),
   getCitas: jest.fn(async () => ({ citas: [] })),
+  getMisTareas: jest.fn(async () => []),
 }));
 
 let raiz: ReactTestRenderer.ReactTestRenderer;

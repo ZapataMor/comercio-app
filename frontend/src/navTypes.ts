@@ -23,7 +23,8 @@ export type RootStackParamList = {
   RegistroGoogle: { idToken: string; perfil: PerfilGoogle };
   // Una vez, tras registrarse: «Completa tu cuenta» (correo o celular, opcionales).
   CompletarCuenta: undefined;
-  Home: undefined;
+  /** negocioId: abre el Inicio en ese negocio (p. ej. al tocar el aviso de una tarea). */
+  Home: { negocioId?: number } | undefined;
   // Datos personales de la cuenta: ver y modificar, y eliminar la cuenta (se
   // abre desde el menú del ícono de usuario de la topbar).
   MiInformacion: undefined;

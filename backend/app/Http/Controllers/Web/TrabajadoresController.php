@@ -10,8 +10,10 @@ use App\Models\Negocio;
 use App\Models\Pedido;
 use App\Models\TareaTrabajo;
 use App\Models\User;
+use App\Notifications\TareaAsignada;
 use App\Support\EquipoNegocio;
 use App\Support\ErrorEquipo;
+use App\Support\Push;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -189,6 +191,7 @@ class TrabajadoresController extends Controller
         abort_unless($this->puedeAsignar($request), 403, 'No tienes permiso para asignar tareas.');
         $datos = $this->datosTarea($request, $negocio, nueva: true);
         $tarea = $negocio->tareas()->create($datos + ['creada_por' => $request->user()->id]);
+        $this->avisarAsignada($tarea, $request);
 
         return redirect()->route('negocio.equipo', ['pestana' => 'tareas'])
             ->with('ok', 'Se le asignó «'.$tarea->titulo.'» a '.$tarea->trabajador->name.'.');
@@ -199,7 +202,11 @@ class TrabajadoresController extends Controller
         $negocio = $this->negocio($request);
         abort_unless($this->puedeAsignar($request), 403, 'No tienes permiso para cambiar tareas.');
         $modelo = $negocio->tareas()->findOrFail($tarea);
+        $antes = $modelo->user_id;
         $modelo->update($this->datosTarea($request, $negocio, nueva: false, actual: $modelo));
+        if ($modelo->user_id !== $antes) {
+            $this->avisarAsignada($modelo, $request);
+        }
 
         return redirect()->route('negocio.equipo', ['pestana' => 'tareas'])->with('ok', 'Se guardó la tarea «'.$modelo->titulo.'».');
     }
@@ -324,6 +331,14 @@ class TrabajadoresController extends Controller
         }
 
         return $fechas;
+    }
+
+    /** Push al trabajador, salvo que se la asigne uno mismo. */
+    private function avisarAsignada(TareaTrabajo $tarea, Request $request): void
+    {
+        if ($tarea->user_id !== $request->user()->id && $tarea->trabajador) {
+            Push::enviar($tarea->trabajador, new TareaAsignada($tarea));
+        }
     }
 
     private function puedeAsignar(Request $request): bool

@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\RecetaPreferidaController;
 use App\Http\Controllers\Api\RecuperarClaveController;
 use App\Http\Controllers\Api\ResenaController;
 use App\Http\Controllers\Api\RutaController;
+use App\Http\Controllers\Api\TareaController;
 use App\Http\Controllers\Api\TelefonoController;
 use App\Http\Controllers\Api\TrabajadorController;
 use App\Http\Controllers\Api\VisitaNegocioController;
@@ -243,6 +244,10 @@ Route::middleware(['auth:sanctum', 'throttle:api-usuario'])->group(function () {
         Route::put('/miembros/{userId}/permisos', [TrabajadorController::class, 'actualizarPermisos']);
         Route::delete('/miembros/{userId}', [TrabajadorController::class, 'quitarMiembro']);
         Route::post('/salir', [TrabajadorController::class, 'salir']);
+
+        // Mis tareas: las que me asignaron desde el panel web.
+        Route::get('/mis-tareas', [TareaController::class, 'index']);
+        Route::patch('/mis-tareas/{id}', [TareaController::class, 'estado'])->whereNumber('id');
     });
 
     // --- Invitaciones de trabajo recibidas (lado del invitado) ---
