@@ -14,6 +14,7 @@ use App\Notifications\TareaAsignada;
 use App\Support\EquipoNegocio;
 use App\Support\ErrorEquipo;
 use App\Support\Push;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,7 +24,8 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
- * Trabajadores del panel web (módulo del núcleo «equipo»):
+ * Trabajadores del panel web (módulo del núcleo «equipo»). El dueño no es un
+ * trabajador: no sale en la lista ni se le asignan tareas.
  * - se asocian con el código público que cada persona tiene en su app; se
  *   crea una invitación y la persona la acepta desde la app,
  * - cada uno tiene su sede (si hay varias), su cargo y sus días y horas,
@@ -48,11 +50,12 @@ class TrabajadoresController extends Controller
         $sedes = $negocio->sedes()->where('activa', true)->orderByDesc('principal')->orderBy('nombre')->get();
 
         $sede = $sedes->firstWhere('id', (int) $request->query('sede'));
-        $miembros = $negocio->miembrosActivos()->get()
+        $todos = $this->trabajadores($negocio)->orderBy('name')->get();
+        $miembros = $todos
             ->when($sede, fn ($c) => $c->filter(fn (User $m) => $m->pivot->sede_id === null || (int) $m->pivot->sede_id === $sede->id))
-            ->sortBy([fn ($a, $b) => ($a->pivot->rol === Negocio::ROL_PROPIETARIO ? 0 : 1) <=> ($b->pivot->rol === Negocio::ROL_PROPIETARIO ? 0 : 1), fn ($a, $b) => strcasecmp($a->name, $b->name)])
+            // Primero los administradores del negocio.
+            ->sortBy([fn ($a, $b) => (int) $b->pivot->administrador <=> (int) $a->pivot->administrador, fn ($a, $b) => strcasecmp($a->name, $b->name)])
             ->values();
-        $todos = $negocio->miembrosActivos()->orderBy('name')->get();
 
         $estado = in_array($request->query('estado'), ['hechas', 'todas'], true) ? $request->query('estado') : 'pendientes';
         $de = (int) $request->query('trabajador');
@@ -148,12 +151,11 @@ class TrabajadoresController extends Controller
         $negocio = $this->negocio($request);
         $quien = $request->user();
         abort_unless($negocio->administra($quien), 403, 'Solo el dueño o el administrador del negocio cambia los datos de los trabajadores.');
-        $persona = $negocio->miembrosActivos()->whereKey($miembro)->firstOrFail();
+        $persona = $this->trabajadores($negocio)->whereKey($miembro)->firstOrFail();
         $datos = $this->datosTrabajador($request, $negocio);
 
-        // Al dueño no se le cambian permisos (los tiene todos) y nadie se
-        // quita a sí mismo los suyos por error.
-        $conPermisos = $persona->pivot->rol !== Negocio::ROL_PROPIETARIO && $persona->id !== $quien->id;
+        // Nadie se quita a sí mismo los permisos por error.
+        $conPermisos = $persona->id !== $quien->id;
         DB::transaction(function () use ($negocio, $persona, $datos, $conPermisos) {
             $pivote = ['horario' => $datos['horario'] !== null ? json_encode($datos['horario']) : null] + $datos['pivote'];
             if (! $conPermisos) {
@@ -287,9 +289,9 @@ class TrabajadoresController extends Controller
             'fecha.after_or_equal' => 'La fecha no puede ser de un día que ya pasó.',
         ], ['user_id' => 'trabajador', 'pedido_id' => 'pedido', 'titulo' => 'tarea', 'descripcion' => 'detalle', 'fecha' => 'fecha']);
 
-        $persona = $negocio->miembrosActivos()->whereKey($datos['user_id'])->first();
+        $persona = $this->trabajadores($negocio)->whereKey($datos['user_id'])->first();
         if (! $persona) {
-            throw ValidationException::withMessages(['user_id' => 'Elige un trabajador del negocio.']);
+            throw ValidationException::withMessages(['user_id' => 'Elige un trabajador del negocio (al dueño no se le asignan tareas).']);
         }
         $pedido = null;
         if ($tipo === 'pedido') {
@@ -339,6 +341,12 @@ class TrabajadoresController extends Controller
         if ($tarea->user_id !== $request->user()->id && $tarea->trabajador) {
             Push::enviar($tarea->trabajador, new TareaAsignada($tarea));
         }
+    }
+
+    /** Miembros activos que no son dueños. */
+    private function trabajadores(Negocio $negocio): BelongsToMany
+    {
+        return $negocio->miembrosActivos()->wherePivot('rol', '!=', Negocio::ROL_PROPIETARIO);
     }
 
     private function puedeAsignar(Request $request): bool

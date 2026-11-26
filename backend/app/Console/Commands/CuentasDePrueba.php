@@ -14,8 +14,9 @@ use Illuminate\Support\Facades\Hash;
  * Deja la base lista para pruebas con cuentas como si se hubieran registrado
  * con el celular:
  *
- *  - Conserva a los dueños de negocio (comerciantes), a los domiciliarios y a
- *    los administradores (estos solo entran al panel web, con su contraseña).
+ *  - Conserva a los dueños de negocio (comerciantes), a los domiciliarios, a
+ *    los trabajadores de los negocios (vitrina:trabajadores-de-prueba) y a los
+ *    administradores (estos solo entran al panel web, con su contraseña).
  *  - Borra a todos los demás (clientes), y con ellos sus pedidos, reseñas,
  *    direcciones y carritos (las llaves foráneas los borran en cascada).
  *  - A comerciantes y luego domiciliarios les pone celulares seguidos desde
@@ -49,7 +50,8 @@ class CuentasDePrueba extends Command
             ->unique()->sort()->values();
         $domiciliarios = User::role('domiciliario')->orderBy('id')->pluck('id')->diff($duenos)->values();
         $admins = User::role('administrador')->pluck('id')->diff($duenos)->diff($domiciliarios)->values();
-        $conservar = $duenos->merge($domiciliarios)->merge($admins);
+        $trabajadores = DB::table('negocio_user')->where('rol', 'trabajador')->pluck('user_id')->unique();
+        $conservar = $duenos->merge($domiciliarios)->merge($admins)->merge($trabajadores);
         $borrar = User::whereNotIn('id', $conservar)->pluck('id');
 
         $this->line("Comerciantes: {$duenos->count()} · Domiciliarios: {$domiciliarios->count()} · Administradores (se conservan): {$admins->count()}");

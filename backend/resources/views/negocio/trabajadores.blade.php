@@ -97,7 +97,7 @@
     {{-- ----------------------------------------------------- Trabajadores --}}
     <div role="tabpanel" id="panel-trabajadores" aria-labelledby="pestana-trabajadores" @if($pestana !== 'trabajadores') hidden @endif>
         @if($miembros->isEmpty())
-            <p class="apagado catalogo-vacio">Nadie trabaja en esta sede todavía.</p>
+            <p class="apagado catalogo-vacio">{{ $sedeFiltro ? 'Nadie trabaja en esta sede todavía.' : 'Todavía no hay trabajadores.' }}{{ $administra && ! $sedeFiltro ? ' Asocia el primero con «+ Asociar trabajador» y el código que tiene en su app.' : '' }}</p>
         @else
             <ul class="trabajadores">
                 @foreach($miembros as $m)

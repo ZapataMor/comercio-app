@@ -787,12 +787,14 @@ test('el dueño cambia sede, días y permisos de un trabajador y lo quita del ne
     $this->put('/negocio/trabajadores/'.$this->trabajador->id, ['modulos' => ['facturacion.emitir']])->assertSessionHasErrors('modulos.0');
     $this->put('/negocio/trabajadores/'.$this->trabajador->id, ['dias' => [2], 'entrada' => [2 => '08:00']])->assertSessionHasErrors('horario');
 
-    // Al dueño no se le tocan los permisos.
-    $this->put('/negocio/trabajadores/'.$this->dueno->id, ['cargo' => 'Gerente', 'vitrina' => []])->assertSessionHas('ok');
+    // El dueño no es un trabajador: no sale en la lista ni se edita aquí.
+    $this->get('/negocio/trabajadores')->assertDontSee('id="trabajador-'.$this->dueno->id.'"', false);
+    $this->put('/negocio/trabajadores/'.$this->dueno->id, ['cargo' => 'Gerente', 'vitrina' => []])->assertNotFound();
     expect($this->negocio->administra($this->dueno))->toBeTrue();
 
     $tarea = $this->negocio->tareas()->create(['user_id' => $this->trabajador->id, 'titulo' => 'Barrer']);
     $this->delete('/negocio/trabajadores/'.$this->dueno->id)->assertSessionHas('error');
+    $this->post('/negocio/trabajadores/tareas', ['user_id' => $this->dueno->id, 'tipo' => 'tarea', 'titulo' => 'Para mí'])->assertSessionHasErrors('user_id');
     $this->delete('/negocio/trabajadores/'.$this->trabajador->id)->assertSessionHas('ok');
     expect($this->negocio->miembros()->whereKey($this->trabajador->id)->exists())->toBeFalse()
         ->and(TareaTrabajo::find($tarea->id))->toBeNull();
@@ -814,7 +816,7 @@ test('un trabajador ve Trabajadores sin editar y solo marca sus propias tareas',
 
     // Con el permiso «Asignar tareas» ya asigna.
     Gestion::guardarPermisos($this->negocio, $this->trabajador, ['equipo.tareas']);
-    $this->post('/negocio/trabajadores/tareas', ['user_id' => $this->dueno->id, 'tipo' => 'tarea', 'titulo' => 'Llamar al proveedor'])->assertSessionHas('ok');
+    $this->post('/negocio/trabajadores/tareas', ['user_id' => $this->trabajador->id, 'tipo' => 'tarea', 'titulo' => 'Llamar al proveedor'])->assertSessionHas('ok');
 });
 
 test('se asignan tareas y pedidos en curso, se cambian de estado y salen en Pedidos', function () {
@@ -840,8 +842,10 @@ test('se asignan tareas y pedidos en curso, se cambian de estado y salen en Pedi
     $this->get('/negocio/pedidos')->assertSee('👤 Ayudante')->assertSee('Asignado a');
 
     $tarea = $this->negocio->tareas()->where('titulo', 'Pintar la reja')->firstOrFail();
-    $this->put('/negocio/trabajadores/tareas/'.$tarea->id, ['user_id' => $this->dueno->id, 'tipo' => 'tarea', 'titulo' => 'Pintar la reja de negro'])->assertSessionHas('ok');
-    expect($tarea->fresh()->user_id)->toBe($this->dueno->id)->and($tarea->fresh()->urgente)->toBeFalse();
+    $otro = User::factory()->create(['name' => 'Pintor']);
+    $this->negocio->miembros()->attach($otro->id, ['rol' => 'trabajador', 'activo' => true]);
+    $this->put('/negocio/trabajadores/tareas/'.$tarea->id, ['user_id' => $otro->id, 'tipo' => 'tarea', 'titulo' => 'Pintar la reja de negro'])->assertSessionHas('ok');
+    expect($tarea->fresh()->user_id)->toBe($otro->id)->and($tarea->fresh()->urgente)->toBeFalse();
     $this->patch('/negocio/trabajadores/tareas/'.$tarea->id.'/estado', ['estado' => 'hecha'])->assertSessionHas('ok');
     $this->get('/negocio/trabajadores?pestana=tareas')->assertDontSee('tarea-titulo">Pintar la reja de negro', false);
     $this->get('/negocio/trabajadores?pestana=tareas&estado=hechas')->assertSee('Pintar la reja de negro');
@@ -861,8 +865,8 @@ test('al asignar una tarea le llega un aviso al trabajador y la ve en la app, do
         return $fcm->data['tipo'] === 'tarea_asignada' && $fcm->data['negocio_id'] === (string) $this->negocio->id
             && str_contains($fcm->notification->title, 'urgente') && str_contains($fcm->notification->body, 'Para hoy');
     });
-    // Asignársela a uno mismo no avisa.
-    $this->post('/negocio/trabajadores/tareas', ['user_id' => $this->dueno->id, 'tipo' => 'tarea', 'titulo' => 'Mía'])->assertSessionHas('ok');
+    // Al dueño no se le asignan tareas.
+    $this->post('/negocio/trabajadores/tareas', ['user_id' => $this->dueno->id, 'tipo' => 'tarea', 'titulo' => 'Mía'])->assertSessionHasErrors('user_id');
     Notification::assertNotSentTo($this->dueno, TareaAsignada::class);
 
     comoNavegador($this);
@@ -878,8 +882,24 @@ test('al asignar una tarea le llega un aviso al trabajador y la ve en la app, do
     $this->actingAs($this->trabajador, 'sanctum')->getJson('/api/negocios/'.$this->negocio->id.'/mis-tareas')->assertJsonCount(1, 'tareas')->assertJsonPath('tareas.0.estado', 'hecha');
     expect($vieja->id)->not->toBe($tarea->id);
 
-    // La del dueño no la toca el trabajador, y un extraño no ve nada.
-    $delDueno = $this->negocio->tareas()->where('titulo', 'Mía')->firstOrFail();
+    // La de otro no la toca el trabajador, y un extraño no ve nada.
+    $delDueno = $this->negocio->tareas()->create(['user_id' => $this->dueno->id, 'titulo' => 'Mía']);
     $this->actingAs($this->trabajador, 'sanctum')->patchJson('/api/negocios/'.$this->negocio->id.'/mis-tareas/'.$delDueno->id, ['estado' => 'hecha'])->assertNotFound();
     $this->actingAs(User::factory()->create(), 'sanctum')->getJson('/api/negocios/'.$this->negocio->id.'/mis-tareas')->assertForbidden();
+});
+
+test('el comando de trabajadores de prueba llena cada negocio sin contar al dueño y se puede repetir', function () {
+    Gestion::activar($this->negocio);
+    $this->artisan('vitrina:trabajadores-de-prueba', ['--por-negocio' => 3])->assertSuccessful();
+    $this->artisan('vitrina:trabajadores-de-prueba', ['--por-negocio' => 3])->assertSuccessful();
+    $trabajadores = $this->negocio->miembrosActivos()->wherePivot('rol', 'trabajador')->whereNotNull('telefono')->where('telefono', 'like', '320%')->get();
+    expect($trabajadores)->toHaveCount(3)
+        ->and($trabajadores->every(fn ($t) => $t->pivot->horario && $t->pivot->cargo))->toBeTrue()
+        ->and($this->negocio->tareas()->count())->toBeGreaterThanOrEqual(3);
+
+    entrarAlPanel($this, $this->dueno);
+    $this->get('/negocio/trabajadores')->assertSee($trabajadores->first()->name)->assertDontSee('trabajador-'.$this->dueno->id.'"', false);
+
+    $this->artisan('vitrina:trabajadores-de-prueba', ['--quitar' => true])->assertSuccessful();
+    expect($this->negocio->miembrosActivos()->where('telefono', 'like', '320%')->count())->toBe(0);
 });

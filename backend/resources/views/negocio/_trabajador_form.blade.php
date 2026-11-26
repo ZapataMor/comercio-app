@@ -4,9 +4,8 @@
     use App\Http\Controllers\Web\TrabajadoresController;
     $clave = $m ? 'trabajador-'.$m->id : 'asociar';
     $usarOld = old('_formulario') === $clave;
-    $esDueno = $m && $m->pivot->rol === 'propietario';
     $esYo = $m && $m->id === auth()->id();
-    $conPermisos = ! $esDueno && ! $esYo;
+    $conPermisos = ! $esYo;
     if ($usarOld) {
         $horario = [];
         foreach ((array) old('dias', []) as $d) {
@@ -76,7 +75,7 @@
             </fieldset>
         @endif
     @else
-        <p class="ancho aviso aviso-info">{{ $esDueno ? 'El dueño tiene todos los permisos.' : 'Tus propios permisos no se cambian desde aquí; los cambia el dueño.' }}</p>
+        <p class="ancho aviso aviso-info">Tus propios permisos no se cambian desde aquí; los cambia el dueño.</p>
     @endif
 
     <div class="ancho botonera producto-form-acciones">
