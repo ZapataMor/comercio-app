@@ -7,6 +7,7 @@ use App\Gestion\Modulos;
 use App\Models\AccesoWeb;
 use App\Models\CategoriaCatalogo;
 use App\Models\Negocio;
+use App\Models\Pedido;
 use App\Models\PlantillaGestion;
 use App\Models\Producto;
 use App\Models\TipoProducto;
@@ -15,6 +16,7 @@ use App\Support\EnVivo;
 use App\Support\GoogleIdToken;
 use App\Support\Telefono\EnviadorCodigos;
 use App\Support\Telefono\EnviadorLog;
+use Carbon\CarbonInterface;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
@@ -658,4 +660,49 @@ test('en la pestaña Servicios el botón añade un servicio, con las mismas regl
         ->and($s->galeria)->toHaveCount(1);
     EnVivo::enviar();
     Event::assertDispatched(CambioEnVivo::class, fn ($e) => $e->tema === 'catalogo' && in_array('negocio.'.$this->negocio->id, $e->canales, true));
+});
+
+/** Un pedido del negocio en el estado y el momento dados (para el panel web). */
+function panelPedido(Negocio $negocio, User $cliente, string $estado, CarbonInterface $creado, array $extra = []): Pedido
+{
+    $p = Pedido::create([
+        'negocio_id' => $negocio->id, 'user_id' => $cliente->id, 'estado' => $estado, 'metodo_pago' => 'efectivo',
+        'subtotal' => 32000, 'costo_domicilio' => 4000, 'total' => 36000, 'paga_con' => 50000,
+        'direccion_entrega' => 'Calle 20 #19-41', 'telefono_contacto' => '3007654321',
+    ] + $extra);
+    $p->forceFill(['created_at' => $creado])->save();
+    $p->items()->create(['nombre' => 'Almuerzo ejecutivo', 'precio' => 16000, 'cantidad' => 2, 'opciones' => ['sin' => ['Fríjoles']]]);
+
+    return $p;
+}
+
+test('los pedidos salen en tarjetas por día, con filtro, calendario y el detalle completo en el modal', function () {
+    Gestion::activar($this->negocio);
+    $cliente = User::factory()->create(['name' => 'Ana Cliente']);
+    $domi = User::factory()->create(['name' => 'Pedro', 'apellidos' => 'Moto', 'telefono' => '3111111111']);
+    $hoy = now()->setTime(12, 0);
+    $entregado = panelPedido($this->negocio, $cliente, 'entregado', $hoy, [
+        'domiciliario_id' => $domi->id, 'minutos_preparacion' => 25,
+        'aceptado_at' => $hoy->copy()->addMinutes(2), 'listo_at' => $hoy->copy()->addMinutes(22),
+        'tomado_at' => $hoy->copy()->addMinutes(5), 'recogido_at' => $hoy->copy()->addMinutes(30),
+        'en_camino_at' => $hoy->copy()->addMinutes(31), 'entregado_at' => $hoy->copy()->addMinutes(45),
+    ]);
+    $cancelado = panelPedido($this->negocio, $cliente, 'cancelado', $hoy->copy()->subDays(3), [
+        'cancelado_por' => 'cliente', 'motivo_cancelacion' => 'Me equivoqué de dirección', 'cancelado_at' => $hoy->copy()->subDays(3)->addMinutes(3),
+    ]);
+    entrarAlPanel($this, $this->dueno);
+
+    $this->get('/negocio/pedidos')->assertOk()
+        ->assertSee('class="pedido"', false)->assertSeeInOrder(['Hoy', $entregado->codigo, $cancelado->codigo])
+        ->assertSee('data-calendario', false)->assertSee('2× Almuerzo ejecutivo')
+        // Modal: cliente, domiciliario, tiempos.
+        ->assertSee('id="pedido-'.$entregado->id.'"', false)->assertSee('Ana Cliente')->assertSee('3007654321')
+        ->assertSee('Pedro Moto')->assertSee('3111111111')->assertSee('Sin fríjoles')
+        ->assertSee('20 min (prometido: 25 min)')->assertSee('Tiempo total')->assertSee('45 min')
+        ->assertSee('cambio $ 14.000', false)->assertSee('Me equivoqué de dirección');
+
+    $this->get('/negocio/pedidos?dia='.$hoy->format('Y-m-d'))->assertSee($entregado->codigo)->assertDontSee($cancelado->codigo);
+    $this->get('/negocio/pedidos?estado=cancelados')->assertSee($cancelado->codigo)->assertDontSee($entregado->codigo);
+    $this->get('/negocio/pedidos?buscar='.$entregado->codigo)->assertSee($entregado->codigo)->assertDontSee($cancelado->codigo);
+    $this->get('/negocio/pedidos?dia=no-es-fecha')->assertOk()->assertSee($cancelado->codigo);
 });

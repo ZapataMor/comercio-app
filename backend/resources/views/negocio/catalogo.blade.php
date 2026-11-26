@@ -15,7 +15,7 @@
 </header>
 
 {{-- Esta parte se vuelve a pedir cuando el catálogo cambia en la app o en otra pestaña. --}}
-<div id="catalogo-vivo" data-negocio="{{ $negocioWeb->id }}">
+<div id="catalogo-vivo" data-vivo data-negocio="{{ $negocioWeb->id }}">
 <section class="bloque">
     <div class="catalogo-barra">
         <div class="pestanas" role="tablist" aria-label="Catálogo">

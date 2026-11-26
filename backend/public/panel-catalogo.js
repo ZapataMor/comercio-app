@@ -179,12 +179,16 @@
     iniciar(document);
 
     // ------------------------------------------------ En vivo
-    // Cuando el catálogo cambia (en la app, en otra pestaña o aquí mismo),
-    // se vuelve a pedir esta página y se cambia solo la parte del catálogo.
+    // La parte marcada con data-vivo se vuelve a pedir y se cambia sola:
+    // - Catálogo (data-negocio): cuando avisa el canal público «catalogo»
+    //   (cambios en la app, en otra pestaña o aquí mismo).
+    // - Pedidos (data-vivo-intervalo): cada tantos milisegundos; su canal es
+    //   privado del equipo y la web no tiene cómo entrar a él.
     // Si hay un modal abierto o se está escribiendo, espera a que termine.
-    const vivo = document.getElementById('catalogo-vivo');
+    const vivo = document.querySelector('[data-vivo]');
     if (!vivo) return;
-    const negocioId = Number(vivo.dataset.negocio);
+    const negocioId = Number(vivo.dataset.negocio || 0);
+    const intervalo = Number(vivo.dataset.vivoIntervalo || 0);
     let pendiente = false;
     let temporizador = null;
 
@@ -197,7 +201,7 @@
         try {
             const r = await fetch(location.href, { credentials: 'same-origin', headers: { Accept: 'text/html' } });
             if (!r.ok || r.redirected) return;
-            const nuevo = new DOMParser().parseFromString(await r.text(), 'text/html').getElementById('catalogo-vivo');
+            const nuevo = new DOMParser().parseFromString(await r.text(), 'text/html').querySelector('[data-vivo]');
             if (!nuevo) return;
             if (ocupado()) { pendiente = true; return; }
             vivo.replaceChildren(...nuevo.childNodes);
@@ -214,10 +218,10 @@
     // Respaldo: al volver a la pestaña y cada minuto si no hay conexión en vivo.
     let conectado = false;
     document.addEventListener('visibilitychange', () => { if (!document.hidden) refrescarLuego(); });
-    setInterval(() => { if (!conectado && !document.hidden) refrescarLuego(); }, 60000);
+    setInterval(() => { if ((intervalo || !conectado) && !document.hidden) refrescarLuego(); }, intervalo || 60000);
 
     const config = window.vitrinaEnVivo;
-    if (!config || !config.clave || typeof window.Pusher !== 'function') return;
+    if (!negocioId || !config || !config.clave || typeof window.Pusher !== 'function') return;
     // Como la app: http://host:8000 -> ws://host:8080 (reverb:start);
     // https://host[:p] -> wss://host[:p] (el proxy pasa /app a Reverb).
     const tls = location.protocol === 'https:';

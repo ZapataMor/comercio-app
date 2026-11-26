@@ -314,6 +314,72 @@ body.panel{min-height:100vh;font-size:15px}
 .producto-form-acciones{position:sticky;bottom:-24px;margin:4px -24px -24px;padding:16px 24px;background:color-mix(in srgb,var(--bg) 94%,transparent);border-top:1px solid var(--line)}
 .enlace-boton{background:none;border:0;padding:0;color:var(--gold);font:600 14px SitioInter,system-ui,sans-serif;cursor:pointer}
 .enlace-boton:hover{text-decoration:underline}
+.chip-peligro{background:#FDE4DC;color:#9B2F12}
+:root[data-mode="noche"] .chip-peligro{background:#4A2433;color:#FFB7A3}
+
+/* Pedidos: filtro + calendario, tarjetas agrupadas por día */
+.pedidos-filtros{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:22px}
+.pedidos-filtros input[type=search],.pedidos-filtros select{min-height:42px;padding:8px 14px;border-radius:12px;border:1px solid var(--input-line);background:var(--surface);color:var(--strong);font:14px SitioInter,system-ui,sans-serif}
+.pedidos-filtros input[type=search]{width:260px}
+.pedidos-filtros input:focus,.pedidos-filtros select:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+.boton-calendario{position:relative;display:inline-flex;align-items:center;gap:8px;min-height:42px;padding:8px 14px;border-radius:12px;border:1px solid var(--input-line);background:var(--surface);color:var(--strong);font:600 14px SitioInter,system-ui,sans-serif;cursor:pointer;white-space:nowrap}
+.boton-calendario:hover{border-color:var(--accent)}
+.boton-calendario.activo{background:var(--accent-soft);border-color:var(--accent);color:var(--gold)}
+.boton-calendario input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0}
+.boton-calendario:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.pedidos-dia + .pedidos-dia{margin-top:28px}
+.pedidos-dia-titulo{display:flex;align-items:center;gap:10px;margin:0 0 14px;font-size:18px}
+.pedidos-dia-total{margin-left:auto;font:700 15px SitioSora,system-ui,sans-serif;color:var(--muted)}
+.pedidos{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px}
+.pedido{display:flex;flex-direction:column;align-items:flex-start;gap:8px;width:100%;height:100%;padding:18px;border:1px solid var(--line);border-radius:18px;background:var(--surface);color:inherit;font:inherit;text-align:left;cursor:pointer;transition:transform .15s,box-shadow .15s,border-color .15s}
+.pedido:hover,.pedido:focus-visible{transform:translateY(-2px);border-color:color-mix(in srgb,var(--accent) 45%,var(--line));box-shadow:var(--sombra)}
+.pedido:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.pedido.cancelado{opacity:.72}
+.pedido-cabeza{display:flex;align-items:baseline;justify-content:space-between;gap:10px;width:100%}
+.pedido-codigo{font:700 16px ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.04em;color:var(--strong)}
+.pedido-hora{font-size:13px;color:var(--muted);white-space:nowrap}
+.pedido-cliente{font:700 16px/1.25 SitioSora,system-ui,sans-serif;color:var(--strong);letter-spacing:-.02em}
+.pedido-items{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:13px;color:var(--muted)}
+.pedido-pie{display:flex;align-items:center;flex-wrap:wrap;gap:8px;width:100%;margin-top:auto;padding-top:10px;border-top:1px solid var(--line)}
+.pedido-total{margin-right:auto;font:700 18px SitioSora,system-ui,sans-serif;color:var(--strong)}
+.pedido-domi{font-size:12px;color:var(--muted)}
+
+/* Modal del pedido */
+.pedido-modal-titulo{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.pedido-detalle{display:flex;flex-direction:column;gap:16px}
+.pedido-detalle .aviso{margin:0}
+.pedido-fecha{margin:-6px 0 0}
+.pedido-columnas{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:16px;align-items:start}
+.pedido-lado{display:flex;flex-direction:column;gap:16px}
+.pedido-caja{padding:18px 20px;border:1px solid var(--line);border-radius:18px;background:var(--surface)}
+.pedido-caja h3{margin:0 0 12px;font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--gold)}
+.pedido-persona{font:700 17px SitioSora,system-ui,sans-serif;color:var(--strong);margin-bottom:8px}
+.pedido-lineas li{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:14px}
+.pedido-lineas li:first-child{border-top:0;padding-top:0}
+.pedido-cantidad{min-width:30px;font-weight:700;color:var(--gold)}
+.pedido-linea-nombre{flex:1;min-width:0;color:var(--strong)}
+.pedido-linea-nombre small{display:block;margin-top:2px;color:var(--muted);font-size:12px}
+.pedido-lineas strong{white-space:nowrap;color:var(--strong)}
+.pedido-cuentas,.pedido-datos{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 16px;margin:12px 0 0;font-size:14px}
+.pedido-cuentas{padding-top:12px;border-top:1px dashed var(--input-line)}
+.pedido-cuentas dd{text-align:right}
+.pedido-cuentas .fuerte{font:700 17px SitioSora,system-ui,sans-serif;color:var(--strong)}
+.pedido-datos dt{color:var(--muted)}
+.pedido-datos dd,.pedido-cuentas dd{margin:0;color:var(--strong);overflow-wrap:anywhere}
+.pedido-cuentas dt{color:var(--muted)}
+.pedido-resumen{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+.pedido-resumen div{display:flex;flex-direction:column;gap:2px;padding:12px 14px;border-radius:14px;background:var(--surface2)}
+.pedido-resumen span{font-size:12px;color:var(--muted)}
+.pedido-resumen strong{font:700 16px SitioSora,system-ui,sans-serif;color:var(--strong)}
+.pedido-linea-tiempo{position:relative;margin:0;padding:0;list-style:none}
+.pedido-linea-tiempo li{position:relative;display:grid;grid-template-columns:22px minmax(0,1fr) auto auto;align-items:center;gap:6px 12px;padding:7px 0;font-size:14px}
+.pedido-linea-tiempo li:not(:last-child)::after{content:"";position:absolute;left:6px;top:24px;bottom:-9px;width:2px;background:var(--line)}
+.pedido-punto{width:14px;height:14px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+.final-cancelado .pedido-punto{background:#B23A17;box-shadow:0 0 0 4px #B23A1726}
+.pedido-evento{color:var(--strong)}
+.pedido-momento{font-variant-numeric:tabular-nums;color:var(--strong);font-weight:600;white-space:nowrap}
+.pedido-momento small{color:var(--muted);font-weight:400}
+.pedido-desde{min-width:74px;text-align:right;font-size:12px;color:var(--muted);white-space:nowrap}
 
 /* Paginación */
 .paginas{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line);font-size:14px;color:var(--muted)}
@@ -348,5 +414,10 @@ body.panel{min-height:100vh;font-size:15px}
     .catalogo-filtros{width:100%}
     .producto-form-vista{width:84px;height:84px}
     .producto-extra{grid-template-columns:minmax(0,1fr) 100px}
+    .pedidos-filtros input[type=search]{width:100%}
+    .pedido-columnas{grid-template-columns:1fr}
+    .pedido-caja{padding:16px}
+    .pedido-linea-tiempo li{grid-template-columns:22px minmax(0,1fr) auto}
+    .pedido-desde{grid-column:2/-1;text-align:left;margin-top:-6px}
 }
 @media (max-width:420px){.productos{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.producto-cuerpo{padding:10px 12px 12px}.producto-nombre{font-size:15px}.producto-precio{font-size:16px}.indicadores{gap:10px}.indicador{padding:16px}.indicador::after{width:60px;height:60px;right:-22px;top:-22px}.indicador strong{font-size:28px}}

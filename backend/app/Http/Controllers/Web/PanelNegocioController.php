@@ -26,6 +26,7 @@ use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -324,8 +325,39 @@ class PanelNegocioController extends Controller
         $user = $request->user();
         abort_unless($negocio->puede($user, 'gestionar_pedidos') || $negocio->puede($user, 'cambiar_estado'), 403, 'No tienes permiso para ver los pedidos.');
 
+        $estado = $request->query('estado');
+        $buscar = trim((string) $request->query('buscar', ''));
+        $dia = null;
+        if (is_string($request->query('dia')) && preg_match('/\A\d{4}-\d{2}-\d{2}\z/', $request->query('dia'))) {
+            try {
+                $dia = Carbon::createFromFormat('!Y-m-d', $request->query('dia'));
+            } catch (\Throwable) {
+                $dia = null;
+            }
+        }
+
+        $query = $negocio->pedidos()->with(['cliente', 'domiciliario', 'items', 'calificacion'])->latest()->latest('id');
+        match ($estado) {
+            'en_curso' => $query->whereIn('estado', Pedido::EN_CURSO),
+            'entregados' => $query->where('estado', 'entregado'),
+            'cancelados' => $query->where('estado', 'cancelado'),
+            default => null,
+        };
+        if ($dia) {
+            $query->whereBetween('created_at', [$dia->copy()->startOfDay(), $dia->copy()->endOfDay()]);
+        }
+        if ($buscar !== '') {
+            $digitos = preg_replace('/\D/', '', $buscar);
+            $query->where(fn ($q) => $q->where('codigo', 'like', '%'.strtoupper($buscar).'%')
+                ->when(strlen($digitos) >= 4, fn ($q) => $q->orWhere('telefono_contacto', 'like', '%'.$digitos.'%'))
+                ->orWhereHas('cliente', fn ($c) => $c->where('name', 'like', '%'.$buscar.'%')));
+        }
+
         return view('negocio.pedidos', [
-            'pedidos' => $negocio->pedidos()->with('cliente')->latest()->paginate(30),
+            'pedidos' => $query->paginate(30)->withQueryString(),
+            'estado' => in_array($estado, ['en_curso', 'entregados', 'cancelados'], true) ? $estado : null,
+            'dia' => $dia,
+            'buscar' => $buscar,
         ]);
     }
 
