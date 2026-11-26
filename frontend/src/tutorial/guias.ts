@@ -439,14 +439,9 @@ export const TUTORIALES: Tutorial[] = [
         texto: 'Mantén presionado para abrir o cerrar tu negocio. Cerrado, no recibe pedidos nuevos.',
       },
       {
-        objetivo: 'negocios.selector',
-        titulo: 'Tus negocios',
-        texto: 'Si tienes más de uno, cámbialo aquí. También puedes crear otro.',
-      },
-      {
         objetivo: 'home.accesos',
         titulo: 'Accesos rápidos',
-        texto: 'Productos, pedidos, equipo, datos de la tienda y más. Toca el que necesites.',
+        texto: 'Productos, pedidos, equipo, datos de la tienda y más. En «Mis negocios» cambias de negocio o creas otro.',
       },
       {
         objetivo: 'home.pedidos',

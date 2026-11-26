@@ -6,8 +6,9 @@ import ReembolsosPerfil from './ReembolsosPerfil';
  * ambos usan las mismas opciones (useOpcionesPerfil). Solo muestra el ícono de la persona; al tocarlo despliega
  * justo debajo (MenuDesplegable) el menú de la cuenta PERSONAL (la persona,
  * no el negocio): recuadros pequeños con "Mi información", "Mis negocios" y
- * "Privacidad", y al final "Cerrar sesión". Estando en sus negocios, en vez
- * de "Mis negocios" ve "Comprar", que lo lleva a Explorar. El domiciliario
+ * "Privacidad", y al final "Cerrar sesión". Estando en el panel de sus
+ * negocios no salen "Mis negocios" ni "Comprar": el panel ya trae esos
+ * accesos ("Mis negocios" y "Explorar negocios"). El domiciliario
  * tiene además "Mis entregas", y al cliente que aún no lo es se le ofrece
  * "Ser domiciliario" en un recuadro destacado.
  *
@@ -17,9 +18,8 @@ import ReembolsosPerfil from './ReembolsosPerfil';
  * guardadas y aparece también "Cerrar todas las sesiones".
  *
  * Al domiciliario se le muestran al lado su nivel de confiabilidad
- * (HeaderConfiabilidad) y su turno (HeaderTurno). Quien tiene negocios ve
- * siempre, junto al ícono de usuario, el de "Mis negocios" (HeaderNegocios):
- * en el catálogo, en Explorar o en cualquier pantalla con esta topbar.
+ * (HeaderConfiabilidad) y su turno (HeaderTurno). Cambiar de negocio se
+ * hace desde "Mis negocios" (cuadro del panel o este menú), no desde la topbar.
  */
 import React from 'react';
 import { Linking, Text, View } from 'react-native';
@@ -34,7 +34,6 @@ import { useToast } from '../Toast';
 import { PressableScale } from './anim';
 import { useConfirmar } from './Confirmacion';
 import HeaderConfiabilidad from './HeaderConfiabilidad';
-import HeaderNegocios from './HeaderNegocios';
 import HeaderTurno from './HeaderTurno';
 import Icon, { IconName } from './Icon';
 import MenuDesplegable, { Elegir, OpcionMenu } from './MenuDesplegable';
@@ -74,11 +73,12 @@ function enSusNegocios(tieneNegocios: boolean): boolean {
 function modulosPara(roles: string[], enNegocio: boolean, serDomiciliario: () => void): Modulo[] {
   const modulos: Modulo[] = [
     { titulo: 'Mi información', icono: 'usuario', abrir: () => navigationRef.navigate('MiInformacion') },
-    // En sus negocios, el atajo es volver a comprar (Explorar es del cliente).
-    enNegocio && roles.includes('usuario')
-      ? { titulo: 'Comprar', icono: 'bolsa', abrir: () => navigationRef.navigate('Explorar') }
-      : { titulo: 'Mis negocios', icono: 'tienda', abrir: () => navigationRef.navigate('MisNegocios') },
   ];
+  // En el panel de sus negocios ya están los cuadros "Mis negocios" y
+  // "Explorar negocios": aquí no se repiten.
+  if (!enNegocio) {
+    modulos.push({ titulo: 'Mis negocios', icono: 'tienda', abrir: () => navigationRef.navigate('MisNegocios') });
+  }
   if (roles.includes('usuario')) {
     modulos.push({ titulo: 'Mis direcciones', icono: 'ubicacion', abrir: () => navigationRef.navigate('MisDirecciones') });
     // Casas en venta o alquiler y patios para eventos que publica.
@@ -262,7 +262,6 @@ export default function HeaderPerfil({ menu = true }: { menu?: boolean }) {
     <View style={styles.fila}>
       <HeaderConfiabilidad />
       <HeaderTurno />
-      <HeaderNegocios />
       {menu && (
         <Objetivo id="perfil.menu" enBarra>
           <MenuDesplegable icono="usuario" etiqueta="Mi perfil" renglones={opciones} />

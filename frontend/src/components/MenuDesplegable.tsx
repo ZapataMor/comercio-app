@@ -1,7 +1,7 @@
 /**
  * Botón redondo de la topbar que, al tocarlo, despliega justo debajo un menú
  * en recuadros pequeños, sin cambiar de pantalla. Lo usan "Mi perfil"
- * (HeaderPerfil) y "Mis negocios" (HeaderNegocios).
+ * (HeaderPerfil), entre otros.
  *
  * La caja entra suave (fundido + escala desde la esquina del ícono) y se
  * despliega hacia abajo mientras sus renglones caen en cascada, uno tras

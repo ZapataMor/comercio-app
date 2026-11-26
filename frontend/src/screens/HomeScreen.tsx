@@ -277,8 +277,8 @@ export default function HomeScreen({ navigation, route }: Props) {
   // Pedido que se está aceptando: su botón muestra que va en curso.
   const [aceptando, setAceptando] = useState<number | null>(null);
 
-  // Topbar: con negocio, el switch Abierto/Cerrado y la lista de mis
-  // negocios van junto a "Mi perfil". (Sin negocio no se muestran.)
+  // Topbar: con negocio, el switch Abierto/Cerrado va junto a "Mi perfil".
+  // (Sin negocio no se muestra.) Cambiar de negocio: cuadro "Mis negocios".
   useLayoutEffect(() => {
     navigation.setOptions({
       // El domiciliario llega aquí desde sus entregas: con la flecha de volver
