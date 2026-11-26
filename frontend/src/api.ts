@@ -1026,6 +1026,12 @@ export async function actualizarProducto(
   return d.producto as Producto;
 }
 
+/** Agotado o de nuevo a la venta, de un toque desde la lista (sin abrir el formulario). */
+export async function cambiarDisponibleProducto(token: string, negocioId: number, id: number, disponible: boolean): Promise<Producto> {
+  const d = await authSend('PUT', `/api/negocios/${negocioId}/productos/${id}`, token, { disponible });
+  return d.producto as Producto;
+}
+
 export async function eliminarProducto(token: string, negocioId: number, id: number): Promise<void> {
   await authSend('DELETE', `/api/negocios/${negocioId}/productos/${id}`, token);
 }

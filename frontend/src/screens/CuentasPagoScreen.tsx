@@ -32,6 +32,7 @@ import { useNegocio } from '../NegocioContext';
 import { font, makeStyles, radius, useTheme } from '../theme';
 import { useToast } from '../Toast';
 import { useLectura } from '../useLectura';
+import { useHayCambios, useSalirSinGuardar } from '../useSalirSinGuardar';
 
 const TIPOS: { v: TipoCuentaPago; t: string }[] = [
   { v: 'nequi', t: 'Nequi' },
@@ -71,6 +72,9 @@ export default function CuentasPagoScreen() {
   const [qrActual, setQrActual] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const pedirClave = usePedirClave();
+  // Atrás o «Cancelar» con la cuenta a medio llenar: se pregunta antes de perderla.
+  const hayCambios = useHayCambios(JSON.stringify(form), editando !== null);
+  const { preguntar } = useSalirSinGuardar(hayCambios);
 
   const cargar = useCallback(async () => {
     if (!negocio) return;
@@ -245,7 +249,7 @@ export default function CuentasPagoScreen() {
           <PressableScale style={styles.btn} onPress={guardar} disabled={guardando}>
             {guardando ? <ActivityIndicator color={c.onBrand} /> : <Text style={styles.btnTxt}>Guardar cuenta</Text>}
           </PressableScale>
-          <TouchableOpacity onPress={() => setEditando(null)} disabled={guardando} style={styles.cancelar}>
+          <TouchableOpacity onPress={() => preguntar(() => setEditando(null))} disabled={guardando} style={styles.cancelar}>
             <Text style={styles.cancelarTxt}>Cancelar</Text>
           </TouchableOpacity>
         </View>

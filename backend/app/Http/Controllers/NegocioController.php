@@ -44,7 +44,7 @@ class NegocioController extends Controller
             $negocio = Negocio::lockForUpdate()->findOrFail($negocio->id);
             abort_unless($negocio->esPropietario($request->user()), 403);
             if ($datos['desactivado']) {
-                $this->validarSinPedidosPendientes($negocio);
+                $this->validarSinPedidosPendientes($negocio, Pedido::EN_CURSO, 'desactivar el negocio');
             }
             $negocio->forceFill(['desactivado_at' => $datos['desactivado'] ? ($negocio->desactivado_at ?? now()) : null])->save();
 
@@ -273,7 +273,9 @@ class NegocioController extends Controller
             $negocio = Negocio::lockForUpdate()->findOrFail($negocio->id);
             if (array_key_exists('activo', $data)) {
                 if (! $data['activo']) {
-                    $this->validarSinPedidosPendientes($negocio);
+                    // Cerrar solo frena pedidos nuevos: los que ya lleva un
+                    // domiciliario siguen su camino con la tienda cerrada.
+                    $this->validarSinPedidosPendientes($negocio, Pedido::NECESITAN_TIENDA, 'cerrar la tienda');
                 }
                 if ((bool) $data['activo'] !== $negocio->activo) {
                     $negocio->activo_cambiado_at = now();
@@ -298,10 +300,38 @@ class NegocioController extends Controller
         ]);
     }
 
-    private function validarSinPedidosPendientes(Negocio $negocio): void
+    /**
+     * No deja cerrar o desactivar con pedidos en `$estados`, y dice cuáles son
+     * y qué hacer con ellos (antes solo decía «tienes pedidos en proceso»).
+     *
+     * @param  list<string>  $estados
+     */
+    private function validarSinPedidosPendientes(Negocio $negocio, array $estados, string $accion): void
     {
-        abort_if($negocio->pedidos()->whereIn('estado', Pedido::EN_CURSO)->exists(), 409,
-            'No puedes cerrar ni desactivar el comercio porque tienes pedidos en proceso. Debes finalizarlos o cancelarlos antes de cerrar o desactivar el comercio.');
+        $pedidos = $negocio->pedidos()->whereIn('estado', $estados)->orderBy('id')->get(['id', 'codigo', 'estado']);
+        if ($pedidos->isEmpty()) {
+            return;
+        }
+
+        if ($pedidos->count() === 1) {
+            $p = $pedidos->first();
+            abort(409, "Aún no puedes {$accion}: el pedido {$p->codigo} ({$p->estadoLabel()}) todavía está en curso. ".self::queHacerCon($p->estado));
+        }
+
+        $codigos = $pedidos->take(3)->pluck('codigo')->implode(', ').($pedidos->count() > 3 ? ' y otros' : '');
+        abort(409, "Aún no puedes {$accion}: tienes {$pedidos->count()} pedidos en curso ({$codigos}). Atiéndelos o cancélalos en Pedidos y vuelve a intentarlo.");
+    }
+
+    /** Lo que la tienda tiene que hacer para que ese pedido deje de frenarla. */
+    private static function queHacerCon(string $estado): string
+    {
+        return match ($estado) {
+            'pendiente' => 'Acéptalo o recházalo y vuelve a intentarlo.',
+            'aceptado' => 'Márcalo listo y entrégaselo al domiciliario, o cancélalo.',
+            'listo', 'tomado' => 'Entrégaselo al domiciliario (pídele su código) o cancélalo.',
+            'devolviendo' => 'El domiciliario te lo está devolviendo: recíbelo primero.',
+            default => 'Espera a que el domiciliario lo entregue.',
+        };
     }
 
     /**

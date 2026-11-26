@@ -36,6 +36,13 @@ class Pedido extends Model
     /** Estados en los que el pedido sigue vivo (ni entregado ni cancelado). */
     public const EN_CURSO = ['pendiente', 'aceptado', 'listo', 'tomado', 'recogido', 'en_camino', 'devolviendo'];
 
+    /**
+     * Pedidos que todavía necesitan a la tienda: aceptarlos, prepararlos,
+     * entregárselos al domiciliario o recibirlos de vuelta. Recogido y en
+     * camino ya no: la tienda puede cerrar mientras el domiciliario lo lleva.
+     */
+    public const NECESITAN_TIENDA = ['pendiente', 'aceptado', 'listo', 'tomado', 'devolviendo'];
+
     /** Etiquetas legibles de cada estado. */
     public const ESTADO_LABEL = [
         'pendiente' => 'Pendiente',

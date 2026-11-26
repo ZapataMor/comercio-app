@@ -54,6 +54,7 @@ import { font, makeStyles, radius, useTheme } from '../theme';
 import { DesplazableTutorial, Objetivo, useDesplazableTutorial } from '../tutorial/Objetivo';
 import { useToast } from '../Toast';
 import { useLecturaEnFoco } from '../useLectura';
+import { useHayCambios, useSalirSinGuardar } from '../useSalirSinGuardar';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MiTienda'>;
 
@@ -142,6 +143,16 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
   // El tutorial de la guía de creación baja hasta el botón «Siguiente».
   const tutorialScroll = useDesplazableTutorial(scrollFormulario);
   const guia = creando;
+
+  // Atrás o «Cancelar» con el formulario a medias: se pregunta antes de perderlo.
+  const hayCambios = useHayCambios(
+    JSON.stringify([
+      nombre, descripcion, nombresAlternos, categorias, categoriaPersonalizada, categoriaOtra, direccion, barrio,
+      ubicacion, telefono, activo, tiempo, horario, imagenUri,
+    ]),
+    modo === 'editar',
+  );
+  const { preguntar, salirSinPreguntar } = useSalirSinGuardar(hayCambios);
 
   function irAlPaso(paso: number) {
     setPasoGuia(paso);
@@ -270,6 +281,7 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
       await (eraNuevo ? crear : guardar)(input, imagenUri ?? undefined);
       if (eraNuevo) {
         toast.exito('Negocio creado', 'Ya puedes gestionar tu tienda.');
+        salirSinPreguntar();
         navigation.navigate('Home');
       } else {
         toast.exito('Listo', 'Negocio actualizado.');
@@ -647,7 +659,7 @@ export default function MiTiendaScreen({ navigation, route }: Props) {
         </TouchableOpacity>}
 
         {negocio && (
-          <TouchableOpacity onPress={() => setModo('ver')} disabled={guardando}>
+          <TouchableOpacity onPress={() => preguntar(() => setModo('ver'))} disabled={guardando}>
             <Text style={styles.cancelar}>Cancelar</Text>
           </TouchableOpacity>
         )}

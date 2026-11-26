@@ -23,17 +23,36 @@ function crearPedidoParaEstado($test, string $estado): Pedido
     ]);
 }
 
-test('no permite cerrar ni desactivar un comercio con pedidos en proceso', function (string $estado) {
-    crearPedidoParaEstado($this, $estado);
+test('no permite cerrar ni desactivar un comercio con pedidos que aún lo necesitan', function (string $estado) {
+    $pedido = crearPedidoParaEstado($this, $estado);
     Sanctum::actingAs($this->dueno);
     $ruta = '/api/negocios/'.$this->negocio->id;
+    // El mensaje dice cuál pedido es.
     $this->putJson($ruta, ['activo' => false])->assertConflict()
-        ->assertJsonPath('message', fn ($m) => str_contains($m, 'cancelarlos'));
+        ->assertJsonPath('message', fn ($m) => str_contains($m, 'cerrar la tienda') && str_contains($m, $pedido->fresh()->codigo));
     $this->putJson($ruta.'/desactivacion', ['desactivado' => true])->assertConflict();
     expect($this->negocio->fresh()->activo)->toBeTrue();
     expect($this->negocio->fresh()->desactivado_at)->toBeNull();
     $this->putJson($ruta, ['activo' => true])->assertOk();
-})->with(Pedido::EN_CURSO);
+})->with(Pedido::NECESITAN_TIENDA);
+
+test('la tienda puede cerrar mientras el domiciliario ya lleva el pedido, pero no desactivarse', function (string $estado) {
+    $pedido = crearPedidoParaEstado($this, $estado);
+    Sanctum::actingAs($this->dueno);
+    $ruta = '/api/negocios/'.$this->negocio->id;
+    $this->putJson($ruta, ['activo' => false])->assertOk();
+    expect($this->negocio->fresh()->activo)->toBeFalse();
+    $this->putJson($ruta.'/desactivacion', ['desactivado' => true])->assertConflict()
+        ->assertJsonPath('message', fn ($m) => str_contains($m, $pedido->fresh()->codigo) && str_contains($m, 'lo entregue'));
+})->with(['recogido', 'en_camino']);
+
+test('con varios pedidos pendientes los nombra', function () {
+    $a = crearPedidoParaEstado($this, 'pendiente');
+    $b = crearPedidoParaEstado($this, 'listo');
+    Sanctum::actingAs($this->dueno);
+    $this->putJson('/api/negocios/'.$this->negocio->id, ['activo' => false])->assertConflict()
+        ->assertJsonPath('message', fn ($m) => str_contains($m, '2 pedidos') && str_contains($m, $a->fresh()->codigo) && str_contains($m, $b->fresh()->codigo));
+});
 
 test('no permite salir de turno con entregas en proceso', function (string $estado) {
     crearPedidoParaEstado($this, $estado);

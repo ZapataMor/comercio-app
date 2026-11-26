@@ -10,6 +10,8 @@ import { ApiError } from '../src/api';
 
 const mockCrear = jest.fn();
 const mockNavigate = jest.fn();
+// El aviso «¿Salir sin guardar?» escucha cuando se sale de la pantalla.
+jest.mock('@react-navigation/native', () => ({ ...jest.requireActual('@react-navigation/native'), useNavigation: () => ({ addListener: () => () => {}, dispatch: jest.fn() }) }));
 jest.mock('../src/NegocioContext', () => ({ useNegocio: () => ({ negocio: null, cargando: false, crear: mockCrear }) }));
 jest.mock('../src/Toast', () => ({ useToast: () => ({ exito: jest.fn(), error: jest.fn() }) }));
 jest.mock('../src/components/SelectorImagen', () => () => null);

@@ -23,6 +23,7 @@ import {
   actualizarProducto,
   CategoriaCatalogo,
   crearProducto,
+  cambiarDisponibleProducto,
   eliminarProducto,
   getCategoriasCatalogo,
   getProductos,
@@ -48,6 +49,7 @@ import { font, makeStyles, radius, useTheme } from '../theme';
 import { Objetivo } from '../tutorial/Objetivo';
 import { useToast } from '../Toast';
 import { EspacioTecladoModal } from '../components/EspacioTeclado';
+import { useHayCambios, useSalirSinGuardar } from '../useSalirSinGuardar';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MisProductos'>;
 
@@ -145,6 +147,20 @@ export default function MisProductosScreen({ navigation }: Props) {
   const [disponible, setDisponible] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [errores, setErrores] = useState<FieldErrors>({});
+  // Productos que se están marcando agotados / disponibles desde la lista.
+  const [cambiando, setCambiando] = useState<number[]>([]);
+
+  // Atrás, «Cancelar» o deslizar hacia abajo con el formulario a medias: se
+  // pregunta antes de perder lo escrito.
+  const hayCambios = useHayCambios(
+    JSON.stringify([
+      nombre, descripcion, precio, unidad, tipoId, categoriasIds, nombresAlternos, atributos, colores, comida,
+      imagenUri, disponible,
+    ]),
+    modal,
+  );
+  const { preguntar } = useSalirSinGuardar(hayCambios);
+  const cerrarFormulario = () => preguntar(() => setModal(false));
 
   // --- Cierre del formulario deslizando hacia abajo (desde la barra de agarre) ---
   // Espejo de `guardando` para leerlo dentro del PanResponder (se crea una sola
@@ -170,6 +186,20 @@ export default function MisProductosScreen({ navigation }: Props) {
     });
   }, [dragY]);
 
+  // Lo que pasa al soltar la tarjeta abajo. El PanResponder se crea una sola
+  // vez: lee esto por ref para ver si hay cambios en ese momento.
+  const alSoltarAbajo = useRef(cerrarDeslizando);
+  useEffect(() => {
+    alSoltarAbajo.current = () => {
+      if (!hayCambios) {
+        cerrarDeslizando();
+        return;
+      }
+      Animated.spring(dragY, { toValue: 0, useNativeDriver: true }).start();
+      preguntar(cerrarDeslizando);
+    };
+  });
+
   const panResponder = useRef(
     PanResponder.create({
       // La zona de agarre no tiene botones, así que reclamamos el gesto desde
@@ -185,7 +215,7 @@ export default function MisProductosScreen({ navigation }: Props) {
       },
       onPanResponderRelease: (_e, g) => {
         if (g.dy > 90 || g.vy > 0.5) {
-          cerrarDeslizando();
+          alSoltarAbajo.current();
         } else {
           // No alcanzó el umbral: la tarjeta rebota a su lugar.
           Animated.spring(dragY, { toValue: 0, useNativeDriver: true }).start();
@@ -363,11 +393,33 @@ export default function MisProductosScreen({ navigation }: Props) {
     }
   }
 
+  /** Agotado ↔ disponible de un toque; si falla, vuelve como estaba. */
+  async function alternarDisponible(p: Producto) {
+    if (!negocioId || cambiando.includes(p.id)) return;
+    const nuevo = !p.disponible;
+    setCambiando(prev => [...prev, p.id]);
+    setProductos(prev => prev.map(x => (x.id === p.id ? { ...x, disponible: nuevo } : x)));
+    try {
+      await cambiarDisponibleProducto(token, negocioId, p.id, nuevo);
+      toast.exito(
+        nuevo ? 'De nuevo a la venta' : 'Marcado como agotado',
+        nuevo ? `Los clientes ya pueden pedir "${p.nombre}".` : `Los clientes no verán "${p.nombre}" hasta que lo vuelvas a activar.`,
+      );
+    } catch (e) {
+      setProductos(prev => prev.map(x => (x.id === p.id ? { ...x, disponible: p.disponible } : x)));
+      toast.error('No se pudo cambiar', messageFromError(e, 'Error'));
+    } finally {
+      setCambiando(prev => prev.filter(id => id !== p.id));
+    }
+  }
+
   function onEliminar(p: Producto) {
     confirmar({
       icono: 'basura',
       titulo: '¿Eliminar este producto?',
-      texto: `"${p.nombre}" se quitará de tu catálogo y los clientes ya no lo verán.`,
+      texto: p.disponible
+        ? `"${p.nombre}" se borra de tu catálogo. Si solo se acabó por ahora, mejor toca «Disponible» para marcarlo agotado: así no lo pierdes.`
+        : `"${p.nombre}" se borra de tu catálogo. Ya está agotado: los clientes no lo ven y puedes activarlo cuando vuelva.`,
       textoBoton: 'Eliminar producto',
       textoCancelar: 'Cancelar',
       peligro: true,
@@ -454,9 +506,20 @@ export default function MisProductosScreen({ navigation }: Props) {
                 <Text style={styles.precio}>{item.precio_formateado ?? precioCOP(item.precio)}</Text>
               </View>
               <View style={styles.acciones}>
-                <Text style={[styles.estado, item.disponible ? styles.disp : styles.oculto]}>
-                  {item.disponible ? 'Disponible' : 'Oculto'}
-                </Text>
+                {/* Un toque lo marca agotado (o de nuevo disponible). */}
+                <TouchableOpacity
+                  onPress={() => alternarDisponible(item)}
+                  disabled={cambiando.includes(item.id)}
+                  hitSlop={8}
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: item.disponible }}
+                  accessibilityLabel={item.disponible ? `Marcar ${item.nombre} como agotado` : `Volver a vender ${item.nombre}`}
+                  style={[styles.estado, item.disponible ? styles.disp : styles.agotado]}>
+                  <Text style={[styles.estadoTxt, { color: item.disponible ? c.success : c.danger }]}>
+                    {item.disponible ? 'Disponible' : 'Agotado'}
+                  </Text>
+                  <Text style={styles.estadoAyuda}>{item.disponible ? 'Toca si se acabó' : 'Toca si ya hay'}</Text>
+                </TouchableOpacity>
                 <TouchableOpacity onPress={() => onEliminar(item)} hitSlop={8}>
                   <Icon name="basura" size={18} color={c.danger} />
                 </TouchableOpacity>
@@ -468,7 +531,7 @@ export default function MisProductosScreen({ navigation }: Props) {
       />
 
       {/* Formulario crear/editar */}
-      <Modal visible={modal} animationType="slide" transparent onRequestClose={() => setModal(false)}>
+      <Modal visible={modal} animationType="slide" transparent onRequestClose={cerrarFormulario}>
         <EspacioTecladoModal style={styles.modalFondo}>
           <Animated.View style={[styles.modalCard, { transform: [{ translateY: dragY }] }]}>
             {/* Barra de agarre: arrastrar hacia abajo cierra el formulario. */}
@@ -651,7 +714,14 @@ export default function MisProductosScreen({ navigation }: Props) {
               />
 
               <View style={styles.switchRow}>
-                <Text style={styles.label}>Disponible</Text>
+                <View style={styles.switchTexto}>
+                  <Text style={styles.label}>{disponible ? 'Disponible' : 'Agotado'}</Text>
+                  <Text style={styles.ayudaCampo}>
+                    {disponible
+                      ? 'Apágalo cuando se acabe: los clientes no lo verán hasta que lo vuelvas a encender.'
+                      : 'Los clientes no lo ven. Enciéndelo cuando vuelva a haber.'}
+                  </Text>
+                </View>
                 <Switch
                   value={disponible}
                   onValueChange={setDisponible}
@@ -671,7 +741,7 @@ export default function MisProductosScreen({ navigation }: Props) {
                   <Text style={styles.botonTxt}>{editando ? 'Guardar cambios' : 'Crear producto'}</Text>
                 )}
               </PressableScale>
-              <TouchableOpacity onPress={() => setModal(false)} disabled={guardando}>
+              <TouchableOpacity onPress={cerrarFormulario} disabled={guardando}>
                 <Text style={styles.cancelar}>Cancelar</Text>
               </TouchableOpacity>
             </ScrollView>
@@ -705,12 +775,12 @@ const useStyles = makeStyles((c, shadow) => ({
   tipo: { fontSize: 12, color: c.mutedSoft, marginTop: 2, fontFamily: font.regular },
   precio: { color: c.goldText, marginTop: 4, fontFamily: font.bold },
   acciones: { alignItems: 'flex-end', gap: 8, marginLeft: 8 },
-  estado: {
-    fontSize: 11, fontFamily: font.bold, paddingHorizontal: 8, paddingVertical: 3,
-    borderRadius: radius.pill, overflow: 'hidden',
-  },
-  disp: { backgroundColor: c.successSoft, color: c.success },
-  oculto: { backgroundColor: c.surface2, color: c.muted },
+  // Mismo ancho en los dos estados: no salta al tocarlo.
+  estado: { alignItems: 'center', minWidth: 112, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.md },
+  estadoTxt: { fontSize: 12, fontFamily: font.bold },
+  estadoAyuda: { fontSize: 10, fontFamily: font.regular, color: c.muted, marginTop: 1 },
+  disp: { backgroundColor: c.successSoft },
+  agotado: { backgroundColor: c.dangerSoft },
   vacio: { textAlign: 'center', color: c.muted, marginTop: 40, lineHeight: 20, fontFamily: font.regular },
   error: { color: c.danger, backgroundColor: c.dangerSoft, padding: 12, borderRadius: radius.sm, margin: 20, fontFamily: font.medium },
   // Modal
@@ -735,7 +805,8 @@ const useStyles = makeStyles((c, shadow) => ({
     paddingHorizontal: 14, paddingVertical: 11, fontSize: 16, marginBottom: 14, color: c.textStrong, fontFamily: font.regular,
   },
   area: { minHeight: 70, textAlignVertical: 'top' },
-  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: 10 },
+  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: 10, gap: 12 },
+  switchTexto: { flex: 1 },
   boton: { backgroundColor: c.brand, borderRadius: radius.md, paddingVertical: 15, alignItems: 'center', marginTop: 6, ...shadow.soft },
   botonTxt: { color: c.onBrand, fontFamily: font.bold, fontSize: 16 },
   cancelar: { textAlign: 'center', color: c.muted, fontFamily: font.semibold, marginTop: 14, marginBottom: 4 },
