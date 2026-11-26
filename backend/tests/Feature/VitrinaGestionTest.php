@@ -368,3 +368,16 @@ test('el comando de pruebas enciende el panel y todos los módulos a todos los n
     }
     expect($archivado->fresh()->gestion_activa)->toBeFalse();
 });
+
+test('el QR pide un código nuevo sin recargar y el anterior deja de servir', function () {
+    Gestion::activar($this->negocio);
+    $this->get('/login');
+    $viejo = AccesoWeb::latest('id')->first();
+    $r = $this->getJson('/login/codigo')->assertOk()->assertJsonStructure(['codigo', 'visible', 'segundos']);
+    expect($r->json('codigo'))->not->toBe($viejo->codigo)
+        ->and($viejo->fresh()->estado)->toBe('vencido');
+    $this->actingAs($this->dueno)->postJson('/api/acceso-web/aprobar', ['codigo' => $viejo->codigo])->assertUnprocessable();
+    $this->postJson('/api/acceso-web/aprobar', ['codigo' => $r->json('codigo')])->assertOk();
+    comoNavegador($this);
+    $this->getJson('/login/estado')->assertJsonPath('estado', 'listo');
+});

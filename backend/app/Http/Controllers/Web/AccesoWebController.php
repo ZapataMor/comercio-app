@@ -67,6 +67,26 @@ class AccesoWebController extends Controller
         ]);
     }
 
+    /**
+     * Código nuevo para el QR sin recargar la página: la página lo pide sola
+     * cuando el anterior vence. El anterior queda vencido.
+     */
+    public function nuevoCodigo(Request $request): JsonResponse
+    {
+        $request->session()->reflash();
+        if (($id = $request->session()->get('acceso_web_pendiente')) && ($anterior = AccesoWeb::find($id)) && $anterior->estado === 'pendiente') {
+            $anterior->update(['estado' => 'vencido']);
+        }
+        $acceso = AccesosWeb::crear($request);
+        $request->session()->put('acceso_web_pendiente', $acceso->id);
+
+        return response()->json([
+            'codigo' => $acceso->codigo,
+            'visible' => $acceso->codigoVisible(),
+            'segundos' => AccesosWeb::MINUTOS_CODIGO * 60,
+        ]);
+    }
+
     public function estado(Request $request): JsonResponse
     {
         // La página pregunta cada 2 segundos: sin esto, una pregunta que llega

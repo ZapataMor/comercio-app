@@ -45,6 +45,7 @@ Route::get('/.well-known/security.txt', [SitioController::class, 'seguridad']);
 Route::controller(AccesoWebController::class)->prefix('login')->name('login')->group(function () {
     Route::get('/', 'entrar')->middleware('throttle:30,1');
     Route::get('/estado', 'estado')->middleware('throttle:90,1')->name('.estado');
+    Route::get('/codigo', 'nuevoCodigo')->middleware('throttle:30,1')->name('.codigo');
     Route::post('/celular', 'celular')->middleware('throttle:acceso')->name('.celular');
     Route::post('/celular/codigo', 'codigoCelular')->middleware('throttle:acceso')->name('.celular.codigo');
     Route::post('/google', 'google')->middleware('throttle:acceso')->name('.google');

@@ -39,7 +39,7 @@
                 <p class="acceso-ayuda">Abre la app Vitrina, ve a <strong>Mis negocios → Entrar a la web</strong> y escanea este código o escribe las letras.</p>
                 <div id="qr" class="acceso-qr" aria-hidden="true"></div>
                 <p class="acceso-codigo" id="codigo">{{ $acceso->codigoVisible() }}</p>
-                <p class="acceso-ayuda centro" id="estado" role="status">El código vence en <span id="restante">{{ $segundos }}</span> segundos.</p>
+                <p class="acceso-ayuda centro" id="estado" role="status">El código cambia solo en <span id="restante">{{ $segundos }}</span> segundos.</p>
                 <p class="centro"><a href="{{ route('login') }}" id="otro" hidden>Mostrar un código nuevo</a></p>
             </div>
 
@@ -139,24 +139,63 @@
         });
     });
 
-    // QR: se muestra y se pregunta cada 2 segundos si ya lo aprobaron en la app.
-    try { new QRCode(document.getElementById('qr'), { text: 'vitrina-web:{{ $acceso->codigo }}', width: 184, height: 184, colorDark: '#1F1B16', colorLight: '#FFFFFF' }); } catch (e) {}
-    var restante = {{ $segundos }}, estado = document.getElementById('estado'), otro = document.getElementById('otro'), fin = false;
+    // QR: se pregunta cada 2 segundos si ya lo aprobaron en la app. Cuando el
+    // código vence, la página pide uno nuevo sola (sin recargar). Con la
+    // pestaña del navegador escondida no se pregunta ni se renueva; al
+    // volver, se renueva si hace falta. Después de una hora sin entrar se
+    // detiene, para no pedir códigos sin fin en una pestaña olvidada.
+    var cajaQr = document.getElementById('qr'), codigo = document.getElementById('codigo'),
+        estado = document.getElementById('estado'), otro = document.getElementById('otro');
+    var qr = null, restante = {{ $segundos }}, renovando = false, fin = false, renovaciones = 0, MAX_RENOVACIONES = 20;
+    var textoEstado = estado.innerHTML;
+    function pintarQr(texto) {
+        try {
+            if (qr) { qr.makeCode(texto); return; }
+            qr = new QRCode(cajaQr, { text: texto, width: 184, height: 184, colorDark: '#1F1B16', colorLight: '#FFFFFF' });
+        } catch (e) {}
+    }
     function terminar(texto) { fin = true; estado.textContent = texto; otro.hidden = false; }
-    var reloj = setInterval(function () {
-        if (fin) return clearInterval(reloj);
-        restante--; var r = document.getElementById('restante'); if (r) r.textContent = Math.max(restante, 0);
-        if (restante <= 0) { clearInterval(reloj); terminar('El código venció.'); }
+    function renovar() {
+        if (fin || renovando) return;
+        if (renovaciones >= MAX_RENOVACIONES) return terminar('El código dejó de cambiar porque pasó mucho tiempo.');
+        renovando = true;
+        estado.textContent = 'Cambiando el código…';
+        fetch('{{ route('login.codigo') }}', { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+            .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+            .then(function (d) {
+                renovaciones++;
+                pintarQr('vitrina-web:' + d.codigo);
+                codigo.textContent = d.visible;
+                restante = d.segundos;
+                estado.innerHTML = textoEstado;
+                document.getElementById('restante').textContent = restante;
+                renovando = false;
+            })
+            .catch(function () { renovando = false; estado.textContent = 'Sin conexión: reintentando…'; setTimeout(renovar, 5000); });
+    }
+    pintarQr('vitrina-web:{{ $acceso->codigo }}');
+    setInterval(function () {
+        if (fin || renovando || document.hidden) return;
+        restante--;
+        var r = document.getElementById('restante'); if (r) r.textContent = Math.max(restante, 0);
+        if (restante <= 0) renovar();
     }, 1000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden && restante <= 0) renovar(); });
     function preguntar() {
         if (fin) return;
+        if (document.hidden || renovando) return setTimeout(preguntar, 2000);
         fetch('{{ route('login.estado') }}', { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
             .then(function (d) {
                 if (d.estado === 'listo') { fin = true; estado.textContent = 'Listo, entrando…'; window.location = d.url; return; }
-                if (d.estado === 'vencido') return terminar('El código venció.');
-                if (d.estado === 'rechazado') return terminar(d.mensaje || 'No se pudo entrar.');
-                if (d.estado === 'sin_codigo') return terminar('Se perdió el código.');
+                if (d.estado === 'rechazado') {
+                    // Lo aprobó una cuenta sin panel web: se avisa y sale otro código.
+                    estado.textContent = d.mensaje || 'No se pudo entrar.';
+                    setTimeout(renovar, 4000);
+                    return setTimeout(preguntar, 5000);
+                } else if (d.estado === 'vencido' || d.estado === 'sin_codigo' || d.estado === 'cerrado') {
+                    renovar();
+                }
                 setTimeout(preguntar, 2000);
             })
             .catch(function () { setTimeout(preguntar, 4000); });
