@@ -358,6 +358,10 @@ class PanelNegocioController extends Controller
             'estado' => in_array($estado, ['en_curso', 'entregados', 'cancelados'], true) ? $estado : null,
             'dia' => $dia,
             'buscar' => $buscar,
+            // Para marcar en el calendario los días con pedidos (último año).
+            'diasConPedidos' => $negocio->pedidos()->where('created_at', '>=', now()->subYear()->startOfDay())
+                ->selectRaw('DATE(created_at) as dia, COUNT(*) as total')->groupBy('dia')->pluck('total', 'dia')
+                ->mapWithKeys(fn ($total, $d) => [substr((string) $d, 0, 10) => (int) $total]),
         ]);
     }
 

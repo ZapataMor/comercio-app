@@ -692,9 +692,13 @@ test('los pedidos salen en tarjetas por día, con filtro, calendario y el detall
     ]);
     entrarAlPanel($this, $this->dueno);
 
-    $this->get('/negocio/pedidos')->assertOk()
-        ->assertSee('class="pedido"', false)->assertSeeInOrder(['Hoy', $entregado->codigo, $cancelado->codigo])
-        ->assertSee('data-calendario', false)->assertSee('2× Almuerzo ejecutivo')
+    $pagina = $this->get('/negocio/pedidos')->assertOk();
+    // El calendario marca los días con pedidos.
+    preg_match("/data-dias='([^']*)'/", $pagina->getContent(), $m);
+    expect(json_decode(html_entity_decode($m[1] ?? ''), true))
+        ->toBe([$cancelado->created_at->format('Y-m-d') => 1, $hoy->format('Y-m-d') => 1]);
+    $pagina->assertSee('class="pedido"', false)->assertSeeInOrder(['Hoy', $entregado->codigo, $cancelado->codigo])
+        ->assertSee('data-calendario-boton', false)->assertSee('2× Almuerzo ejecutivo')
         // Modal: cliente, domiciliario, tiempos.
         ->assertSee('id="pedido-'.$entregado->id.'"', false)->assertSee('Ana Cliente')->assertSee('3007654321')
         ->assertSee('Pedro Moto')->assertSee('3111111111')->assertSee('Sin fríjoles')

@@ -49,12 +49,29 @@
         <option value="entregados" @selected($estado === 'entregados')>Entregados</option>
         <option value="cancelados" @selected($estado === 'cancelados')>Cancelados</option>
     </select>
-    {{-- El botón del calendario abre el selector de fecha del navegador. --}}
-    <label @class(['boton-calendario', 'activo' => $dia]) title="Elegir un día">
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16.5" rx="3"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>
-        <span>{{ $dia ? $dia->copy()->locale('es')->translatedFormat('j M Y') : 'Elegir día' }}</span>
-        <input type="date" name="dia" value="{{ $dia?->format('Y-m-d') }}" max="{{ now()->format('Y-m-d') }}" aria-label="Elegir un día" data-calendario>
-    </label>
+    {{-- Calendario propio (el del navegador cambia en cada uno y a veces no abre). --}}
+    <div class="calendario-envoltura" data-calendario
+         data-dias='@json($diasConPedidos)' data-hoy="{{ now()->format('Y-m-d') }}" data-elegido="{{ $dia?->format('Y-m-d') }}">
+        <input type="hidden" name="dia" value="{{ $dia?->format('Y-m-d') }}">
+        <button type="button" @class(['boton-calendario', 'activo' => $dia]) aria-haspopup="dialog" aria-expanded="false" data-calendario-boton>
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16.5" rx="3"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>
+            <span>{{ $dia ? $dia->copy()->locale('es')->translatedFormat('j M Y') : 'Elegir día' }}</span>
+        </button>
+        <div class="calendario" role="dialog" aria-label="Elegir un día" hidden data-calendario-panel>
+            <div class="calendario-cabeza">
+                <button type="button" class="calendario-flecha" data-mes="-1" aria-label="Mes anterior">‹</button>
+                <strong data-calendario-titulo></strong>
+                <button type="button" class="calendario-flecha" data-mes="1" aria-label="Mes siguiente">›</button>
+            </div>
+            <div class="calendario-semana" aria-hidden="true"><span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span>D</span></div>
+            <div class="calendario-dias" data-calendario-dias></div>
+            <div class="calendario-pie">
+                <button type="button" class="enlace-boton" data-calendario-hoy>Hoy</button>
+                @if($dia)<button type="button" class="enlace-boton" data-calendario-quitar>Todos los días</button>@endif
+            </div>
+            <p class="calendario-ayuda"><span class="calendario-marca" aria-hidden="true"></span> Días con pedidos</p>
+        </div>
+    </div>
     <button class="boton boton-claro boton-chico">Buscar</button>
     @if($hayFiltros)<a class="enlace" href="{{ route('negocio.pedidos') }}">Quitar filtros</a>@endif
 </form>
@@ -237,12 +254,83 @@
 @push('pie')
 <script src="{{ asset('panel-catalogo.js') }}?v={{ filemtime(public_path('panel-catalogo.js')) }}"></script>
 <script>
-    // Al elegir un día en el calendario se filtra de una vez.
-    document.querySelectorAll('[data-calendario]').forEach((input) => {
-        input.addEventListener('change', () => input.form.submit());
-        input.closest('label').addEventListener('click', (e) => {
-            if (e.target !== input && typeof input.showPicker === 'function') { e.preventDefault(); try { input.showPicker(); } catch (_) { input.focus(); } }
+    // Calendario para ver un día: se mueve por meses, marca los días con
+    // pedidos y al tocar un día filtra de una vez. Los días futuros no se eligen.
+    document.querySelectorAll('[data-calendario]').forEach((caja) => {
+        const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+        const boton = caja.querySelector('[data-calendario-boton]');
+        const panel = caja.querySelector('[data-calendario-panel]');
+        const rejilla = caja.querySelector('[data-calendario-dias]');
+        const input = caja.querySelector('input[name=dia]');
+        const dias = JSON.parse(caja.dataset.dias || '{}');
+        const hoy = caja.dataset.hoy;
+        const elegido = caja.dataset.elegido;
+        const base = (elegido || hoy).split('-').map(Number);
+        let anio = base[0], mes = base[1] - 1;
+        const dos = (n) => String(n).padStart(2, '0');
+
+        const pintar = () => {
+            caja.querySelector('[data-calendario-titulo]').textContent = MESES[mes][0].toUpperCase() + MESES[mes].slice(1) + ' ' + anio;
+            const primero = (new Date(anio, mes, 1).getDay() + 6) % 7; // lunes = 0
+            const total = new Date(anio, mes + 1, 0).getDate();
+            const celdas = [];
+            for (let i = 0; i < primero; i++) celdas.push('<span></span>');
+            for (let d = 1; d <= total; d++) {
+                const f = anio + '-' + dos(mes + 1) + '-' + dos(d);
+                const n = dias[f] || 0;
+                const clases = ['calendario-dia', f === hoy ? 'hoy' : '', f === elegido ? 'elegido' : '', n ? 'con-pedidos' : ''].join(' ');
+                const etiqueta = d + ' de ' + MESES[mes] + (n ? ', ' + n + (n === 1 ? ' pedido' : ' pedidos') : '');
+                celdas.push('<button type="button" class="' + clases + '" data-fecha="' + f + '" aria-label="' + etiqueta + '"'
+                    + (f > hoy ? ' disabled' : '') + (f === elegido ? ' aria-current="date"' : '') + '>' + d + '</button>');
+            }
+            rejilla.innerHTML = celdas.join('');
+            const [ha, hm] = hoy.split('-').map(Number);
+            caja.querySelector('[data-mes="1"]').disabled = anio > ha || (anio === ha && mes >= hm - 1);
+        };
+        const abrir = () => {
+            pintar();
+            panel.hidden = false;
+            // Que no se salga de la pantalla (en celular el botón queda a la derecha).
+            panel.style.left = '0px';
+            const r = panel.getBoundingClientRect();
+            const sobra = r.right - (document.documentElement.clientWidth - 16);
+            if (sobra > 0) panel.style.left = Math.max(-sobra, 16 - r.left) + 'px';
+            boton.setAttribute('aria-expanded', 'true');
+            (rejilla.querySelector('.elegido') || rejilla.querySelector('.hoy') || rejilla.querySelector('button:not([disabled])'))?.focus();
+        };
+        const cerrar = (devolverFoco) => {
+            panel.hidden = true;
+            boton.setAttribute('aria-expanded', 'false');
+            if (devolverFoco) boton.focus();
+        };
+        const elegir = (fecha) => { input.value = fecha; input.form.submit(); };
+
+        boton.addEventListener('click', () => (panel.hidden ? abrir() : cerrar(false)));
+        panel.addEventListener('click', (e) => {
+            const flecha = e.target.closest('[data-mes]');
+            if (flecha) {
+                mes += Number(flecha.dataset.mes);
+                if (mes < 0) { mes = 11; anio--; }
+                if (mes > 11) { mes = 0; anio++; }
+                pintar();
+                return;
+            }
+            const dia = e.target.closest('[data-fecha]');
+            if (dia && !dia.disabled) { elegir(dia.dataset.fecha); return; }
+            if (e.target.closest('[data-calendario-hoy]')) { elegir(hoy); return; }
+            if (e.target.closest('[data-calendario-quitar]')) { elegir(''); }
         });
+        // Flechas del teclado para moverse entre días.
+        rejilla.addEventListener('keydown', (e) => {
+            const salto = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
+            if (!salto || !e.target.dataset.fecha) return;
+            e.preventDefault();
+            const botones = [...rejilla.querySelectorAll('[data-fecha]')];
+            const destino = botones[botones.indexOf(e.target) + salto];
+            if (destino && !destino.disabled) destino.focus();
+        });
+        document.addEventListener('click', (e) => { if (!panel.hidden && !caja.contains(e.target)) cerrar(false); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !panel.hidden) cerrar(true); });
     });
 </script>
 @endpush
