@@ -19,7 +19,7 @@ class InventarioMovimiento extends Model
         'ajuste' => 'Ajuste por conteo',
     ];
 
-    protected $fillable = ['user_id', 'tipo', 'cantidad', 'saldo', 'nota'];
+    protected $fillable = ['user_id', 'tipo', 'cantidad', 'saldo', 'nota', 'produccion_id'];
 
     protected function casts(): array
     {
@@ -34,6 +34,11 @@ class InventarioMovimiento extends Model
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function produccion(): BelongsTo
+    {
+        return $this->belongsTo(Produccion::class);
     }
 
     public function tipoTexto(): string

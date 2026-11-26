@@ -178,7 +178,7 @@
 
                         <div class="detalle-acciones">
                             <button type="button" class="boton boton-claro boton-chico" data-editar>Editar</button>
-                            <form method="POST" action="{{ route('negocio.inventario.eliminar', $a->id) }}" data-confirmar="¿Eliminar «{{ $a->nombre }}» del inventario? También se borra su historial de movimientos.">@csrf @method('DELETE')
+                            <form method="POST" action="{{ route('negocio.inventario.eliminar', $a->id) }}" data-confirmar="¿Eliminar «{{ $a->nombre }}» del inventario? También se borra su historial de movimientos{{ $a->productos->isNotEmpty() ? ' y deja de descontarse en '.$a->productos->count().' '.($a->productos->count() === 1 ? 'producto' : 'productos') : '' }}.">@csrf @method('DELETE')
                                 <button class="boton boton-chico boton-peligro">Eliminar</button>
                             </form>
                         </div>
@@ -195,6 +195,10 @@
                 <dt>Se cuenta en</dt><dd>{{ mb_strtolower(InventarioArticulo::UNIDADES[$a->unidad][0] ?? $a->unidad) }}</dd>
                 <dt>Costo por {{ InventarioArticulo::UNIDADES[$a->unidad][1] ?? $a->unidad }}</dt><dd>{{ $pesos($a->costo) ?? '—' }}</dd>
                 @if($a->valor() !== null)<dt>Valor de lo que hay</dt><dd>{{ $pesos($a->valor()) }}</dd>@endif
+                @if($produccionActiva)
+                    <dt>Se usa en</dt>
+                    <dd>@forelse($a->productos as $prod)<a class="chip chip-enlace" href="{{ route('negocio.produccion', ['producto' => $prod->id]) }}">{{ $prod->nombre }} · {{ $a->cantidadTexto((float) $prod->pivot->cantidad) }}</a>@empty<span class="apagado">Ningún producto todavía.</span>@endforelse</dd>
+                @endif
                 <dt>Proveedor</dt><dd>{{ $a->proveedor ?? '—' }}</dd>
                 <dt>Referencia o código</dt><dd>{{ $a->referencia ?? '—' }}</dd>
                 @if($sedes->count() > 1)<dt>Sede</dt><dd>{{ $a->sede?->nombre ?? 'Sin sede' }}</dd>@endif

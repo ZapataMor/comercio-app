@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
@@ -98,6 +99,12 @@ class InventarioArticulo extends Model
         return $this->belongsTo(Sede::class);
     }
 
+    /** Productos del catálogo que lo gastan (con la cantidad por unidad). */
+    public function productos(): BelongsToMany
+    {
+        return $this->belongsToMany(Producto::class, 'producto_materiales', 'articulo_id', 'producto_id')->withPivot('cantidad');
+    }
+
     public function movimientos(): HasMany
     {
         return $this->hasMany(InventarioMovimiento::class, 'articulo_id');
@@ -142,6 +149,12 @@ class InventarioArticulo extends Model
     public function valor(): ?int
     {
         return $this->costo !== null ? (int) round($this->cantidad * $this->costo) : null;
+    }
+
+    /** «Calibre 18 · Largo 6 m» para distinguir artículos con el mismo nombre. */
+    public function rasgosTexto(int $maximo = 3): string
+    {
+        return collect($this->listaCaracteristicas())->take($maximo)->map(fn ($c) => $c['nombre'].' '.$c['valor'])->join(' · ');
     }
 
     public static function nombreUnidad(string $unidad, float $cantidad): string

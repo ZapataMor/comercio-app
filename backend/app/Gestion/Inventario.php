@@ -23,7 +23,7 @@ final class Inventario
      * - entrada: suma, salida: resta (no deja la existencia en negativo),
      * - ajuste: la existencia pasa a ser lo que se contó.
      */
-    public static function mover(InventarioArticulo $articulo, string $tipo, float $cantidad, ?User $quien = null, ?string $nota = null): InventarioMovimiento
+    public static function mover(InventarioArticulo $articulo, string $tipo, float $cantidad, ?User $quien = null, ?string $nota = null, ?int $produccionId = null): InventarioMovimiento
     {
         if (! isset(InventarioMovimiento::TIPOS[$tipo])) {
             throw ValidationException::withMessages(['tipo' => 'Elige si es una entrada, una salida o un ajuste.']);
@@ -33,7 +33,7 @@ final class Inventario
             throw ValidationException::withMessages(['cantidad' => $tipo === 'ajuste' ? 'La cantidad contada no puede ser negativa.' : 'Escribe una cantidad mayor que cero.']);
         }
 
-        return DB::transaction(function () use ($articulo, $tipo, $cantidad, $quien, $nota) {
+        return DB::transaction(function () use ($articulo, $tipo, $cantidad, $quien, $nota, $produccionId) {
             $actual = InventarioArticulo::whereKey($articulo->id)->lockForUpdate()->firstOrFail();
             $saldo = match ($tipo) {
                 'entrada' => $actual->cantidad + $cantidad,
@@ -57,6 +57,7 @@ final class Inventario
                 'cantidad' => $cantidad,
                 'saldo' => $saldo,
                 'nota' => filled($nota) ? trim($nota) : null,
+                'produccion_id' => $produccionId,
             ]);
         });
     }

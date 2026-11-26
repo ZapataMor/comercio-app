@@ -190,6 +190,12 @@ test('el comando de prueba carga el inventario de una latonería y se puede repe
         ->and($this->negocio->articulosInventario()->count())->toBe(20)
         ->and($this->negocio->articulosInventario()->where('nombre', 'Disco de corte 7"')->value('cantidad'))->toEqual(3);
 
+    $this->artisan('vitrina:inventario-de-prueba', ['negocio' => $this->negocio->id, '--con-productos' => true])->assertSuccessful();
+    expect(Gestion::tieneModulo($this->negocio, 'produccion'))->toBeTrue()
+        ->and($this->negocio->productos()->whereHas('materiales')->count())->toBe(3)
+        ->and($this->negocio->producciones()->count())->toBe(1);
+
     $this->artisan('vitrina:inventario-de-prueba', ['negocio' => $this->negocio->id, '--quitar' => true])->assertSuccessful();
     expect($this->negocio->articulosInventario()->count())->toBe(0);
+    expect($this->negocio->productos()->withTrashed()->count())->toBe(0)->and($this->negocio->producciones()->count())->toBe(0);
 });

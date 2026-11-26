@@ -7,6 +7,7 @@ use App\Http\Controllers\Web\GestionAdminController;
 use App\Http\Controllers\Web\InventarioController;
 use App\Http\Controllers\Web\OperacionController;
 use App\Http\Controllers\Web\PanelNegocioController;
+use App\Http\Controllers\Web\ProduccionController;
 use App\Http\Controllers\Web\PublicoController;
 use App\Http\Controllers\Web\SitioController;
 use App\Http\Controllers\Web\TrabajadoresController;
@@ -151,5 +152,13 @@ Route::prefix('negocio')->name('negocio.')->group(function () {
         Route::put('/inventario/{articulo}', 'guardar')->whereNumber('articulo')->name('inventario.guardar');
         Route::delete('/inventario/{articulo}', 'eliminar')->whereNumber('articulo')->name('inventario.eliminar');
         Route::post('/inventario/{articulo}/movimientos', 'mover')->whereNumber('articulo')->name('inventario.mover');
+    });
+    // Producción y materiales (módulo opcional): lo que gasta cada producto
+    // del catálogo; se descuenta del inventario al hacerlo o con cada pedido.
+    Route::middleware(NegocioWeb::class)->controller(ProduccionController::class)->group(function () {
+        Route::get('/produccion', 'index')->name('produccion');
+        Route::put('/produccion/productos/{producto}/materiales', 'guardarMateriales')->whereNumber('producto')->name('produccion.materiales');
+        Route::post('/produccion/productos/{producto}/hecho', 'registrar')->whereNumber('producto')->name('produccion.registrar');
+        Route::post('/produccion/{produccion}/anular', 'anular')->whereNumber('produccion')->name('produccion.anular');
     });
 });

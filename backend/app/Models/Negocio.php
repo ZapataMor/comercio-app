@@ -175,6 +175,12 @@ class Negocio extends Model
         return $this->hasMany(InventarioArticulo::class);
     }
 
+    /** Veces que se hizo un producto (módulo «produccion»). */
+    public function producciones(): HasMany
+    {
+        return $this->hasMany(Produccion::class);
+    }
+
     /** Tareas asignadas a sus trabajadores desde el panel web. */
     public function tareas(): HasMany
     {

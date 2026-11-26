@@ -142,12 +142,12 @@ final class Modulos
             ],
             'produccion' => [
                 'grupo' => 'operacion', 'nombre' => 'Producción y materiales',
-                'descripcion' => 'Materia prima que se descuenta al fabricar y cola de fabricación.',
+                'descripcion' => 'Lo que gasta cada producto del catálogo; los materiales e insumos se descuentan del inventario al hacerlo o con cada pedido.',
                 'depende_de' => ['inventario'],
-                'permisos' => ['produccion.gestionar' => 'Gestionar materiales y fabricación'],
-                'secciones' => ['Materiales', 'Lo que gasta cada producto', 'Órdenes de fabricación'],
-                'en_app' => [],
-                'estado' => 'en_construccion',
+                'permisos' => ['produccion.gestionar' => 'Definir los materiales de cada producto y registrar lo que se hizo'],
+                'secciones' => ['Lo que gasta cada producto', 'Registrar lo que se hizo', 'Descuento con cada pedido', 'Cuántos alcanzan con lo que hay', 'Historial de producción'],
+                'en_app' => ['Registrar que se hizo un producto'],
+                'estado' => 'disponible',
             ],
             'compras' => [
                 'grupo' => 'operacion', 'nombre' => 'Compras y proveedores',

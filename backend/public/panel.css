@@ -641,6 +641,76 @@ button.trabajador:focus-visible{outline:2px solid var(--accent);outline-offset:2
 }
 @media (max-width:420px){.articulos{grid-template-columns:1fr}.articulo-foto{aspect-ratio:12/5}.inventario-indicadores .indicador{padding:16px}.inventario-indicadores .indicador strong{font-size:26px}.indicador-dinero{font-size:19px!important}}
 
+/* Producción y materiales: lo que gasta cada producto, registrar como hecho, historial */
+.chip-enlace{text-decoration:none;color:var(--strong)}
+.chip-enlace:hover{background:var(--accent-soft);color:var(--gold)}
+.materiales-producto{margin-top:18px;padding:18px 20px;border:1px solid var(--line);border-radius:18px;background:var(--surface)}
+.materiales-producto h3{margin:0;font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--gold)}
+.materiales-producto h3 .ayuda{letter-spacing:0;text-transform:none}
+.materiales-producto [hidden]{display:none!important}
+.materiales-form{display:none;flex-direction:column;gap:12px}
+.materiales-producto.editando-materiales .materiales-vista,.materiales-producto.editando-materiales [data-materiales-editar]{display:none}
+.materiales-producto.editando-materiales .materiales-form{display:flex}
+.materiales-form .aviso{margin:0}
+.materiales-lista li{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:6px 12px;padding:10px 0;border-top:1px solid var(--line)}
+.materiales-lista li:first-child{border-top:0;padding-top:0}
+.material-nombre{display:flex;flex-direction:column;min-width:0}
+.material-nombre strong{font-size:14px;color:var(--strong);overflow-wrap:anywhere}
+.material-nombre small{font-size:12px;color:var(--muted)}
+.material-gasta{font:700 15px SitioSora,system-ui,sans-serif;color:var(--strong);white-space:nowrap;font-variant-numeric:tabular-nums}
+.materiales-resumen{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;padding-top:12px;border-top:1px dashed var(--input-line)}
+.materiales-resumen .chip{white-space:normal}
+.producir-form{display:flex;flex-direction:column;gap:10px;margin-top:16px;padding:14px 16px;border-radius:14px;background:var(--bg)}
+.producir-form h4{margin:0;font:700 15px SitioSora,system-ui,sans-serif;color:var(--strong)}
+.producir-form .ayuda{margin:0}
+.producir-form .boton{align-self:flex-start}
+.producir-campos{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:12px}
+.producir-vista:empty{display:none}
+.producir-titulo{margin:0 0 4px;font-size:12px;font-weight:600;color:var(--muted)}
+.producir-vista li{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px;padding:4px 0;font-size:13px;color:var(--text)}
+.producir-vista li span{flex:1;min-width:0}
+.producir-vista li strong{color:var(--strong);font-variant-numeric:tabular-nums}
+.producir-vista li.corto,.producir-vista li.corto strong{color:#B23A17}
+:root[data-mode="noche"] .producir-vista li.corto,:root[data-mode="noche"] .producir-vista li.corto strong{color:#FF9C7E}
+.producir-vista li small{width:100%;text-align:right;font-size:12px}
+.materiales-filas{display:flex;flex-direction:column;gap:8px}
+.material-fila{display:grid;grid-template-columns:minmax(0,1fr) 170px 30px;align-items:center;gap:8px}
+.material-fila select{min-height:42px;padding:8px 10px;border-radius:11px;border:1px solid var(--input-line);background:var(--surface);color:var(--strong);font:14px SitioInter,system-ui,sans-serif;min-width:0}
+.material-fila select:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+.material-fila .campo-unidad input{min-height:40px;padding:8px 10px;border:0;background:transparent;color:var(--strong);font:14px SitioInter,system-ui,sans-serif;outline:0;flex:1;min-width:0;width:100%}
+.material-fila .campo-unidad > span{padding:0 10px;font-size:12px}
+.materiales-agregar{align-self:flex-start}
+.materiales-modo{margin:4px 0 0;padding:0;border:0;min-width:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.materiales-modo legend{grid-column:1/-1;padding:0;margin-bottom:8px;font-size:13px;font-weight:600;color:var(--strong)}
+.produccion-ficha{display:flex;align-items:center;gap:16px}
+.produccion-ficha h2{margin:0 0 4px;font-size:24px}
+.produccion-ficha-foto{display:grid;place-items:center;flex-shrink:0;width:72px;height:72px;overflow:hidden;border-radius:18px;background:var(--surface2)}
+.produccion-ficha-foto img{width:100%;height:100%;object-fit:cover}
+.produccion-ficha-foto .producto-sin-foto{font-size:28px}
+.producciones li.produccion{display:flex;align-items:flex-start;gap:12px;padding:14px 0;border-top:1px solid var(--line)}
+.producciones li.produccion:first-child{border-top:0;padding-top:0}
+.produccion.anulada{opacity:.6}
+.produccion.anulada .produccion-titulo strong{text-decoration:line-through}
+.produccion-texto{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0}
+.produccion-titulo{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0}
+.produccion-titulo strong{font:700 15px SitioSora,system-ui,sans-serif;color:var(--strong)}
+.produccion-texto > small{font-size:12px;color:var(--muted)}
+.produccion-gasto{display:flex;flex-wrap:wrap;gap:5px;margin-top:2px}
+.produccion-falto{margin:0;font-size:12px;font-weight:600;color:#9A4D06}
+:root[data-mode="noche"] .produccion-falto{color:#FFC58A}
+.produccion-lado{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.produccion-costo{font:700 15px SitioSora,system-ui,sans-serif;color:var(--strong);white-space:nowrap}
+@media (max-width:900px){
+    .producir-campos,.materiales-modo{grid-template-columns:minmax(0,1fr)}
+    .material-fila{grid-template-columns:minmax(0,1fr) 30px}
+    .material-fila select{grid-column:1/-1}
+    .material-fila{padding-bottom:10px;border-bottom:1px dashed var(--line)}
+    .material-fila .campo-unidad{grid-column:1}
+    .materiales-lista li{grid-template-columns:minmax(0,1fr) auto}
+    .material-hay{grid-column:1/-1;justify-self:start}
+    .materiales-producto{padding:14px 16px}
+}
+
 @media (max-width:1100px){.indicadores{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:900px){
     .panel-marco{grid-template-columns:1fr}

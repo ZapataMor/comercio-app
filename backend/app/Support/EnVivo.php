@@ -337,6 +337,9 @@ class EnVivo
             Web\InventarioController::class.'@guardar' => null,
             Web\InventarioController::class.'@mover' => null,
             Web\InventarioController::class.'@eliminar' => null,
+            Web\ProduccionController::class.'@guardarMateriales' => null,
+            Web\ProduccionController::class.'@registrar' => null,
+            Web\ProduccionController::class.'@anular' => null,
             // Lo que se cambia en el panel web lo ven al instante la app y las demás pestañas.
             Web\PanelNegocioController::class.'@guardarTienda' => ['despues' => fn (Request $r) => self::datosNegocio($r->attributes->get('negocio_web')?->id)],
             Web\PanelNegocioController::class.'@guardarCuenta' => null,

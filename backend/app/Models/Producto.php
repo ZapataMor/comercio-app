@@ -101,6 +101,17 @@ class Producto extends Model
     }
 
     /**
+     * Lo que gasta una unidad del producto (módulo «produccion»): artículos
+     * del inventario con la cantidad en su unidad. materiales_al dice si se
+     * descuentan al registrar que se hizo («fabricar») o con cada pedido.
+     */
+    public function materiales(): BelongsToMany
+    {
+        return $this->belongsToMany(InventarioArticulo::class, 'producto_materiales', 'producto_id', 'articulo_id')
+            ->withPivot('cantidad')->withTimestamps()->orderBy('inventario_articulos.nombre');
+    }
+
+    /**
      * Texto para la búsqueda tolerante a errores. Los otros nombres
      * («bolígrafo» para un lapicero) cuentan como el nombre.
      */

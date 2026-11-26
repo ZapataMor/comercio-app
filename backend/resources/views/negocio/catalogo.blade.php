@@ -183,6 +183,10 @@
                 <dt>Creado</dt><dd>{{ $p->created_at?->format('d/m/Y H:i') }}</dd>
                 <dt>Última edición</dt><dd>{{ $p->updated_at?->format('d/m/Y H:i') }}</dd>
             </dl>
+
+            @if($produccionActiva)
+                @include('negocio._materiales_producto', ['p' => $p])
+            @endif
         </div>
 
         @if($puedeEditar)
@@ -249,6 +253,10 @@
     @endif
 </section>
 
+@if($puedeProducir)
+    <template id="plantilla-material">@include('negocio._material_fila', ['i' => 0, 'articuloId' => 0, 'cantidad' => ''])</template>
+@endif
+
 {{-- Para nuevas filas de las listas «uno por uno». --}}
 <template id="plantilla-lista-item">
     <li class="lista-item">
@@ -264,6 +272,11 @@
 <script>window.vitrinaEnVivo = {!! json_encode(['clave' => config('broadcasting.connections.reverb.key'), 'puerto' => 8080]) !!};</script>
 <script src="{{ asset('vendor/pusher-8.5.0.min.js') }}"></script>
 <script src="{{ asset('panel-catalogo.js') }}?v={{ filemtime(public_path('panel-catalogo.js')) }}"></script>
+@if($produccionActiva)<script src="{{ asset('panel-produccion.js') }}?v={{ filemtime(public_path('panel-produccion.js')) }}"></script>@endif
+@php $abrirMateriales = session('abrir') ?? (old('_materiales') ? 'producto-'.(int) old('_materiales') : (old('_hecho') ? 'producto-'.(int) old('_hecho') : null)); @endphp
+@if($abrirMateriales)
+    <script>window.panelCatalogo && window.panelCatalogo.abrir(@json($abrirMateriales));</script>
+@endif
 @if($errors->any() && old('_producto'))
     {{-- Volvió con errores: reabrir el formulario de ese producto. --}}
     <script>window.panelCatalogo && window.panelCatalogo.abrir('producto-{{ preg_replace('/[^0-9a-z]/', '', old('_producto')) }}', true);</script>

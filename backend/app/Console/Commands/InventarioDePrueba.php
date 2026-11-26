@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Gestion\Gestion;
 use App\Gestion\Inventario;
+use App\Gestion\Materiales;
 use App\Models\InventarioArticulo;
 use App\Models\Negocio;
 use Illuminate\Console\Command;
@@ -22,7 +23,8 @@ class InventarioDePrueba extends Command
 {
     protected $signature = 'vitrina:inventario-de-prueba
         {negocio : Id del negocio}
-        {--quitar : Borrar los artículos de prueba en vez de crearlos}';
+        {--con-productos : También crea un portón, una puerta y una reja en el catálogo con los materiales que gastan}
+        {--quitar : Borrar los artículos (y productos) de prueba en vez de crearlos}';
 
     protected $description = 'Carga materia prima, insumos, productos y herramientas de prueba en el inventario de un negocio';
 
@@ -50,6 +52,13 @@ class InventarioDePrueba extends Command
         ['herramienta', 'Equipo de soldar', 'Herramientas', 'unidad', 2, null, 1450000, 'Soldaduras Maicao', ['Marca' => 'Lincoln', 'Amperaje' => '225 A'], []],
     ];
 
+    /** Productos del catálogo con lo que gasta cada uno: [nombre, precio, [referencia => cantidad]]. */
+    private const PRODUCTOS = [
+        ['Portón 3 x 2,20 m', 2800000, ['GR-003' => 6, 'GR-005' => 2, 'GR-009' => 4, 'GR-011' => 1.5, 'GR-012' => 2, 'GR-014' => 0.5, 'GR-016' => 3]],
+        ['Puerta en lámina 0,90 x 2,10 m', 680000, ['GR-001' => 3, 'GR-005' => 1, 'GR-011' => 0.5, 'GR-012' => 1, 'GR-015' => 0.25, 'GR-016' => 2]],
+        ['Reja de ventana 1,20 x 1,00 m', 350000, ['GR-009' => 5, 'GR-008' => 1, 'GR-011' => 0.3, 'GR-014' => 0.25]],
+    ];
+
     public function handle(): int
     {
         $negocio = Negocio::find($this->argument('negocio'));
@@ -60,6 +69,8 @@ class InventarioDePrueba extends Command
         }
         $nombres = array_unique(array_column(self::ARTICULOS, 1));
         $borrados = $negocio->articulosInventario()->whereIn('nombre', $nombres)->delete();
+        $negocio->productos()->withTrashed()->whereIn('nombre', array_column(self::PRODUCTOS, 0))->get()->each->forceDelete();
+        $negocio->producciones()->whereIn('nombre', array_column(self::PRODUCTOS, 0))->delete();
         if ($this->option('quitar')) {
             $this->info("Se borraron {$borrados} artículos de prueba de «{$negocio->nombre}».");
 
@@ -92,6 +103,21 @@ class InventarioDePrueba extends Command
         });
 
         $this->info('Se cargaron '.count(self::ARTICULOS)." artículos en el inventario de «{$negocio->nombre}».");
+
+        if ($this->option('con-productos')) {
+            if (! Gestion::tieneModulo($negocio, 'produccion')) {
+                Gestion::definirModulos($negocio, [...Gestion::opcionalesEncendidos($negocio), 'produccion']);
+            }
+            $porReferencia = $negocio->articulosInventario()->whereIn('nombre', $nombres)->pluck('id', 'referencia');
+            foreach (self::PRODUCTOS as $i => [$nombre, $precio, $receta]) {
+                $producto = $negocio->productos()->create(['nombre' => $nombre, 'precio' => $precio, 'disponible' => true, 'descripcion' => 'Producto de prueba de Producción y materiales.']);
+                Materiales::guardar($producto, collect($receta)->mapWithKeys(fn ($c, $ref) => [$porReferencia[$ref] => $c])->all(), 'fabricar');
+                if ($i === 1) {
+                    Materiales::registrar($producto, 1, $quien, 'Para el señor Pérez');
+                }
+            }
+            $this->info('Se crearon '.count(self::PRODUCTOS).' productos con sus materiales en el catálogo.');
+        }
 
         return self::SUCCESS;
     }

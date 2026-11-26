@@ -185,7 +185,9 @@ class PanelNegocioController extends Controller
         $buscar = trim((string) $request->query('buscar', ''));
         $estado = $request->query('estado');
 
-        $query = $negocio->productos()->with(['categoria', 'tipoProducto', 'categoriasCatalogo'])->orderBy('nombre');
+        // Con «Producción y materiales», cada producto muestra lo que gasta.
+        $produccion = Gestion::puedeVerModulo($request->user(), $negocio, 'produccion');
+        $query = $negocio->productos()->with(['categoria', 'tipoProducto', 'categoriasCatalogo', ...($produccion ? ['materiales'] : [])])->orderBy('nombre');
         if ($buscar !== '') {
             Busqueda::contieneTodos($query, 'productos.busqueda', Busqueda::terminos($buscar));
         }
@@ -213,6 +215,9 @@ class PanelNegocioController extends Controller
             'categorias' => $negocio->categorias()->orderBy('nombre')->get(['id', 'nombre']),
             'tipos' => TipoProducto::orderBy('orden')->orderBy('nombre')->get(),
             'categoriasCatalogo' => CategoriaCatalogo::orderBy('nombre')->get(['id', 'nombre']),
+            'produccionActiva' => $produccion,
+            'articulosInv' => $produccion ? ProduccionController::articulos($negocio) : collect(),
+            'puedeProducir' => $produccion && Gestion::puede($request->user(), $negocio, 'produccion.gestionar'),
         ]);
     }
 

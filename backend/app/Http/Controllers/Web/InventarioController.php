@@ -44,7 +44,7 @@ class InventarioController extends Controller
         $sede = $sedes->count() > 1 ? $sedes->firstWhere('id', (int) $request->query('sede')) : null;
 
         $base = $negocio->articulosInventario();
-        $articulos = (clone $base)->with(['sede', 'movimientos' => fn ($q) => $q->with('usuario')->latest('id')->limit(8)])
+        $articulos = (clone $base)->with(['sede', 'productos:id,nombre,unidad_medida', 'movimientos' => fn ($q) => $q->with('usuario')->latest('id')->limit(8)])
             ->when($tipo, fn ($q) => $q->where('tipo', $tipo))
             ->when($categoria !== '', fn ($q) => $q->where('categoria', $categoria))
             ->when($sede, fn ($q) => $q->where('sede_id', $sede->id))
@@ -77,6 +77,7 @@ class InventarioController extends Controller
             'sedeFiltro' => $sede,
             'sugerencias' => Inventario::sugerencias($negocio),
             'puedeEditar' => $this->puedeEditar($request),
+            'produccionActiva' => Gestion::puedeVerModulo($request->user(), $negocio, 'produccion'),
         ]);
     }
 
