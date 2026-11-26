@@ -84,7 +84,7 @@ class PanelNegocioController extends Controller
         ]);
     }
 
-    /** Editar la información del negocio y su imagen de portada (solo dueño o administrador). */
+    /** Editar la información del negocio y su foto principal (la misma de la app, que aquí sale de portada; solo dueño o administrador). */
     public function guardarTienda(Request $request): RedirectResponse
     {
         $negocio = $this->negocio($request);
@@ -100,11 +100,11 @@ class PanelNegocioController extends Controller
             'imagen' => ['nullable', 'image', 'max:4096'],
         ], [
             'barrio.regex' => 'El barrio solo lleva letras, números, puntos y guiones.',
-            'imagen.image' => 'La portada debe ser una imagen.',
-            'imagen.max' => 'La portada no puede pasar de 4 MB.',
+            'imagen.image' => 'La foto del negocio debe ser una imagen.',
+            'imagen.max' => 'La foto del negocio no puede pasar de 4 MB.',
         ], [
             'nombre' => 'nombre', 'descripcion' => 'descripción', 'direccion' => 'dirección', 'barrio' => 'barrio',
-            'telefono' => 'teléfono', 'tiempo_preparacion' => 'tiempo de preparación', 'imagen' => 'portada',
+            'telefono' => 'teléfono', 'tiempo_preparacion' => 'tiempo de preparación', 'imagen' => 'foto del negocio',
         ]);
         unset($data['imagen']);
 

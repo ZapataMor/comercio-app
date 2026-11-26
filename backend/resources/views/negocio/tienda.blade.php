@@ -91,9 +91,9 @@
 
                 <div class="ancho tienda-form-portada">
                     <div class="tienda-form-vista" data-vista-foto>
-                        @if($portada)<img src="{{ $portada }}" alt="">@else<span>Sin imagen de portada</span>@endif
+                        @if($portada)<img src="{{ $portada }}" alt="">@else<span>Sin foto del negocio</span>@endif
                     </div>
-                    <label class="campo-panel">Imagen de portada <span class="ayuda">Se ve grande detrás del nombre. Mejor horizontal; JPG o PNG hasta 4 MB.</span>
+                    <label class="campo-panel">Foto principal del negocio <span class="ayuda">Es la misma que ven los clientes en la app; aquí sale grande detrás del nombre. JPG o PNG hasta 4 MB.</span>
                         <input type="file" name="imagen" accept="image/*" data-elegir-foto>
                     </label>
                 </div>
