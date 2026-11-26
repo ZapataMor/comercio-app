@@ -5,10 +5,12 @@ namespace App\Console\Commands;
 use App\Gestion\Gestion;
 use App\Gestion\Inventario;
 use App\Gestion\Materiales;
+use App\Gestion\Terminados;
 use App\Models\Barrio;
 use App\Models\InventarioArticulo;
 use App\Models\Negocio;
 use App\Models\PlantillaGestion;
+use App\Models\ProductoEnEspera;
 use App\Models\Sede;
 use App\Models\TipoNegocio;
 use App\Models\TipoProducto;
@@ -29,7 +31,8 @@ use Spatie\Permission\Models\Role;
  * trabajadores por sede con cargo, días, permisos y tareas, ~20 productos con
  * imagen, servicios con fotos, cuentas de pago de prueba, el inventario de
  * materiales con imagen y lo que gasta cada producto, y un historial de
- * producción de las últimas semanas.
+ * producción de las últimas semanas: parte quedó en stock en el catálogo,
+ * parte eran encargos y dos piezas esperan sus datos en «En espera».
  *
  * Las imágenes salen de database/seeders/imagenes/grumar (las genera
  * scripts/generar-imagenes-grumar.py). Todo es de prueba salvo el nombre,
@@ -140,9 +143,6 @@ class GrumarDePrueba extends Command
         'cerradura' => ['insumo', 'Cerradura de sobreponer', 'Herrajes', 'unidad', 12, 5, 68000, 'Ferretería El Tornillo', ['Marca' => 'Segurex', 'Llaves' => '3'], 'material-cerradura.jpg', 'fabrica'],
         'rueda' => ['insumo', 'Rueda para portón corredizo', 'Herrajes', 'unidad', 10, 4, 42000, 'Ferretería El Tornillo', ['Diámetro' => '3 pulgadas', 'Canal' => 'En V'], 'material-rueda-porton.jpg', 'fabrica'],
         'tornillos' => ['insumo', 'Tornillo con chazo 1/4 × 2"', 'Herrajes', 'caja', 8, 3, 18000, 'Ferretería El Tornillo', ['Medida' => '1/4 × 2 pulgadas', 'Presentación' => 'Caja × 100'], 'material-tornillos.jpg', 'fabrica'],
-        'stock-puerta' => ['producto', 'Puerta en lámina 0,90 × 2,10 m (en stock)', 'Puertas', 'unidad', 4, 2, 520000, null, ['Ancho' => '90 cm', 'Alto' => '210 cm', 'Calibre' => '18', 'Color' => 'Negro'], 'producto-puerta-lamina-negra.jpg', 'principal'],
-        'stock-ventana' => ['producto', 'Ventana corrediza 1,20 × 1,00 m (en stock)', 'Ventanas', 'unidad', 3, 2, 260000, null, ['Ancho' => '120 cm', 'Alto' => '100 cm', 'Lleva' => 'Vidrio', 'Color' => 'Blanco'], 'producto-ventana-corrediza.jpg', 'carrera10'],
-        'stock-reja' => ['producto', 'Reja de ventana 1,20 × 1,00 m (en stock)', 'Rejas', 'unidad', 1, 2, 210000, null, ['Ancho' => '120 cm', 'Alto' => '100 cm', 'Color' => 'Negro'], 'producto-reja-ventana-blanca.jpg', 'carrera10'],
         'pulidora' => ['herramienta', 'Pulidora 4 1/2"', 'Herramientas', 'unidad', 5, null, 289000, 'Ferretería El Tornillo', ['Marca' => 'DeWalt', 'Potencia' => '900 W'], 'material-pulidora.jpg', 'fabrica'],
         'tronzadora' => ['herramienta', 'Tronzadora 14"', 'Herramientas', 'unidad', 2, null, 790000, 'Ferretería El Tornillo', ['Marca' => 'Makita', 'Potencia' => '2.000 W'], 'material-pulidora.jpg', 'fabrica'],
         'soldador' => ['herramienta', 'Equipo de soldar', 'Herramientas', 'unidad', 3, null, 1450000, 'Soldaduras Maicao', ['Marca' => 'Lincoln', 'Amperaje' => '225 A'], 'material-equipo-soldar.jpg', 'fabrica'],
@@ -433,12 +433,15 @@ class GrumarDePrueba extends Command
     {
         $plan = [[0, 2, 20], [8, 3, 18], [12, 1, 15], [2, 1, 13], [9, 2, 11], [5, 1, 9], [0, 1, 7], [15, 4, 6], [6, 1, 4], [13, 2, 3], [8, 2, 2], [19, 6, 1], [3, 1, 0]];
         $notas = ['Para reponer la vitrina', 'Pedido del señor Pérez', 'Obra en el barrio San José', null, 'Cliente de Paraguachón', null, 'Para la sede Carrera 10'];
+        // Unas van al catálogo (quedan en stock), otras eran encargos y dos quedan en espera de sus datos.
+        $destinos = ['catalogo', 'pedido', 'catalogo', 'espera', 'pedido', 'catalogo', 'catalogo', 'pedido', 'catalogo', 'espera', 'pedido', 'pedido', 'catalogo'];
         foreach ($plan as $k => [$i, $cantidad, $dias]) {
             $quien = $fabrica[$k % 3];
-            $p = Materiales::registrar($productos[$i], $cantidad, $quien, $notas[$k % count($notas)], true);
+            $p = Terminados::registrar($productos[$i], $cantidad, $quien, $notas[$k % count($notas)], true, $destinos[$k]);
             $cuando = now()->subDays($dias)->setTime(9 + $k % 7, ($k * 13) % 60);
             $p->forceFill(['created_at' => $cuando, 'updated_at' => $cuando])->saveQuietly();
             $p->movimientos()->update(['created_at' => $cuando, 'updated_at' => $cuando]);
+            ProductoEnEspera::where('produccion_id', $p->id)->update(['created_at' => $cuando, 'updated_at' => $cuando]);
         }
     }
 

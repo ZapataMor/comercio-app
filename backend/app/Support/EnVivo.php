@@ -331,6 +331,8 @@ class EnVivo
                 'despues' => fn (Request $r, Response $res, ?int $antes) => self::tareas($r->attributes->get('negocio_web')?->id, [$antes]),
             ],
             Api\TareaController::class.'@index' => null,
+            Api\ProduccionController::class.'@index' => null,
+            Api\ProduccionController::class.'@registrar' => ['despues' => fn (Request $r) => self::catalogo($negocioRuta($r))],
             Api\TareaController::class.'@estado' => ['despues' => fn (Request $r) => self::tareas($negocioRuta($r), [$yo($r)])],
             Web\PanelNegocioController::class.'@guardarSede' => null,
             // El inventario todavía no se muestra en la app ni en otras pestañas.
@@ -338,8 +340,11 @@ class EnVivo
             Web\InventarioController::class.'@mover' => null,
             Web\InventarioController::class.'@eliminar' => null,
             Web\ProduccionController::class.'@guardarMateriales' => null,
-            Web\ProduccionController::class.'@registrar' => null,
-            Web\ProduccionController::class.'@anular' => null,
+            // Lo que se suma al catálogo cambia sus existencias y lo deja disponible.
+            Web\ProduccionController::class.'@registrar' => ['despues' => fn (Request $r) => self::catalogo($r->attributes->get('negocio_web')?->id)],
+            Web\EnEsperaController::class.'@guardar' => ['despues' => fn (Request $r) => self::catalogo($r->attributes->get('negocio_web')?->id)],
+            Web\EnEsperaController::class.'@descartar' => null,
+            Web\ProduccionController::class.'@anular' => ['despues' => fn (Request $r) => self::catalogo($r->attributes->get('negocio_web')?->id)],
             // Lo que se cambia en el panel web lo ven al instante la app y las demás pestañas.
             Web\PanelNegocioController::class.'@guardarTienda' => ['despues' => fn (Request $r) => self::datosNegocio($r->attributes->get('negocio_web')?->id)],
             Web\PanelNegocioController::class.'@guardarCuenta' => null,

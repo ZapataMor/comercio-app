@@ -40,6 +40,10 @@
         </select>
     </label>
 
+    <label class="campo-panel ancho"><span>Unidades en stock <span class="ayuda">Opcional. Déjalo vacío si no llevas la cuenta; lo que se registra como hecho en Producción se suma solo.</span></span>
+        <input name="existencias" inputmode="decimal" autocomplete="off" value="{{ $v('existencias', $p && $p->existencias !== null ? \App\Models\InventarioArticulo::numero($p->existencias) : '') }}" placeholder="Sin contar">
+    </label>
+
     <label class="campo-panel">Tipo de producto
         <select name="tipo_producto_id" required data-tipo-producto>
             <option value="">Elige uno</option>

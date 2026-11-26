@@ -63,6 +63,8 @@ class Producto extends Model
             'ingredientes_fijos' => 'array',
             'extras' => 'array',
             'resenas_total' => 'integer',
+            // Unidades listas para vender (null = no se lleva la cuenta).
+            'existencias' => 'float',
         ];
     }
 

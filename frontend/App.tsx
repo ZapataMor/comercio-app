@@ -54,6 +54,8 @@ import MisNegociosScreen from './src/screens/MisNegociosScreen';
 import EntrarWebScreen from './src/screens/EntrarWebScreen';
 import MisProductosScreen from './src/screens/MisProductosScreen';
 import MisServiciosScreen from './src/screens/MisServiciosScreen';
+import ProduccionScreen from './src/screens/ProduccionScreen';
+import RegistrarHechoScreen from './src/screens/RegistrarHechoScreen';
 import EquipoScreen from './src/screens/EquipoScreen';
 import CuentasPagoScreen from './src/screens/CuentasPagoScreen';
 import AgendarCitaScreen from './src/screens/AgendarCitaScreen';
@@ -280,6 +282,8 @@ function Navegacion({ listo }: { listo: boolean }) {
             <Stack.Screen name="Resenas" component={ResenasScreen} options={{ title: 'Reseñas' }} />
             <Stack.Screen name="MisProductos" component={MisProductosScreen} options={{ title: 'Mis productos' }} />
             <Stack.Screen name="MisServicios" component={MisServiciosScreen} options={{ title: 'Mis servicios' }} />
+            <Stack.Screen name="Produccion" component={ProduccionScreen} options={{ title: 'Producción' }} />
+            <Stack.Screen name="RegistrarHecho" component={RegistrarHechoScreen} options={{ title: 'Registrar como hecho' }} />
             <Stack.Screen name="Equipo" component={EquipoScreen} options={{ title: 'Equipo' }} />
             <Stack.Screen name="CuentasPago" component={CuentasPagoScreen} options={{ title: 'Cuentas para transferencias' }} />
             <Stack.Screen name="AgendarCita" component={AgendarCitaScreen} options={{ title: 'Agendar cita' }} />

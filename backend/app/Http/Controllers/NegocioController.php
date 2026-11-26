@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Gestion\Gestion;
+use App\Gestion\Materiales;
 use App\Http\Resources\NegocioResource;
 use App\Models\Barrio;
 use App\Rules\Direccion;
 use App\Models\Negocio;
 use App\Models\Pedido;
 use App\Models\TipoNegocio;
+use App\Models\User;
 use App\Support\EliminarNegocio;
 use App\Support\FotoOptimizada;
 use App\Support\HorarioNegocio;
@@ -69,6 +72,7 @@ class NegocioController extends Controller
             ->map(fn (Negocio $n) => (new NegocioResource($n))->resolve() + [
                 'rol' => $n->pivot->rol,
                 'permisos' => $n->permisosPara($user),
+                'puede_producir' => self::puedeProducir($n, $user),
             ]);
 
         return response()->json([
@@ -372,7 +376,16 @@ class NegocioController extends Controller
     /** Resource del negocio + el rol del usuario en él (para la app). */
     private function conRol(Negocio $negocio, ?string $rol): array
     {
-        return (new NegocioResource($negocio->load('tiposNegocio')))->resolve() + ['rol' => $rol, 'permisos' => $negocio->permisosPara(request()->user())];
+        return (new NegocioResource($negocio->load('tiposNegocio')))->resolve() + [
+            'rol' => $rol, 'permisos' => $negocio->permisosPara(request()->user()),
+            'puede_producir' => request()->user() ? self::puedeProducir($negocio, request()->user()) : false,
+        ];
+    }
+
+    /** ¿Ve «Producción» en la app? (módulo encendido y permiso produccion.gestionar) */
+    private static function puedeProducir(Negocio $negocio, User $user): bool
+    {
+        return Materiales::activo($negocio) && Gestion::puede($user, $negocio, 'produccion.gestionar');
     }
 
     private function sinAcceso(string $mensaje = 'No tienes acceso a este negocio.'): JsonResponse

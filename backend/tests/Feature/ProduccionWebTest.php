@@ -118,7 +118,7 @@ test('registrar un portón hecho descuenta sus materiales y queda en el historia
     recetaPorton($this);
     entrarAlPanelProduccion($this, $this->dueno);
 
-    $this->post("/negocio/produccion/productos/{$this->porton->id}/hecho", ['cantidad' => '2', 'nota' => 'Para el señor Pérez'])->assertSessionHas('ok');
+    $this->post("/negocio/produccion/productos/{$this->porton->id}/hecho", ['cantidad' => '2', 'nota' => 'Para el señor Pérez', 'destino' => 'pedido'])->assertSessionHas('ok');
 
     expect($this->soldadura->fresh()->cantidad)->toBe(80.0)
         ->and($this->lamina->fresh()->cantidad)->toBe(1.0)
@@ -138,11 +138,11 @@ test('si no alcanza no se registra, salvo que se pida descontar lo que haya', fu
     $url = "/negocio/produccion/productos/{$this->porton->id}/hecho";
 
     // 3 portones necesitan 30 varillas y solo hay 25.
-    $this->post($url, ['cantidad' => 3])->assertSessionHasErrors('cantidad');
+    $this->post($url, ['cantidad' => 3, 'destino' => 'pedido'])->assertSessionHasErrors('cantidad');
     expect(session('errors')->first('cantidad'))->toContain('5 unidades de «Varilla 3/8»');
     expect(Produccion::count())->toBe(0)->and($this->varilla->fresh()->cantidad)->toBe(25.0);
 
-    $this->post($url, ['cantidad' => 3, 'aunque_falte' => 1])->assertSessionHas('ok');
+    $this->post($url, ['cantidad' => 3, 'aunque_falte' => 1, 'destino' => 'pedido'])->assertSessionHas('ok');
     $p = Produccion::sole();
     expect($this->varilla->fresh()->cantidad)->toBe(0.0)->and($this->lamina->fresh()->cantidad)->toBe(0.0)
         ->and($p->faltantes)->toBe([['articulo_id' => $this->varilla->id, 'nombre' => 'Varilla 3/8', 'falto' => 5, 'unidad' => 'unidad']]);
@@ -215,21 +215,21 @@ test('el trabajador necesita el permiso de producción para cambiar materiales o
 
     Gestion::guardarPermisos($this->negocio, $this->trabajador, ['inventario.ver']);
     $this->get('/negocio/produccion')->assertForbidden();
-    $this->post("/negocio/produccion/productos/{$this->porton->id}/hecho", ['cantidad' => 1])->assertForbidden();
+    $this->post("/negocio/produccion/productos/{$this->porton->id}/hecho", ['cantidad' => 1, 'destino' => 'pedido'])->assertForbidden();
 
     Gestion::guardarPermisos($this->negocio, $this->trabajador, ['produccion.gestionar']);
     $this->get('/negocio/produccion')->assertOk()->assertSee('Registrar como hecho');
-    $this->post("/negocio/produccion/productos/{$this->porton->id}/hecho", ['cantidad' => 1])->assertSessionHas('ok');
+    $this->post("/negocio/produccion/productos/{$this->porton->id}/hecho", ['cantidad' => 1, 'destino' => 'pedido'])->assertSessionHas('ok');
     expect($this->lamina->fresh()->cantidad)->toBe(2.0);
 });
 
 test('no se registra un producto sin materiales ni uno de otro negocio', function () {
     entrarAlPanelProduccion($this, $this->dueno);
-    $this->post("/negocio/produccion/productos/{$this->porton->id}/hecho", ['cantidad' => 1])->assertSessionHasErrors('cantidad');
+    $this->post("/negocio/produccion/productos/{$this->porton->id}/hecho", ['cantidad' => 1, 'destino' => 'pedido'])->assertSessionHasErrors('cantidad');
 
     $ajeno = User::factory()->create()->negocio()->create(['nombre' => 'Otro', 'direccion' => 'C', 'barrio' => 'B'])
         ->productos()->create(['nombre' => 'Ajeno', 'precio' => 1]);
-    $this->post("/negocio/produccion/productos/{$ajeno->id}/hecho", ['cantidad' => 1])->assertNotFound();
+    $this->post("/negocio/produccion/productos/{$ajeno->id}/hecho", ['cantidad' => 1, 'destino' => 'pedido'])->assertNotFound();
     $this->put("/negocio/produccion/productos/{$ajeno->id}/materiales", ['materiales_al' => 'fabricar'])->assertNotFound();
     expect(fn () => Materiales::guardar($this->porton, [$this->lamina->id => 1], 'nunca'))->toThrow(ValidationException::class);
 });

@@ -112,6 +112,8 @@ export type EventoReputacion = {
 
 export type Negocio = {
   permisos?: PermisosNegocio;
+  /** ¿Ve «Producción»? (módulo de Vitrina Gestión encendido y permiso para registrar lo que se hace). */
+  puede_producir?: boolean;
   id: number;
   nombre: string;
   /** Otros nombres con que lo buscan («barbería» para una peluquería). */
@@ -2393,6 +2395,73 @@ export async function getMisTareas(token: string, negocioId: number): Promise<Ta
 
 export async function cambiarEstadoTarea(token: string, negocioId: number, id: number, estado: TareaAsignada['estado']): Promise<TareaAsignada> {
   return (await authSend('PATCH', `/api/negocios/${negocioId}/mis-tareas/${id}`, token, { estado })).tarea;
+}
+
+/** Un producto del catálogo que gasta materiales del inventario (Producción). */
+export type ProduccionProducto = {
+  id: number;
+  nombre: string;
+  imagen: string | null;
+  precio: number;
+  /** Unidades listas para vender; null = el negocio no lleva la cuenta. */
+  existencias: number | null;
+  /** Cuándo se descuentan: al registrar que se hizo o con cada pedido. */
+  modo: 'fabricar' | 'pedido';
+  /** Para cuántos alcanza lo que hay en el inventario. */
+  alcanza: number | null;
+  materiales: {
+    id: number;
+    nombre: string;
+    rasgos: string;
+    por_unidad: number;
+    hay: number;
+    unidad_uno: string;
+    unidad_varios: string;
+  }[];
+};
+
+export type DestinoProduccion = 'catalogo' | 'espera' | 'pedido';
+
+export type ProduccionRegistro = {
+  id: number;
+  nombre: string;
+  cantidad: number;
+  texto: string;
+  origen: 'manual' | 'pedido';
+  destino: DestinoProduccion | null;
+  quien: string | null;
+  nota: string | null;
+  anulada: boolean;
+  falto: boolean;
+  fecha: string;
+};
+
+export type ProduccionResumen = {
+  productos: ProduccionProducto[];
+  recientes: ProduccionRegistro[];
+  en_espera: number;
+  destinos: { valor: DestinoProduccion; texto: string; ayuda: string }[];
+};
+
+/** Lo que se puede registrar como hecho en el negocio y lo último que se hizo. */
+export async function getProduccion(token: string, negocioId: number): Promise<ProduccionResumen> {
+  return await authGet(`/api/negocios/${negocioId}/produccion`, token);
+}
+
+/**
+ * «Registrar como hecho»: descuenta los materiales. Si falta material lanza
+ * ApiError 422 con `data.faltantes` ([{nombre, falta}]); con `aunqueFalte`
+ * descuenta lo que haya.
+ */
+export async function registrarHecho(
+  token: string,
+  negocioId: number,
+  productoId: number,
+  datos: { cantidad: string; nota?: string; destino: DestinoProduccion; aunqueFalte?: boolean },
+): Promise<{ message: string; produccion: ProduccionRegistro; producto: ProduccionProducto }> {
+  return await authSend('POST', `/api/negocios/${negocioId}/produccion/${productoId}/hecho`, token, {
+    cantidad: datos.cantidad, nota: datos.nota || null, destino: datos.destino, aunque_falte: !!datos.aunqueFalte,
+  });
 }
 
 export async function getServicios(token: string, negocioId: number): Promise<Servicio[]> {

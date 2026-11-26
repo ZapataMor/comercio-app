@@ -170,6 +170,7 @@ final class Materiales
                     Inventario::mover($m->articulo, 'entrada', $m->cantidad, $quien, 'Se anuló: '.self::texto($actual->cantidad, $actual->nombre), $actual->id);
                 }
             }
+            Terminados::revertir($actual);
             $actual->forceFill(['anulada_at' => now(), 'anulada_por' => $quien?->id])->save();
             $produccion->setRawAttributes($actual->getAttributes(), true);
         });
@@ -222,6 +223,8 @@ final class Materiales
                 'nota' => filled($nota) ? trim($nota) : null,
                 'faltantes' => $faltantes ?: null,
                 'costo' => (int) round($costo),
+                // Lo de un pedido de Vitrina ya tiene dueño: no va al catálogo.
+                'destino' => $origen === 'pedido' ? 'pedido' : null,
             ]);
             $motivo = ($origen === 'pedido' ? $produccion->nota.': ' : 'Se hizo: ').self::texto($cantidad, $producto->nombre);
             foreach ($salidas as [$articulo, $sale]) {

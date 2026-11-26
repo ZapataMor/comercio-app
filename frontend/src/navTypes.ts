@@ -1,5 +1,5 @@
 // Rutas de navegación de la app (React Navigation - native stack).
-import { ComercioPedido, Coordenadas, ModoRuta, PerfilGoogle, Servicio } from './api';
+import { ComercioPedido, Coordenadas, ModoRuta, PerfilGoogle, ProduccionProducto, Servicio } from './api';
 
 /** A dónde lleva «Cómo llegar» (pantalla Ruta). */
 export type DestinoRuta = {
@@ -38,6 +38,9 @@ export type RootStackParamList = {
   // Catálogo del negocio activo: lista de productos + "Añadir producto".
   MisProductos: undefined;
   MisServicios: undefined;
+  // Producción (Vitrina Gestión): registrar desde el teléfono lo que se hizo.
+  Produccion: undefined;
+  RegistrarHecho: { producto: ProduccionProducto };
   // Miembros e invitaciones del negocio activo.
   Equipo: undefined;
   // Dónde recibe transferencias el negocio activo (Nequi, llave, banco, QR).

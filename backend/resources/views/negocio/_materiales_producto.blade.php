@@ -53,6 +53,7 @@
             <div class="materiales-resumen">
                 <span @class(['chip', 'chip-exito' => $alcanza > 0, 'chip-peligro' => $alcanza === 0])>{{ $alcanza === 0 ? 'No alcanza para ninguno' : 'Alcanza para '.number_format($alcanza, 0, ',', '.') }}</span>
                 <span class="chip">Se descuenta {{ mb_strtolower(Materiales::MODOS[$p->materiales_al] ?? Materiales::MODOS['fabricar']) }}</span>
+                @if($p->existencias !== null)<span class="chip chip-acento">{{ \App\Gestion\Terminados::textoExistencias($p->existencias) }} en el catálogo</span>@endif
                 @if($costo && $costo['costo'] > 0)
                     <span class="chip chip-acento">Materiales: $ {{ number_format($costo['costo'], 0, ',', '.') }}{{ $costo['completo'] ? '' : ' (faltan costos)' }}@if((float) $p->precio > 0) · {{ (int) round($costo['costo'] / (float) $p->precio * 100) }} % del precio @endif</span>
                 @endif
@@ -78,6 +79,16 @@
                             <input name="nota" maxlength="255" value="{{ $hechoOld ? old('nota') : '' }}" placeholder="Para el señor Pérez, pedido de la semana…">
                         </label>
                     </div>
+                    @php $destinoActual = $hechoOld ? old('destino', 'catalogo') : 'catalogo'; @endphp
+                    <fieldset class="producir-destino">
+                        <legend>¿Qué pasa con lo que se hizo?</legend>
+                        @foreach(\App\Gestion\Terminados::DESTINOS as $clave => $texto)
+                            <label class="articulo-tipo-opcion">
+                                <input type="radio" name="destino" value="{{ $clave }}" @checked($destinoActual === $clave)>
+                                <span><strong>{{ $texto }}</strong><small>{{ \App\Gestion\Terminados::DESTINOS_AYUDA[$clave] }}</small></span>
+                            </label>
+                        @endforeach
+                    </fieldset>
                     <div class="producir-vista" data-producir-vista aria-live="polite"></div>
                     @if($hechoOld && $errors->any())<p class="campo-error" role="alert">{{ $errors->first() }}</p>@endif
                     <label class="casilla" data-producir-aunque @unless($hechoOld && $errors->any()) hidden @endunless><input type="checkbox" name="aunque_falte" value="1"> Registrar de todas formas y descontar lo que haya</label>

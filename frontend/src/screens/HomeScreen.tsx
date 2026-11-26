@@ -385,6 +385,8 @@ export default function HomeScreen({ navigation, route }: Props) {
             { icono: 'calendario', titulo: 'Mis servicios', abrir: () => navigation.navigate('MisServicios') },
           ] satisfies Acceso[] : []),
           { icono: 'lista', titulo: 'Pedidos y ventas', abrir: () => navigation.navigate('PedidosNegocio') },
+          // Vitrina Gestión: quien está en la fábrica registra lo que hizo.
+          ...(negocio.puede_producir ? [{ icono: 'herramientas', titulo: 'Producción', abrir: () => navigation.navigate('Produccion') }] satisfies Acceso[] : []),
           { icono: 'usuarios', titulo: 'Equipo', abrir: () => navigation.navigate('Equipo') },
           ...(tienePermiso(negocio, 'administrador') ? [
             { icono: 'banco', titulo: 'Cuentas de pago', abrir: () => navigation.navigate('CuentasPago') },

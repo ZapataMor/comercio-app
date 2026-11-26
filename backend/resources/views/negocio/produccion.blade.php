@@ -93,6 +93,7 @@
                                 <strong>{{ Materiales::texto($h->cantidad, $h->nombre) }}</strong>
                                 @if($h->anulada())<span class="chip">Anulada</span>@endif
                                 @if($h->origen === 'pedido')<span class="chip chip-acento">Pedido {{ $h->pedido?->codigo ?? '' }}</span>@endif
+                                @if($h->origen !== 'pedido' && $h->destino)<span @class(['chip', 'chip-exito' => $h->destino === 'catalogo', 'chip-aviso' => $h->destino === 'espera'])>{{ ['catalogo' => 'Al catálogo', 'espera' => 'En espera', 'pedido' => 'De un encargo'][$h->destino] ?? '' }}</span>@endif
                             </p>
                             <small>{{ $h->created_at?->locale('es')->translatedFormat('j M Y, g:i a') }}{{ $h->usuario ? ' · '.$h->usuario->name : '' }}{{ $h->nota && $h->origen !== 'pedido' ? ' · '.$h->nota : '' }}</small>
                             <div class="produccion-gasto">

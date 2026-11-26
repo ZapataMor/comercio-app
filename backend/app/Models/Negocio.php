@@ -181,6 +181,12 @@ class Negocio extends Model
         return $this->hasMany(Produccion::class);
     }
 
+    /** Lo fabricado que espera sus datos para entrar al catálogo. */
+    public function productosEnEspera(): HasMany
+    {
+        return $this->hasMany(ProductoEnEspera::class);
+    }
+
     /** Tareas asignadas a sus trabajadores desde el panel web. */
     public function tareas(): HasMany
     {

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Gestion\Gestion;
 use App\Gestion\Inventario;
 use App\Gestion\Materiales;
+use App\Gestion\Terminados;
 use App\Http\Controllers\Controller;
 use App\Models\InventarioArticulo;
 use App\Models\Negocio;
@@ -105,14 +106,21 @@ class ProduccionController extends Controller
         $datos = $request->validate([
             'cantidad' => ['required', 'numeric', 'gt:0', 'max:100000'],
             'nota' => ['nullable', 'string', 'max:255'],
+            'destino' => ['required', Rule::in(array_keys(Terminados::DESTINOS))],
         ], [
+            'destino.required' => 'Elige qué pasa con lo que se hizo.',
             'cantidad.required' => 'Escribe cuántos se hicieron.',
             'cantidad.numeric' => 'Escribe cuántos se hicieron con números, por ejemplo 2.',
             'cantidad.gt' => 'Escribe cuántos se hicieron.',
         ], ['cantidad' => 'cantidad', 'nota' => 'nota']);
 
-        $produccion = Materiales::registrar($modelo, (float) $datos['cantidad'], $request->user(), $datos['nota'] ?? null, $request->boolean('aunque_falte'));
-        $aviso = 'Se registró: '.Materiales::texto($produccion->cantidad, $modelo->nombre).'. Los materiales ya se descontaron del inventario.';
+        $produccion = Terminados::registrar($modelo, (float) $datos['cantidad'], $request->user(), $datos['nota'] ?? null, $request->boolean('aunque_falte'), $datos['destino']);
+        $aviso = 'Se registró: '.Materiales::texto($produccion->cantidad, $modelo->nombre).'. Los materiales ya se descontaron del inventario.'
+            .match ($datos['destino']) {
+                'catalogo' => ' Ahora hay '.Terminados::textoExistencias($modelo->fresh()->existencias).' en el catálogo.',
+                'espera' => ' Quedó en «En espera» del catálogo para completar sus datos.',
+                default => '',
+            };
         if ($produccion->faltantes) {
             $aviso .= ' Faltó: '.collect($produccion->faltantes)->map(fn ($f) => InventarioArticulo::numero($f['falto']).' '.InventarioArticulo::nombreUnidad($f['unidad'], $f['falto']).' de «'.$f['nombre'].'»')->join('; ').'.';
         }

@@ -17,7 +17,7 @@ class Produccion extends Model
 
     public const ORIGENES = ['manual' => 'Registrada a mano', 'pedido' => 'Por un pedido'];
 
-    protected $fillable = ['producto_id', 'nombre', 'cantidad', 'origen', 'pedido_id', 'user_id', 'nota', 'faltantes', 'costo'];
+    protected $fillable = ['producto_id', 'nombre', 'cantidad', 'origen', 'pedido_id', 'user_id', 'nota', 'faltantes', 'costo', 'destino'];
 
     protected function casts(): array
     {

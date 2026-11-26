@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\RecetaPreferidaController;
 use App\Http\Controllers\Api\RecuperarClaveController;
 use App\Http\Controllers\Api\ResenaController;
 use App\Http\Controllers\Api\RutaController;
+use App\Http\Controllers\Api\ProduccionController;
 use App\Http\Controllers\Api\TareaController;
 use App\Http\Controllers\Api\TelefonoController;
 use App\Http\Controllers\Api\TrabajadorController;
@@ -248,6 +249,10 @@ Route::middleware(['auth:sanctum', 'throttle:api-usuario'])->group(function () {
         // Mis tareas: las que me asignaron desde el panel web.
         Route::get('/mis-tareas', [TareaController::class, 'index']);
         Route::patch('/mis-tareas/{id}', [TareaController::class, 'estado'])->whereNumber('id');
+
+        // Producción: registrar desde el teléfono que se hizo algo (se descuentan los materiales).
+        Route::get('/produccion', [ProduccionController::class, 'index']);
+        Route::post('/produccion/{producto}/hecho', [ProduccionController::class, 'registrar'])->whereNumber('producto');
     });
 
     // --- Invitaciones de trabajo recibidas (lado del invitado) ---

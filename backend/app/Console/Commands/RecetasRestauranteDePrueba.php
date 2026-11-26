@@ -11,7 +11,8 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Producción y materiales en un restaurante de prueba (por defecto «El Rincón
- * Paisa»): insumos en el inventario y lo que gasta cada plato, que se
+ * Paisa»): insumos en el inventario y lo que gasta cada plato (platos típicos:
+ * bandeja, sancocho, hamburguesas, carnes, picadas, jugos y postres), que se
  * descuenta «con cada pedido» cuando el pedido queda listo. Deja también unas
  * preparaciones registradas a mano para que el historial no esté vacío.
  *
@@ -53,6 +54,11 @@ class RecetasRestauranteDePrueba extends Command
         'salsas' => ['Salsas de la casa', 'Abarrotes', 'l', 4, 1, 12000, null],
         'empaque' => ['Empaque desechable', 'Empaques', 'unidad', 120, 40, 450, 'Papelería El Lápiz Feliz'],
         'vaso' => ['Vaso con tapa 16 oz', 'Empaques', 'unidad', 90, 30, 300, 'Papelería El Lápiz Feliz'],
+        'pollo' => ['Pechuga de pollo', 'Carnes', 'kg', 10, 3, 17000, 'Carnes Finas El Novillo'],
+        'res' => ['Carne de res para asar', 'Carnes', 'kg', 9, 3, 32000, 'Carnes Finas El Novillo'],
+        'costilla' => ['Costilla de cerdo', 'Carnes', 'kg', 7, 2, 21000, 'Carnes Finas El Novillo'],
+        'azucar' => ['Azúcar', 'Abarrotes', 'kg', 6, 2, 4800, 'Supermercado El Ahorro'],
+        'harina' => ['Harina de trigo', 'Abarrotes', 'kg', 5, 2, 4200, 'Supermercado El Ahorro'],
     ];
 
     /** palabra del nombre del plato => [insumo => por porción] */
@@ -67,6 +73,16 @@ class RecetasRestauranteDePrueba extends Command
         'salchipapa especial' => ['salchicha' => 2, 'papa' => 0.3, 'queso' => 2, 'huevo' => 1, 'salsas' => 0.05, 'aceite' => 0.1, 'empaque' => 1],
         'limonada' => ['panela' => 0.08, 'limon' => 2, 'vaso' => 1],
         'mora' => ['mora' => 0.15, 'leche' => 0.25, 'panela' => 0.03, 'vaso' => 1],
+        'almuerzo ejecutivo' => ['arroz' => 0.12, 'frijol' => 0.08, 'carne' => 0.12, 'maduro' => 0.5, 'aguacate' => 0.25, 'empaque' => 1],
+        'arroz con pollo' => ['pollo' => 0.15, 'arroz' => 0.2, 'empaque' => 1],
+        'pechuga' => ['pollo' => 0.25, 'arroz' => 0.12, 'papa' => 0.15, 'empaque' => 1],
+        'churrasco' => ['res' => 0.3, 'papa' => 0.2, 'aceite' => 0.05, 'empaque' => 1],
+        'costillas' => ['costilla' => 0.4, 'papa' => 0.2, 'salsas' => 0.04, 'empaque' => 1],
+        'punta de anca' => ['res' => 0.35, 'papa' => 0.2, 'arepa' => 1, 'empaque' => 1],
+        'picada para dos' => ['res' => 0.25, 'chorizo' => 2, 'chicharron' => 0.2, 'maduro' => 1, 'arepa' => 2, 'papa' => 0.3, 'empaque' => 1],
+        'picada familiar' => ['res' => 0.5, 'chorizo' => 4, 'chicharron' => 0.4, 'maduro' => 2, 'arepa' => 4, 'papa' => 0.6, 'empaque' => 2],
+        'tres leches' => ['leche' => 0.15, 'huevo' => 1, 'harina' => 0.05, 'azucar' => 0.05, 'empaque' => 1],
+        'flan' => ['leche' => 0.12, 'huevo' => 1, 'azucar' => 0.04, 'empaque' => 1],
     ];
 
     public function handle(): int

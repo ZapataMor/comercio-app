@@ -4,6 +4,7 @@ use App\Http\Controllers\Web\AccesoWebController;
 use App\Http\Controllers\Web\AdminController;
 use App\Http\Controllers\Web\AuthWebController;
 use App\Http\Controllers\Web\GestionAdminController;
+use App\Http\Controllers\Web\EnEsperaController;
 use App\Http\Controllers\Web\InventarioController;
 use App\Http\Controllers\Web\OperacionController;
 use App\Http\Controllers\Web\PanelNegocioController;
@@ -121,6 +122,9 @@ Route::prefix('negocio')->name('negocio.')->group(function () {
         Route::patch('/catalogo/productos/{producto}/disponible', 'disponibilidadProducto')->whereNumber('producto')->name('productos.disponible');
         Route::delete('/catalogo/productos/{producto}', 'eliminarProducto')->whereNumber('producto')->name('productos.eliminar');
         Route::post('/catalogo/servicios', 'crearServicio')->name('servicios.crear');
+        // Lo fabricado que espera sus datos para entrar al catálogo.
+        Route::put('/catalogo/en-espera/{espera}', [EnEsperaController::class, 'guardar'])->whereNumber('espera')->name('espera.guardar');
+        Route::post('/catalogo/en-espera/{espera}/descartar', [EnEsperaController::class, 'descartar'])->whereNumber('espera')->name('espera.descartar');
         Route::get('/pedidos', 'pedidos')->name('pedidos');
         Route::get('/agenda', 'agenda')->name('agenda');
         Route::get('/resenas', 'resenas')->name('resenas');

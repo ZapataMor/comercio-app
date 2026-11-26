@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Gestion\Gestion;
+use App\Gestion\Inventario;
 use App\Gestion\Modulos;
 use App\Http\Controllers\Controller;
 use App\Models\Barrio;
@@ -10,6 +11,7 @@ use App\Models\CategoriaCatalogo;
 use App\Models\Cita;
 use App\Models\Negocio;
 use App\Models\Pedido;
+use App\Models\ProductoEnEspera;
 use App\Models\Resena;
 use App\Models\Sede;
 use App\Models\TipoProducto;
@@ -198,7 +200,15 @@ class PanelNegocioController extends Controller
         $totalProductos = $negocio->productos()->count();
         $servicios = $negocio->servicios()->orderBy('nombre')->get();
         // Primero los productos; los servicios si no hay productos o si los piden.
+        // «En espera»: lo fabricado que espera sus datos para entrar al catálogo.
+        $conEspera = Gestion::tieneModulo($negocio, 'produccion');
+        $enEspera = $conEspera
+            ? $negocio->productosEnEspera()->where('estado', ProductoEnEspera::EN_ESPERA)->with(['producto.categoria', 'sede', 'usuario'])->latest('id')->get()
+            : collect();
         $pestana = $request->query('pestana') === 'servicios' || ($totalProductos === 0 && $servicios->isNotEmpty()) ? 'servicios' : 'productos';
+        if ($request->query('pestana') === 'espera' && $conEspera) {
+            $pestana = 'espera';
+        }
         if ($buscar !== '' || $estado) {
             $pestana = 'productos';
         }
@@ -216,6 +226,8 @@ class PanelNegocioController extends Controller
             'tipos' => TipoProducto::orderBy('orden')->orderBy('nombre')->get(),
             'categoriasCatalogo' => CategoriaCatalogo::orderBy('nombre')->get(['id', 'nombre']),
             'produccionActiva' => $produccion,
+            'conEspera' => $conEspera,
+            'enEspera' => $enEspera,
             'articulosInv' => $produccion ? ProduccionController::articulos($negocio) : collect(),
             'puedeProducir' => $produccion && Gestion::puede($request->user(), $negocio, 'produccion.gestionar'),
         ]);
@@ -234,10 +246,19 @@ class PanelNegocioController extends Controller
             'categoria_id' => 'sección', 'imagen' => 'imagen', 'descripcion' => 'descripción',
         ]);
 
+        // Unidades en stock: vacío = no se lleva la cuenta.
+        $existencias = Inventario::leerNumero($request->input('existencias'));
+        if ($existencias !== null && (! is_numeric($existencias) || $existencias < 0 || $existencias > 99999999)) {
+            throw ValidationException::withMessages(['existencias' => 'Las unidades en stock deben ser un número, por ejemplo 3 (o vacío si no llevas la cuenta).']);
+        }
+
         if ($modelo) {
             EditorProducto::actualizar($modelo, $data, $request->file('imagen'));
         } else {
             $modelo = EditorProducto::crear($negocio, $data, $request->file('imagen'));
+        }
+        if ($request->has('existencias')) {
+            $modelo->forceFill(['existencias' => $existencias === null ? null : round((float) $existencias, 3)])->save();
         }
 
         return redirect()->to(url()->previous())->with('ok', 'Se guardó «'.$modelo->nombre.'».');

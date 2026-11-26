@@ -11,9 +11,10 @@
     // Los nombres de los campos se rehacen en orden antes de enviar, así las
     // filas nuevas o quitadas no dejan huecos.
     const renumerar = (caja) => {
+        const campo = caja.dataset.campo || 'caracteristicas';
         caja.querySelectorAll('.caracteristica-fila').forEach((fila, i) => {
-            fila.querySelector('[data-car-nombre]').name = `caracteristicas[${i}][nombre]`;
-            fila.querySelector('[data-car-valor]').name = `caracteristicas[${i}][valor]`;
+            fila.querySelector('[data-car-nombre]').name = `${campo}[${i}][nombre]`;
+            fila.querySelector('[data-car-valor]').name = `${campo}[${i}][valor]`;
         });
     };
     const sugerirValores = (nombreInput) => {
