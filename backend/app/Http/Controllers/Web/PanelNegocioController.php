@@ -5,12 +5,16 @@ namespace App\Http\Controllers\Web;
 use App\Gestion\Gestion;
 use App\Gestion\Modulos;
 use App\Http\Controllers\Controller;
+use App\Models\CategoriaCatalogo;
 use App\Models\Cita;
 use App\Models\Negocio;
 use App\Models\Pedido;
 use App\Models\Resena;
 use App\Models\Sede;
+use App\Models\TipoProducto;
 use App\Models\User;
+use App\Support\Busqueda;
+use App\Support\EditorProducto;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -70,12 +74,102 @@ class PanelNegocioController extends Controller
     public function catalogo(Request $request): View
     {
         $negocio = $this->negocio($request);
+        $buscar = trim((string) $request->query('buscar', ''));
+        $estado = $request->query('estado');
+
+        $query = $negocio->productos()->with(['categoria', 'tipoProducto', 'categoriasCatalogo'])->orderBy('nombre');
+        if ($buscar !== '') {
+            Busqueda::contieneTodos($query, 'productos.busqueda', Busqueda::terminos($buscar));
+        }
+        if (in_array($estado, ['disponibles', 'agotados'], true)) {
+            $query->where('disponible', $estado === 'disponibles');
+        }
 
         return view('negocio.catalogo', [
-            'productos' => $negocio->productos()->with('categoria')->orderBy('nombre')->paginate(30, ['*'], 'productos')->withQueryString(),
+            'productos' => $query->paginate(24, ['*'], 'productos')->withQueryString(),
+            'totalProductos' => $negocio->productos()->count(),
+            'buscar' => $buscar,
+            'estado' => $estado,
             'servicios' => $negocio->servicios()->orderBy('nombre')->get(),
             'campos' => $negocio->plantillaGestion?->campos_producto ?? [],
+            'puedeEditar' => $negocio->puede($request->user(), 'modificar_inventario'),
+            'categorias' => $negocio->categorias()->orderBy('nombre')->get(['id', 'nombre']),
+            'tipos' => TipoProducto::orderBy('orden')->orderBy('nombre')->get(),
+            'categoriasCatalogo' => CategoriaCatalogo::orderBy('nombre')->get(['id', 'nombre']),
         ]);
+    }
+
+    /** Crear (sin producto) o editar un producto del catálogo desde la web. */
+    public function guardarProducto(Request $request, ?int $producto = null): RedirectResponse
+    {
+        $negocio = $this->negocio($request);
+        abort_unless($negocio->puede($request->user(), 'modificar_inventario'), 403, 'No tienes permiso para cambiar el catálogo.');
+        $modelo = $producto ? $negocio->productos()->findOrFail($producto) : null;
+
+        $request->merge($this->datosDeFormulario($request));
+        $data = $request->validate(EditorProducto::reglas($negocio, creando: $modelo === null), [], [
+            'nombre' => 'nombre', 'precio' => 'precio', 'tipo_producto_id' => 'tipo de producto',
+            'categoria_id' => 'sección', 'imagen' => 'imagen', 'descripcion' => 'descripción',
+        ]);
+
+        if ($modelo) {
+            EditorProducto::actualizar($modelo, $data, $request->file('imagen'));
+        } else {
+            $modelo = EditorProducto::crear($negocio, $data, $request->file('imagen'));
+        }
+
+        return redirect()->to(url()->previous())->with('ok', 'Se guardó «'.$modelo->nombre.'».');
+    }
+
+    public function disponibilidadProducto(Request $request, int $producto): RedirectResponse
+    {
+        $negocio = $this->negocio($request);
+        abort_unless($negocio->puede($request->user(), 'modificar_inventario'), 403, 'No tienes permiso para cambiar el catálogo.');
+        $modelo = $negocio->productos()->findOrFail($producto);
+        $modelo->update(['disponible' => ! $modelo->disponible]);
+
+        return back()->with('ok', '«'.$modelo->nombre.'» quedó '.($modelo->disponible ? 'disponible.' : 'agotado.'));
+    }
+
+    /** Borrado suave, como en la app: no rompe el historial de pedidos. */
+    public function eliminarProducto(Request $request, int $producto): RedirectResponse
+    {
+        $negocio = $this->negocio($request);
+        abort_unless($negocio->puede($request->user(), 'modificar_inventario'), 403, 'No tienes permiso para cambiar el catálogo.');
+        $modelo = $negocio->productos()->findOrFail($producto);
+        $modelo->delete();
+
+        return back()->with('ok', 'Se eliminó «'.$modelo->nombre.'».');
+    }
+
+    /**
+     * Lleva el formulario web a los campos de la app: listas escritas en un
+     * cuadro de texto (por renglón o coma), «se vende por» y el precio con puntos.
+     *
+     * @return array<string, mixed>
+     */
+    private function datosDeFormulario(Request $request): array
+    {
+        $lista = fn (string $campo) => array_values(array_filter(array_map('trim', preg_split('/[,\n]+/', (string) $request->input($campo, ''))), 'strlen'));
+        $venta = ['cantidad' => ['cantidad', 'unidad'], 'kilos' => ['peso', 'kg'], 'libras' => ['peso', 'libra']][$request->input('venta')] ?? ['cantidad', 'unidad'];
+        $precio = preg_replace('/\D/', '', (string) $request->input('precio', ''));
+
+        return [
+            'precio' => $precio === '' ? null : (int) $precio,
+            'categoria_id' => $request->input('categoria_id') ?: null,
+            'atributos' => $lista('atributos_texto'),
+            'colores' => $lista('colores_texto'),
+            'ingredientes_fijos' => $lista('fijos_texto'),
+            'nombres_alternos' => $lista('otros_nombres'),
+            'extras' => collect($request->input('extras_lista', []))
+                ->filter(fn ($e) => is_array($e) && trim((string) ($e['nombre'] ?? '')) !== '')
+                ->map(fn ($e) => ['nombre' => $e['nombre'], 'precio' => (int) preg_replace('/\D/', '', (string) ($e['precio'] ?? '0'))])
+                ->values()->all(),
+            'categorias_catalogo' => array_map('intval', (array) $request->input('categorias_marcadas', [])),
+            'tipo_venta' => $venta[0],
+            'unidad_medida' => $venta[1],
+            'disponible' => $request->boolean('disponible'),
+        ];
     }
 
     public function pedidos(Request $request): View

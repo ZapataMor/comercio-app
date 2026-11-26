@@ -236,6 +236,89 @@ test('el catálogo muestra los productos en tarjetas con su imagen', function ()
         ->assertSee('Sin imagen de Espejo lateral')->assertSee('Agotado');
 });
 
+test('el dueño crea, edita, agota y elimina productos desde el catálogo web', function () {
+    \Illuminate\Support\Facades\Storage::fake('public');
+    Gestion::activar($this->negocio);
+    $comida = \App\Models\TipoProducto::where('slug', 'comida')->firstOrFail();
+    $global = \App\Models\CategoriaCatalogo::firstOrFail();
+    $seccion = $this->negocio->categorias()->create(['nombre' => 'Repuestos']);
+    entrarAlPanel($this, $this->dueno);
+    $this->get('/negocio/catalogo')->assertOk()->assertSee('Nuevo producto');
+
+    $this->from('/negocio/catalogo')->post('/negocio/catalogo/productos', [
+        '_producto' => 'nuevo', 'nombre' => 'Arepa rellena', 'descripcion' => 'Con queso', 'precio' => '3.500',
+        'venta' => 'kilos', 'tipo_producto_id' => $comida->id, 'categoria_id' => $seccion->id,
+        'atributos_texto' => "Queso, Maíz\nMantequilla", 'fijos_texto' => 'Maíz, Pollo',
+        'extras_lista' => [['nombre' => 'Huevo', 'precio' => '1.000'], ['nombre' => '', 'precio' => '']],
+        'otros_nombres' => 'arepita', 'categorias_marcadas' => [$global->id], 'disponible' => '1',
+        'imagen' => \Illuminate\Http\UploadedFile::fake()->image('arepa.png', 800, 600),
+    ])->assertRedirect('/negocio/catalogo')->assertSessionHas('ok');
+
+    $p = $this->negocio->productos()->where('nombre', 'Arepa rellena')->firstOrFail();
+    expect((int) $p->precio)->toBe(3500)
+        ->and($p->unidad_medida)->toBe('kg')->and($p->tipo_venta)->toBe('peso')
+        ->and($p->atributos)->toBe(['Queso', 'Maíz', 'Mantequilla'])
+        ->and($p->ingredientes_fijos)->toBe(['Maíz'])
+        ->and($p->extras)->toBe([['nombre' => 'Huevo', 'precio' => 1000]])
+        ->and($p->nombres_alternos)->toBe(['arepita'])
+        ->and($p->categoriasCatalogo->pluck('id')->all())->toBe([$global->id])
+        ->and($p->imagen)->not->toBeNull();
+    \Illuminate\Support\Facades\Storage::disk('public')->assertExists($p->imagen);
+
+    // El detalle del modal muestra toda la información.
+    $this->get('/negocio/catalogo')->assertSee('id="producto-'.$p->id.'"', false)
+        ->assertSee('Con queso')->assertSee('Huevo · $ 1.000')->assertSee('arepita')->assertSee($global->nombre);
+
+    // Editar: sin categorías de Vitrina y por cantidad.
+    $this->from('/negocio/catalogo')->put('/negocio/catalogo/productos/'.$p->id, [
+        '_producto' => (string) $p->id, 'nombre' => 'Arepa de queso', 'precio' => '4000', 'venta' => 'cantidad',
+        'tipo_producto_id' => $comida->id, 'atributos_texto' => 'Queso', 'disponible' => '1',
+    ])->assertRedirect('/negocio/catalogo');
+    $p->refresh();
+    expect($p->nombre)->toBe('Arepa de queso')->and((int) $p->precio)->toBe(4000)
+        ->and($p->unidad_medida)->toBe('unidad')->and($p->categoriasCatalogo()->count())->toBe(0);
+
+    // Con errores vuelve con el formulario de ese producto.
+    $this->from('/negocio/catalogo')->put('/negocio/catalogo/productos/'.$p->id, ['_producto' => (string) $p->id, 'nombre' => '', 'precio' => '', 'tipo_producto_id' => $comida->id])
+        ->assertRedirect('/negocio/catalogo')->assertSessionHasErrors(['nombre', 'precio'])->assertSessionHasInput('_producto', (string) $p->id);
+
+    $this->patch('/negocio/catalogo/productos/'.$p->id.'/disponible')->assertSessionHas('ok');
+    expect($p->fresh()->disponible)->toBeFalse();
+
+    $this->delete('/negocio/catalogo/productos/'.$p->id)->assertSessionHas('ok');
+    expect($this->negocio->productos()->find($p->id))->toBeNull()
+        ->and(\App\Models\Producto::withTrashed()->find($p->id))->not->toBeNull();
+});
+
+test('sin permiso de catálogo solo se ven los productos, sin editarlos', function () {
+    Gestion::activar($this->negocio);
+    $p = $this->negocio->productos()->create(['nombre' => 'Bomper', 'precio' => 1000]);
+    $otro = User::factory()->create()->negocio()->create(['nombre' => 'Otro']);
+    $ajeno = $otro->productos()->create(['nombre' => 'Ajeno', 'precio' => 1000]);
+    entrarAlPanel($this, $this->trabajador);
+
+    $this->get('/negocio/catalogo')->assertOk()->assertSee('Bomper')->assertDontSee('Nuevo producto')->assertDontSee('data-editar', false);
+    $this->put('/negocio/catalogo/productos/'.$p->id, ['nombre' => 'X'])->assertForbidden();
+    $this->patch('/negocio/catalogo/productos/'.$p->id.'/disponible')->assertForbidden();
+    $this->delete('/negocio/catalogo/productos/'.$p->id)->assertForbidden();
+    expect($p->fresh()->nombre)->toBe('Bomper');
+
+    // El dueño tampoco toca productos de otro negocio.
+    auth()->logout();
+    entrarAlPanel($this, $this->dueno);
+    $this->delete('/negocio/catalogo/productos/'.$ajeno->id)->assertNotFound();
+});
+
+test('el catálogo web busca y filtra por disponibilidad', function () {
+    Gestion::activar($this->negocio);
+    $this->negocio->productos()->create(['nombre' => 'Bomper delantero', 'precio' => 1000]);
+    $this->negocio->productos()->create(['nombre' => 'Espejo lateral', 'precio' => 1000, 'disponible' => false]);
+    entrarAlPanel($this, $this->dueno);
+
+    $this->get('/negocio/catalogo?buscar=bomper')->assertSee('Bomper delantero')->assertDontSee('Espejo lateral');
+    $this->get('/negocio/catalogo?estado=agotados')->assertSee('Espejo lateral')->assertDontSee('Bomper delantero');
+});
+
 test('el dueño da permisos de módulos desde Equipo', function () {
     Gestion::activar($this->negocio);
     Gestion::definirModulos($this->negocio, ['personal']);

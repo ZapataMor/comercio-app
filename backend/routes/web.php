@@ -109,6 +109,10 @@ Route::prefix('negocio')->name('negocio.')->group(function () {
         Route::get('/', 'inicio')->name('inicio');
         Route::get('/tienda', 'tienda')->name('tienda');
         Route::get('/catalogo', 'catalogo')->name('catalogo');
+        Route::post('/catalogo/productos', 'guardarProducto')->name('productos.crear');
+        Route::put('/catalogo/productos/{producto}', 'guardarProducto')->whereNumber('producto')->name('productos.guardar');
+        Route::patch('/catalogo/productos/{producto}/disponible', 'disponibilidadProducto')->whereNumber('producto')->name('productos.disponible');
+        Route::delete('/catalogo/productos/{producto}', 'eliminarProducto')->whereNumber('producto')->name('productos.eliminar');
         Route::get('/pedidos', 'pedidos')->name('pedidos');
         Route::get('/equipo', 'equipo')->name('equipo');
         Route::put('/equipo/{miembro}/permisos', 'permisos')->whereNumber('miembro')->name('permisos');
