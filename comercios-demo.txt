@@ -34,6 +34,12 @@ COMERCIANTES (local)
 3000000027  Moto Repuestos Caribe
 3000000028  Óptica Visión Clara
 3000000029  Barbería El Patrón
+3000000032  Ismael, dueño de Grumar (latonería; vitrina:grumar-de-prueba)
+
+TRABAJADORES DE GRUMAR (local)
+3300000001 a 3300000007  Sede principal (Calle 17)
+3300000008 a 3300000014  Punto de venta Carrera 10
+3300000015 a 3300000021  Fábrica
 
 DOMICILIARIOS (local)
 3000000030  Cliente Ana
