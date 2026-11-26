@@ -333,6 +333,10 @@ class EnVivo
             Api\TareaController::class.'@index' => null,
             Api\TareaController::class.'@estado' => ['despues' => fn (Request $r) => self::tareas($negocioRuta($r), [$yo($r)])],
             Web\PanelNegocioController::class.'@guardarSede' => null,
+            // El inventario todavía no se muestra en la app ni en otras pestañas.
+            Web\InventarioController::class.'@guardar' => null,
+            Web\InventarioController::class.'@mover' => null,
+            Web\InventarioController::class.'@eliminar' => null,
             // Lo que se cambia en el panel web lo ven al instante la app y las demás pestañas.
             Web\PanelNegocioController::class.'@guardarTienda' => ['despues' => fn (Request $r) => self::datosNegocio($r->attributes->get('negocio_web')?->id)],
             Web\PanelNegocioController::class.'@guardarCuenta' => null,

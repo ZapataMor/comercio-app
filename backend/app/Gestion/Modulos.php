@@ -133,12 +133,12 @@ final class Modulos
             ],
             'inventario' => [
                 'grupo' => 'operacion', 'nombre' => 'Inventario',
-                'descripcion' => 'Existencias por sede, movimientos, conteos y alertas; agota solo en Vitrina.',
+                'descripcion' => 'Materia prima, insumos, productos y herramientas con sus características, existencias, movimientos y alertas.',
                 'depende_de' => [],
-                'permisos' => ['inventario.ver' => 'Ver existencias', 'inventario.editar' => 'Registrar entradas, salidas y ajustes'],
-                'secciones' => ['Existencias', 'Movimientos', 'Conteos', 'Alertas', 'Reportes'],
+                'permisos' => ['inventario.ver' => 'Ver existencias', 'inventario.editar' => 'Crear artículos y registrar entradas, salidas y ajustes'],
+                'secciones' => ['Artículos con características a la medida', 'Existencias por unidad, peso o medida', 'Entradas, salidas y ajustes', 'Alertas de existencias bajas'],
                 'en_app' => ['Consultar la existencia de un producto', 'Aviso de existencias bajas'],
-                'estado' => 'en_construccion',
+                'estado' => 'disponible',
             ],
             'produccion' => [
                 'grupo' => 'operacion', 'nombre' => 'Producción y materiales',

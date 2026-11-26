@@ -4,6 +4,7 @@ use App\Http\Controllers\Web\AccesoWebController;
 use App\Http\Controllers\Web\AdminController;
 use App\Http\Controllers\Web\AuthWebController;
 use App\Http\Controllers\Web\GestionAdminController;
+use App\Http\Controllers\Web\InventarioController;
 use App\Http\Controllers\Web\OperacionController;
 use App\Http\Controllers\Web\PanelNegocioController;
 use App\Http\Controllers\Web\PublicoController;
@@ -141,5 +142,14 @@ Route::prefix('negocio')->name('negocio.')->group(function () {
         Route::delete('/trabajadores/tareas/{tarea}', 'eliminarTarea')->whereNumber('tarea')->name('equipo.tareas.eliminar');
         Route::put('/trabajadores/{miembro}', 'guardar')->whereNumber('miembro')->name('equipo.guardar');
         Route::delete('/trabajadores/{miembro}', 'quitar')->whereNumber('miembro')->name('equipo.quitar');
+    });
+    // Inventario (módulo opcional): materia prima, insumos, productos y
+    // herramientas con características libres, existencias y movimientos.
+    Route::middleware(NegocioWeb::class)->controller(InventarioController::class)->group(function () {
+        Route::get('/inventario', 'index')->name('inventario');
+        Route::post('/inventario', 'guardar')->name('inventario.crear');
+        Route::put('/inventario/{articulo}', 'guardar')->whereNumber('articulo')->name('inventario.guardar');
+        Route::delete('/inventario/{articulo}', 'eliminar')->whereNumber('articulo')->name('inventario.eliminar');
+        Route::post('/inventario/{articulo}/movimientos', 'mover')->whereNumber('articulo')->name('inventario.mover');
     });
 });

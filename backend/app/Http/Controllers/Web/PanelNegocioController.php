@@ -27,6 +27,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -37,6 +38,7 @@ use Illuminate\View\View;
  * - el núcleo muestra los datos que ya existen en la app y la edición se trae
  *   módulo por módulo (Catálogo y Mi tienda ya se editan aquí),
  * - «Varias sedes» funciona completo,
+ * - Inventario vive en InventarioController,
  * - Trabajadores vive en TrabajadoresController,
  * - los módulos en construcción muestran cómo van a estar constituidos.
  */
@@ -455,8 +457,8 @@ class PanelNegocioController extends Controller
     {
         $negocio = $this->negocio($request);
         abort_unless(Modulos::existe($modulo), 404);
-        if (Modulos::esNucleo($modulo) || $modulo === 'sedes') {
-            return redirect()->route($modulo === 'inicio' ? 'negocio.inicio' : 'negocio.'.$modulo);
+        if ($modulo === 'inicio' || Route::has('negocio.'.$modulo)) {
+            return redirect()->route('negocio.'.$modulo);
         }
         abort_unless(Gestion::puedeVerModulo($request->user(), $negocio, $modulo), 403, 'Este módulo no está activo o no tienes permiso.');
 

@@ -169,6 +169,12 @@ class Negocio extends Model
         return $this->puede($user, 'administrador');
     }
 
+    /** Inventario del panel web: materia prima, insumos, productos, herramientas… */
+    public function articulosInventario(): HasMany
+    {
+        return $this->hasMany(InventarioArticulo::class);
+    }
+
     /** Tareas asignadas a sus trabajadores desde el panel web. */
     public function tareas(): HasMany
     {

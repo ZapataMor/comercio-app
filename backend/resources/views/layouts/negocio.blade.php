@@ -37,7 +37,8 @@
                     <p>{{ \App\Gestion\Modulos::GRUPOS[$grupo] }}</p>
                     @foreach($modulos as $clave => $m)
                         @php
-                            $ruta = $clave === 'inicio' ? 'negocio.inicio' : (\App\Gestion\Modulos::esNucleo($clave) || $clave === 'sedes' ? 'negocio.'.$clave : null);
+                            // Los módulos con página propia tienen la ruta negocio.<clave>; los demás, la genérica.
+                            $ruta = $clave === 'inicio' ? 'negocio.inicio' : (\Illuminate\Support\Facades\Route::has('negocio.'.$clave) ? 'negocio.'.$clave : null);
                             $url = $ruta ? route($ruta) : route('negocio.modulo', $clave);
                             $activo = $ruta ? request()->routeIs($ruta.'*') : (request()->routeIs('negocio.modulo') && request()->route('modulo') === $clave);
                         @endphp
