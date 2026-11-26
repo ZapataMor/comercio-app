@@ -32,7 +32,7 @@
                 <a href="{{ route('sitio.planes') }}" @class(['activo' => request()->routeIs('sitio.planes')])>Planes</a>
                 <a href="{{ route('sitio.preguntas') }}" @class(['activo' => request()->routeIs('sitio.preguntas', 'sitio.contacto')])>Ayuda</a>
             </nav>
-            <a href="{{ route('sitio.entrar') }}" class="boton boton-claro boton-chico">Iniciar sesión</a>
+            <a href="{{ route('login') }}" class="boton boton-claro boton-chico">Iniciar sesión</a>
         </div>
     </header>
 
@@ -54,7 +54,7 @@
                 <h2>Vitrina</h2>
                 <a href="{{ route('sitio.como-funciona') }}">Cómo funciona</a>
                 <a href="{{ route('sitio.planes') }}">Planes para negocios</a>
-                <a href="{{ route('sitio.entrar') }}">Pagar mi membresía</a>
+                <a href="{{ route('login') }}">Pagar mi membresía</a>
             </nav>
             <nav aria-label="Ayuda">
                 <h2>Ayuda</h2>

@@ -133,7 +133,7 @@ test('el super administrador crea plantillas con ficha técnica', function () {
 test('se entra a la web con el código aprobado desde la app', function () {
     Gestion::activar($this->negocio);
     $this->get('/negocio')->assertRedirect('/login');
-    $this->get('/login')->assertOk()->assertSee('Entrar a Vitrina en la web');
+    $this->get('/login')->assertOk()->assertSee('Iniciar sesión')->assertSee('Código QR');
     $acceso = AccesoWeb::latest('id')->first();
     $this->getJson('/login/estado')->assertJsonPath('estado', 'pendiente');
 

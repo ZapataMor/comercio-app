@@ -29,11 +29,6 @@ class SitioController extends Controller
         return view('sitio.planes');
     }
 
-    public function entrar(): View
-    {
-        return view('sitio.entrar');
-    }
-
     public function preguntas(): View
     {
         return view('sitio.preguntas');

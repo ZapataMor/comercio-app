@@ -55,8 +55,8 @@ foreach ($paginas as $ruta => $archivo) {
     $kernel->terminate($req, $res);
 
     // Sin servidor: el acceso a la cuenta y el pago de membresías van a Contacto.
-    $html = preg_replace('#<a href="'.preg_quote($falso, '#').'/cuenta/entrar" class="boton boton-claro boton-chico">.*?</a>#s', '', $html);
-    $html = str_replace($falso.'/cuenta/entrar', $falso.'/contacto', $html);
+    $html = preg_replace('#<a href="'.preg_quote($falso, '#').'/login" class="boton boton-claro boton-chico">.*?</a>#s', '', $html);
+    $html = str_replace($falso.'/login', $falso.'/contacto', $html);
     $html = str_replace('>Pagar mi membresía<', '>Pagar mi membresía (escríbenos)<', $html);
     $html = preg_replace('#En esta web, en «Iniciar sesión», con la misma cuenta del negocio en la app\.#u',
         'Escríbenos a vitrinacomercioapp@gmail.com o al 313 632 3644 y te indicamos cómo pagarla.', $html);

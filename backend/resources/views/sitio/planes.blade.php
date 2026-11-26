@@ -62,7 +62,7 @@
         </div>
 
         <p class="planes-nota">
-            ¿Ya tienes tu negocio en Vitrina? <a href="{{ route('sitio.entrar') }}">Inicia sesión para pagar tu membresía</a>.
+            ¿Ya tienes tu negocio en Vitrina? <a href="{{ route('login') }}">Inicia sesión para pagar tu membresía</a>.
         </p>
         <p class="planes-nota">
             Al contratar un plan aceptas las <a href="{{ route('membresia') }}">condiciones de la membresía</a>:

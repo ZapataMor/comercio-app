@@ -108,7 +108,7 @@
             </p>
             <div class="acciones">
                 <a href="{{ route('sitio.planes') }}" class="boton boton-oscuro">Ver planes</a>
-                <a href="{{ route('sitio.entrar') }}" class="boton boton-claro">Pagar mi membresía</a>
+                <a href="{{ route('login') }}" class="boton boton-claro">Pagar mi membresía</a>
             </div>
         </div>
         <ul class="lista tarjeta">

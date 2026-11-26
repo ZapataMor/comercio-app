@@ -13,7 +13,9 @@ test('el sitio público se ve sin iniciar sesión', function () {
     $this->get('/')->assertOk()->assertSee('Descargar en Google Play');
     $this->get('/como-funciona')->assertOk()->assertSee('Domiciliarios');
     $this->get('/planes')->assertOk()->assertSee('Elegir plan mensual');
-    $this->get('/cuenta/entrar')->assertOk()->assertSee('Iniciar sesión');
+    $this->get('/cuenta/entrar')->assertRedirect('/login');
+    $this->get('/login')->assertOk()->assertSee('Iniciar sesión')->assertSee('Código QR')->assertSee('WhatsApp')->assertSee('Google');
+    $this->get('/')->assertSee('href="'.route('login').'"', false);
     $this->get('/preguntas-frecuentes')->assertOk()->assertSee('¿Vitrina cobra comisión por pedido?');
     $this->get('/contacto')->assertOk()->assertSee('Plazos de respuesta');
 });
@@ -96,7 +98,7 @@ test('las sesiones existentes no conservan acceso a la web retirada', function (
 
 test('el registro publico ya no esta disponible aunque siga activa la variable antigua', function () {
     config(['vitrina.web_pruebas' => true]);
-    $this->get('/login')->assertOk()->assertSee('Entrar a Vitrina en la web')->assertSee('Administrador de Vitrina con usuario y contraseña')->assertDontSee('Crear cuenta');
+    $this->get('/login')->assertOk()->assertSee('Iniciar sesión')->assertSee('Código QR')->assertSee('Administrador de Vitrina con usuario y contraseña')->assertDontSee('Crear cuenta');
     $this->get('/registro')->assertNotFound();
     $this->post('/registro', ['username' => 'nuevo', 'password' => 'password123', 'password_confirmation' => 'password123'])
         ->assertNotFound();

@@ -189,6 +189,25 @@ a{color:inherit}
 .caja-enlaces{display:flex;justify-content:space-between;gap:12px;margin-top:22px;font-size:14px}
 .caja-enlaces button{background:none;border:0;padding:0;color:var(--gold);font:inherit;cursor:pointer}
 .aviso{margin-top:28px;padding:14px 16px;border-radius:14px;background:var(--accent-soft);color:var(--gold);font-size:13px}
+/* Iniciar sesión: pestañas QR / WhatsApp / Google */
+.acceso-pestanas{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:22px;padding:4px;border-radius:14px;background:var(--surface2);border:1px solid var(--line)}
+.acceso-pestanas button{min-height:40px;border:0;border-radius:11px;background:transparent;color:var(--muted);font:600 14px SitioInter,system-ui,sans-serif;cursor:pointer}
+.acceso-pestanas button.activa{background:var(--surface);color:var(--strong);box-shadow:0 1px 3px #0000001f}
+.acceso-panel{margin-top:18px}
+.acceso-panel.oculto{display:none}
+.acceso-panel .aviso{margin-top:16px}
+.acceso-ayuda{color:var(--muted);font-size:14px}
+.acceso-ayuda.centro,.acceso-panel .centro{text-align:center}
+.acceso-qr{display:flex;justify-content:center;margin:20px auto 14px;padding:14px;width:max-content;background:#fff;border-radius:18px;border:1px solid var(--line)}
+.acceso-codigo{text-align:center;font:700 28px/1.2 SitioSora,sans-serif;letter-spacing:.18em;color:var(--strong)}
+.acceso-google{display:flex;justify-content:center;margin-top:22px;min-height:44px}
+.acceso-mensaje{margin-top:16px;padding:12px 14px;border-radius:12px;font-size:14px}
+.acceso-ok{background:var(--success-soft);color:var(--strong)}
+.acceso-error{background:#fde8e4;color:#9f2d1c}
+:root[data-mode="noche"] .acceso-error{background:#40263a;color:#ffb4a8}
+.acceso-admin{margin-top:26px;font-size:14px;color:var(--muted)}
+.acceso-admin summary{cursor:pointer}
+.acceso-admin form .boton-ancho{margin-top:18px}
 
 /* Pie */
 .sitio-pie{background:var(--surface);border-top:1px solid var(--line);padding:56px 0 28px;margin-top:0}
@@ -208,6 +227,7 @@ a{color:inherit}
     .rol{grid-template-columns:1fr;gap:20px}
     .acceso{grid-template-columns:1fr}
     .acceso-lado{padding:48px 24px}
+    .acceso-form{order:-1;padding:36px 20px 48px}
     .sitio-pie-rejilla{grid-template-columns:1fr 1fr}
     .planes{max-width:520px;margin:0 auto}
 }

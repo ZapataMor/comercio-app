@@ -20,7 +20,7 @@ Route::controller(SitioController::class)->name('sitio.')->group(function () {
     Route::get('/preguntas-frecuentes', 'preguntas')->name('preguntas');
     Route::get('/contacto', 'contacto')->name('contacto');
     // Acceso de los negocios al pago de su membresía (aún sin funcionalidad).
-    Route::get('/cuenta/entrar', 'entrar')->name('entrar');
+    Route::redirect('/cuenta/entrar', '/login')->name('entrar');
 });
 
 // --- Páginas legales (sin sesión). Play Store enlaza /privacidad y /eliminar-cuenta: no cambiarlas. ---
