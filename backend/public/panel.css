@@ -91,12 +91,54 @@ body.panel{min-height:100vh;font-size:15px}
 .tabla .vacia{padding:28px 0;text-align:center;color:var(--muted)}
 .tabla .vacia:hover,.tabla tr:has(.vacia):hover td{background:none}
 
-/* Datos (Mi tienda) */
-.datos{display:grid;grid-template-columns:180px minmax(0,1fr);margin:0}
-.datos dt,.datos dd{margin:0;padding:12px 0;border-top:1px solid var(--line)}
-.datos dt{color:var(--muted);font-size:14px}
-.datos dd{color:var(--strong)}
-.datos dt:first-of-type,.datos dd:first-of-type{border-top:0;padding-top:0}
+/* Mi tienda: portada con la imagen del negocio y el nombre encima */
+.tienda-portada{position:relative;isolation:isolate;display:flex;flex-direction:column;justify-content:space-between;min-height:340px;margin-bottom:16px;padding:30px 34px;overflow:hidden;border-radius:24px;background:var(--hero);color:#fff;box-shadow:var(--sombra)}
+.tienda-portada-img{position:absolute;inset:0;z-index:-2;width:100%;height:100%;object-fit:cover}
+.tienda-portada::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(160deg,#0d0b09d9 0%,#0d0b0966 45%,#0d0b0926 70%,#0d0b09a6 100%)}
+.tienda-portada.sin-imagen::after{background:radial-gradient(120% 90% at 100% 0%,color-mix(in srgb,var(--accent) 38%,transparent),transparent 60%),radial-gradient(80% 80% at 0% 100%,#ffffff12,transparent 70%)}
+.tienda-portada-texto{max-width:min(720px,100%)}
+.tienda-portada .panel-ceja{color:var(--accent)}
+.tienda-portada h1{margin:0;font-size:clamp(34px,5vw,58px);line-height:1.02;letter-spacing:-.035em;color:#fff;text-shadow:0 2px 24px #00000059;overflow-wrap:anywhere}
+.tienda-portada-texto p{margin-top:10px;font-size:15px;color:#ffffffd9}
+.tienda-portada-pie{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:28px}
+.tienda-estado{padding:6px 13px;font-size:13px;background:#1F1B16b3;color:#fff;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.tienda-estado.chip-exito{background:color-mix(in srgb,var(--success) 85%,#000);color:#fff}
+.bloque-barra{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.bloque-barra h2{margin:0}
+.bloque-texto{margin:-6px 0 18px;font-size:14px;color:var(--muted);max-width:70ch}
+.tienda-datos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0}
+.tienda-datos > div{padding:14px 16px;border-radius:14px;background:var(--surface2)}
+.tienda-datos .ancho{grid-column:1/-1}
+.tienda-datos dt{margin-bottom:4px;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.tienda-datos dd{margin:0;color:var(--strong);overflow-wrap:anywhere}
+.tienda-descripcion{white-space:pre-line}
+.tienda-form-portada{display:flex;flex-direction:column;gap:12px}
+.tienda-form-vista{display:grid;place-items:center;aspect-ratio:3/1;overflow:hidden;border-radius:16px;background:var(--surface2);color:var(--muted);font-size:13px}
+.tienda-form-vista img{width:100%;height:100%;object-fit:cover}
+.modal-mediano{width:min(680px,calc(100vw - 32px))}
+.modal-chico{width:min(460px,calc(100vw - 32px))}
+
+/* Cuentas para transferencias en tarjetas */
+.cuentas{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px}
+.cuenta{position:relative;display:flex;flex-direction:column;gap:10px;padding:20px;overflow:hidden;border:1px solid var(--line);border-radius:18px;background:var(--surface);transition:border-color .15s,box-shadow .15s}
+.cuenta::before{content:"";position:absolute;inset:0 0 auto;height:4px;background:var(--accent)}
+.cuenta:hover{border-color:color-mix(in srgb,var(--accent) 45%,var(--line));box-shadow:var(--sombra)}
+.cuenta-cabeza{display:flex;align-items:center;gap:12px}
+.cuenta-cabeza > div{flex:1;min-width:0}
+.cuenta-marca{display:grid;place-items:center;flex-shrink:0;width:42px;height:42px;border-radius:13px;background:var(--accent-soft);color:var(--gold);font:700 18px SitioSora,system-ui,sans-serif}
+.cuenta-nombre{font:700 16px/1.25 SitioSora,system-ui,sans-serif;color:var(--strong);overflow-wrap:anywhere}
+.cuenta-tipo{font-size:12px;color:var(--muted)}
+.cuenta-qr{width:52px;height:52px;flex-shrink:0;border-radius:10px;object-fit:cover;background:#fff;border:1px solid var(--line)}
+.cuenta-numero{margin-top:4px;font:600 21px/1.2 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.02em;color:var(--strong);overflow-wrap:anywhere}
+.cuenta-titular{font-size:14px;color:var(--strong)}
+.cuenta-acciones{display:flex;gap:8px;margin-top:auto;padding-top:14px;border-top:1px solid var(--line)}
+.cuentas-vacio{padding:28px;border:1px dashed var(--input-line);border-radius:16px;text-align:center;color:var(--muted)}
+.cuenta-form [hidden]{display:none!important}
+.cuenta-form-qr{width:96px;height:96px;background:#fff}
+.cuenta-form-qr img{object-fit:contain}
+.cuenta-form-qr-campos{display:flex;flex-direction:column;gap:10px;flex:1;min-width:0}
+.cuenta-clave{padding-top:14px;border-top:1px solid var(--line)}
+.cuenta-clave input{max-width:160px;letter-spacing:.4em}
 
 /* Reseñas */
 .estrellas{color:var(--accent);letter-spacing:2px;font-size:16px}
@@ -236,9 +278,6 @@ body.panel{min-height:100vh;font-size:15px}
     .filas-dos li:nth-child(2){border-top:1px solid var(--line);padding-top:11px}
     .bloque{padding:18px 16px}
     .tabla-scroll{margin:0 -16px;padding:0 16px}
-    .datos{grid-template-columns:1fr}
-    .datos dd{border-top:0;padding-top:0}
-    .datos dd:first-of-type{padding-top:0}
     .detalle-portada{grid-template-columns:1fr;gap:18px}
     .detalle-datos{grid-template-columns:1fr;padding:4px 16px}
     .detalle-datos dd{border-top:0;padding-top:0}
@@ -247,6 +286,9 @@ body.panel{min-height:100vh;font-size:15px}
     .modal-cabeza{padding:12px 16px}
     .producto-form-acciones{bottom:-18px;margin:4px -16px -18px;padding:14px 16px}
     .catalogo-filtros input{width:100%}
+    .tienda-portada{min-height:260px;padding:22px 20px;border-radius:20px}
+    .tienda-datos{grid-template-columns:1fr}
+    .tienda-portada-pie{justify-content:flex-start}
     .catalogo-filtros{width:100%}
     .producto-form-vista{width:84px;height:84px}
     .producto-extra{grid-template-columns:minmax(0,1fr) 100px}

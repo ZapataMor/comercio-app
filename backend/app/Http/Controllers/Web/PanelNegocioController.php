@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Gestion\Gestion;
 use App\Gestion\Modulos;
 use App\Http\Controllers\Controller;
+use App\Models\Barrio;
 use App\Models\CategoriaCatalogo;
 use App\Models\Cita;
 use App\Models\Negocio;
@@ -13,18 +14,26 @@ use App\Models\Resena;
 use App\Models\Sede;
 use App\Models\TipoProducto;
 use App\Models\User;
+use App\Rules\Direccion;
+use App\Rules\Telefono;
 use App\Support\Busqueda;
+use App\Support\ClavePin;
+use App\Support\EditorCuentaPago;
 use App\Support\EditorProducto;
+use App\Support\FotoOptimizada;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
  * Panel web del negocio (ADR-005). Por ahora:
- * - el núcleo muestra los datos que ya existen en la app (la edición se trae
- *   módulo por módulo en la fase 0),
+ * - el núcleo muestra los datos que ya existen en la app y la edición se trae
+ *   módulo por módulo (Catálogo y Mi tienda ya se editan aquí),
  * - «Varias sedes» funciona completo,
  * - Equipo permite dar los permisos de cada módulo,
  * - los módulos en construcción muestran cómo van a estar constituidos.
@@ -65,10 +74,105 @@ class PanelNegocioController extends Controller
     public function tienda(Request $request): View
     {
         $negocio = $this->negocio($request);
+        $administra = $negocio->administra($request->user());
 
         return view('negocio.tienda', [
-            'cuentas' => $negocio->administra($request->user()) ? $negocio->cuentasPago()->orderBy('orden')->get() : collect(),
+            'puedeEditar' => $administra,
+            'cuentas' => $administra ? $negocio->cuentasPago()->orderBy('orden')->get() : collect(),
+            'tiposNegocio' => $negocio->tiposNegocio()->orderBy('nombre')->pluck('nombre'),
         ]);
+    }
+
+    /** Editar la información del negocio y su imagen de portada (solo dueño o administrador). */
+    public function guardarTienda(Request $request): RedirectResponse
+    {
+        $negocio = $this->negocio($request);
+        abort_unless($negocio->administra($request->user()), 403, 'Solo el dueño o el administrador del negocio cambia su información.');
+
+        $data = $request->validate([
+            'nombre' => ['required', 'string', 'max:255'],
+            'descripcion' => ['nullable', 'string', 'max:2000'],
+            'direccion' => ['required', 'string', 'max:255', new Direccion],
+            'barrio' => ['required', 'string', 'max:100', 'regex:'.Direccion::BARRIO],
+            'telefono' => ['nullable', 'string', new Telefono],
+            'tiempo_preparacion' => ['required', 'integer', 'min:5', 'max:180'],
+            'imagen' => ['nullable', 'image', 'max:4096'],
+        ], [
+            'barrio.regex' => 'El barrio solo lleva letras, números, puntos y guiones.',
+            'imagen.image' => 'La portada debe ser una imagen.',
+            'imagen.max' => 'La portada no puede pasar de 4 MB.',
+        ], [
+            'nombre' => 'nombre', 'descripcion' => 'descripción', 'direccion' => 'dirección', 'barrio' => 'barrio',
+            'telefono' => 'teléfono', 'tiempo_preparacion' => 'tiempo de preparación', 'imagen' => 'portada',
+        ]);
+        unset($data['imagen']);
+
+        $negocio->update($data);
+        Barrio::registrarSiEsNuevo($data['barrio'], $request->user()->id);
+        if ($request->hasFile('imagen')) {
+            $anterior = $negocio->imagen;
+            $negocio->imagen = FotoOptimizada::guardarEn($request->file('imagen'), 'negocios');
+            $negocio->save();
+            if ($anterior) {
+                Storage::disk('public')->delete($anterior);
+            }
+        }
+
+        return redirect()->route('negocio.tienda')->with('ok', 'Se guardó la información del negocio.');
+    }
+
+    /**
+     * Crear (sin cuenta) o editar una cuenta para transferencias. Pide la
+     * clave de 4 números, como en la app: quien entre a la sesión de un
+     * comerciante no puede cambiar el número para quedarse con los pagos.
+     */
+    public function guardarCuenta(Request $request, ?int $cuenta = null): RedirectResponse
+    {
+        $negocio = $this->negocio($request);
+        abort_unless($negocio->administra($request->user()), 403, 'Solo el dueño o el administrador del negocio maneja las cuentas.');
+        $modelo = $cuenta ? $negocio->cuentasPago()->findOrFail($cuenta) : null;
+
+        return $this->conClave($request, function () use ($request, $negocio, $modelo) {
+            $datos = EditorCuentaPago::validar($request, $modelo);
+            if ($modelo) {
+                EditorCuentaPago::actualizar($modelo, $datos, $request->file('qr'), $request->boolean('quitar_qr'));
+            } else {
+                $modelo = EditorCuentaPago::crear($negocio, $datos, $request->file('qr'));
+            }
+
+            return redirect()->route('negocio.tienda')->with('ok', 'Se guardó la cuenta de '.$modelo->nombre().'.');
+        });
+    }
+
+    public function eliminarCuenta(Request $request, int $cuenta): RedirectResponse
+    {
+        $negocio = $this->negocio($request);
+        abort_unless($negocio->administra($request->user()), 403, 'Solo el dueño o el administrador del negocio maneja las cuentas.');
+        $modelo = $negocio->cuentasPago()->findOrFail($cuenta);
+
+        return $this->conClave($request, function () use ($modelo) {
+            EditorCuentaPago::eliminar($modelo);
+
+            return redirect()->route('negocio.tienda')->with('ok', 'Se eliminó la cuenta de '.$modelo->nombre().'.');
+        });
+    }
+
+    /**
+     * Revisa la clave y corre `$accion`. Los errores vuelven al formulario sin
+     * guardar la clave en la sesión (Laravel la guardaría con el resto).
+     */
+    private function conClave(Request $request, \Closure $accion): RedirectResponse
+    {
+        $volver = fn () => back()->withInput($request->except(['pin', 'qr']));
+        try {
+            ClavePin::comprobar($request->user(), $request->input('pin'));
+
+            return $accion();
+        } catch (ValidationException $e) {
+            return $volver()->withErrors($e->errors());
+        } catch (HttpResponseException) {
+            return $volver()->with('error', 'Tu clave quedó bloqueada por intentos fallidos. Desbloquéala en la app con «¿Olvidaste tu clave?».');
+        }
     }
 
     public function catalogo(Request $request): View

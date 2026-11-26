@@ -4,13 +4,18 @@ use App\Gestion\AccesosWeb;
 use App\Gestion\Gestion;
 use App\Gestion\Modulos;
 use App\Models\AccesoWeb;
+use App\Models\CategoriaCatalogo;
 use App\Models\Negocio;
 use App\Models\PlantillaGestion;
+use App\Models\Producto;
+use App\Models\TipoProducto;
 use App\Models\User;
 use App\Support\GoogleIdToken;
 use App\Support\Telefono\EnviadorCodigos;
 use App\Support\Telefono\EnviadorLog;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Role;
 
 beforeEach(function () {
@@ -237,10 +242,10 @@ test('el catálogo muestra los productos en tarjetas con su imagen', function ()
 });
 
 test('el dueño crea, edita, agota y elimina productos desde el catálogo web', function () {
-    \Illuminate\Support\Facades\Storage::fake('public');
+    Storage::fake('public');
     Gestion::activar($this->negocio);
-    $comida = \App\Models\TipoProducto::where('slug', 'comida')->firstOrFail();
-    $global = \App\Models\CategoriaCatalogo::firstOrFail();
+    $comida = TipoProducto::where('slug', 'comida')->firstOrFail();
+    $global = CategoriaCatalogo::firstOrFail();
     $seccion = $this->negocio->categorias()->create(['nombre' => 'Repuestos']);
     entrarAlPanel($this, $this->dueno);
     $this->get('/negocio/catalogo')->assertOk()->assertSee('Nuevo producto');
@@ -251,7 +256,7 @@ test('el dueño crea, edita, agota y elimina productos desde el catálogo web', 
         'atributos_texto' => "Queso, Maíz\nMantequilla", 'fijos_texto' => 'Maíz, Pollo',
         'extras_lista' => [['nombre' => 'Huevo', 'precio' => '1.000'], ['nombre' => '', 'precio' => '']],
         'otros_nombres' => 'arepita', 'categorias_marcadas' => [$global->id], 'disponible' => '1',
-        'imagen' => \Illuminate\Http\UploadedFile::fake()->image('arepa.png', 800, 600),
+        'imagen' => UploadedFile::fake()->image('arepa.png', 800, 600),
     ])->assertRedirect('/negocio/catalogo')->assertSessionHas('ok');
 
     $p = $this->negocio->productos()->where('nombre', 'Arepa rellena')->firstOrFail();
@@ -263,7 +268,7 @@ test('el dueño crea, edita, agota y elimina productos desde el catálogo web', 
         ->and($p->nombres_alternos)->toBe(['arepita'])
         ->and($p->categoriasCatalogo->pluck('id')->all())->toBe([$global->id])
         ->and($p->imagen)->not->toBeNull();
-    \Illuminate\Support\Facades\Storage::disk('public')->assertExists($p->imagen);
+    Storage::disk('public')->assertExists($p->imagen);
 
     // El detalle del modal muestra toda la información.
     $this->get('/negocio/catalogo')->assertSee('id="producto-'.$p->id.'"', false)
@@ -287,7 +292,7 @@ test('el dueño crea, edita, agota y elimina productos desde el catálogo web', 
 
     $this->delete('/negocio/catalogo/productos/'.$p->id)->assertSessionHas('ok');
     expect($this->negocio->productos()->find($p->id))->toBeNull()
-        ->and(\App\Models\Producto::withTrashed()->find($p->id))->not->toBeNull();
+        ->and(Producto::withTrashed()->find($p->id))->not->toBeNull();
 });
 
 test('sin permiso de catálogo solo se ven los productos, sin editarlos', function () {
@@ -477,4 +482,78 @@ test('el QR pide un código nuevo sin recargar y el anterior deja de servir', fu
     $this->postJson('/api/acceso-web/aprobar', ['codigo' => $r->json('codigo')])->assertOk();
     comoNavegador($this);
     $this->getJson('/login/estado')->assertJsonPath('estado', 'listo');
+});
+
+test('Mi tienda muestra la portada con el nombre y el dueño edita la información', function () {
+    Storage::fake('public');
+    Gestion::activar($this->negocio);
+    $this->negocio->forceFill(['imagen' => 'negocios/vieja.jpg'])->save();
+    Storage::disk('public')->put('negocios/vieja.jpg', 'x');
+    entrarAlPanel($this, $this->dueno);
+
+    $this->get('/negocio/tienda')->assertOk()
+        ->assertSee('class="tienda-portada"', false)
+        ->assertSee('src="'.asset('storage/negocios/vieja.jpg').'"', false)
+        ->assertSee('Editar información')->assertSee('Cuentas para transferencias');
+
+    $this->from('/negocio/tienda')->put('/negocio/tienda', [
+        '_formulario' => 'tienda', 'nombre' => 'Latonería Grumar', 'descripcion' => 'Bompers y rejas',
+        'direccion' => 'Calle 12 # 5-20', 'barrio' => 'San José', 'telefono' => '3001234567', 'tiempo_preparacion' => 45,
+        'imagen' => UploadedFile::fake()->image('portada.jpg', 1600, 600),
+    ])->assertRedirect('/negocio/tienda')->assertSessionHas('ok');
+
+    $n = $this->negocio->fresh();
+    expect($n->nombre)->toBe('Latonería Grumar')->and($n->barrio)->toBe('San José')
+        ->and($n->tiempo_preparacion)->toBe(45)->and($n->imagen)->not->toBe('negocios/vieja.jpg');
+    Storage::disk('public')->assertMissing('negocios/vieja.jpg');
+    Storage::disk('public')->assertExists($n->imagen);
+
+    $this->from('/negocio/tienda')->put('/negocio/tienda', ['nombre' => '', 'direccion' => 'Calle 12', 'barrio' => 'Centro', 'tiempo_preparacion' => 2])
+        ->assertRedirect('/negocio/tienda')->assertSessionHasErrors(['nombre', 'tiempo_preparacion']);
+});
+
+test('quien no administra ve Mi tienda sin editar ni ver las cuentas', function () {
+    Gestion::activar($this->negocio);
+    $this->negocio->cuentasPago()->create(['tipo' => 'nequi', 'numero' => '3001112233', 'titular' => 'Ismael', 'orden' => 1]);
+    entrarAlPanel($this, $this->trabajador);
+
+    $this->get('/negocio/tienda')->assertOk()->assertSee('Latonería')
+        ->assertDontSee('Editar información')->assertDontSee('3001112233');
+    $this->put('/negocio/tienda', ['nombre' => 'Otro', 'direccion' => 'Calle 1', 'barrio' => 'Centro', 'tiempo_preparacion' => 20])->assertForbidden();
+    $this->post('/negocio/tienda/cuentas', ['tipo' => 'nequi', 'numero' => '3009998877', 'titular' => 'Ayudante', 'pin' => '2468'])->assertForbidden();
+});
+
+test('el dueño agrega, edita y elimina cuentas para transferencias con su clave', function () {
+    Gestion::activar($this->negocio);
+    $this->dueno->forceFill(['pin' => '2468'])->save();
+    entrarAlPanel($this, $this->dueno);
+
+    // Sin clave o con la equivocada no guarda, y la clave no queda en la sesión.
+    $this->from('/negocio/tienda')->post('/negocio/tienda/cuentas', ['_formulario' => 'cuenta-nueva', 'tipo' => 'nequi', 'numero' => '3001112233', 'titular' => 'Ismael Pérez', 'pin' => '1111'])
+        ->assertRedirect('/negocio/tienda')->assertSessionHasErrors('pin')->assertSessionHasInput('numero', '3001112233')->assertSessionMissing('_old_input.pin');
+    expect($this->negocio->cuentasPago()->count())->toBe(0);
+
+    $this->from('/negocio/tienda')->post('/negocio/tienda/cuentas', ['tipo' => 'banco', 'numero' => '123-456', 'titular' => 'Ismael Pérez', 'pin' => '2468'])
+        ->assertSessionHasErrors(['banco', 'tipo_cuenta']);
+
+    $this->from('/negocio/tienda')->post('/negocio/tienda/cuentas', ['tipo' => 'nequi', 'numero' => '300 111  2233', 'titular' => 'Ismael Pérez', 'pin' => '2468'])
+        ->assertRedirect('/negocio/tienda')->assertSessionHas('ok');
+    $cuenta = $this->negocio->cuentasPago()->firstOrFail();
+    expect($cuenta->numero)->toBe('300 111 2233');
+
+    $this->get('/negocio/tienda')->assertOk()->assertSee('class="cuenta"', false)->assertSee('300 111 2233')->assertSee('Ismael Pérez')
+        ->assertSee('data-abrir="cuenta-'.$cuenta->id.'"', false)->assertSee('data-abrir="eliminar-'.$cuenta->id.'"', false);
+
+    $this->from('/negocio/tienda')->put('/negocio/tienda/cuentas/'.$cuenta->id, ['tipo' => 'bancolombia', 'numero' => '12345678901', 'tipo_cuenta' => 'ahorros', 'titular' => 'Ismael Pérez', 'pin' => '2468'])
+        ->assertRedirect('/negocio/tienda')->assertSessionHas('ok');
+    expect($cuenta->fresh()->only(['tipo', 'numero', 'tipo_cuenta']))->toBe(['tipo' => 'bancolombia', 'numero' => '12345678901', 'tipo_cuenta' => 'ahorros']);
+
+    $this->from('/negocio/tienda')->delete('/negocio/tienda/cuentas/'.$cuenta->id, [])->assertSessionHasErrors('pin');
+    $this->from('/negocio/tienda')->delete('/negocio/tienda/cuentas/'.$cuenta->id, ['pin' => '2468'])->assertRedirect('/negocio/tienda')->assertSessionHas('ok');
+    expect($this->negocio->cuentasPago()->count())->toBe(0);
+
+    // La cuenta de otro negocio no se toca desde este panel.
+    $otro = User::factory()->create()->negocio()->create(['nombre' => 'Otro', 'direccion' => 'Calle 1', 'barrio' => 'Centro']);
+    $ajena = $otro->cuentasPago()->create(['tipo' => 'nequi', 'numero' => '3005556677', 'titular' => 'Otra persona', 'orden' => 1]);
+    $this->delete('/negocio/tienda/cuentas/'.$ajena->id, ['pin' => '2468'])->assertNotFound();
 });

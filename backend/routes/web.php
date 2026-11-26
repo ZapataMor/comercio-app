@@ -108,6 +108,10 @@ Route::prefix('negocio')->name('negocio.')->group(function () {
         Route::post('/elegir', 'cambiar')->name('cambiar');
         Route::get('/', 'inicio')->name('inicio');
         Route::get('/tienda', 'tienda')->name('tienda');
+        Route::put('/tienda', 'guardarTienda')->name('tienda.guardar');
+        Route::post('/tienda/cuentas', 'guardarCuenta')->name('cuentas.crear');
+        Route::put('/tienda/cuentas/{cuenta}', 'guardarCuenta')->whereNumber('cuenta')->name('cuentas.guardar');
+        Route::delete('/tienda/cuentas/{cuenta}', 'eliminarCuenta')->whereNumber('cuenta')->name('cuentas.eliminar');
         Route::get('/catalogo', 'catalogo')->name('catalogo');
         Route::post('/catalogo/productos', 'guardarProducto')->name('productos.crear');
         Route::put('/catalogo/productos/{producto}', 'guardarProducto')->whereNumber('producto')->name('productos.guardar');
