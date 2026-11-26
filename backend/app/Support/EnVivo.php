@@ -296,6 +296,13 @@ class EnVivo
             Web\PanelNegocioController::class.'@cambiar' => null,
             Web\PanelNegocioController::class.'@permisos' => null,
             Web\PanelNegocioController::class.'@guardarSede' => null,
+            // Lo que se cambia en el panel web lo ven al instante la app y las demás pestañas.
+            Web\PanelNegocioController::class.'@guardarTienda' => ['despues' => fn (Request $r) => self::datosNegocio($r->attributes->get('negocio_web')?->id)],
+            Web\PanelNegocioController::class.'@guardarCuenta' => null,
+            Web\PanelNegocioController::class.'@eliminarCuenta' => null,
+            Web\PanelNegocioController::class.'@guardarProducto' => ['despues' => fn (Request $r) => self::catalogo($r->attributes->get('negocio_web')?->id)],
+            Web\PanelNegocioController::class.'@disponibilidadProducto' => ['despues' => fn (Request $r) => self::catalogo($r->attributes->get('negocio_web')?->id)],
+            Web\PanelNegocioController::class.'@eliminarProducto' => ['despues' => fn (Request $r) => self::catalogo($r->attributes->get('negocio_web')?->id)],
 
             // --- Cuenta y perfil ---
             AuthController::class.'@register' => ['despues' => fn () => self::avisar(self::ADMIN, 'usuarios')],

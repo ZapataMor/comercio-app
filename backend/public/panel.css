@@ -180,7 +180,6 @@ body.panel{min-height:100vh;font-size:15px}
 /* Catálogo: productos en tarjetas a todo el ancho */
 .panel-encabezado-fila{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .catalogo-barra{display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap;margin-bottom:20px}
-.catalogo-barra h2{margin:0}
 .catalogo-filtros{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .catalogo-filtros input,.catalogo-filtros select{min-height:40px;padding:8px 14px;border-radius:12px;border:1px solid var(--input-line);background:var(--surface);color:var(--strong);font:14px SitioInter,system-ui,sans-serif}
 .catalogo-filtros input{width:240px}
@@ -188,8 +187,65 @@ body.panel{min-height:100vh;font-size:15px}
 .catalogo-vacio{padding:36px 0;text-align:center}
 .catalogo-extra{margin-top:16px}
 .productos{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:18px}
-.producto{display:flex;flex-direction:column;width:100%;height:100%;padding:0;overflow:hidden;border:1px solid var(--line);border-radius:18px;background:var(--surface);color:inherit;font:inherit;text-align:left;cursor:pointer;transition:transform .15s,box-shadow .15s,border-color .15s}
-.producto:hover,.producto:focus-visible{transform:translateY(-3px);border-color:color-mix(in srgb,var(--accent) 45%,var(--line));box-shadow:var(--sombra)}
+.producto{display:flex;flex-direction:column;height:100%;overflow:hidden;border:1px solid var(--line);border-radius:18px;background:var(--surface);transition:transform .15s,box-shadow .15s,border-color .15s}
+.producto:hover,.producto:focus-within{transform:translateY(-3px);border-color:color-mix(in srgb,var(--accent) 45%,var(--line));box-shadow:var(--sombra)}
+.producto-abrir{display:flex;flex-direction:column;flex:1;width:100%;padding:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.producto-abrir:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:18px 18px 0 0}
+
+/* Switch disponible / agotado */
+.interruptor{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none}
+.interruptor input{position:absolute;opacity:0;width:1px;height:1px}
+.interruptor-pista{position:relative;flex-shrink:0;width:42px;height:24px;border-radius:999px;background:var(--input-line);transition:background .18s}
+.interruptor-pista::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #0000004d;transition:transform .18s}
+.interruptor input:checked + .interruptor-pista{background:var(--success)}
+.interruptor input:checked + .interruptor-pista::after{transform:translateX(18px)}
+.interruptor input:focus-visible + .interruptor-pista{outline:2px solid var(--accent);outline-offset:2px}
+.interruptor input:disabled + .interruptor-pista{opacity:.6}
+.interruptor-texto{font-size:13px;font-weight:600;color:var(--muted)}
+.interruptor input:checked ~ .interruptor-texto{color:var(--success)}
+.producto-pie{padding:12px 18px;border-top:1px solid var(--line)}
+
+/* Pestañas Productos / Servicios */
+.pestanas{display:inline-flex;gap:4px;padding:4px;border-radius:14px;background:var(--surface2)}
+.pestana{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:8px 16px;border:0;border-radius:11px;background:transparent;color:var(--muted);font:600 16px SitioSora,system-ui,sans-serif;letter-spacing:-.02em;cursor:pointer;transition:background .15s,color .15s}
+.pestana:hover{color:var(--strong)}
+.pestana[aria-selected="true"]{background:var(--surface);color:var(--strong);box-shadow:0 1px 3px #0000001f}
+.pestana[aria-selected="true"] .bloque-cuenta{background:var(--accent-soft);color:var(--gold)}
+.pestana:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.catalogo-filtros[hidden],[role="tabpanel"][hidden]{display:none}
+
+/* Servicios */
+.servicios{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+.servicio{display:flex;flex-direction:column;gap:10px;padding:20px;border:1px solid var(--line);border-radius:18px;background:var(--surface)}
+.servicio.agotado{opacity:.7}
+.servicio-cabeza{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.servicio-nombre{font:700 17px/1.25 SitioSora,system-ui,sans-serif;color:var(--strong);letter-spacing:-.02em}
+.servicio-descripcion{font-size:14px;color:var(--text);white-space:pre-line}
+.servicio-pie{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:auto;padding-top:8px}
+.servicio-pie .producto-precio{margin:0 auto 0 0;padding:0;font-size:18px}
+
+/* Extras en el modal del producto */
+.detalle-extras{margin-top:18px;padding:14px 16px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+.detalle-extras h3{margin:0 0 8px;font-size:14px;display:flex;align-items:baseline;gap:8px}
+.detalle-extras li{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+.detalle-extras li:first-child{border-top:0}
+.detalle-extras strong{color:var(--strong);white-space:nowrap}
+
+/* Listas que se llenan uno por uno */
+.lista-items{display:flex;flex-direction:column;gap:10px;font-weight:400}
+.lista-items-filas{display:flex;flex-direction:column;gap:6px}
+.lista-item{display:flex;align-items:center;gap:10px;padding:6px 6px 6px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.lista-item-texto{flex:1;min-width:0;font-size:14px;color:var(--strong);overflow-wrap:anywhere}
+.campo-panel .lista-item-obligatorio{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap}
+.campo-panel .lista-item-obligatorio input{width:16px;height:16px;min-height:0;margin:0;padding:0;accent-color:var(--accent)}
+.lista-item-obligatorio:has(input:checked){color:var(--gold)}
+.producto-form:not([data-tipo="comida"]) .lista-item-obligatorio{display:none}
+.lista-item-quitar{display:grid;place-items:center;flex-shrink:0;width:30px;height:30px;border-radius:9px;border:0;background:transparent;color:var(--muted);font-size:13px;cursor:pointer}
+.lista-item-quitar:hover{background:#B23A1714;color:#B23A17}
+.lista-items-agregar{display:flex;gap:8px}
+.lista-items-agregar input{flex:1;min-width:0}
+.lista-items-vacia{margin:0}
+.lista-items [hidden]{display:none!important}
 .producto-foto{position:relative;display:block;aspect-ratio:1/1;background:var(--surface2)}
 .producto-foto img{display:block;width:100%;height:100%;object-fit:cover}
 .producto-sin-foto{display:grid;place-items:center;width:100%;height:100%;font:700 48px SitioSora,system-ui,sans-serif;color:var(--muted);opacity:.6}

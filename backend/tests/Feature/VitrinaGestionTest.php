@@ -1,5 +1,6 @@
 <?php
 
+use App\Events\CambioEnVivo;
 use App\Gestion\AccesosWeb;
 use App\Gestion\Gestion;
 use App\Gestion\Modulos;
@@ -10,10 +11,12 @@ use App\Models\PlantillaGestion;
 use App\Models\Producto;
 use App\Models\TipoProducto;
 use App\Models\User;
+use App\Support\EnVivo;
 use App\Support\GoogleIdToken;
 use App\Support\Telefono\EnviadorCodigos;
 use App\Support\Telefono\EnviadorLog;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Role;
@@ -253,9 +256,9 @@ test('el dueño crea, edita, agota y elimina productos desde el catálogo web', 
     $this->from('/negocio/catalogo')->post('/negocio/catalogo/productos', [
         '_producto' => 'nuevo', 'nombre' => 'Arepa rellena', 'descripcion' => 'Con queso', 'precio' => '3.500',
         'venta' => 'kilos', 'tipo_producto_id' => $comida->id, 'categoria_id' => $seccion->id,
-        'atributos_texto' => "Queso, Maíz\nMantequilla", 'fijos_texto' => 'Maíz, Pollo',
+        'atributos_lista' => ['Queso', ' Maíz ', 'Mantequilla', 'Queso', ''], 'fijos_lista' => ['Maíz', 'Pollo'],
         'extras_lista' => [['nombre' => 'Huevo', 'precio' => '1.000'], ['nombre' => '', 'precio' => '']],
-        'otros_nombres' => 'arepita', 'categorias_marcadas' => [$global->id], 'disponible' => '1',
+        'otros_nombres_lista' => ['arepita'], 'categorias_marcadas' => [$global->id], 'disponible' => '1',
         'imagen' => UploadedFile::fake()->image('arepa.png', 800, 600),
     ])->assertRedirect('/negocio/catalogo')->assertSessionHas('ok');
 
@@ -272,12 +275,14 @@ test('el dueño crea, edita, agota y elimina productos desde el catálogo web', 
 
     // El detalle del modal muestra toda la información.
     $this->get('/negocio/catalogo')->assertSee('id="producto-'.$p->id.'"', false)
-        ->assertSee('Con queso')->assertSee('Huevo · $ 1.000')->assertSee('arepita')->assertSee($global->nombre);
+        ->assertSee('Con queso')->assertSee('Ingredientes opcionales')->assertSee('Ingredientes obligatorios')
+        ->assertSeeInOrder(['Extras', 'Huevo', '+ $ 1.000'])->assertSee('arepita')->assertSee($global->nombre)
+        ->assertSee('name="atributos_lista[]" value="Mantequilla"', false)->assertSee('name="fijos_lista[]" value="Maíz" checked', false);
 
     // Editar: sin categorías de Vitrina y por cantidad.
     $this->from('/negocio/catalogo')->put('/negocio/catalogo/productos/'.$p->id, [
         '_producto' => (string) $p->id, 'nombre' => 'Arepa de queso', 'precio' => '4000', 'venta' => 'cantidad',
-        'tipo_producto_id' => $comida->id, 'atributos_texto' => 'Queso', 'disponible' => '1',
+        'tipo_producto_id' => $comida->id, 'atributos_lista' => ['Queso'], 'disponible' => '1',
     ])->assertRedirect('/negocio/catalogo');
     $p->refresh();
     expect($p->nombre)->toBe('Arepa de queso')->and((int) $p->precio)->toBe(4000)
@@ -556,4 +561,71 @@ test('el dueño agrega, edita y elimina cuentas para transferencias con su clave
     $otro = User::factory()->create()->negocio()->create(['nombre' => 'Otro', 'direccion' => 'Calle 1', 'barrio' => 'Centro']);
     $ajena = $otro->cuentasPago()->create(['tipo' => 'nequi', 'numero' => '3005556677', 'titular' => 'Otra persona', 'orden' => 1]);
     $this->delete('/negocio/tienda/cuentas/'.$ajena->id, ['pin' => '2468'])->assertNotFound();
+});
+
+test('el switch de cada tarjeta marca disponible o agotado y avisa a la app', function () {
+    Event::fake([CambioEnVivo::class]);
+    Gestion::activar($this->negocio);
+    $p = $this->negocio->productos()->create(['nombre' => 'Rejilla', 'precio' => 50000]);
+    entrarAlPanel($this, $this->dueno);
+
+    $this->get('/negocio/catalogo')->assertOk()->assertSee('role="switch"', false)
+        ->assertSee('data-disponible="'.route('negocio.productos.disponible', $p->id).'"', false);
+
+    // Con el valor es idempotente: dos veces «agotado» sigue agotado.
+    foreach ([1, 2] as $_) {
+        $this->patchJson('/negocio/catalogo/productos/'.$p->id.'/disponible', ['disponible' => false])
+            ->assertOk()->assertJson(['disponible' => false]);
+    }
+    expect($p->fresh()->disponible)->toBeFalse();
+    EnVivo::enviar();
+    Event::assertDispatched(CambioEnVivo::class, fn ($e) => $e->tema === 'catalogo'
+        && in_array('catalogo', $e->canales, true) && in_array('negocio.'.$this->negocio->id, $e->canales, true));
+
+    $this->patchJson('/negocio/catalogo/productos/'.$p->id.'/disponible', ['disponible' => true])->assertJson(['disponible' => true]);
+    expect($p->fresh()->disponible)->toBeTrue();
+});
+
+test('quien no puede cambiar el catálogo no ve el switch ni lo usa', function () {
+    Gestion::activar($this->negocio);
+    $p = $this->negocio->productos()->create(['nombre' => 'Rejilla', 'precio' => 50000]);
+    entrarAlPanel($this, $this->trabajador);
+
+    $this->get('/negocio/catalogo')->assertOk()->assertSee('Rejilla')->assertDontSee('role="switch"', false);
+    $this->patchJson('/negocio/catalogo/productos/'.$p->id.'/disponible', ['disponible' => false])->assertForbidden();
+    expect($p->fresh()->disponible)->toBeTrue();
+});
+
+test('las pestañas muestran primero los productos y, si no hay, los servicios', function () {
+    Gestion::activar($this->negocio);
+    entrarAlPanel($this, $this->dueno);
+    $this->negocio->servicios()->create(['nombre' => 'Pintura de puerta', 'descripcion' => 'Con pintura electrostática', 'duracion_minutos' => 120, 'precio' => 90000]);
+
+    // Solo servicios: abre en Servicios.
+    $this->get('/negocio/catalogo')->assertOk()
+        ->assertSee('data-pestana="servicios" aria-selected="true"', false)
+        ->assertSee('Pintura de puerta')->assertSee('$ 90.000');
+
+    // Con productos y servicios: primero los productos.
+    $this->negocio->productos()->create(['nombre' => 'Bomper', 'precio' => 350000]);
+    $this->get('/negocio/catalogo')->assertSee('data-pestana="productos" aria-selected="true"', false)
+        ->assertSee('data-pestana="servicios" aria-selected="false"', false);
+    $this->get('/negocio/catalogo?pestana=servicios')->assertSee('data-pestana="servicios" aria-selected="true"', false);
+
+    // Sin servicios: productos.
+    $this->negocio->servicios()->delete();
+    $this->get('/negocio/catalogo')->assertSee('data-pestana="productos" aria-selected="true"', false)
+        ->assertSee('Este negocio no ofrece servicios');
+});
+
+test('editar desde la web avisa en vivo a la app y a las demás pestañas', function () {
+    Event::fake([CambioEnVivo::class]);
+    Gestion::activar($this->negocio);
+    $this->dueno->forceFill(['pin' => '2468'])->save();
+    entrarAlPanel($this, $this->dueno);
+
+    $this->put('/negocio/tienda', ['nombre' => 'Latonería Grumar', 'direccion' => 'Calle 12 # 5-20', 'barrio' => 'Centro', 'tiempo_preparacion' => 30])
+        ->assertSessionHas('ok');
+    EnVivo::enviar();
+    Event::assertDispatched(CambioEnVivo::class, fn ($e) => $e->tema === 'negocio' && in_array('catalogo', $e->canales, true));
 });

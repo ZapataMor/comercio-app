@@ -8,6 +8,11 @@
     $extras = $usarOld ? array_values(array_filter((array) old('extras_lista', []), fn ($e) => is_array($e))) : ($p?->extras ?? []);
     $extras = array_pad(array_slice($extras, 0, 20), max(count($extras) + 2, 3), ['nombre' => '', 'precio' => '']);
     $tipoActual = (string) $v('tipo_producto_id', $p?->tipo_producto_id);
+    $listaOld = fn (string $campo, ?array $valor) => array_values(array_filter(array_map('strval', array_filter($usarOld ? (array) old($campo, []) : ($valor ?? []), 'is_scalar')), 'strlen'));
+    $atributos = $listaOld('atributos_lista', $p?->atributos);
+    $fijos = $listaOld('fijos_lista', $p?->ingredientes_fijos);
+    $colores = $listaOld('colores_lista', $p?->colores);
+    $otrosNombres = $listaOld('otros_nombres_lista', $p?->nombres_alternos);
 @endphp
 <form method="POST" enctype="multipart/form-data" class="formulario producto-form"
       action="{{ $p ? route('negocio.productos.guardar', $p->id) : route('negocio.productos.crear') }}">
@@ -52,12 +57,11 @@
         </select>
     </label>
 
-    <label class="campo-panel ancho"><span data-etiqueta-atributos>{{ $p?->tipoProducto?->atributo_label ?? 'Características' }}</span>
-        <textarea name="atributos_texto" rows="2" placeholder="Uno por renglón o separados por comas">{{ $v('atributos_texto', implode(', ', $p?->atributos ?? [])) }}</textarea>
-    </label>
-    <label class="campo-panel ancho" data-solo="comida">Ingredientes que no se pueden quitar <span class="ayuda">Deben estar también en los ingredientes.</span>
-        <textarea name="fijos_texto" rows="2" placeholder="Separados por comas">{{ $v('fijos_texto', implode(', ', $p?->ingredientes_fijos ?? [])) }}</textarea>
-    </label>
+    <div class="campo-panel ancho">
+        <span><span data-etiqueta-atributos>{{ $p?->tipoProducto?->atributo_label ?? 'Características' }}</span>
+            <span class="ayuda" data-solo="comida">Agrega uno por uno. Marca «Obligatorio» los que el cliente no puede quitar; los demás son opcionales.</span></span>
+        @include('negocio._lista_items', ['campo' => 'atributos_lista', 'items' => $atributos, 'fijos' => $fijos, 'placeholder' => 'Escribe uno y presiona Agregar'])
+    </div>
     <fieldset class="ancho producto-extras" data-solo="comida">
         <legend>Extras <span class="ayuda">Se piden aparte; precio 0 = gratis.</span></legend>
         @foreach($extras as $i => $e)
@@ -67,12 +71,12 @@
             </div>
         @endforeach
     </fieldset>
-    <label class="campo-panel ancho" data-solo="ropa-y-calzado">Colores
-        <textarea name="colores_texto" rows="2" placeholder="Separados por comas">{{ $v('colores_texto', implode(', ', $p?->colores ?? [])) }}</textarea>
-    </label>
-    <label class="campo-panel ancho">Otros nombres <span class="ayuda">Cómo más lo busca la gente (máximo 10).</span>
-        <input name="otros_nombres" value="{{ $v('otros_nombres', implode(', ', $p?->nombres_alternos ?? [])) }}" placeholder="Separados por comas">
-    </label>
+    <div class="campo-panel ancho" data-solo="ropa-y-calzado"><span>Colores</span>
+        @include('negocio._lista_items', ['campo' => 'colores_lista', 'items' => $colores, 'placeholder' => 'Escribe un color'])
+    </div>
+    <div class="campo-panel ancho"><span>Otros nombres <span class="ayuda">Cómo más lo busca la gente (máximo 10).</span></span>
+        @include('negocio._lista_items', ['campo' => 'otros_nombres_lista', 'items' => $otrosNombres, 'maximo' => 10, 'placeholder' => 'Escribe otro nombre'])
+    </div>
 
     <fieldset class="ancho producto-categorias">
         <legend>Categorías de Vitrina <span class="ayuda">Hasta 8; ayudan a que te encuentren al explorar.</span></legend>

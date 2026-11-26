@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('titulo', 'Panel') - {{ isset($negocioWeb) ? $negocioWeb->nombre : 'Vitrina' }}</title>
     <link rel="icon" type="image/svg+xml" href="{{ asset('images/vitrina-mark.svg') }}">
     <link rel="stylesheet" href="{{ asset('brand.css') }}">

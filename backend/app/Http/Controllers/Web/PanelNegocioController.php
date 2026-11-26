@@ -22,6 +22,7 @@ use App\Support\EditorCuentaPago;
 use App\Support\EditorProducto;
 use App\Support\FotoOptimizada;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -189,12 +190,21 @@ class PanelNegocioController extends Controller
             $query->where('disponible', $estado === 'disponibles');
         }
 
+        $totalProductos = $negocio->productos()->count();
+        $servicios = $negocio->servicios()->orderBy('nombre')->get();
+        // Primero los productos; los servicios si no hay productos o si los piden.
+        $pestana = $request->query('pestana') === 'servicios' || ($totalProductos === 0 && $servicios->isNotEmpty()) ? 'servicios' : 'productos';
+        if ($buscar !== '' || $estado) {
+            $pestana = 'productos';
+        }
+
         return view('negocio.catalogo', [
             'productos' => $query->paginate(24, ['*'], 'productos')->withQueryString(),
-            'totalProductos' => $negocio->productos()->count(),
+            'totalProductos' => $totalProductos,
             'buscar' => $buscar,
             'estado' => $estado,
-            'servicios' => $negocio->servicios()->orderBy('nombre')->get(),
+            'servicios' => $servicios,
+            'pestana' => $pestana,
             'campos' => $negocio->plantillaGestion?->campos_producto ?? [],
             'puedeEditar' => $negocio->puede($request->user(), 'modificar_inventario'),
             'categorias' => $negocio->categorias()->orderBy('nombre')->get(['id', 'nombre']),
@@ -225,14 +235,24 @@ class PanelNegocioController extends Controller
         return redirect()->to(url()->previous())->with('ok', 'Se guardó «'.$modelo->nombre.'».');
     }
 
-    public function disponibilidadProducto(Request $request, int $producto): RedirectResponse
+    /**
+     * Disponible o agotado. El switch de cada tarjeta manda el valor
+     * (`disponible`) y espera JSON; sin valor, se cambia al contrario.
+     */
+    public function disponibilidadProducto(Request $request, int $producto): RedirectResponse|JsonResponse
     {
         $negocio = $this->negocio($request);
         abort_unless($negocio->puede($request->user(), 'modificar_inventario'), 403, 'No tienes permiso para cambiar el catálogo.');
         $modelo = $negocio->productos()->findOrFail($producto);
-        $modelo->update(['disponible' => ! $modelo->disponible]);
+        $disponible = $request->has('disponible') ? $request->boolean('disponible') : ! $modelo->disponible;
+        $modelo->update(['disponible' => $disponible]);
+        $mensaje = '«'.$modelo->nombre.'» quedó '.($modelo->disponible ? 'disponible.' : 'agotado.');
 
-        return back()->with('ok', '«'.$modelo->nombre.'» quedó '.($modelo->disponible ? 'disponible.' : 'agotado.'));
+        if ($request->expectsJson()) {
+            return response()->json(['disponible' => $modelo->disponible, 'message' => $mensaje]);
+        }
+
+        return back()->with('ok', $mensaje);
     }
 
     /** Borrado suave, como en la app: no rompe el historial de pedidos. */
@@ -247,24 +267,28 @@ class PanelNegocioController extends Controller
     }
 
     /**
-     * Lleva el formulario web a los campos de la app: listas escritas en un
-     * cuadro de texto (por renglón o coma), «se vende por» y el precio con puntos.
+     * Lleva el formulario web a los campos de la app: listas que se agregan
+     * una por una (ingredientes, obligatorios, colores, otros nombres), «se
+     * vende por» y el precio con puntos.
      *
      * @return array<string, mixed>
      */
     private function datosDeFormulario(Request $request): array
     {
-        $lista = fn (string $campo) => array_values(array_filter(array_map('trim', preg_split('/[,\n]+/', (string) $request->input($campo, ''))), 'strlen'));
+        $lista = fn (string $campo) => array_values(array_unique(array_filter(
+            array_map(fn ($v) => trim((string) $v), array_filter((array) $request->input($campo, []), 'is_scalar')),
+            'strlen'
+        )));
         $venta = ['cantidad' => ['cantidad', 'unidad'], 'kilos' => ['peso', 'kg'], 'libras' => ['peso', 'libra']][$request->input('venta')] ?? ['cantidad', 'unidad'];
         $precio = preg_replace('/\D/', '', (string) $request->input('precio', ''));
 
         return [
             'precio' => $precio === '' ? null : (int) $precio,
             'categoria_id' => $request->input('categoria_id') ?: null,
-            'atributos' => $lista('atributos_texto'),
-            'colores' => $lista('colores_texto'),
-            'ingredientes_fijos' => $lista('fijos_texto'),
-            'nombres_alternos' => $lista('otros_nombres'),
+            'atributos' => $lista('atributos_lista'),
+            'colores' => $lista('colores_lista'),
+            'ingredientes_fijos' => $lista('fijos_lista'),
+            'nombres_alternos' => $lista('otros_nombres_lista'),
             'extras' => collect($request->input('extras_lista', []))
                 ->filter(fn ($e) => is_array($e) && trim((string) ($e['nombre'] ?? '')) !== '')
                 ->map(fn ($e) => ['nombre' => $e['nombre'], 'precio' => (int) preg_replace('/\D/', '', (string) ($e['precio'] ?? '0'))])
