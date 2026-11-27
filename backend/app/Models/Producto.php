@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Validation\ValidationException;
 
 class Producto extends Model
 {
@@ -19,7 +20,7 @@ class Producto extends Model
     {
         static::saving(function (Producto $producto) {
             if ((float) $producto->precio <= 0) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
+                throw ValidationException::withMessages([
                     'precio' => 'El precio del producto debe ser mayor que 0 pesos.',
                 ]);
             }
@@ -103,14 +104,13 @@ class Producto extends Model
     }
 
     /**
-     * Lo que gasta una unidad del producto (módulo «produccion»): artículos
-     * del inventario con la cantidad en su unidad. materiales_al dice si se
-     * descuentan al registrar que se hizo («fabricar») o con cada pedido.
+     * Modelo con el que se hace (Materiales y producción): sus materiales
+     * predeterminados y, si es «con cada pedido», lo que se descuenta del
+     * inventario cuando un pedido de este producto queda listo.
      */
-    public function materiales(): BelongsToMany
+    public function modelo(): BelongsTo
     {
-        return $this->belongsToMany(InventarioArticulo::class, 'producto_materiales', 'producto_id', 'articulo_id')
-            ->withPivot('cantidad')->withTimestamps()->orderBy('inventario_articulos.nombre');
+        return $this->belongsTo(ModeloProduccion::class, 'modelo_id');
     }
 
     /**

@@ -4,7 +4,7 @@ namespace App\Console\Commands;
 
 use App\Gestion\Gestion;
 use App\Gestion\Inventario;
-use App\Gestion\Materiales;
+use App\Gestion\Modelos;
 use App\Models\Negocio;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -136,6 +136,8 @@ class RecetasRestauranteDePrueba extends Command
         DB::transaction(function () use ($negocio, $viejos) {
             $negocio->producciones()->whereHas('movimientos', fn ($q) => $q->whereIn('articulo_id', $viejos))->delete();
             $negocio->articulosInventario()->whereIn('id', $viejos)->delete();
+            // Los modelos «con cada pedido» que se quedaron sin ingredientes.
+            $negocio->modelosProduccion()->where('al_pedido', true)->whereDoesntHave('materiales')->delete();
         });
         if ($this->option('quitar')) {
             $this->info("Se borraron {$viejos->count()} insumos de prueba de «{$negocio->nombre}».");
@@ -143,9 +145,9 @@ class RecetasRestauranteDePrueba extends Command
             return self::SUCCESS;
         }
 
-        if (! Gestion::tieneModulo($negocio, 'produccion')) {
+        if (! Gestion::tieneModulo($negocio, 'inventario')) {
             Gestion::activar($negocio);
-            Gestion::definirModulos($negocio, [...Gestion::opcionalesEncendidos($negocio), 'produccion']);
+            Gestion::definirModulos($negocio, [...Gestion::opcionalesEncendidos($negocio), 'inventario']);
         }
         $dueno = $negocio->user;
         $sede = $negocio->sedes()->where('activa', true)->orderByDesc('principal')->first();
@@ -160,25 +162,19 @@ class RecetasRestauranteDePrueba extends Command
             $insumos = [];
             foreach (array_intersect_key(self::INSUMOS, array_flip($usados)) as $clave => [$nombre, $categoria, $unidad, $cantidad, $minimo, $costo, $proveedor]) {
                 $a = $negocio->articulosInventario()->create([
-                    'tipo' => 'insumo', 'nombre' => $nombre, 'categoria' => $categoria, 'unidad' => $unidad,
+                    'tipo' => 'material', 'nombre' => $nombre, 'categoria' => $categoria, 'unidad' => $unidad,
                     'minimo' => $minimo, 'costo' => $costo, 'proveedor' => $proveedor, 'sede_id' => $sede?->id,
                 ]);
                 Inventario::mover($a, 'entrada', $cantidad * 1.5, $dueno, 'Mercado de la semana');
                 $insumos[$clave] = $a;
             }
 
+            // Cada plato: un modelo «con cada pedido» con sus ingredientes.
             $hechos = [];
             foreach ($platos as [$producto, $receta]) {
-                Materiales::guardar($producto, collect($receta)->mapWithKeys(fn ($c, $k) => [$insumos[$k]->id => $c])->all(), 'pedido');
+                Modelos::guardar($negocio, $producto->modelo, ['nombre' => $producto->nombre, 'al_pedido' => true],
+                    collect($receta)->mapWithKeys(fn ($c, $k) => [$insumos[$k]->id => $c])->all(), [$producto->id]);
                 $hechos[] = $producto;
-            }
-
-            // Lo que se preparó adelantado para el almuerzo de los últimos días.
-            foreach (array_slice($hechos, 0, 6) as $k => $producto) {
-                $p = Materiales::registrar($producto, 3 + $k % 3, $dueno, 'Adelantado para el almuerzo', true);
-                $cuando = now()->subDays(5 - $k)->setTime(10, 30);
-                $p->forceFill(['created_at' => $cuando, 'updated_at' => $cuando])->saveQuietly();
-                $p->movimientos()->update(['created_at' => $cuando, 'updated_at' => $cuando]);
             }
 
             return $hechos;

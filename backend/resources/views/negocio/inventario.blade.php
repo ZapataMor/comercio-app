@@ -1,30 +1,33 @@
 @extends('layouts.negocio')
-@section('titulo', 'Inventario')
+@section('titulo', 'Materiales y producción')
 @section('contenido')
 @php
     use App\Models\InventarioArticulo;
     use App\Models\InventarioMovimiento;
     $pesos = fn (?int $v) => $v === null ? null : '$ '.number_format($v, 0, ',', '.');
     $filtrado = $buscar !== '' || $categoria !== '' || $estado || $sedeFiltro;
-    $urlTipo = fn (?string $t) => route('negocio.inventario', array_filter(['tipo' => $t, 'buscar' => $buscar ?: null, 'categoria' => $categoria ?: null, 'estado' => $estado, 'sede' => $sedeFiltro?->id]));
+    $esHerramienta = $tipo === 'herramienta';
+    $nuevoTexto = $esHerramienta ? 'una herramienta' : 'un material';
+    $plural = mb_strtolower(InventarioArticulo::TIPOS_PLURAL[$tipo]);
 @endphp
 <header class="panel-encabezado panel-encabezado-fila">
     <div>
         <span class="panel-ceja">Operación</span>
-        <h1>Inventario</h1>
-        <p>Materia prima, insumos, productos y herramientas del negocio, cada uno con sus propias características. Toca una tarjeta para ver toda su información{{ $puedeEditar ? ', registrar entradas y salidas o editarla' : '' }}.</p>
+        <h1>Materiales y producción</h1>
+        <p>{{ $esHerramienta ? 'Lo que se usa y no se gasta: pulidoras, taladros, soldadores, moldes…' : 'Con lo que se fabrica y lo que se gasta al trabajar: tubos, láminas, pintura, soldadura, harina…' }} Toca una tarjeta para ver toda su información{{ $puedeEditar ? ', registrar entradas y salidas o editarla' : '' }}.</p>
     </div>
     @if($puedeEditar)
-        <button type="button" class="boton boton-acento" data-abrir="articulo-nuevo">+ Añadir al inventario</button>
+        <button type="button" class="boton boton-acento" data-abrir="articulo-nuevo">+ Añadir {{ $nuevoTexto }}</button>
     @endif
 </header>
 
+@include('negocio._materiales_pestanas', ['seccion' => $tipo])
+
 <div class="indicadores inventario-indicadores">
-    <div class="indicador"><p>Artículos</p><strong>{{ number_format($total, 0, ',', '.') }}</strong></div>
-    <div class="indicador"><p>Materia prima</p><strong>{{ number_format($porTipo['materia_prima'] ?? 0, 0, ',', '.') }}</strong></div>
+    <div class="indicador"><p>{{ InventarioArticulo::TIPOS_PLURAL[$tipo] }}</p><strong>{{ number_format($total, 0, ',', '.') }}</strong></div>
     <div @class(['indicador', 'indicador-alerta' => $bajos > 0])>
         <p>Por acabarse o agotados</p><strong>{{ $bajos }}</strong>
-        @if($bajos)<a class="indicador-enlace" href="{{ route('negocio.inventario', ['estado' => 'bajos']) }}">Ver cuáles</a>@endif
+        @if($bajos)<a class="indicador-enlace" href="{{ route('negocio.inventario', array_filter(['tipo' => $esHerramienta ? 'herramienta' : null, 'estado' => 'bajos'])) }}">Ver cuáles</a>@endif
     </div>
     <div class="indicador"><p>Valor de lo que hay</p><strong class="indicador-dinero">{{ $conCosto ? $pesos($valorTotal) : '—' }}</strong>
         @if(! $conCosto && $total)<span class="indicador-nota">Ponle costo a los artículos para verlo.</span>@endif
@@ -33,17 +36,9 @@
 
 <section class="bloque">
     <div class="catalogo-barra inventario-barra">
-        <nav class="pestanas inventario-tipos" aria-label="Tipo de artículo">
-            <a href="{{ $urlTipo(null) }}" class="pestana" aria-selected="{{ $tipo ? 'false' : 'true' }}" @if(! $tipo) aria-current="page" @endif>Todo <span class="bloque-cuenta">{{ $total }}</span></a>
-            @foreach(InventarioArticulo::TIPOS as $clave => $texto)
-                @if(($porTipo[$clave] ?? 0) > 0 || $tipo === $clave)
-                    <a href="{{ $urlTipo($clave) }}" class="pestana" aria-selected="{{ $tipo === $clave ? 'true' : 'false' }}" @if($tipo === $clave) aria-current="page" @endif>{{ $texto }} <span class="bloque-cuenta">{{ $porTipo[$clave] ?? 0 }}</span></a>
-                @endif
-            @endforeach
-        </nav>
         <form method="GET" class="catalogo-filtros" role="search">
-            @if($tipo)<input type="hidden" name="tipo" value="{{ $tipo }}">@endif
-            <input type="search" name="buscar" value="{{ $buscar }}" placeholder="Buscar por nombre, característica…" aria-label="Buscar en el inventario">
+            @if($esHerramienta)<input type="hidden" name="tipo" value="herramienta">@endif
+            <input type="search" name="buscar" value="{{ $buscar }}" placeholder="Buscar por nombre, característica…" aria-label="Buscar en {{ $plural }}">
             @if($categorias->isNotEmpty())
                 <select name="categoria" aria-label="Filtrar por categoría" onchange="this.form.submit()">
                     <option value="">Todas las categorías</option>
@@ -62,15 +57,19 @@
                 </select>
             @endif
             <button class="boton boton-claro boton-chico">Buscar</button>
-            @if($filtrado)<a class="enlace" href="{{ route('negocio.inventario', array_filter(['tipo' => $tipo])) }}">Quitar filtros</a>@endif
+            @if($filtrado)<a class="enlace" href="{{ route('negocio.inventario', array_filter(['tipo' => $esHerramienta ? 'herramienta' : null])) }}">Quitar filtros</a>@endif
         </form>
     </div>
 
     @if($articulos->isEmpty())
         <div class="inventario-vacio">
             @if($total === 0)
-                <p class="inventario-vacio-titulo">Todavía no hay nada en el inventario.</p>
-                <p class="apagado">Empieza por la materia prima: tubos, láminas, tela, harina… Cada artículo lleva las características que necesites (calibre, color, medida, material) y se cuenta en su unidad: unidades, kilos, metros o láminas.</p>
+                <p class="inventario-vacio-titulo">Todavía no hay {{ $plural }}.</p>
+                @if($esHerramienta)
+                    <p class="apagado">Anota las pulidoras, taladros, soldadores y moldes del negocio para saber cuántos hay y en qué sede están.</p>
+                @else
+                    <p class="apagado">Empieza por lo que más usas: tubos, láminas, pintura, soldadura… Cada material lleva las características que necesites (calibre, color, medida) y se cuenta en su unidad: unidades, kilos, metros, láminas o galones.</p>
+                @endif
                 @if($puedeEditar)<button type="button" class="boton boton-oscuro boton-chico" data-abrir="articulo-nuevo">+ Añadir el primero</button>@endif
             @else
                 <p class="apagado">Ningún artículo coincide con la búsqueda.</p>
@@ -91,7 +90,6 @@
                             @else
                                 <span class="articulo-inicial" aria-hidden="true">{{ mb_strtoupper(mb_substr($a->nombre, 0, 1)) }}</span>
                             @endif
-                            <span class="chip articulo-tipo">{{ $a->tipoTexto() }}</span>
                             {{-- Siempre montado: el «−» lo muestra u oculta sin recargar. --}}
                             <span @class(['chip', 'articulo-estado', 'chip-peligro' => $estadoA === 'agotado', 'chip-aviso' => $estadoA === 'bajo']) data-estado @if($estadoA === 'ok') hidden @endif>{{ $a->estadoTexto() }}</span>
                         </span>
@@ -175,7 +173,7 @@
 
                         <div class="detalle-acciones">
                             <button type="button" class="boton boton-claro boton-chico" data-editar>Editar</button>
-                            <form method="POST" action="{{ route('negocio.inventario.eliminar', $a->id) }}" data-confirmar="¿Eliminar «{{ $a->nombre }}» del inventario? También se borra su historial de movimientos{{ $a->productos->isNotEmpty() ? ' y deja de descontarse en '.$a->productos->count().' '.($a->productos->count() === 1 ? 'producto' : 'productos') : '' }}.">@csrf @method('DELETE')
+                            <form method="POST" action="{{ route('negocio.inventario.eliminar', $a->id) }}" data-confirmar="¿Eliminar «{{ $a->nombre }}»? También se borra su historial de movimientos{{ $a->modelos->isNotEmpty() ? ' y sale de '.$a->modelos->count().' '.($a->modelos->count() === 1 ? 'modelo' : 'modelos') : '' }}.">@csrf @method('DELETE')
                                 <button class="boton boton-chico boton-peligro">Eliminar</button>
                             </form>
                         </div>
@@ -192,10 +190,10 @@
                 <dt>Se cuenta en</dt><dd>{{ mb_strtolower(InventarioArticulo::UNIDADES[$a->unidad][0] ?? $a->unidad) }}</dd>
                 <dt>Costo por {{ InventarioArticulo::UNIDADES[$a->unidad][1] ?? $a->unidad }}</dt><dd>{{ $pesos($a->costo) ?? '—' }}</dd>
                 @if($a->valor() !== null)<dt>Valor de lo que hay</dt><dd>{{ $pesos($a->valor()) }}</dd>@endif
-                @if($produccionActiva)
+                @unless($a->esHerramienta())
                     <dt>Se usa en</dt>
-                    <dd>@forelse($a->productos as $prod)<a class="chip chip-enlace" href="{{ route('negocio.produccion', ['producto' => $prod->id]) }}">{{ $prod->nombre }} · {{ $a->cantidadTexto((float) $prod->pivot->cantidad) }}</a>@empty<span class="apagado">Ningún producto todavía.</span>@endforelse</dd>
-                @endif
+                    <dd>@forelse($a->modelos as $mod)<a class="chip chip-enlace" href="{{ route('negocio.inventario.modelos', ['abrir' => $mod->id]) }}">{{ $mod->nombre }} · {{ $a->cantidadTexto((float) $mod->pivot->cantidad) }}</a>@empty<span class="apagado">Ningún modelo todavía.</span>@endforelse</dd>
+                @endunless
                 <dt>Proveedor</dt><dd>{{ $a->proveedor ?? '—' }}</dd>
                 <dt>Referencia o código</dt><dd>{{ $a->referencia ?? '—' }}</dd>
                 @if($sedes->count() > 1)<dt>Sede</dt><dd>{{ $a->sede?->nombre ?? 'Sin sede' }}</dd>@endif
@@ -236,7 +234,7 @@
 @if($puedeEditar)
     <dialog class="modal modal-solo-edicion" id="articulo-nuevo" aria-labelledby="articulo-nuevo-titulo">
         <div class="modal-cabeza">
-            <h2 id="articulo-nuevo-titulo">Añadir al inventario</h2>
+            <h2 id="articulo-nuevo-titulo">Añadir {{ $nuevoTexto }}</h2>
             <button type="button" class="modal-cerrar" data-cerrar aria-label="Cerrar">✕</button>
         </div>
         <div class="modal-edicion">@include('negocio._articulo_form', ['a' => null])</div>

@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Gestion\Materiales;
+use App\Gestion\Etapas;
 use App\Http\Controllers\Controller;
 use App\Models\Negocio;
 use App\Models\Pedido;
@@ -298,7 +298,7 @@ class ComercioPedidoController extends Controller
         $pedido->refresh();
         // Listo = ya se preparó: descuenta los materiales de lo que se descuenta
         // «con cada pedido» (Producción y materiales). Nunca frena el pedido.
-        rescue(fn () => Materiales::descontarPedido($pedido));
+        rescue(fn () => Etapas::descontarPedido($pedido));
 
         // ¿Cumplió el tiempo de preparación que promete? Cuenta desde que lo
         // aceptó (por transferencia, desde que confirmó el pago).

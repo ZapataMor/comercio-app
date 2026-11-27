@@ -4,8 +4,8 @@ use App\Http\Controllers\Web\AccesoWebController;
 use App\Http\Controllers\Web\AdminController;
 use App\Http\Controllers\Web\AuthWebController;
 use App\Http\Controllers\Web\GestionAdminController;
-use App\Http\Controllers\Web\EnEsperaController;
 use App\Http\Controllers\Web\InventarioController;
+use App\Http\Controllers\Web\ModelosController;
 use App\Http\Controllers\Web\OperacionController;
 use App\Http\Controllers\Web\PanelNegocioController;
 use App\Http\Controllers\Web\ProduccionController;
@@ -123,8 +123,6 @@ Route::prefix('negocio')->name('negocio.')->group(function () {
         Route::delete('/catalogo/productos/{producto}', 'eliminarProducto')->whereNumber('producto')->name('productos.eliminar');
         Route::post('/catalogo/servicios', 'crearServicio')->name('servicios.crear');
         // Lo fabricado que espera sus datos para entrar al catálogo.
-        Route::put('/catalogo/en-espera/{espera}', [EnEsperaController::class, 'guardar'])->whereNumber('espera')->name('espera.guardar');
-        Route::post('/catalogo/en-espera/{espera}/descartar', [EnEsperaController::class, 'descartar'])->whereNumber('espera')->name('espera.descartar');
         Route::get('/pedidos', 'pedidos')->name('pedidos');
         Route::get('/agenda', 'agenda')->name('agenda');
         Route::get('/resenas', 'resenas')->name('resenas');
@@ -148,7 +146,7 @@ Route::prefix('negocio')->name('negocio.')->group(function () {
         Route::put('/trabajadores/{miembro}', 'guardar')->whereNumber('miembro')->name('equipo.guardar');
         Route::delete('/trabajadores/{miembro}', 'quitar')->whereNumber('miembro')->name('equipo.quitar');
     });
-    // Inventario (módulo opcional): materia prima, insumos, productos y
+    // Materiales y producción (módulo opcional «inventario»): materiales y
     // herramientas con características libres, existencias y movimientos.
     Route::middleware(NegocioWeb::class)->controller(InventarioController::class)->group(function () {
         Route::get('/inventario', 'index')->name('inventario');
@@ -157,12 +155,21 @@ Route::prefix('negocio')->name('negocio.')->group(function () {
         Route::delete('/inventario/{articulo}', 'eliminar')->whereNumber('articulo')->name('inventario.eliminar');
         Route::post('/inventario/{articulo}/movimientos', 'mover')->whereNumber('articulo')->name('inventario.mover');
     });
-    // Producción y materiales (módulo opcional): lo que gasta cada producto
-    // del catálogo; se descuenta del inventario al hacerlo o con cada pedido.
+    // La producción por etapas del mismo módulo: por hacer (con sus
+    // materiales), terminada (ponerle nombre) y al catálogo.
     Route::middleware(NegocioWeb::class)->controller(ProduccionController::class)->group(function () {
-        Route::get('/produccion', 'index')->name('produccion');
-        Route::put('/produccion/productos/{producto}/materiales', 'guardarMateriales')->whereNumber('producto')->name('produccion.materiales');
-        Route::post('/produccion/productos/{producto}/hecho', 'registrar')->whereNumber('producto')->name('produccion.registrar');
-        Route::post('/produccion/{produccion}/anular', 'anular')->whereNumber('produccion')->name('produccion.anular');
+        Route::get('/inventario/produccion', 'index')->name('inventario.produccion');
+        Route::post('/inventario/produccion', 'crear')->name('inventario.produccion.crear');
+        Route::put('/inventario/produccion/{produccion}', 'guardar')->whereNumber('produccion')->name('inventario.produccion.guardar');
+        Route::delete('/inventario/produccion/{produccion}', 'cancelar')->whereNumber('produccion')->name('inventario.produccion.cancelar');
+        Route::put('/inventario/produccion/{produccion}/nombre', 'nombrar')->whereNumber('produccion')->name('inventario.produccion.nombrar');
+        Route::post('/inventario/produccion/{produccion}/anular', 'anular')->whereNumber('produccion')->name('inventario.produccion.anular');
+    });
+    // Modelos: la base de lo que se hace, con sus materiales predeterminados.
+    Route::middleware(NegocioWeb::class)->controller(ModelosController::class)->group(function () {
+        Route::get('/inventario/modelos', 'index')->name('inventario.modelos');
+        Route::post('/inventario/modelos', 'guardar')->name('inventario.modelos.crear');
+        Route::put('/inventario/modelos/{modelo}', 'guardar')->whereNumber('modelo')->name('inventario.modelos.guardar');
+        Route::delete('/inventario/modelos/{modelo}', 'eliminar')->whereNumber('modelo')->name('inventario.modelos.eliminar');
     });
 });

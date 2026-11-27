@@ -2,9 +2,10 @@
 
 namespace App\Console\Commands;
 
+use App\Gestion\Etapas;
 use App\Gestion\Gestion;
 use App\Gestion\Inventario;
-use App\Gestion\Materiales;
+use App\Gestion\Modelos;
 use App\Models\InventarioArticulo;
 use App\Models\Negocio;
 use Illuminate\Console\Command;
@@ -26,7 +27,7 @@ class InventarioDePrueba extends Command
         {--con-productos : También crea un portón, una puerta y una reja en el catálogo con los materiales que gastan}
         {--quitar : Borrar los artículos (y productos) de prueba en vez de crearlos}';
 
-    protected $description = 'Carga materia prima, insumos, productos y herramientas de prueba en el inventario de un negocio';
+    protected $description = 'Carga materiales y herramientas de prueba (y, si se pide, productos con su modelo) en un negocio';
 
     /** [tipo, nombre, categoría, unidad, cantidad, mínimo, costo, proveedor, características, movimientos [tipo, cantidad, nota]] */
     private const ARTICULOS = [
@@ -87,7 +88,7 @@ class InventarioDePrueba extends Command
         DB::transaction(function () use ($negocio, $quien, $sede) {
             foreach (self::ARTICULOS as $i => [$tipo, $nombre, $categoria, $unidad, $cantidad, $minimo, $costo, $proveedor, $rasgos, $movimientos]) {
                 $articulo = $negocio->articulosInventario()->create([
-                    'tipo' => $tipo, 'nombre' => $nombre, 'categoria' => $categoria, 'unidad' => $unidad,
+                    'tipo' => $tipo === 'herramienta' ? 'herramienta' : 'material', 'nombre' => $nombre, 'categoria' => $categoria, 'unidad' => $unidad,
                     'minimo' => $minimo, 'costo' => $costo, 'proveedor' => $proveedor, 'sede_id' => $sede?->id,
                     'referencia' => sprintf('GR-%03d', $i + 1),
                     'caracteristicas' => collect($rasgos)->map(fn ($valor, $nombre) => ['nombre' => $nombre, 'valor' => $valor])->values()->all(),
@@ -105,18 +106,16 @@ class InventarioDePrueba extends Command
         $this->info('Se cargaron '.count(self::ARTICULOS)." artículos en el inventario de «{$negocio->nombre}».");
 
         if ($this->option('con-productos')) {
-            if (! Gestion::tieneModulo($negocio, 'produccion')) {
-                Gestion::definirModulos($negocio, [...Gestion::opcionalesEncendidos($negocio), 'produccion']);
-            }
             $porReferencia = $negocio->articulosInventario()->whereIn('nombre', $nombres)->pluck('id', 'referencia');
             foreach (self::PRODUCTOS as $i => [$nombre, $precio, $receta]) {
-                $producto = $negocio->productos()->create(['nombre' => $nombre, 'precio' => $precio, 'disponible' => true, 'descripcion' => 'Producto de prueba de Producción y materiales.']);
-                Materiales::guardar($producto, collect($receta)->mapWithKeys(fn ($c, $ref) => [$porReferencia[$ref] => $c])->all(), 'fabricar');
+                $producto = $negocio->productos()->create(['nombre' => $nombre, 'precio' => $precio, 'disponible' => true, 'descripcion' => 'Producto de prueba de Materiales y producción.']);
+                $modelo = Modelos::guardar($negocio, null, ['nombre' => $nombre], collect($receta)->mapWithKeys(fn ($c, $ref) => [$porReferencia[$ref] => $c])->all(), [$producto->id]);
                 if ($i === 1) {
-                    Materiales::registrar($producto, 1, $quien, 'Para el señor Pérez');
+                    // Una por hacer, para ver la etapa 1 con sus materiales.
+                    Etapas::crear($negocio, $modelo, null, 1, $quien, 'Para el señor Pérez');
                 }
             }
-            $this->info('Se crearon '.count(self::PRODUCTOS).' productos con sus materiales en el catálogo.');
+            $this->info('Se crearon '.count(self::PRODUCTOS).' productos con su modelo y sus materiales.');
         }
 
         return self::SUCCESS;

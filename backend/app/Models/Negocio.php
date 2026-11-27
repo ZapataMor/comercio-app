@@ -169,22 +169,22 @@ class Negocio extends Model
         return $this->puede($user, 'administrador');
     }
 
-    /** Inventario del panel web: materia prima, insumos, productos, herramientas… */
+    /** Materiales y herramientas del panel web. */
     public function articulosInventario(): HasMany
     {
         return $this->hasMany(InventarioArticulo::class);
     }
 
-    /** Veces que se hizo un producto (módulo «produccion»). */
+    /** Lo que se hace, por etapas (Materiales y producción). */
     public function producciones(): HasMany
     {
         return $this->hasMany(Produccion::class);
     }
 
-    /** Lo fabricado que espera sus datos para entrar al catálogo. */
-    public function productosEnEspera(): HasMany
+    /** Modelos de lo que se hace, con sus materiales predeterminados. */
+    public function modelosProduccion(): HasMany
     {
-        return $this->hasMany(ProductoEnEspera::class);
+        return $this->hasMany(ModeloProduccion::class);
     }
 
     /** Tareas asignadas a sus trabajadores desde el panel web. */

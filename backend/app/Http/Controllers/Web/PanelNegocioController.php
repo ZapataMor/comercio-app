@@ -11,7 +11,6 @@ use App\Models\CategoriaCatalogo;
 use App\Models\Cita;
 use App\Models\Negocio;
 use App\Models\Pedido;
-use App\Models\ProductoEnEspera;
 use App\Models\Resena;
 use App\Models\Sede;
 use App\Models\TipoProducto;
@@ -187,9 +186,9 @@ class PanelNegocioController extends Controller
         $buscar = trim((string) $request->query('buscar', ''));
         $estado = $request->query('estado');
 
-        // Con «Producción y materiales», cada producto muestra lo que gasta.
-        $produccion = Gestion::puedeVerModulo($request->user(), $negocio, 'produccion');
-        $query = $negocio->productos()->with(['categoria', 'tipoProducto', 'categoriasCatalogo', ...($produccion ? ['materiales'] : [])])->orderBy('nombre');
+        // Con «Materiales y producción», cada producto dice de qué modelo se hace.
+        $modelos = Gestion::puedeVerModulo($request->user(), $negocio, 'inventario');
+        $query = $negocio->productos()->with(['categoria', 'tipoProducto', 'categoriasCatalogo', ...($modelos ? ['modelo'] : [])])->orderBy('nombre');
         if ($buscar !== '') {
             Busqueda::contieneTodos($query, 'productos.busqueda', Busqueda::terminos($buscar));
         }
@@ -200,15 +199,7 @@ class PanelNegocioController extends Controller
         $totalProductos = $negocio->productos()->count();
         $servicios = $negocio->servicios()->orderBy('nombre')->get();
         // Primero los productos; los servicios si no hay productos o si los piden.
-        // «En espera»: lo fabricado que espera sus datos para entrar al catálogo.
-        $conEspera = Gestion::tieneModulo($negocio, 'produccion');
-        $enEspera = $conEspera
-            ? $negocio->productosEnEspera()->where('estado', ProductoEnEspera::EN_ESPERA)->with(['producto.categoria', 'sede', 'usuario'])->latest('id')->get()
-            : collect();
         $pestana = $request->query('pestana') === 'servicios' || ($totalProductos === 0 && $servicios->isNotEmpty()) ? 'servicios' : 'productos';
-        if ($request->query('pestana') === 'espera' && $conEspera) {
-            $pestana = 'espera';
-        }
         if ($buscar !== '' || $estado) {
             $pestana = 'productos';
         }
@@ -225,11 +216,7 @@ class PanelNegocioController extends Controller
             'categorias' => $negocio->categorias()->orderBy('nombre')->get(['id', 'nombre']),
             'tipos' => TipoProducto::orderBy('orden')->orderBy('nombre')->get(),
             'categoriasCatalogo' => CategoriaCatalogo::orderBy('nombre')->get(['id', 'nombre']),
-            'produccionActiva' => $produccion,
-            'conEspera' => $conEspera,
-            'enEspera' => $enEspera,
-            'articulosInv' => $produccion ? ProduccionController::articulos($negocio) : collect(),
-            'puedeProducir' => $produccion && Gestion::puede($request->user(), $negocio, 'produccion.gestionar'),
+            'modelosActivos' => $modelos,
         ]);
     }
 

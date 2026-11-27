@@ -59,7 +59,7 @@ function entrarAlPanel($test, User $user): void
 test('el catálogo de módulos resuelve dependencias y dependientes', function () {
     expect(Modulos::conDependencias('caja'))->toBe(['inventario', 'caja'])
         ->and(Modulos::conDependencias('facturacion'))->toBe(['cuentas', 'facturacion'])
-        ->and(Modulos::dependientes('inventario'))->toEqualCanonicalizing(['caja', 'produccion', 'compras'])
+        ->and(Modulos::dependientes('inventario'))->toEqualCanonicalizing(['caja', 'compras'])
         ->and(Modulos::nucleo())->toContain('inicio', 'catalogo', 'equipo')
         ->and(Modulos::opcionales())->not->toContain('inicio');
     foreach (Modulos::todos() as $clave => $m) {
@@ -101,7 +101,7 @@ test('encender el panel crea la sede principal y queda en el registro de accione
 test('los módulos se encienden con sus dependencias y la plantilla suma los suyos', function () {
     Gestion::activar($this->negocio);
     $this->actingAs($this->super)->post('/admin/gestion/negocios/'.$this->negocio->id.'/modulos', ['modulos' => ['caja', 'facturacion']])
-        ->assertSessionHas('ok', fn ($m) => str_contains($m, 'Inventario') && str_contains($m, 'Cuentas'));
+        ->assertSessionHas('ok', fn ($m) => str_contains($m, 'Materiales y producción') && str_contains($m, 'Cuentas'));
     expect(Gestion::opcionalesEncendidos($this->negocio))->toEqualCanonicalizing(['inventario', 'caja', 'cuentas', 'facturacion']);
 
     $this->post('/admin/gestion/negocios/'.$this->negocio->id.'/modulos', ['modulos' => ['personal']]);

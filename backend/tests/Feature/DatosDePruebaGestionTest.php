@@ -32,12 +32,15 @@ test('el comando crea Grumar completo y con --rehacer lo vuelve a crear', functi
         ->and($grumar->miembrosActivos()->wherePivot('rol', 'trabajador')->count())->toBe(21)
         ->and($grumar->productos()->count())->toBeGreaterThanOrEqual(20)
         ->and($grumar->productos()->whereNull('imagen')->count())->toBe(0)
-        ->and($grumar->productos()->whereDoesntHave('materiales')->count())->toBe(0)
+        ->and($grumar->productos()->whereNull('modelo_id')->count())->toBe(0)
         ->and($grumar->servicios()->count())->toBeGreaterThanOrEqual(5)
         ->and($grumar->articulosInventario()->whereNull('imagen')->count())->toBe(0)
         ->and($grumar->cuentasPago()->count())->toBe(4)
         ->and($grumar->producciones()->count())->toBeGreaterThan(5)
-        ->and(Gestion::tieneModulo($grumar, 'produccion'))->toBeTrue()
+        ->and($grumar->producciones()->where('estado', 'por_hacer')->count())->toBe(3)
+        ->and($grumar->producciones()->where('estado', 'terminada')->count())->toBe(2)
+        ->and($grumar->articulosInventario()->whereNotIn('tipo', ['material', 'herramienta'])->count())->toBe(0)
+        ->and(Gestion::tieneModulo($grumar, 'inventario'))->toBeTrue()
         ->and(Gestion::tieneModulo($grumar, 'sedes'))->toBeTrue();
     Storage::disk('public')->assertExists($grumar->imagen);
     Storage::disk('public')->assertExists($grumar->productos()->first()->imagen);
@@ -64,8 +67,12 @@ test('las recetas del restaurante se descuentan cuando un pedido queda listo', f
     $negocio->productos()->create(['nombre' => 'Plato sin receta', 'precio' => 1000, 'disponible' => true]);
 
     $this->artisan('vitrina:recetas-restaurante-de-prueba', ['negocio' => $negocio->id])->assertSuccessful();
-    expect($negocio->productos()->whereHas('materiales')->count())->toBe(2)
-        ->and($bandeja->fresh()->materiales_al)->toBe('pedido');
+    expect($negocio->productos()->whereNotNull('modelo_id')->count())->toBe(2)
+        ->and($bandeja->fresh()->modelo->al_pedido)->toBeTrue()
+        ->and($bandeja->fresh()->modelo->materiales()->count())->toBeGreaterThan(2);
+    // Repetirlo no duplica los modelos.
+    $this->artisan('vitrina:recetas-restaurante-de-prueba', ['negocio' => $negocio->id])->assertSuccessful();
+    expect($negocio->modelosProduccion()->count())->toBe(2);
 
     $huevos = $negocio->articulosInventario()->where('nombre', 'Huevo AA')->sole();
     $antes = $huevos->cantidad;
@@ -80,5 +87,6 @@ test('las recetas del restaurante se descuentan cuando un pedido queda listo', f
     expect($huevos->fresh()->cantidad)->toBe($antes - 2.0);
 
     $this->artisan('vitrina:recetas-restaurante-de-prueba', ['negocio' => $negocio->id, '--quitar' => true])->assertSuccessful();
-    expect($negocio->articulosInventario()->count())->toBe(0)->and($negocio->productos()->whereHas('materiales')->count())->toBe(0);
+    expect($negocio->articulosInventario()->count())->toBe(0)->and($negocio->modelosProduccion()->count())->toBe(0)
+        ->and($negocio->productos()->whereNotNull('modelo_id')->count())->toBe(0);
 });

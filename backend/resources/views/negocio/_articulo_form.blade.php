@@ -1,4 +1,4 @@
-{{-- Formulario de un artículo del inventario (crear o editar). $a = null para uno nuevo. --}}
+{{-- Formulario de un material o una herramienta (crear o editar). $a = null para uno nuevo; $tipo es la pestaña abierta. --}}
 @php
     use App\Models\InventarioArticulo;
     $clave = $a ? (string) $a->id : 'nuevo';
@@ -12,7 +12,7 @@
     if (! $a && ! $usarOld && ! $filas) {
         $filas = [['nombre' => '', 'valor' => ''], ['nombre' => '', 'valor' => '']];
     }
-    $tipoActual = (string) $v('tipo', $a?->tipo ?? 'materia_prima');
+    $tipoActual = (string) $v('tipo', $a?->tipo ?? $tipo ?? 'material');
     $unidadActual = (string) $v('unidad', $a?->unidad ?? 'unidad');
     $rapidas = array_slice($sugerencias['nombres'], 0, 8);
 @endphp
@@ -114,7 +114,7 @@
     <label class="campo-panel ancho"><span>Notas <span class="ayuda">opcional</span></span><textarea name="descripcion" rows="2" maxlength="3000" placeholder="Dónde se guarda, para qué se usa…">{{ $v('descripcion', $a?->descripcion) }}</textarea></label>
 
     <div class="ancho botonera producto-form-acciones">
-        <button class="boton boton-oscuro boton-chico">{{ $a ? 'Guardar cambios' : 'Añadir al inventario' }}</button>
+        <button class="boton boton-oscuro boton-chico">{{ $a ? 'Guardar cambios' : 'Añadir' }}</button>
         <button type="button" class="enlace-boton" data-cancelar-edicion>{{ $a ? 'Cancelar' : 'Cerrar' }}</button>
     </div>
 </form>

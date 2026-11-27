@@ -1,4 +1,4 @@
-{{-- Una fila de «Materiales que gasta»: el artículo del inventario y cuánto se gasta. $i, $articuloId, $cantidad, $articulosInv. --}}
+{{-- Una fila de los materiales predeterminados de un modelo: el material y cuánto gasta una unidad. $i, $articuloId, $cantidad, $articulosInv (por categoría). --}}
 @php use App\Models\InventarioArticulo; @endphp
 <li class="material-fila">
     <select name="materiales[{{ $i }}][articulo_id]" data-material-articulo aria-label="Material">

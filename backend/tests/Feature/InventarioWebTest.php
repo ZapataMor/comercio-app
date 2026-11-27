@@ -32,7 +32,7 @@ function entrarAlPanelInventario($test, User $user): void
 function articuloDePrueba(Negocio $negocio, array $datos = []): InventarioArticulo
 {
     return $negocio->articulosInventario()->create($datos + [
-        'nombre' => 'Tubo cuadrado 1"', 'tipo' => 'materia_prima', 'unidad' => 'unidad', 'categoria' => 'Tubos',
+        'nombre' => 'Tubo cuadrado 1"', 'tipo' => 'material', 'unidad' => 'unidad', 'categoria' => 'Tubos',
         'caracteristicas' => [['nombre' => 'Calibre', 'valor' => '18'], ['nombre' => 'Largo', 'valor' => '6 m']],
     ]);
 }
@@ -42,7 +42,7 @@ test('el inventario ya funciona y sale en el menú con su propia página', funct
 
     $this->get('/negocio')->assertOk()->assertSee('/negocio/inventario')->assertDontSee('/negocio/modulos/inventario');
     $this->get('/negocio/modulos/inventario')->assertRedirect('/negocio/inventario');
-    $this->get('/negocio/inventario')->assertOk()->assertSee('Todavía no hay nada en el inventario')->assertSee('+ Añadir al inventario');
+    $this->get('/negocio/inventario')->assertOk()->assertSee('Todavía no hay materiales')->assertSee('+ Añadir un material');
 });
 
 test('sin el módulo encendido no se entra', function () {
@@ -50,7 +50,7 @@ test('sin el módulo encendido no se entra', function () {
     entrarAlPanelInventario($this, $this->dueno);
 
     $this->get('/negocio/inventario')->assertForbidden();
-    $this->post('/negocio/inventario', ['nombre' => 'X', 'tipo' => 'otro', 'unidad' => 'unidad', 'cantidad' => 1])->assertForbidden();
+    $this->post('/negocio/inventario', ['nombre' => 'X', 'tipo' => 'material', 'unidad' => 'unidad', 'cantidad' => 1])->assertForbidden();
 });
 
 test('se crea materia prima con características libres y la existencia inicial queda como entrada', function () {
@@ -59,7 +59,7 @@ test('se crea materia prima con características libres y la existencia inicial 
 
     $this->from('/negocio/inventario')->post('/negocio/inventario', [
         '_articulo' => 'nuevo',
-        'tipo' => 'materia_prima',
+        'tipo' => 'material',
         'nombre' => '  Lámina galvanizada ',
         'categoria' => 'Láminas',
         'unidad' => 'lamina',
@@ -122,7 +122,7 @@ test('editar no cambia la existencia y se pueden quitar características', funct
     Inventario::mover($a, 'entrada', 10);
 
     $this->put("/negocio/inventario/{$a->id}", [
-        'tipo' => 'materia_prima', 'nombre' => 'Tubo cuadrado 1 pulgada', 'unidad' => 'unidad', 'cantidad' => '999',
+        'tipo' => 'material', 'nombre' => 'Tubo cuadrado 1 pulgada', 'unidad' => 'unidad', 'cantidad' => '999',
         'caracteristicas' => [['nombre' => 'Calibre', 'valor' => '20']],
     ])->assertSessionHas('ok');
 
@@ -154,7 +154,7 @@ test('no se toca el inventario de otro negocio', function () {
     entrarAlPanelInventario($this, $this->dueno);
 
     $this->post("/negocio/inventario/{$ajeno->id}/movimientos", ['tipo' => 'entrada', 'cantidad' => 1])->assertNotFound();
-    $this->put("/negocio/inventario/{$ajeno->id}", ['tipo' => 'otro', 'nombre' => 'X', 'unidad' => 'unidad'])->assertNotFound();
+    $this->put("/negocio/inventario/{$ajeno->id}", ['tipo' => 'material', 'nombre' => 'X', 'unidad' => 'unidad'])->assertNotFound();
     $this->delete("/negocio/inventario/{$ajeno->id}")->assertNotFound();
 });
 
@@ -191,9 +191,9 @@ test('el comando de prueba carga el inventario de una latonería y se puede repe
         ->and($this->negocio->articulosInventario()->where('nombre', 'Disco de corte 7"')->value('cantidad'))->toEqual(3);
 
     $this->artisan('vitrina:inventario-de-prueba', ['negocio' => $this->negocio->id, '--con-productos' => true])->assertSuccessful();
-    expect(Gestion::tieneModulo($this->negocio, 'produccion'))->toBeTrue()
-        ->and($this->negocio->productos()->whereHas('materiales')->count())->toBe(3)
-        ->and($this->negocio->producciones()->count())->toBe(1);
+    expect($this->negocio->modelosProduccion()->count())->toBe(3)
+        ->and($this->negocio->productos()->whereNotNull('modelo_id')->count())->toBe(3)
+        ->and($this->negocio->producciones()->where('estado', 'por_hacer')->count())->toBe(1);
 
     $this->artisan('vitrina:inventario-de-prueba', ['negocio' => $this->negocio->id, '--quitar' => true])->assertSuccessful();
     expect($this->negocio->articulosInventario()->count())->toBe(0);

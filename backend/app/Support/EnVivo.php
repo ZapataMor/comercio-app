@@ -331,20 +331,25 @@ class EnVivo
                 'despues' => fn (Request $r, Response $res, ?int $antes) => self::tareas($r->attributes->get('negocio_web')?->id, [$antes]),
             ],
             Api\TareaController::class.'@index' => null,
+            // Producción en la app: no cambia el catálogo (eso pasa al publicar en la web).
             Api\ProduccionController::class.'@index' => null,
-            Api\ProduccionController::class.'@registrar' => ['despues' => fn (Request $r) => self::catalogo($negocioRuta($r))],
+            Api\ProduccionController::class.'@crear' => null,
+            Api\ProduccionController::class.'@guardar' => null,
+            Api\ProduccionController::class.'@cancelar' => null,
             Api\TareaController::class.'@estado' => ['despues' => fn (Request $r) => self::tareas($negocioRuta($r), [$yo($r)])],
             Web\PanelNegocioController::class.'@guardarSede' => null,
-            // El inventario todavía no se muestra en la app ni en otras pestañas.
+            // Materiales y herramientas todavía no se muestran en la app ni en otras pestañas.
             Web\InventarioController::class.'@guardar' => null,
             Web\InventarioController::class.'@mover' => null,
             Web\InventarioController::class.'@eliminar' => null,
-            Web\ProduccionController::class.'@guardarMateriales' => null,
-            // Lo que se suma al catálogo cambia sus existencias y lo deja disponible.
-            Web\ProduccionController::class.'@registrar' => ['despues' => fn (Request $r) => self::catalogo($r->attributes->get('negocio_web')?->id)],
-            Web\EnEsperaController::class.'@guardar' => ['despues' => fn (Request $r) => self::catalogo($r->attributes->get('negocio_web')?->id)],
-            Web\EnEsperaController::class.'@descartar' => null,
+            Web\ProduccionController::class.'@crear' => null,
+            Web\ProduccionController::class.'@guardar' => null,
+            Web\ProduccionController::class.'@cancelar' => null,
+            // Publicar (o anular algo publicado) cambia las unidades del catálogo.
+            Web\ProduccionController::class.'@nombrar' => ['despues' => fn (Request $r) => self::catalogo($r->attributes->get('negocio_web')?->id)],
             Web\ProduccionController::class.'@anular' => ['despues' => fn (Request $r) => self::catalogo($r->attributes->get('negocio_web')?->id)],
+            Web\ModelosController::class.'@guardar' => null,
+            Web\ModelosController::class.'@eliminar' => null,
             // Lo que se cambia en el panel web lo ven al instante la app y las demás pestañas.
             Web\PanelNegocioController::class.'@guardarTienda' => ['despues' => fn (Request $r) => self::datosNegocio($r->attributes->get('negocio_web')?->id)],
             Web\PanelNegocioController::class.'@guardarCuenta' => null,

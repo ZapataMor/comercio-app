@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\InventarioArticulo;
 use App\Models\InventarioMovimiento;
 use App\Models\Negocio;
+use App\Models\Produccion;
 use App\Support\FotoOptimizada;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -19,9 +20,9 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
- * Inventario del panel web (módulo opcional «inventario»). Guarda cualquier
- * cosa del negocio —materia prima, insumos, productos, herramientas— en
- * tarjetas, con características libres (calibre, color, talla, sabor…), su
+ * Materiales y herramientas del panel web (módulo opcional «inventario»,
+ * «Materiales y producción»; la producción está en ProduccionController).
+ * Cada artículo va en una tarjeta, con características libres (calibre, color, talla, sabor…), su
  * unidad (unidades, kilos, metros, láminas…), existencia, mínimo para la
  * alerta, costo y proveedor. La existencia cambia con entradas, salidas y
  * ajustes por conteo, que quedan en el historial del artículo.
@@ -38,7 +39,7 @@ class InventarioController extends Controller
         $negocio = $this->negocio($request);
         $this->verModulo($request);
 
-        $tipo = array_key_exists((string) $request->query('tipo'), InventarioArticulo::TIPOS) ? $request->query('tipo') : null;
+        $tipo = array_key_exists((string) $request->query('tipo'), InventarioArticulo::TIPOS) ? $request->query('tipo') : 'material';
         $buscar = trim((string) $request->query('buscar'));
         $categoria = trim((string) $request->query('categoria'));
         $estado = in_array($request->query('estado'), ['bajos', 'agotados'], true) ? $request->query('estado') : null;
@@ -46,8 +47,8 @@ class InventarioController extends Controller
         $sede = $sedes->count() > 1 ? $sedes->firstWhere('id', (int) $request->query('sede')) : null;
 
         $base = $negocio->articulosInventario();
-        $articulos = (clone $base)->with(['sede', 'productos:id,nombre,unidad_medida', 'movimientos' => fn ($q) => $q->with('usuario')->latest('id')->limit(8)])
-            ->when($tipo, fn ($q) => $q->where('tipo', $tipo))
+        $articulos = (clone $base)->with(['sede', 'modelos:id,nombre', 'movimientos' => fn ($q) => $q->with('usuario')->latest('id')->limit(8)])
+            ->where('tipo', $tipo)
             ->when($categoria !== '', fn ($q) => $q->where('categoria', $categoria))
             ->when($sede, fn ($q) => $q->where('sede_id', $sede->id))
             ->when($estado === 'agotados', fn ($q) => $q->where('cantidad', '<=', 0))
@@ -61,15 +62,16 @@ class InventarioController extends Controller
             ->paginate(self::POR_PAGINA)->withQueryString();
 
         $todos = (clone $base)->get(['id', 'tipo', 'categoria', 'proveedor', 'cantidad', 'minimo', 'costo']);
+        $delTipo = $todos->where('tipo', $tipo);
 
         return view('negocio.inventario', [
             'articulos' => $articulos,
-            'total' => $todos->count(),
-            'porTipo' => $todos->countBy('tipo'),
-            'bajos' => $todos->filter(fn (InventarioArticulo $a) => $a->estado() !== 'ok')->count(),
-            'valorTotal' => $todos->sum(fn (InventarioArticulo $a) => $a->valor() ?? 0),
-            'conCosto' => $todos->whereNotNull('costo')->count(),
-            'categorias' => $todos->pluck('categoria')->filter()->unique()->sort(SORT_NATURAL | SORT_FLAG_CASE)->values(),
+            'total' => $delTipo->count(),
+            'bajos' => $delTipo->filter(fn (InventarioArticulo $a) => $a->estado() !== 'ok')->count(),
+            'valorTotal' => $delTipo->sum(fn (InventarioArticulo $a) => $a->valor() ?? 0),
+            'conCosto' => $delTipo->whereNotNull('costo')->count(),
+            'cuentas' => self::cuentas($negocio),
+            'categorias' => $delTipo->pluck('categoria')->filter()->unique()->sort(SORT_NATURAL | SORT_FLAG_CASE)->values(),
             'proveedores' => $todos->pluck('proveedor')->filter()->unique()->sort(SORT_NATURAL | SORT_FLAG_CASE)->values(),
             'tipo' => $tipo,
             'buscar' => $buscar,
@@ -79,7 +81,6 @@ class InventarioController extends Controller
             'sedeFiltro' => $sede,
             'sugerencias' => Inventario::sugerencias($negocio),
             'puedeEditar' => $this->puedeEditar($request),
-            'produccionActiva' => Gestion::puedeVerModulo($request->user(), $negocio, 'produccion'),
         ]);
     }
 
@@ -228,10 +229,27 @@ class InventarioController extends Controller
             Storage::disk('public')->delete($imagen);
         }
 
-        return redirect()->to(url()->previous())->with('ok', 'Se eliminó «'.$modelo->nombre.'» del inventario.');
+        return redirect()->to(url()->previous())->with('ok', 'Se eliminó «'.$modelo->nombre.'».');
     }
 
     // ------------------------------------------------------------- Apoyo
+
+    /**
+     * Lo que cuentan las pestañas del módulo.
+     *
+     * @return array{material: int, herramienta: int, produccion: int, modelos: int}
+     */
+    public static function cuentas(Negocio $negocio): array
+    {
+        $porTipo = $negocio->articulosInventario()->selectRaw('tipo, count(*) as n')->groupBy('tipo')->pluck('n', 'tipo');
+
+        return [
+            'material' => (int) ($porTipo['material'] ?? 0),
+            'herramienta' => (int) ($porTipo['herramienta'] ?? 0),
+            'produccion' => $negocio->producciones()->whereNull('anulada_at')->whereIn('estado', [Produccion::POR_HACER, Produccion::TERMINADA])->count(),
+            'modelos' => $negocio->modelosProduccion()->count(),
+        ];
+    }
 
     /**
      * Filas del formulario → [['nombre', 'valor']]: sin vacías, sin nombres
@@ -264,7 +282,7 @@ class InventarioController extends Controller
 
     private function verModulo(Request $request): void
     {
-        abort_unless(Gestion::puedeVerModulo($request->user(), $this->negocio($request), 'inventario'), 403, 'El inventario no está activo para este negocio o no tienes permiso.');
+        abort_unless(Gestion::puedeVerModulo($request->user(), $this->negocio($request), 'inventario'), 403, 'Materiales y producción no está activo para este negocio o no tienes permiso.');
     }
 
     private function puedeEditar(Request $request): bool

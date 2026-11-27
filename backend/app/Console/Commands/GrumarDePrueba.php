@@ -2,15 +2,15 @@
 
 namespace App\Console\Commands;
 
+use App\Gestion\Etapas;
 use App\Gestion\Gestion;
 use App\Gestion\Inventario;
-use App\Gestion\Materiales;
-use App\Gestion\Terminados;
+use App\Gestion\Modelos;
 use App\Models\Barrio;
 use App\Models\InventarioArticulo;
 use App\Models\Negocio;
 use App\Models\PlantillaGestion;
-use App\Models\ProductoEnEspera;
+use App\Models\Producto;
 use App\Models\Sede;
 use App\Models\TipoNegocio;
 use App\Models\TipoProducto;
@@ -298,7 +298,7 @@ class GrumarDePrueba extends Command
         if ($plantilla) {
             Gestion::aplicarPlantilla($negocio, $plantilla, $dueno);
         }
-        Gestion::definirModulos($negocio, [...Gestion::opcionalesEncendidos($negocio), 'sedes', 'inventario', 'produccion'], $dueno);
+        Gestion::definirModulos($negocio, [...Gestion::opcionalesEncendidos($negocio), 'sedes', 'inventario'], $dueno);
 
         return $negocio->fresh();
     }
@@ -368,7 +368,7 @@ class GrumarDePrueba extends Command
         foreach (self::ARTICULOS as $clave => [$tipo, $nombre, $categoria, $unidad, $cantidad, $minimo, $costo, $proveedor, $rasgos, $imagen, $sede]) {
             $i++;
             $a = $negocio->articulosInventario()->create([
-                'tipo' => $tipo, 'nombre' => $nombre, 'categoria' => $categoria, 'unidad' => $unidad,
+                'tipo' => $tipo === 'herramienta' ? 'herramienta' : 'material', 'nombre' => $nombre, 'categoria' => $categoria, 'unidad' => $unidad,
                 'minimo' => $minimo, 'costo' => $costo, 'proveedor' => $proveedor, 'sede_id' => $sedes[$sede]->id,
                 'referencia' => sprintf('GR-%03d', $i),
                 'caracteristicas' => collect($rasgos)->map(fn ($v, $k) => ['nombre' => $k, 'valor' => $v])->values()->all(),
@@ -387,7 +387,7 @@ class GrumarDePrueba extends Command
         return $articulos;
     }
 
-    /** @return array<int, \App\Models\Producto> */
+    /** @return array<int, Producto> */
     private function catalogo(Negocio $negocio, array $articulos): array
     {
         $tipo = TipoProducto::where('slug', 'otro')->value('id');
@@ -400,8 +400,9 @@ class GrumarDePrueba extends Command
                 'categoria_id' => $categoria->id, 'tipo_producto_id' => $tipo, 'atributos' => $etiquetas,
             ]);
             $p->forceFill(['imagen' => $this->imagen($imagen, 'productos/grumar/'.$imagen)])->saveQuietly();
-            Materiales::guardar($p, collect($materiales)->mapWithKeys(fn ($c, $k) => [$articulos[$k]->id => $c])->all(), 'fabricar');
-            $productos[] = $p;
+            // Cada producto tiene su modelo con los materiales de una unidad.
+            Modelos::guardar($negocio, null, ['nombre' => $nombre], collect($materiales)->mapWithKeys(fn ($c, $k) => [$articulos[$k]->id => $c])->all(), [$p->id]);
+            $productos[] = $p->fresh();
         }
 
         return $productos;
@@ -428,20 +429,55 @@ class GrumarDePrueba extends Command
         $qr->forceFill(['qr' => $this->imagen('cuenta-qr-prueba.png', 'cuentas-pago/grumar-qr-prueba.png')])->save();
     }
 
-    /** Lo que se hizo en las últimas tres semanas. */
+    /**
+     * Lo que se hizo en las últimas tres semanas, por etapas: unas se
+     * sumaron al catálogo (quedan en stock), otras eran encargos, dos esperan
+     * su nombre y tres siguen por hacer (con materiales de más, de menos o
+     * añadidos aparte).
+     */
     private function produccion(Negocio $negocio, array $productos, array $fabrica): void
     {
-        $plan = [[0, 2, 20], [8, 3, 18], [12, 1, 15], [2, 1, 13], [9, 2, 11], [5, 1, 9], [0, 1, 7], [15, 4, 6], [6, 1, 4], [13, 2, 3], [8, 2, 2], [19, 6, 1], [3, 1, 0]];
+        $plan = [[0, 2, 20], [8, 3, 18], [12, 1, 15], [2, 1, 13], [9, 2, 11], [5, 1, 9], [0, 1, 7], [15, 4, 6], [6, 1, 4], [13, 2, 3], [8, 2, 2], [19, 6, 1], [3, 1, 0], [4, 1, 0], [10, 2, 0], [1, 1, 0]];
         $notas = ['Para reponer la vitrina', 'Pedido del señor Pérez', 'Obra en el barrio San José', null, 'Cliente de Paraguachón', null, 'Para la sede Carrera 10'];
-        // Unas van al catálogo (quedan en stock), otras eran encargos y dos quedan en espera de sus datos.
-        $destinos = ['catalogo', 'pedido', 'catalogo', 'espera', 'pedido', 'catalogo', 'catalogo', 'pedido', 'catalogo', 'espera', 'pedido', 'pedido', 'catalogo'];
+        $destinos = ['catalogo', 'encargo', 'catalogo', 'nombrar', 'encargo', 'catalogo', 'catalogo', 'encargo', 'catalogo', 'nombrar', 'encargo', 'encargo', 'catalogo', 'por_hacer', 'por_hacer', 'por_hacer'];
+        $soldadura = $negocio->articulosInventario()->where('nombre', 'like', 'Soldadura%')->value('id');
         foreach ($plan as $k => [$i, $cantidad, $dias]) {
             $quien = $fabrica[$k % 3];
-            $p = Terminados::registrar($productos[$i], $cantidad, $quien, $notas[$k % count($notas)], true, $destinos[$k]);
+            $producto = $productos[$i];
+            $p = Etapas::crear($negocio, $producto->modelo, null, $cantidad, $quien, $notas[$k % count($notas)]);
+            // Como en el taller: a veces se usa un poco más o menos de lo normal, o algo aparte.
+            $filas = $p->materiales()->get()->mapWithKeys(fn ($a) => [$a->id => (float) $a->pivot->cantidad])->all();
+            if ($k % 3 === 1 && $filas) {
+                $primero = array_key_first($filas);
+                $filas[$primero] += 1;
+            }
+            if ($k % 4 === 2 && count($filas) > 1) {
+                $ultimo = array_key_last($filas);
+                $filas[$ultimo] = max(0, $filas[$ultimo] - 1);
+            }
+            if ($k % 5 === 3 && $soldadura && ! isset($filas[$soldadura])) {
+                $filas[$soldadura] = 0.5;
+            }
+            Etapas::guardar($p, $cantidad, $filas, $p->nota);
             $cuando = now()->subDays($dias)->setTime(9 + $k % 7, ($k * 13) % 60);
-            $p->forceFill(['created_at' => $cuando, 'updated_at' => $cuando])->saveQuietly();
+            $p->forceFill(['created_at' => $cuando->copy()->subHours(5), 'updated_at' => $cuando])->saveQuietly();
+            if ($destinos[$k] === 'por_hacer') {
+                continue;
+            }
+
+            Etapas::terminar($p, $quien, true);
+            $p->forceFill(['terminada_at' => $cuando])->saveQuietly();
             $p->movimientos()->update(['created_at' => $cuando, 'updated_at' => $cuando]);
-            ProductoEnEspera::where('produccion_id', $p->id)->update(['created_at' => $cuando, 'updated_at' => $cuando]);
+            if ($destinos[$k] === 'catalogo') {
+                Etapas::publicar($p, 'sumar', $producto);
+                $p->forceFill(['publicada_at' => $cuando])->saveQuietly();
+            } elseif ($destinos[$k] === 'encargo') {
+                Etapas::encargo($p);
+            } else {
+                // Espera su nombre: ya trae algunas medidas de esta pieza.
+                $p->forceFill(['precio' => (int) $producto->precio ?: null, 'categoria_id' => $producto->categoria_id,
+                    'especificaciones' => [['nombre' => 'Ancho', 'valor' => (90 + $k * 10).' cm'], ['nombre' => 'Color', 'valor' => $k % 2 ? 'Negro mate' : 'Gris']]])->saveQuietly();
+            }
         }
     }
 

@@ -8,8 +8,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * Algo que el negocio guarda en su inventario: materia prima, insumos,
- * productos terminados, herramientas… Se cuenta en su unidad y sus
+ * Algo que el negocio guarda (Materiales y producción): un material, con lo
+ * que se fabrica o lo que se gasta al trabajar (tubos, láminas, pintura,
+ * soldadura, harina…), o una herramienta. Se cuenta en su unidad y sus
  * características son libres (nombre y valor) para que sirva a cualquier
  * negocio: calibre y largo en una latonería, talla y color en una tienda de
  * ropa, presentación y sabor en una panadería.
@@ -21,20 +22,20 @@ class InventarioArticulo extends Model
     protected $table = 'inventario_articulos';
 
     public const TIPOS = [
-        'materia_prima' => 'Materia prima',
-        'insumo' => 'Insumo',
-        'producto' => 'Producto terminado',
-        'herramienta' => 'Herramienta o equipo',
-        'otro' => 'Otro',
+        'material' => 'Material',
+        'herramienta' => 'Herramienta',
+    ];
+
+    /** Para las pestañas del módulo. */
+    public const TIPOS_PLURAL = [
+        'material' => 'Materiales',
+        'herramienta' => 'Herramientas',
     ];
 
     /** Ayuda corta de cada tipo para el formulario. */
     public const TIPOS_AYUDA = [
-        'materia_prima' => 'Con lo que se fabrica: tubos, láminas, tela, harina…',
-        'insumo' => 'Lo que se gasta al trabajar: soldadura, discos, pintura, empaques…',
-        'producto' => 'Lo que ya está listo para vender.',
+        'material' => 'Con lo que se fabrica o lo que se gasta al trabajar: tubos, láminas, pintura, soldadura, harina…',
         'herramienta' => 'Lo que se usa y no se gasta: pulidoras, taladros, moldes…',
-        'otro' => 'Cualquier otra cosa que quieras contar.',
     ];
 
     /** clave => [en el formulario, singular, plural] */
@@ -71,7 +72,7 @@ class InventarioArticulo extends Model
         'unidad', 'minimo', 'costo', 'proveedor', 'caracteristicas',
     ];
 
-    protected $attributes = ['tipo' => 'materia_prima', 'unidad' => 'unidad', 'cantidad' => 0];
+    protected $attributes = ['tipo' => 'material', 'unidad' => 'unidad', 'cantidad' => 0];
 
     protected function casts(): array
     {
@@ -99,10 +100,16 @@ class InventarioArticulo extends Model
         return $this->belongsTo(Sede::class);
     }
 
-    /** Productos del catálogo que lo gastan (con la cantidad por unidad). */
-    public function productos(): BelongsToMany
+    /** Modelos que lo gastan (con la cantidad por unidad). */
+    public function modelos(): BelongsToMany
     {
-        return $this->belongsToMany(Producto::class, 'producto_materiales', 'articulo_id', 'producto_id')->withPivot('cantidad');
+        return $this->belongsToMany(ModeloProduccion::class, 'modelo_materiales', 'articulo_id', 'modelo_id')->withPivot('cantidad');
+    }
+
+    /** Herramientas: se usan y no se gastan, así que no van en una producción. */
+    public function esHerramienta(): bool
+    {
+        return $this->tipo === 'herramienta';
     }
 
     public function movimientos(): HasMany

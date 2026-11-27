@@ -25,11 +25,6 @@
             <button type="button" role="tab" class="pestana" id="pestana-servicios" aria-controls="panel-servicios" data-pestana="servicios" aria-selected="{{ $pestana === 'servicios' ? 'true' : 'false' }}" @if($pestana !== 'servicios') tabindex="-1" @endif>
                 Servicios <span class="bloque-cuenta">{{ $servicios->count() }}</span>
             </button>
-            @if($conEspera)
-                <button type="button" role="tab" class="pestana" id="pestana-espera" aria-controls="panel-espera" data-pestana="espera" aria-selected="{{ $pestana === 'espera' ? 'true' : 'false' }}" @if($pestana !== 'espera') tabindex="-1" @endif>
-                    En espera <span @class(['bloque-cuenta', 'cuenta-aviso' => $enEspera->isNotEmpty()])>{{ $enEspera->count() }}</span>
-                </button>
-            @endif
         </div>
         <form method="GET" class="catalogo-filtros" role="search" data-solo-pestana="productos" @if($pestana !== 'productos') hidden @endif>
             <input type="search" name="buscar" value="{{ $buscar }}" placeholder="Buscar producto" aria-label="Buscar producto">
@@ -64,7 +59,7 @@
                                 <span class="producto-categoria">{{ $p->categoria?->nombre ?? 'Sin sección' }}</span>
                                 <span class="producto-nombre">{{ $p->nombre }}</span>
                                 <span class="producto-precio">$ {{ number_format((float) $p->precio, 0, ',', '.') }}@if($p->unidad_medida && $p->unidad_medida !== 'unidad')<small> / {{ $p->unidad_medida }}</small>@endif</span>
-                                @if($p->existencias !== null)<span @class(['producto-stock', 'sin-stock' => $p->existencias <= 0])>{{ $p->existencias > 0 ? \App\Gestion\Terminados::textoExistencias($p->existencias) : 'Sin unidades en stock' }}</span>@endif
+                                @if($p->existencias !== null)<span @class(['producto-stock', 'sin-stock' => $p->existencias <= 0])>{{ $p->existencias > 0 ? \App\Gestion\Etapas::textoExistencias($p->existencias) : 'Sin unidades en stock' }}</span>@endif
                             </span>
                         </button>
                         @if($puedeEditar)
@@ -106,124 +101,6 @@
     </div>
 </section>
 
-@if($conEspera)
-<section class="bloque catalogo-espera" role="tabpanel" id="panel-espera" aria-labelledby="pestana-espera" @if($pestana !== 'espera') hidden @endif>
-    <p class="bloque-texto">Lo que se registró como hecho en Producción con medidas, color o acabado propios. Complétale los datos y publícalo: entra al catálogo como producto nuevo o se suma a las unidades del producto del que salió. Lo que es de un pedido no llega aquí.</p>
-    @if($enEspera->isEmpty())
-        <p class="apagado catalogo-vacio">No hay nada en espera. Cuando en Producción registren algo como «Dejar en espera», aparece aquí.</p>
-    @else
-        <ul class="articulos">
-            @foreach($enEspera as $e)
-                @php $fotoE = \App\Support\EditorProducto::urlImagen($e->imagen ?: $e->producto?->imagen); $specs = $e->listaEspecificaciones(); @endphp
-                <li class="articulo articulo-espera">
-                    <button type="button" class="articulo-abrir" data-abrir="espera-{{ $e->id }}" aria-haspopup="dialog">
-                        <span @class(['articulo-foto', 'sin-foto' => ! $fotoE, 'tipo-producto'])>
-                            @if($fotoE)<img src="{{ $fotoE }}" alt="{{ $e->nombre }}" loading="lazy">@else<span class="articulo-inicial" aria-hidden="true">{{ mb_strtoupper(mb_substr($e->nombre, 0, 1)) }}</span>@endif
-                            <span class="chip articulo-tipo">{{ \App\Models\InventarioArticulo::numero($e->cantidad) }} {{ $e->cantidad == 1 ? 'unidad' : 'unidades' }}</span>
-                            <span class="chip articulo-estado chip-aviso">En espera</span>
-                        </span>
-                        <span class="articulo-cuerpo">
-                            <span class="producto-categoria">{{ $e->producto?->categoria?->nombre ?? 'Sin sección' }}</span>
-                            <span class="articulo-nombre">{{ $e->nombre }}</span>
-                            <span class="articulo-rasgos">
-                                @forelse(array_slice($specs, 0, 4) as $r)<span class="rasgo"><small>{{ $r['nombre'] }}</small> {{ $r['valor'] }}</span>@empty<span class="rasgo rasgo-mas">Faltan sus especificaciones</span>@endforelse
-                            </span>
-                            <span class="articulo-existencia">
-                                <span>{{ $e->created_at?->locale('es')->translatedFormat('j M') }}{{ $e->usuario ? ' · '.$e->usuario->name : '' }}</span>
-                                @if($e->sede)<span class="articulo-sede">{{ $e->sede->nombre }}</span>@endif
-                            </span>
-                        </span>
-                    </button>
-                </li>
-            @endforeach
-        </ul>
-    @endif
-</section>
-
-@foreach($enEspera as $e)
-    @php
-        $eOld = old('_espera') === (string) $e->id;
-        $specs = $eOld ? array_values(array_filter((array) old('especificaciones', []), 'is_array')) : $e->listaEspecificaciones();
-        // Sin especificaciones: arranca con los campos de la ficha técnica de la plantilla.
-        if (! $specs) {
-            $specs = collect($campos)->map(fn ($c) => ['nombre' => $c['etiqueta'].(isset($c['unidad']) ? ' ('.$c['unidad'].')' : ''), 'valor' => ''])->all() ?: [['nombre' => '', 'valor' => ''], ['nombre' => '', 'valor' => '']];
-        }
-        $fotoE = \App\Support\EditorProducto::urlImagen($e->imagen ?: $e->producto?->imagen);
-        $unidadesE = \App\Models\InventarioArticulo::numero($e->cantidad).' '.($e->cantidad == 1 ? 'unidad' : 'unidades');
-    @endphp
-    <dialog class="modal modal-solo-edicion" id="espera-{{ $e->id }}" aria-labelledby="espera-{{ $e->id }}-titulo">
-        <div class="modal-cabeza">
-            <h2 id="espera-{{ $e->id }}-titulo">Completar y publicar</h2>
-            <button type="button" class="modal-cerrar" data-cerrar aria-label="Cerrar">✕</button>
-        </div>
-        <div class="modal-edicion">
-            <p class="espera-origen">Se hizo{{ $e->usuario ? ' por '.$e->usuario->name : '' }} el {{ $e->created_at?->locale('es')->translatedFormat('j \d\e F') }}{{ $e->producto ? ' a partir de «'.$e->producto->nombre.'»' : '' }}: {{ $unidadesE }}{{ $e->sede ? ' en '.$e->sede->nombre : '' }}.</p>
-            @if($eOld && $errors->any())
-                <div class="aviso aviso-error" role="alert"><strong>Revisa estos datos</strong><ul>@foreach($errors->all() as $er)<li>{{ $er }}</li>@endforeach</ul></div>
-            @endif
-            @if($puedeEditar)
-                <form method="POST" enctype="multipart/form-data" class="formulario producto-form articulo-form" action="{{ route('negocio.espera.guardar', $e->id) }}">
-                    @csrf @method('PUT')
-                    <input type="hidden" name="_espera" value="{{ $e->id }}">
-                    <div class="ancho producto-form-foto">
-                        <div class="producto-form-vista" data-vista-foto>@if($fotoE)<img src="{{ $fotoE }}" alt="">@else<span>Sin foto</span>@endif</div>
-                        <div class="campo-panel"><span>Foto <span class="ayuda">La de esta pieza; si no subes una, usa la del producto de partida.</span></span>
-                            <input type="file" name="imagen" accept="image/*" data-elegir-foto aria-label="Foto">
-                            @if($e->imagen)<label class="casilla"><input type="checkbox" name="quitar_imagen" value="1"> Quitar la foto</label>@endif
-                        </div>
-                    </div>
-                    <label class="campo-panel ancho">Nombre<input name="nombre" required maxlength="255" value="{{ $eOld ? old('nombre') : $e->nombre }}"></label>
-                    <label class="campo-panel">Precio (pesos)<input name="precio" inputmode="numeric" value="{{ $eOld ? old('precio') : $e->precio }}" placeholder="680000"></label>
-                    <div class="campo-panel"><span>Unidades</span><p class="articulo-existencia-fija">{{ $unidadesE }}</p></div>
-                    <div class="campo-panel ancho">
-                        <span>Especificaciones <span class="ayuda">Lo puntual de esta pieza: medidas, color, apertura, calibre…</span></span>
-                        <div class="caracteristicas" data-caracteristicas data-campo="especificaciones">
-                            <ul class="caracteristicas-filas" data-car-filas>
-                                @foreach($specs as $i => $r)
-                                    <li class="caracteristica-fila">
-                                        <input name="especificaciones[{{ $i }}][nombre]" data-car-nombre list="espera-nombres" maxlength="40" value="{{ $r['nombre'] ?? '' }}" placeholder="Ej.: Ancho" aria-label="Especificación {{ $i + 1 }}">
-                                        <input name="especificaciones[{{ $i }}][valor]" data-car-valor maxlength="80" value="{{ $r['valor'] ?? '' }}" placeholder="Ej.: 90 cm" aria-label="Valor {{ $i + 1 }}">
-                                        <button type="button" class="lista-item-quitar" data-car-quitar aria-label="Quitar especificación">✕</button>
-                                    </li>
-                                @endforeach
-                            </ul>
-                            <div class="caracteristicas-rapidas"><button type="button" class="boton boton-claro boton-chico" data-car-agregar="">+ Agregar especificación</button></div>
-                        </div>
-                    </div>
-                    <label class="campo-panel ancho"><span>Descripción <span class="ayuda">opcional</span></span><textarea name="descripcion" rows="3" maxlength="5000">{{ $eOld ? old('descripcion') : $e->descripcion }}</textarea></label>
-                    @php $modoE = $eOld ? old('modo', 'nuevo') : 'nuevo'; @endphp
-                    <fieldset class="ancho producir-destino">
-                        <legend>¿Cómo entra al catálogo?</legend>
-                        <label class="articulo-tipo-opcion"><input type="radio" name="modo" value="nuevo" @checked($modoE === 'nuevo')><span><strong>Como producto nuevo</strong><small>Con su nombre, precio, foto y especificaciones propias.</small></span></label>
-                        @if($e->producto && ! $e->producto->trashed())
-                            <label class="articulo-tipo-opcion"><input type="radio" name="modo" value="sumar" @checked($modoE === 'sumar')><span><strong>Sumar a «{{ $e->producto->nombre }}»</strong><small>Es igual a ese producto: solo suma sus unidades.</small></span></label>
-                        @endif
-                    </fieldset>
-                    <div class="ancho botonera producto-form-acciones">
-                        <button class="boton boton-oscuro boton-chico" name="accion" value="publicar">Publicar en el catálogo</button>
-                        <button class="boton boton-claro boton-chico" name="accion" value="guardar">Guardar y seguir en espera</button>
-                        <button type="button" class="enlace-boton" data-cerrar>Cerrar</button>
-                    </div>
-                </form>
-                <form method="POST" action="{{ route('negocio.espera.descartar', $e->id) }}" class="espera-descartar" data-confirmar="¿Quitar «{{ $e->nombre }}» de «En espera»? No entra al catálogo (los materiales ya se descontaron).">@csrf
-                    <button class="enlace-boton enlace-peligro">Quitar de «En espera» sin publicar</button>
-                </form>
-            @else
-                <p class="apagado">Solo quien puede cambiar el catálogo completa y publica lo que está en espera.</p>
-            @endif
-        </div>
-    </dialog>
-@endforeach
-<datalist id="espera-nombres">@foreach(collect($campos)->map(fn ($c) => $c['etiqueta'].(isset($c['unidad']) ? ' ('.$c['unidad'].')' : ''))->merge(\App\Models\InventarioArticulo::CARACTERISTICAS_SUGERIDAS)->unique() as $n)<option value="{{ $n }}">@endforeach</datalist>
-<template id="plantilla-caracteristica">
-    <li class="caracteristica-fila">
-        <input data-car-nombre list="espera-nombres" maxlength="40" placeholder="Ej.: Ancho" aria-label="Especificación">
-        <input data-car-valor maxlength="80" placeholder="Ej.: 90 cm" aria-label="Valor">
-        <button type="button" class="lista-item-quitar" data-car-quitar aria-label="Quitar especificación">✕</button>
-    </li>
-</template>
-@endif
-
 {{-- Un modal por producto: toda la información y, para quien puede, la edición. --}}
 @foreach($productos as $p)
     @php
@@ -254,7 +131,7 @@
                     <div class="detalle-chips">
                         <span @class(['chip', 'chip-exito' => $p->disponible])>{{ $p->disponible ? 'Disponible' : 'Agotado' }}</span>
                         @if($p->tipoProducto)<span class="chip">{{ $p->tipoProducto->nombre }}</span>@endif
-                        @if($p->existencias !== null)<span class="chip chip-acento">{{ \App\Gestion\Terminados::textoExistencias($p->existencias) }}</span>@endif
+                        @if($p->existencias !== null)<span class="chip chip-acento">{{ \App\Gestion\Etapas::textoExistencias($p->existencias) }}</span>@endif
                         @if($p->resenas_total)<span class="chip chip-acento">★ {{ number_format((float) $p->resenas_promedio, 1, ',', '.') }} · {{ $p->resenas_total }} {{ $p->resenas_total === 1 ? 'reseña' : 'reseñas' }}</span>@endif
                     </div>
                     <p class="detalle-descripcion">{{ $p->descripcion ?: 'Sin descripción.' }}</p>
@@ -302,16 +179,15 @@
                 @if($colores)<dt>Colores</dt><dd>@foreach($colores as $a)<span class="chip">{{ $a }}</span>@endforeach</dd>@endif
                 <dt>Se vende por</dt><dd>{{ $venta }}</dd>
                 <dt>Sección del negocio</dt><dd>{{ $p->categoria?->nombre ?? 'Sin sección' }}</dd>
+                @if($modelosActivos)
+                    <dt>Modelo</dt><dd>@if($p->modelo)<a class="chip chip-enlace" href="{{ route('negocio.inventario.modelos', ['abrir' => $p->modelo->id]) }}">{{ $p->modelo->nombre }}</a>@else<span class="apagado">—</span>@endif</dd>
+                @endif
                 <dt>Categorías de Vitrina</dt>
                 <dd>@forelse($p->categoriasCatalogo as $c)<span class="chip">{{ $c->nombre }}</span>@empty<span class="apagado">Ninguna</span>@endforelse</dd>
                 <dt>Otros nombres</dt><dd>@forelse($p->nombres_alternos ?? [] as $a)<span class="chip">{{ $a }}</span>@empty<span class="apagado">—</span>@endforelse</dd>
                 <dt>Creado</dt><dd>{{ $p->created_at?->format('d/m/Y H:i') }}</dd>
                 <dt>Última edición</dt><dd>{{ $p->updated_at?->format('d/m/Y H:i') }}</dd>
             </dl>
-
-            @if($produccionActiva)
-                @include('negocio._materiales_producto', ['p' => $p])
-            @endif
         </div>
 
         @if($puedeEditar)
@@ -378,10 +254,6 @@
     @endif
 </section>
 
-@if($puedeProducir)
-    <template id="plantilla-material">@include('negocio._material_fila', ['i' => 0, 'articuloId' => 0, 'cantidad' => ''])</template>
-@endif
-
 {{-- Para nuevas filas de las listas «uno por uno». --}}
 <template id="plantilla-lista-item">
     <li class="lista-item">
@@ -397,13 +269,6 @@
 <script>window.vitrinaEnVivo = {!! json_encode(['clave' => config('broadcasting.connections.reverb.key'), 'puerto' => 8080]) !!};</script>
 <script src="{{ asset('vendor/pusher-8.5.0.min.js') }}"></script>
 <script src="{{ asset('panel-catalogo.js') }}?v={{ filemtime(public_path('panel-catalogo.js')) }}"></script>
-@if($produccionActiva)<script src="{{ asset('panel-produccion.js') }}?v={{ filemtime(public_path('panel-produccion.js')) }}"></script>@endif
-@if($conEspera)<script src="{{ asset('panel-inventario.js') }}?v={{ filemtime(public_path('panel-inventario.js')) }}"></script>@endif
-@if($errors->any() && old('_espera'))<script>window.panelCatalogo && window.panelCatalogo.abrir('espera-{{ (int) old('_espera') }}');</script>@endif
-@php $abrirMateriales = session('abrir') ?? (old('_materiales') ? 'producto-'.(int) old('_materiales') : (old('_hecho') ? 'producto-'.(int) old('_hecho') : null)); @endphp
-@if($abrirMateriales)
-    <script>window.panelCatalogo && window.panelCatalogo.abrir(@json($abrirMateriales));</script>
-@endif
 @if($errors->any() && old('_producto'))
     {{-- Volvió con errores: reabrir el formulario de ese producto. --}}
     <script>window.panelCatalogo && window.panelCatalogo.abrir('producto-{{ preg_replace('/[^0-9a-z]/', '', old('_producto')) }}', true);</script>

@@ -3,14 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Gestion\Gestion;
-use App\Gestion\Materiales;
+use App\Gestion\Modelos;
 use App\Http\Resources\NegocioResource;
 use App\Models\Barrio;
-use App\Rules\Direccion;
 use App\Models\Negocio;
 use App\Models\Pedido;
 use App\Models\TipoNegocio;
 use App\Models\User;
+use App\Rules\Direccion;
+use App\Rules\Telefono;
 use App\Support\EliminarNegocio;
 use App\Support\FotoOptimizada;
 use App\Support\HorarioNegocio;
@@ -96,9 +97,9 @@ class NegocioController extends Controller
             'categoria' => ['required_without:categorias', 'nullable', 'string', 'max:100'],
             'categorias' => ['required_without:categoria', 'array', 'min:1'],
             'categorias.*' => ['required', 'string', 'max:100', 'distinct'],
-            'direccion' => ['required', 'string', 'max:255', new \App\Rules\Direccion],
+            'direccion' => ['required', 'string', 'max:255', new Direccion],
             'barrio' => ['required', 'string', 'max:100', 'regex:'.Direccion::BARRIO],
-            'telefono' => ['nullable', 'string', new \App\Rules\Telefono],
+            'telefono' => ['nullable', 'string', new Telefono],
             'activo' => ['sometimes', 'boolean'],
             // Tiempo promedio que promete para tener listo un pedido (minutos).
             'tiempo_preparacion' => ['sometimes', 'integer', 'min:5', 'max:180'],
@@ -250,9 +251,9 @@ class NegocioController extends Controller
             'categoria' => ['sometimes', 'required_without:categorias', 'nullable', 'string', 'max:100'],
             'categorias' => ['sometimes', 'array', 'min:1'],
             'categorias.*' => ['required', 'string', 'max:100', 'distinct'],
-            'direccion' => ['sometimes', 'required', 'string', 'max:255', new \App\Rules\Direccion],
+            'direccion' => ['sometimes', 'required', 'string', 'max:255', new Direccion],
             'barrio' => ['sometimes', 'required', 'string', 'max:100', 'regex:'.Direccion::BARRIO],
-            'telefono' => ['nullable', 'string', new \App\Rules\Telefono],
+            'telefono' => ['nullable', 'string', new Telefono],
             'activo' => ['sometimes', 'boolean'],
             // Tiempo promedio que promete para tener listo un pedido (minutos).
             'tiempo_preparacion' => ['sometimes', 'integer', 'min:5', 'max:180'],
@@ -382,10 +383,10 @@ class NegocioController extends Controller
         ];
     }
 
-    /** ¿Ve «Producción» en la app? (módulo encendido y permiso produccion.gestionar) */
+    /** ¿Ve «Producción» en la app? (Materiales y producción encendido y permiso produccion.gestionar) */
     private static function puedeProducir(Negocio $negocio, User $user): bool
     {
-        return Materiales::activo($negocio) && Gestion::puede($user, $negocio, 'produccion.gestionar');
+        return Modelos::activo($negocio) && Gestion::puede($user, $negocio, 'produccion.gestionar');
     }
 
     private function sinAcceso(string $mensaje = 'No tienes acceso a este negocio.'): JsonResponse

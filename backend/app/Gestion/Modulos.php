@@ -131,22 +131,18 @@ final class Modulos
                 'en_app' => [],
                 'estado' => 'disponible',
             ],
+            // La clave sigue siendo «inventario»; en la web se llama Materiales y producción.
             'inventario' => [
-                'grupo' => 'operacion', 'nombre' => 'Inventario',
-                'descripcion' => 'Materia prima, insumos, productos y herramientas con sus características, existencias, movimientos y alertas.',
+                'grupo' => 'operacion', 'nombre' => 'Materiales y producción',
+                'descripcion' => 'Materiales y herramientas con sus existencias, y la producción por etapas: lo que se hará con sus materiales, y su nombre para que llegue al catálogo.',
                 'depende_de' => [],
-                'permisos' => ['inventario.ver' => 'Ver existencias', 'inventario.editar' => 'Crear artículos y registrar entradas, salidas y ajustes'],
-                'secciones' => ['Artículos con características a la medida', 'Existencias por unidad, peso o medida', 'Entradas, salidas y ajustes', 'Alertas de existencias bajas'],
-                'en_app' => ['Consultar la existencia de un producto', 'Aviso de existencias bajas'],
-                'estado' => 'disponible',
-            ],
-            'produccion' => [
-                'grupo' => 'operacion', 'nombre' => 'Producción y materiales',
-                'descripcion' => 'Lo que gasta cada producto del catálogo; los materiales e insumos se descuentan del inventario al hacerlo o con cada pedido.',
-                'depende_de' => ['inventario'],
-                'permisos' => ['produccion.gestionar' => 'Definir los materiales de cada producto y registrar lo que se hizo'],
-                'secciones' => ['Lo que gasta cada producto', 'Registrar lo que se hizo', 'Descuento con cada pedido', 'Cuántos alcanzan con lo que hay', 'Historial de producción'],
-                'en_app' => ['Registrar que se hizo un producto'],
+                'permisos' => [
+                    'inventario.ver' => 'Ver materiales y herramientas',
+                    'inventario.editar' => 'Crear materiales y herramientas y registrar entradas, salidas y ajustes',
+                    'produccion.gestionar' => 'Registrar lo que se hace, con sus materiales, y definir los modelos',
+                ],
+                'secciones' => ['Materiales', 'Herramientas', 'Producción por etapas', 'Modelos con materiales predeterminados', 'Descuento con cada pedido', 'Alertas de existencias bajas'],
+                'en_app' => ['Empezar una producción y ajustar sus materiales', 'Marcarla terminada'],
                 'estado' => 'disponible',
             ],
             'compras' => [

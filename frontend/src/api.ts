@@ -2397,38 +2397,36 @@ export async function cambiarEstadoTarea(token: string, negocioId: number, id: n
   return (await authSend('PATCH', `/api/negocios/${negocioId}/mis-tareas/${id}`, token, { estado })).tarea;
 }
 
-/** Un producto del catálogo que gasta materiales del inventario (Producción). */
-export type ProduccionProducto = {
+/** Un material del negocio (Materiales y producción) para usar en una producción. */
+export type ProduccionMaterial = {
   id: number;
   nombre: string;
-  imagen: string | null;
-  precio: number;
-  /** Unidades listas para vender; null = el negocio no lleva la cuenta. */
-  existencias: number | null;
-  /** Cuándo se descuentan: al registrar que se hizo o con cada pedido. */
-  modo: 'fabricar' | 'pedido';
-  /** Para cuántos alcanza lo que hay en el inventario. */
-  alcanza: number | null;
-  materiales: {
-    id: number;
-    nombre: string;
-    rasgos: string;
-    por_unidad: number;
-    hay: number;
-    unidad_uno: string;
-    unidad_varios: string;
-  }[];
+  rasgos: string;
+  /** Lo que hay ahora en el inventario. */
+  hay: number;
+  unidad_uno: string;
+  unidad_varios: string;
 };
 
-export type DestinoProduccion = 'catalogo' | 'espera' | 'pedido';
+/** Un material de una producción por hacer: lo que se usa y lo normal del modelo. */
+export type ProduccionLinea = ProduccionMaterial & {
+  cantidad: number;
+  /** Lo predeterminado del modelo para esa cantidad; null si se añadió aparte. */
+  normal: number | null;
+  /** Lo normal de una unidad (para recalcular si cambia cuántas se hacen). */
+  por_unidad: number | null;
+};
+
+export type EstadoProduccion = 'por_hacer' | 'terminada' | 'publicada' | 'encargo' | 'pedido';
 
 export type ProduccionRegistro = {
   id: number;
   nombre: string;
   cantidad: number;
   texto: string;
+  estado: EstadoProduccion;
+  estado_texto: string;
   origen: 'manual' | 'pedido';
-  destino: DestinoProduccion | null;
   quien: string | null;
   nota: string | null;
   anulada: boolean;
@@ -2436,32 +2434,67 @@ export type ProduccionRegistro = {
   fecha: string;
 };
 
-export type ProduccionResumen = {
-  productos: ProduccionProducto[];
-  recientes: ProduccionRegistro[];
-  en_espera: number;
-  destinos: { valor: DestinoProduccion; texto: string; ayuda: string }[];
+/** Etapa 1: se dijo que se hará; sus materiales se ajustan con − y +. */
+export type ProduccionPorHacer = ProduccionRegistro & {
+  modelo: { id: number; nombre: string } | null;
+  materiales: ProduccionLinea[];
 };
 
-/** Lo que se puede registrar como hecho en el negocio y lo último que se hizo. */
+/** Modelo con materiales predeterminados («una reja: 6 varillas y 1 galón de pintura»). */
+export type ModeloProduccion = {
+  id: number;
+  nombre: string;
+  /** Para cuántos alcanza lo que hay; null si no tiene materiales. */
+  alcanza: number | null;
+  /** «6 unidades de Varilla 3/8», … */
+  materiales: string[];
+};
+
+export type ProduccionResumen = {
+  por_hacer: ProduccionPorHacer[];
+  /** Terminadas que esperan su nombre (se les pone en la web). */
+  para_nombrar: number;
+  recientes: ProduccionRegistro[];
+  modelos: ModeloProduccion[];
+  materiales: ProduccionMaterial[];
+};
+
+/** Lo que está por hacer, los modelos para empezar otra y lo último que se terminó. */
 export async function getProduccion(token: string, negocioId: number): Promise<ProduccionResumen> {
   return await authGet(`/api/negocios/${negocioId}/produccion`, token);
 }
 
-/**
- * «Registrar como hecho»: descuenta los materiales. Si falta material lanza
- * ApiError 422 con `data.faltantes` ([{nombre, falta}]); con `aunqueFalte`
- * descuenta lo que haya.
- */
-export async function registrarHecho(
+/** «Se hará»: de un modelo (sus materiales salen ya puestos) o sin modelo, con su nombre. */
+export async function crearProduccion(
   token: string,
   negocioId: number,
-  productoId: number,
-  datos: { cantidad: string; nota?: string; destino: DestinoProduccion; aunqueFalte?: boolean },
-): Promise<{ message: string; produccion: ProduccionRegistro; producto: ProduccionProducto }> {
-  return await authSend('POST', `/api/negocios/${negocioId}/produccion/${productoId}/hecho`, token, {
-    cantidad: datos.cantidad, nota: datos.nota || null, destino: datos.destino, aunque_falte: !!datos.aunqueFalte,
+  datos: { modeloId?: number; nombre?: string; cantidad?: number },
+): Promise<{ message: string; produccion: ProduccionPorHacer }> {
+  return await authSend('POST', `/api/negocios/${negocioId}/produccion`, token, {
+    modelo_id: datos.modeloId ?? null, nombre: datos.nombre || null, cantidad: datos.cantidad ?? 1,
   });
+}
+
+/**
+ * Guarda cuántas se hacen y sus materiales. Con `terminar` además los
+ * descuenta del inventario; si falta material lanza ApiError 422 con
+ * `data.faltantes` ([{nombre, falta}]) y con `aunqueFalte` descuenta lo que haya.
+ */
+export async function guardarProduccion(
+  token: string,
+  negocioId: number,
+  id: number,
+  datos: { cantidad: number; nota?: string; materiales: { articulo_id: number; cantidad: number }[]; terminar?: boolean; aunqueFalte?: boolean },
+): Promise<{ message: string; produccion: ProduccionRegistro | ProduccionPorHacer }> {
+  return await authSend('PUT', `/api/negocios/${negocioId}/produccion/${id}`, token, {
+    cantidad: datos.cantidad, nota: datos.nota || null, materiales: datos.materiales,
+    terminar: !!datos.terminar, aunque_falte: !!datos.aunqueFalte,
+  });
+}
+
+/** Cancela una producción por hacer (todavía no se había descontado nada). */
+export async function cancelarProduccion(token: string, negocioId: number, id: number): Promise<{ message: string }> {
+  return await authSend('DELETE', `/api/negocios/${negocioId}/produccion/${id}`, token);
 }
 
 export async function getServicios(token: string, negocioId: number): Promise<Servicio[]> {

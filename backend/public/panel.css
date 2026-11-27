@@ -523,8 +523,6 @@ button.trabajador:focus-visible{outline:2px solid var(--accent);outline-offset:2
 .indicador-enlace{color:var(--gold);font-weight:600;text-decoration:none}
 .indicador-enlace:hover{text-decoration:underline}
 .indicador-nota{color:var(--muted)}
-.inventario-tipos{flex-wrap:wrap}
-.inventario-tipos a.pestana{text-decoration:none;font-size:15px}
 .inventario-vacio{display:flex;flex-direction:column;align-items:center;gap:10px;max-width:560px;margin:0 auto;padding:40px 0;text-align:center}
 .inventario-vacio-titulo{font:700 18px SitioSora,system-ui,sans-serif;color:var(--strong)}
 .chip-aviso{background:#FCE7CF;color:#9A4D06}
@@ -641,22 +639,12 @@ button.trabajador:focus-visible{outline:2px solid var(--accent);outline-offset:2
     .articulo-movimientos{padding:14px 16px}
     .mov-saldo{display:none}
     .inventario-barra{flex-direction:column;align-items:stretch}
-    .inventario-tipos{flex-wrap:nowrap;max-width:100%;overflow-x:auto;scrollbar-width:none}
-    .inventario-tipos a.pestana{flex-shrink:0;white-space:nowrap;font-size:14px;padding:8px 12px}
 }
 @media (max-width:420px){.articulos{grid-template-columns:1fr}.articulo-foto{aspect-ratio:12/5}.inventario-indicadores .indicador{padding:16px}.inventario-indicadores .indicador strong{font-size:26px}.indicador-dinero{font-size:19px!important}}
 
 /* Producción y materiales: lo que gasta cada producto, registrar como hecho, historial */
 .chip-enlace{text-decoration:none;color:var(--strong)}
 .chip-enlace:hover{background:var(--accent-soft);color:var(--gold)}
-.materiales-producto{margin-top:18px;padding:18px 20px;border:1px solid var(--line);border-radius:18px;background:var(--surface)}
-.materiales-producto h3{margin:0;font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--gold)}
-.materiales-producto h3 .ayuda{letter-spacing:0;text-transform:none}
-.materiales-producto [hidden]{display:none!important}
-.materiales-form{display:none;flex-direction:column;gap:12px}
-.materiales-producto.editando-materiales .materiales-vista,.materiales-producto.editando-materiales [data-materiales-editar]{display:none}
-.materiales-producto.editando-materiales .materiales-form{display:flex}
-.materiales-form .aviso{margin:0}
 .materiales-lista li{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:6px 12px;padding:10px 0;border-top:1px solid var(--line)}
 .materiales-lista li:first-child{border-top:0;padding-top:0}
 .material-nombre{display:flex;flex-direction:column;min-width:0}
@@ -665,19 +653,8 @@ button.trabajador:focus-visible{outline:2px solid var(--accent);outline-offset:2
 .material-gasta{font:700 15px SitioSora,system-ui,sans-serif;color:var(--strong);white-space:nowrap;font-variant-numeric:tabular-nums}
 .materiales-resumen{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;padding-top:12px;border-top:1px dashed var(--input-line)}
 .materiales-resumen .chip{white-space:normal}
-.producir-form{display:flex;flex-direction:column;gap:10px;margin-top:16px;padding:14px 16px;border-radius:14px;background:var(--bg)}
-.producir-form h4{margin:0;font:700 15px SitioSora,system-ui,sans-serif;color:var(--strong)}
-.producir-form .ayuda{margin:0}
-.producir-form .boton{align-self:flex-start}
 .producir-campos{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:12px}
 .producir-vista:empty{display:none}
-.producir-titulo{margin:0 0 4px;font-size:12px;font-weight:600;color:var(--muted)}
-.producir-vista li{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px;padding:4px 0;font-size:13px;color:var(--text)}
-.producir-vista li span{flex:1;min-width:0}
-.producir-vista li strong{color:var(--strong);font-variant-numeric:tabular-nums}
-.producir-vista li.corto,.producir-vista li.corto strong{color:#B23A17}
-:root[data-mode="noche"] .producir-vista li.corto,:root[data-mode="noche"] .producir-vista li.corto strong{color:#FF9C7E}
-.producir-vista li small{width:100%;text-align:right;font-size:12px}
 .materiales-filas{display:flex;flex-direction:column;gap:8px}
 .material-fila{display:grid;grid-template-columns:minmax(0,1fr) 170px 30px;align-items:center;gap:8px}
 .material-fila select{min-height:42px;padding:8px 10px;border-radius:11px;border:1px solid var(--input-line);background:var(--surface);color:var(--strong);font:14px SitioInter,system-ui,sans-serif;min-width:0}
@@ -687,12 +664,6 @@ button.trabajador:focus-visible{outline:2px solid var(--accent);outline-offset:2
 .materiales-agregar{align-self:flex-start}
 .materiales-modo{margin:4px 0 0;padding:0;border:0;min-width:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .materiales-modo legend{grid-column:1/-1;padding:0;margin-bottom:8px;font-size:13px;font-weight:600;color:var(--strong)}
-.produccion-modo{font-size:12px;color:var(--muted);line-height:1.35}
-.produccion-ficha{display:flex;align-items:center;gap:16px}
-.produccion-ficha h2{margin:0 0 4px;font-size:24px}
-.produccion-ficha-foto{display:grid;place-items:center;flex-shrink:0;width:72px;height:72px;overflow:hidden;border-radius:18px;background:var(--surface2)}
-.produccion-ficha-foto img{width:100%;height:100%;object-fit:cover}
-.produccion-ficha-foto .producto-sin-foto{font-size:28px}
 .producciones li.produccion{display:flex;align-items:flex-start;gap:12px;padding:14px 0;border-top:1px solid var(--line)}
 .producciones li.produccion:first-child{border-top:0;padding-top:0}
 .produccion.anulada{opacity:.6}
@@ -714,14 +685,12 @@ button.trabajador:focus-visible{outline:2px solid var(--accent);outline-offset:2
     .material-fila .campo-unidad{grid-column:1}
     .materiales-lista li{grid-template-columns:minmax(0,1fr) auto}
     .material-hay{grid-column:1/-1;justify-self:start}
-    .materiales-producto{padding:14px 16px}
 }
 
 .producto-stock{display:inline-flex;align-self:flex-start;padding:2px 9px;border-radius:999px;background:var(--accent-soft);color:var(--gold);font-size:12px;font-weight:600}
 .producto-stock.sin-stock{background:var(--surface2);color:var(--muted)}
 .pestana .cuenta-aviso{background:#FCE7CF;color:#9A4D06}
 :root[data-mode="noche"] .pestana .cuenta-aviso{background:#4A3420;color:#FFC58A}
-.catalogo-espera .bloque-texto{margin:0 0 18px}
 .producir-destino{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0;padding:0;border:0;min-width:0}
 .producir-destino legend{grid-column:1/-1;padding:0;margin-bottom:8px;font-size:13px;font-weight:600;color:var(--strong)}
 .articulo-form .producir-destino{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -771,3 +740,61 @@ button.trabajador:focus-visible{outline:2px solid var(--accent);outline-offset:2
     .encabezado-acciones,.encabezado-acciones .boton{width:100%}
 }
 @media (max-width:420px){.productos{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.producto-cuerpo{padding:10px 12px 12px}.producto-nombre{font-size:15px}.producto-precio{font-size:16px}.indicadores{gap:10px}.indicador{padding:16px}.indicador::after{width:60px;height:60px;right:-22px;top:-22px}.indicador strong{font-size:28px}}
+
+/* Materiales y producción: pestañas del módulo, etapas y modelos */
+.modulo-pestanas{display:flex;flex-wrap:wrap;width:max-content;max-width:100%;margin:0 0 20px}
+.modulo-pestanas a.pestana{text-decoration:none;font-size:15px}
+.etapa-grupo + .etapa-grupo{margin-top:30px}
+.etapa-grupo > .apagado{margin:4px 0 14px;font-size:14px}
+.etapa-grupo-titulo{display:flex;align-items:center;gap:10px;margin:0;font:700 18px SitioSora,system-ui,sans-serif;color:var(--strong)}
+.etapa-numero{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--accent-soft);color:var(--gold);font-size:14px}
+.etapas-pasos{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;list-style:none;counter-reset:paso}
+.etapas-pasos li{counter-increment:paso;display:inline-flex;align-items:center;gap:6px;padding:4px 10px 4px 4px;border-radius:999px;background:var(--surface2);color:var(--muted);font-size:12px;font-weight:600}
+.etapas-pasos li::before{content:counter(paso);display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--surface);font-size:11px}
+.etapas-pasos li.actual{background:var(--accent-soft);color:var(--gold)}
+.etapas-pasos li.actual::before{background:var(--accent);color:#fff}
+.etapas-pasos li.hecho::before{content:"✓"}
+.etapa-form{display:flex;flex-direction:column;gap:12px;margin-top:16px}
+.etapa-form .aviso,.etapa-form > .ayuda{margin:0}
+.etapa-form [hidden]{display:none!important}
+.etapa-subtitulo{margin:10px 0 0;font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--gold)}
+.etapa-materiales{display:flex;flex-direction:column;margin:0;padding:0;list-style:none}
+.etapa-material{display:grid;grid-template-columns:minmax(0,1fr) 216px 132px 30px;align-items:center;gap:6px 12px;padding:10px 0;border-top:1px solid var(--line)}
+.etapa-material:first-child{border-top:0}
+.etapa-material .material-nombre{display:flex;flex-direction:column;gap:2px;min-width:0}
+.etapa-material .material-nombre strong{color:var(--strong)}
+.etapa-material .material-nombre small{font-size:12px;color:var(--muted)}
+.etapa-material.corto .material-nombre strong{color:#B23A17}
+:root[data-mode="noche"] .etapa-material.corto .material-nombre strong{color:#FF9C7E}
+.etapa-material .material-hay{justify-self:start}
+.etapa-materiales:not(:has(.lista-item-quitar)) .etapa-material{grid-template-columns:minmax(0,1fr) auto 132px}
+.etapa-ajuste{display:inline-flex;align-items:center;gap:4px}
+.etapa-ajuste input{width:68px;min-height:36px;padding:6px 8px;border-radius:10px;border:1px solid var(--input-line);background:var(--surface);color:var(--strong);font:600 15px SitioInter,system-ui,sans-serif;text-align:center;font-variant-numeric:tabular-nums}
+.etapa-ajuste input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+.etapa-boton{display:grid;place-items:center;width:36px;height:36px;border:1px solid var(--input-line);border-radius:10px;background:var(--surface);color:var(--strong);font:700 18px system-ui,sans-serif;cursor:pointer;transition:border-color .15s,color .15s}
+.etapa-boton:hover{border-color:var(--accent);color:var(--gold)}
+.etapa-boton:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.etapa-unidad{min-width:58px;font-size:13px;color:var(--muted)}
+.etapa-anadir{display:flex;flex-wrap:wrap;gap:8px}
+.etapa-anadir select{flex:1;min-width:220px;min-height:42px;padding:8px 10px;border-radius:11px;border:1px solid var(--input-line);background:var(--surface);color:var(--strong);font:14px SitioInter,system-ui,sans-serif}
+.etapa-anadir select:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+.etapa-acciones{display:flex;flex-wrap:wrap;gap:8px}
+.etapa-otras{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:18px;padding-top:14px;border-top:1px dashed var(--input-line)}
+.etapa-sumar{grid-column:1/-1}
+.nueva-modelos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0;padding:0;border:0;min-width:0}
+.nueva-modelos legend{grid-column:1/-1;padding:0;margin-bottom:8px;font-size:13px;font-weight:600;color:var(--strong)}
+.nueva-modelos > .apagado{grid-column:1/-1;margin:0}
+.modelo-productos{display:flex;flex-direction:column;gap:4px;max-height:200px;overflow:auto;margin:8px 0 0;padding:10px 12px;border:1px solid var(--input-line);border-radius:12px;list-style:none}
+.modelo-productos li[hidden]{display:none}
+.campo-panel .modelo-productos-buscar{min-height:40px;font-size:14px}
+.materiales-form-modelo{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+@media (max-width:640px){
+    .etapa-material{grid-template-columns:minmax(0,1fr) 30px}
+    .etapa-materiales:not(:has(.lista-item-quitar)) .etapa-material{grid-template-columns:minmax(0,1fr)}
+    .etapa-ajuste{grid-column:1}
+    .etapa-material .material-hay{grid-column:1/-1;justify-self:start}
+    .etapa-material .lista-item-quitar{grid-column:2;grid-row:1}
+    .nueva-modelos{grid-template-columns:minmax(0,1fr)}
+    .modulo-pestanas{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;width:auto}
+    .modulo-pestanas a.pestana{flex-shrink:0;white-space:nowrap;font-size:14px;padding:8px 12px}
+}
