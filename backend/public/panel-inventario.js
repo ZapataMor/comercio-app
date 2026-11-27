@@ -102,6 +102,50 @@
         if (e.target.matches('[data-movimiento] input[name=tipo]')) ajustarMovimiento(e.target.closest('form'));
     });
 
+    // ------------------------------------------------ «−» en la tarjeta: se usó uno
+    const csrf = () => (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+    const usar = async (boton) => {
+        const tarjeta = boton.closest('[data-articulo]');
+        boton.disabled = true;
+        try {
+            const datos = new FormData();
+            datos.append('tipo', 'salida');
+            datos.append('cantidad', '1');
+            datos.append('nota', 'Se usó (desde la tarjeta)');
+            const r = await fetch(boton.dataset.usar, {
+                method: 'POST', body: datos, credentials: 'same-origin',
+                headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf(), 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            const json = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(json.message || 'No se pudo descontar.');
+            tarjeta.querySelector('[data-cantidad]').textContent = json.numero;
+            tarjeta.querySelector('[data-unidad]').textContent = json.unidad;
+            tarjeta.classList.remove('articulo-ok', 'articulo-bajo', 'articulo-agotado');
+            tarjeta.classList.add('articulo-' + json.estado);
+            const chip = tarjeta.querySelector('[data-estado]');
+            chip.hidden = json.estado === 'ok';
+            chip.textContent = json.estado_texto;
+            chip.classList.toggle('chip-peligro', json.estado === 'agotado');
+            chip.classList.toggle('chip-aviso', json.estado === 'bajo');
+            const modal = document.querySelector('[data-existencia-modal="' + tarjeta.dataset.articulo + '"]');
+            if (modal) {
+                modal.querySelector('strong').textContent = json.numero;
+                modal.querySelector('span').textContent = json.unidad;
+            }
+            boton.disabled = json.cantidad < 1;
+            tarjeta.classList.remove('recien-usado');
+            void tarjeta.offsetWidth; // reinicia la animación
+            tarjeta.classList.add('recien-usado');
+        } catch (err) {
+            boton.disabled = false;
+            alert(err.message || 'No se pudo descontar. Revisa tu conexión.');
+        }
+    };
+    document.addEventListener('click', (e) => {
+        const boton = e.target.closest('[data-usar]');
+        if (boton) usar(boton);
+    });
+
     document.querySelectorAll('[data-unidad]').forEach(ajustarUnidad);
     document.querySelectorAll('[data-movimiento]').forEach(ajustarMovimiento);
     document.querySelectorAll('[data-car-nombre]').forEach(sugerirValores);

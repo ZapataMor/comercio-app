@@ -146,7 +146,7 @@ function TarjetaProducto({ producto: p, onPress }: { producto: ProduccionProduct
             {noAlcanza ? 'No alcanza el material' : `Alcanza para ${numero(p.alcanza ?? 0)}`}
           </Text>
           {p.existencias !== null && <Text style={[styles.chip, styles.chipAcento]}>{numero(p.existencias)} en stock</Text>}
-          {p.modo === 'pedido' && <Text style={styles.chip}>Con cada pedido</Text>}
+          {p.modo === 'pedido' && <Text style={styles.chip}>Se descuenta con cada pedido</Text>}
         </View>
         <Text style={styles.materiales} numberOfLines={1}>
           {p.materiales.length} {p.materiales.length === 1 ? 'material' : 'materiales'}: {p.materiales.map(m => m.nombre).join(', ')}

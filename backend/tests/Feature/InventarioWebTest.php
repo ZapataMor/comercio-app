@@ -199,3 +199,17 @@ test('el comando de prueba carga el inventario de una latonería y se puede repe
     expect($this->negocio->articulosInventario()->count())->toBe(0);
     expect($this->negocio->productos()->withTrashed()->count())->toBe(0)->and($this->negocio->producciones()->count())->toBe(0);
 });
+
+test('el «−» de la tarjeta descuenta uno sin recargar y no deja la existencia en negativo', function () {
+    entrarAlPanelInventario($this, $this->dueno);
+    $a = articuloDePrueba($this->negocio, ['minimo' => 1]);
+    Inventario::mover($a, 'entrada', 2);
+    $this->get('/negocio/inventario')->assertSee('data-usar=', false)->assertDontSee('Calibre</small>', false);
+
+    $url = "/negocio/inventario/{$a->id}/movimientos";
+    $this->postJson($url, ['tipo' => 'salida', 'cantidad' => 1, 'nota' => 'Se usó (desde la tarjeta)'])->assertOk()
+        ->assertJsonPath('numero', '1')->assertJsonPath('unidad', 'unidad')->assertJsonPath('estado', 'bajo');
+    $this->postJson($url, ['tipo' => 'salida', 'cantidad' => 1])->assertOk()->assertJsonPath('estado', 'agotado');
+    $this->postJson($url, ['tipo' => 'salida', 'cantidad' => 1])->assertStatus(422);
+    expect($a->fresh()->cantidad)->toBe(0.0)->and($a->movimientos()->where('tipo', 'salida')->count())->toBe(2);
+});

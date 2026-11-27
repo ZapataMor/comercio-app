@@ -9,11 +9,13 @@ use App\Models\InventarioArticulo;
 use App\Models\InventarioMovimiento;
 use App\Models\Negocio;
 use App\Support\FotoOptimizada;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -168,7 +170,7 @@ class InventarioController extends Controller
         return redirect()->to(url()->previous())->with('ok', 'Se guardó «'.$modelo->nombre.'».');
     }
 
-    public function mover(Request $request, int $articulo): RedirectResponse
+    public function mover(Request $request, int $articulo): RedirectResponse|JsonResponse
     {
         $negocio = $this->negocio($request);
         $this->verModulo($request);
@@ -185,7 +187,26 @@ class InventarioController extends Controller
             'cantidad.numeric' => 'La cantidad debe ser un número, por ejemplo 12 o 2,5.',
         ], ['tipo' => 'movimiento', 'cantidad' => 'cantidad', 'nota' => 'nota']);
 
-        $movimiento = Inventario::mover($modelo, $datos['tipo'], (float) $datos['cantidad'], $request->user(), $datos['nota'] ?? null);
+        try {
+            $movimiento = Inventario::mover($modelo, $datos['tipo'], (float) $datos['cantidad'], $request->user(), $datos['nota'] ?? null);
+        } catch (ValidationException $e) {
+            // El «−» de la tarjeta espera JSON, no volver a la página.
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $e->validator->errors()->first(), 'errors' => $e->errors()], 422);
+            }
+            throw $e;
+        }
+        // El «−» de la tarjeta: responde sin recargar la página.
+        if ($request->expectsJson()) {
+            return response()->json([
+                'cantidad' => $modelo->cantidad,
+                'numero' => InventarioArticulo::numero($modelo->cantidad),
+                'unidad' => InventarioArticulo::nombreUnidad($modelo->unidad, $modelo->cantidad),
+                'estado' => $modelo->estado(),
+                'estado_texto' => $modelo->estadoTexto(),
+                'mensaje' => 'Se descontó '.$modelo->cantidadTexto($movimiento->cantidad).' de «'.$modelo->nombre.'». Quedan '.$modelo->cantidadTexto().'.',
+            ]);
+        }
         $hecho = match ($movimiento->tipo) {
             'entrada' => 'Entraron '.$modelo->cantidadTexto($movimiento->cantidad),
             'salida' => 'Salieron '.$modelo->cantidadTexto($movimiento->cantidad),

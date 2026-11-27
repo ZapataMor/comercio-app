@@ -58,12 +58,12 @@
                         <button type="button" class="articulo-abrir" data-abrir="producto-{{ $p->id }}" aria-haspopup="dialog">
                             <span @class(['articulo-foto', 'sin-foto' => ! $foto, 'tipo-producto'])>
                                 @if($foto)<img src="{{ $foto }}" alt="{{ $p->nombre }}" loading="lazy">@else<span class="articulo-inicial" aria-hidden="true">{{ mb_strtoupper(mb_substr($p->nombre, 0, 1)) }}</span>@endif
-                                <span class="chip articulo-tipo">{{ $p->materiales_al === 'pedido' ? 'Con cada pedido' : 'Al registrar' }}</span>
                                 <span @class(['chip', 'articulo-estado', 'chip-exito' => $alcanza > 0, 'chip-peligro' => $alcanza === 0])>{{ $alcanza === 0 ? 'No alcanza' : 'Alcanza para '.number_format($alcanza, 0, ',', '.') }}</span>
                             </span>
                             <span class="articulo-cuerpo">
                                 <span class="producto-categoria">{{ $p->categoria?->nombre ?? 'Sin sección' }}</span>
                                 <span class="articulo-nombre">{{ $p->nombre }}</span>
+                                <span class="produccion-modo" title="Cuándo se descuentan sus materiales del inventario">{{ $p->materiales_al === 'pedido' ? 'Los materiales se descuentan con cada pedido' : 'Los materiales se descuentan al registrarlo como hecho' }}</span>
                                 <span class="articulo-rasgos">
                                     @foreach($p->materiales->take(4) as $m)<span class="rasgo"><small>{{ $m->cantidadTexto((float) $m->pivot->cantidad) }}</small> {{ $m->nombre }}</span>@endforeach
                                     @if($p->materiales->count() > 4)<span class="rasgo rasgo-mas">+{{ $p->materiales->count() - 4 }}</span>@endif

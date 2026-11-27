@@ -81,12 +81,9 @@
             @foreach($articulos as $a)
                 @php
                     $foto = \App\Support\EditorProducto::urlImagen($a->imagen);
-                    $rasgos = $a->listaCaracteristicas();
                     $estadoA = $a->estado();
-                    // Nivel frente al mínimo: lleno cuando hay el triple del mínimo.
-                    $nivel = $a->minimo ? max(0, min(100, (int) round($a->cantidad / ($a->minimo * 3) * 100))) : null;
                 @endphp
-                <li @class(['articulo', 'articulo-'.$estadoA])>
+                <li @class(['articulo', 'articulo-'.$estadoA]) data-articulo="{{ $a->id }}">
                     <button type="button" class="articulo-abrir" data-abrir="articulo-{{ $a->id }}" aria-haspopup="dialog">
                         <span @class(['articulo-foto', 'sin-foto' => ! $foto, 'tipo-'.$a->tipo])>
                             @if($foto)
@@ -95,27 +92,27 @@
                                 <span class="articulo-inicial" aria-hidden="true">{{ mb_strtoupper(mb_substr($a->nombre, 0, 1)) }}</span>
                             @endif
                             <span class="chip articulo-tipo">{{ $a->tipoTexto() }}</span>
-                            @if($estadoA !== 'ok')<span @class(['chip', 'articulo-estado', 'chip-peligro' => $estadoA === 'agotado', 'chip-aviso' => $estadoA === 'bajo'])>{{ $a->estadoTexto() }}</span>@endif
+                            {{-- Siempre montado: el «−» lo muestra u oculta sin recargar. --}}
+                            <span @class(['chip', 'articulo-estado', 'chip-peligro' => $estadoA === 'agotado', 'chip-aviso' => $estadoA === 'bajo']) data-estado @if($estadoA === 'ok') hidden @endif>{{ $a->estadoTexto() }}</span>
                         </span>
                         <span class="articulo-cuerpo">
                             <span class="producto-categoria">{{ $a->categoria ?? 'Sin categoría' }}@if($a->referencia)<span class="articulo-ref"> · {{ $a->referencia }}</span>@endif</span>
                             <span class="articulo-nombre">{{ $a->nombre }}</span>
-                            @if($rasgos)
-                                <span class="articulo-rasgos">
-                                    @foreach(array_slice($rasgos, 0, 4) as $r)<span class="rasgo"><small>{{ $r['nombre'] }}</small> {{ $r['valor'] }}</span>@endforeach
-                                    @if(count($rasgos) > 4)<span class="rasgo rasgo-mas">+{{ count($rasgos) - 4 }}</span>@endif
-                                </span>
-                            @endif
-                            <span class="articulo-existencia">
-                                <strong>{{ InventarioArticulo::numero($a->cantidad) }}</strong>
-                                <span>{{ InventarioArticulo::nombreUnidad($a->unidad, $a->cantidad) }}</span>
-                                @if($sedes->count() > 1 && $a->sede)<span class="articulo-sede">{{ $a->sede->nombre }}</span>@endif
-                            </span>
-                            @if($nivel !== null)
-                                <span class="articulo-nivel" role="img" aria-label="Mínimo: {{ $a->cantidadTexto($a->minimo) }}"><span style="width: {{ $nivel }}%"></span></span>
-                            @endif
                         </span>
                     </button>
+                    {{-- Fuera del botón de la tarjeta: el «−» no abre el modal. --}}
+                    <div class="articulo-pie">
+                        <span class="articulo-existencia">
+                            <strong data-cantidad>{{ InventarioArticulo::numero($a->cantidad) }}</strong>
+                            <span data-unidad>{{ InventarioArticulo::nombreUnidad($a->unidad, $a->cantidad) }}</span>
+                            @if($sedes->count() > 1 && $a->sede)<span class="articulo-sede">{{ $a->sede->nombre }}</span>@endif
+                        </span>
+                        @if($puedeEditar)
+                            <button type="button" class="articulo-usar" data-usar="{{ route('negocio.inventario.mover', $a->id) }}"
+                                    aria-label="Se usó 1 {{ InventarioArticulo::nombreUnidad($a->unidad, 1) }} de {{ $a->nombre }}"
+                                    title="Se usó 1 {{ InventarioArticulo::nombreUnidad($a->unidad, 1) }}" @disabled($a->cantidad < 1)>−</button>
+                        @endif
+                    </div>
                 </li>
             @endforeach
         </ul>
@@ -144,7 +141,7 @@
                 </div>
                 <div class="detalle-principal">
                     <h2 id="articulo-{{ $a->id }}-titulo">{{ $a->nombre }}</h2>
-                    <p class="articulo-existencia-grande"><strong>{{ InventarioArticulo::numero($a->cantidad) }}</strong> {{ InventarioArticulo::nombreUnidad($a->unidad, $a->cantidad) }}</p>
+                    <p class="articulo-existencia-grande" data-existencia-modal="{{ $a->id }}"><strong>{{ InventarioArticulo::numero($a->cantidad) }}</strong> <span>{{ InventarioArticulo::nombreUnidad($a->unidad, $a->cantidad) }}</span></p>
                     <div class="detalle-chips">
                         <span @class(['chip', 'chip-exito' => $estadoA === 'ok', 'chip-aviso' => $estadoA === 'bajo', 'chip-peligro' => $estadoA === 'agotado'])>{{ $a->estadoTexto() }}</span>
                         <span class="chip">{{ $a->tipoTexto() }}</span>
